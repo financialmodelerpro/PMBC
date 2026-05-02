@@ -34,7 +34,8 @@ PMBC is the parent entity. Financial Modeler Pro is its flagship platform. The w
 | Phase 1 — Scaffold + DB | ✅ Complete (2026-04-30) | Next.js 15 + Supabase migrations 001-008 applied. |
 | Phase 2 — Auth + Admin Shell | ✅ Complete (2026-05-02) | NextAuth credentials provider, middleware, login page, admin layout + sidebar, empty dashboard. Login verified end-to-end. |
 | Phase 3 — CMS Foundations | ✅ Complete (2026-05-02) | Six admin editors (branding, content, header settings, site settings, email branding, email templates), six API routes (all session-gated, all audit-logged). |
-| Phase 4 — Page Builder | ⬜ Next | `/admin/pages`, `/admin/page-builder/[slug]`, drag-and-drop section reorder, first four section editors. |
+| Phase 4 — Page Builder | ✅ Complete (2026-05-02) | `/admin/pages`, three-pane `/admin/page-builder/[slug]` with dnd reorder + visibility + delete, four section editors (hero, paragraphs, stats_block, service_cards), public `/[slug]` route + home wired up. |
+| Phase 5 — Public Pages (core) | ⬜ Next | Root layout with CMS-driven Navbar + Footer, contact form + API route + email templates wired up. |
 
 **Working admin login (local dev):** `meetahmadch@gmail.com` / `Admin@2026`. This is a debug-only password — must be rotated to a strong production credential before launch. Use `npm run seed-admin` (after editing `ADMIN_PASSWORD` in `scripts/seed-admin.mjs`) to rotate.
 
@@ -838,7 +839,7 @@ Follow this order. Don't skip ahead. Each phase is testable on its own.
 3. Site settings at `/admin/settings`
 4. Email branding and templates admin
 
-### Phase 4: Page Builder (Day 3-5)
+### Phase 4: Page Builder (Day 3-5) — ✅ Complete (2026-05-02)
 1. `/admin/pages` listing
 2. `/admin/page-builder/[slug]` three-pane layout
 3. Section editors for: hero, paragraphs, stats_block, service_cards (start with these four)
@@ -1033,4 +1034,40 @@ End of technical handoff. Read this in full before starting any new task. Update
 4. Drag-and-drop section reorder (already have `@dnd-kit` installed).
 5. Visibility toggle and per-section save.
 6. Still pending: rotate `Admin@2026` to a strong production password before any deploy.
+
+### 2026-05-02 (evening) — Phase 4: Page Builder
+
+**Built**
+- `src/lib/cms/sectionTypes.ts` — registry of all 13 section types: `label`, `description`, `implemented` flag (true for hero/paragraphs/stats_block/service_cards, false for the other 9), and `defaultContent` blob used by `/create`.
+- `src/lib/cms/pages.ts` — `fetchPages()`, `fetchPage(slug)`, `fetchPageSections(slug, { onlyVisible })`.
+- `src/lib/cms/serializers.ts` — `LocalSection` type + `sectionFromRow(row)`. **Server-safe** module so both `page.tsx` (server) and `PageBuilder.tsx` (client) can import.
+- API routes (all session-gated, zod-validated, audit-logged):
+  - `POST /api/admin/page-sections` — batch upsert; bumps `cms_pages.updated_at`.
+  - `POST /api/admin/page-sections/create` — inserts empty section of given type at `max(display_order) + 10`.
+  - `DELETE /api/admin/page-sections/[id]` — deletes one section.
+- Public renderer at `src/components/public/SectionRenderer.tsx` + four section components (`Hero`, `Paragraphs`, `StatsBlock`, `ServiceCards`) + dashed `Placeholder` for the 9 not-yet-implemented types.
+- Public route `src/app/(public)/[slug]/page.tsx` — fetches page + sections, supports `?preview=1` (shows hidden sections + draft pages).
+- `src/app/page.tsx` updated so the home (`/`) renders sections for slug `home`, with placeholder fallback if none exist. Same `?preview=1` semantics as the catch-all route.
+- `src/app/admin/pages/page.tsx` — table of every `cms_pages` row with section count + status badge + "Builder" link.
+- Section editors at `src/components/admin/editors/{HeroEditor,ParagraphsEditor,StatsBlockEditor,ServiceCardsEditor}.tsx` plus shared `types.ts`.
+- Three-pane `src/app/admin/page-builder/[slug]/{page,PageBuilder,SectionEditorPanel,SectionPickerDialog}.tsx`. Top bar: title + status + "Unsaved changes" pill + Save (disabled when not dirty). Left: dnd section list + visibility eye + delete + "Add section". Center: editor for the selected type (raw-JSON inspector for unimplemented types). Right: iframe at `/[slug]?preview=1` (or `/?preview=1` for home) with Refresh button; iframe re-keys after every save / add / delete.
+- `beforeunload` warning on dirty navigation.
+- `scripts/smoke-builder.mjs` — programmatically logs in via NextAuth credentials and GETs each `/admin/page-builder/<slug>` route; used to verify the `fromServerRow` regression fix end-to-end.
+
+**Verified**
+- `npm run typecheck` clean. `npm run build` clean (23 routes total).
+- Smoke script: 7 distinct slugs (`home`, `about`, `services`, `sectors`, `contact`, `financial-modeler-pro`, `service-business-valuation`) + `/admin/pages` all returned HTTP 200 with an authenticated session.
+
+**Notable detours / lessons**
+- **Don't export non-component functions from a `'use client'` module that a server component imports.** First version of `PageBuilder.tsx` exported a `fromServerRow` helper that was called from the server `page.tsx`. Next.js threw `Attempted to call fromServerRow() from the server but fromServerRow is on the client`. Fix: move the helper to `src/lib/cms/serializers.ts` (no `'use client'`). Type-only exports from client modules are fine — types are erased at build.
+- **Don't run `npm run build` while `npm run dev` is also running on the same project** — Turbopack and the production build both write to `.next/` and clobber each other (`ENOENT _buildManifest.js.tmp.*` cascade). Recovery: stop dev, `rm -rf .next`, restart dev.
+- **Field-name compat for hero seeds**: existing seeded hero rows use `badge` (not `badge_text` from spec). Renderer + editor read both keys; editor writes the canonical `badge_text` going forward. Same pattern for `service_cards` seed using `items` vs spec `cards`.
+- **No draft preview state in v1**: the iframe shows the last *saved* state, not unsaved edits. Amber strip in preview pane reminds the user of this when dirty.
+- **Add section creates immediately on the server** (so it has a stable id for editing). That's why "Add section" doesn't mark the page dirty — the row is already persisted.
+
+**Open items for next session — Phase 5: Public Pages (core)**
+1. Root layout with CMS-driven Navbar + Footer (read from `cms_content` `header_settings`/`footer_settings` and the new `header_settings.config` JSON blob).
+2. Contact page form + `/api/contact` route + email templates wired up via Resend.
+3. Per-page metadata pulling from `cms_pages` (`meta_title` already wired in `(public)/[slug]/page.tsx`; needs root layout title template + the home slug variant).
+4. Still pending: rotate `Admin@2026` to a strong production password before any deploy.
 
