@@ -2,7 +2,7 @@
 
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
-import { useEffect } from 'react';
+import { useEffect, type CSSProperties } from 'react';
 import {
   Bold,
   Italic,
@@ -13,6 +13,8 @@ import {
   Undo2,
   Redo2,
 } from 'lucide-react';
+
+import { ADMIN_COLORS } from '@/lib/admin/styles';
 
 type Props = {
   value: string;
@@ -34,6 +36,20 @@ function ToolbarButton({
   title: string;
   children: React.ReactNode;
 }) {
+  const style: CSSProperties = {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 30,
+    height: 30,
+    borderRadius: 6,
+    border: 'none',
+    background: active ? ADMIN_COLORS.primary : 'transparent',
+    color: active ? '#FFFFFF' : ADMIN_COLORS.primaryDeep,
+    cursor: disabled ? 'not-allowed' : 'pointer',
+    opacity: disabled ? 0.4 : 1,
+    transition: 'background 120ms ease',
+  };
   return (
     <button
       type="button"
@@ -42,12 +58,13 @@ function ToolbarButton({
       aria-pressed={active}
       disabled={disabled}
       onClick={onClick}
-      className={
-        'inline-flex h-8 w-8 items-center justify-center rounded text-[#0F2540] transition ' +
-        (active
-          ? 'bg-[#1B3A5F] text-white'
-          : 'hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-40')
-      }
+      style={style}
+      onMouseEnter={(e) => {
+        if (!active && !disabled) e.currentTarget.style.background = '#F3F4F6';
+      }}
+      onMouseLeave={(e) => {
+        if (!active) e.currentTarget.style.background = 'transparent';
+      }}
     >
       {children}
     </button>
@@ -71,7 +88,6 @@ export function RichTextEditor({ value, onChange, minHeight = 180, ariaLabel }: 
     },
   });
 
-  // Sync external value changes (e.g. after a save resets state).
   useEffect(() => {
     if (!editor) return;
     if (editor.getHTML() !== value) {
@@ -82,76 +98,97 @@ export function RichTextEditor({ value, onChange, minHeight = 180, ariaLabel }: 
   if (!editor) {
     return (
       <div
-        className="rounded-md border border-neutral-200 bg-neutral-50"
-        style={{ minHeight: minHeight + 48 }}
+        style={{
+          background: '#F9FAFB',
+          border: `1px solid ${ADMIN_COLORS.border}`,
+          borderRadius: 8,
+          minHeight: minHeight + 48,
+        }}
       />
     );
   }
 
   return (
-    <div className="rounded-md border border-neutral-200 bg-white">
-      <div className="flex flex-wrap items-center gap-1 border-b border-neutral-200 px-2 py-1.5">
+    <div
+      style={{
+        background: '#FFFFFF',
+        border: `1px solid ${ADMIN_COLORS.border}`,
+        borderRadius: 8,
+        overflow: 'hidden',
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          gap: 4,
+          padding: 6,
+          borderBottom: `1px solid ${ADMIN_COLORS.border}`,
+          background: ADMIN_COLORS.altBg,
+        }}
+      >
         <ToolbarButton
           title="Paragraph"
           active={editor.isActive('paragraph')}
           onClick={() => editor.chain().focus().setParagraph().run()}
         >
-          <Pilcrow className="h-4 w-4" />
+          <Pilcrow size={15} />
         </ToolbarButton>
         <ToolbarButton
           title="Heading"
           active={editor.isActive('heading', { level: 2 })}
           onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
         >
-          <Heading2 className="h-4 w-4" />
+          <Heading2 size={15} />
         </ToolbarButton>
-        <span className="mx-1 h-5 w-px bg-neutral-200" />
+        <span style={{ width: 1, height: 18, background: ADMIN_COLORS.border, margin: '0 4px' }} />
         <ToolbarButton
           title="Bold"
           active={editor.isActive('bold')}
           onClick={() => editor.chain().focus().toggleBold().run()}
         >
-          <Bold className="h-4 w-4" />
+          <Bold size={15} />
         </ToolbarButton>
         <ToolbarButton
           title="Italic"
           active={editor.isActive('italic')}
           onClick={() => editor.chain().focus().toggleItalic().run()}
         >
-          <Italic className="h-4 w-4" />
+          <Italic size={15} />
         </ToolbarButton>
-        <span className="mx-1 h-5 w-px bg-neutral-200" />
+        <span style={{ width: 1, height: 18, background: ADMIN_COLORS.border, margin: '0 4px' }} />
         <ToolbarButton
           title="Bullet list"
           active={editor.isActive('bulletList')}
           onClick={() => editor.chain().focus().toggleBulletList().run()}
         >
-          <List className="h-4 w-4" />
+          <List size={15} />
         </ToolbarButton>
         <ToolbarButton
           title="Numbered list"
           active={editor.isActive('orderedList')}
           onClick={() => editor.chain().focus().toggleOrderedList().run()}
         >
-          <ListOrdered className="h-4 w-4" />
+          <ListOrdered size={15} />
         </ToolbarButton>
-        <span className="mx-1 h-5 w-px bg-neutral-200" />
+        <span style={{ width: 1, height: 18, background: ADMIN_COLORS.border, margin: '0 4px' }} />
         <ToolbarButton
           title="Undo"
           disabled={!editor.can().undo()}
           onClick={() => editor.chain().focus().undo().run()}
         >
-          <Undo2 className="h-4 w-4" />
+          <Undo2 size={15} />
         </ToolbarButton>
         <ToolbarButton
           title="Redo"
           disabled={!editor.can().redo()}
           onClick={() => editor.chain().focus().redo().run()}
         >
-          <Redo2 className="h-4 w-4" />
+          <Redo2 size={15} />
         </ToolbarButton>
       </div>
-      <div className="px-3 py-3">
+      <div style={{ padding: '12px 14px' }}>
         <EditorContent editor={editor} />
       </div>
     </div>

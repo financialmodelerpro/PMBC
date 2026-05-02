@@ -2,6 +2,13 @@
 
 import { useEffect } from 'react';
 
+import {
+  ADMIN_COLORS,
+  adminButtonGhost,
+  adminButtonPrimary,
+  adminButtonDanger,
+} from '@/lib/admin/styles';
+
 export function ConfirmDialog({
   open,
   title,
@@ -33,28 +40,73 @@ export function ConfirmDialog({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center" role="dialog" aria-modal="true">
-      <div className="absolute inset-0 bg-[#0F2540]/50" onClick={onCancel} />
-      <div className="relative w-full max-w-sm rounded-lg border border-neutral-200 bg-white p-5 shadow-lg">
-        <h3 className="text-base font-semibold text-[#0F1B2D]">{title}</h3>
-        <p className="mt-2 text-sm text-neutral-600">{body}</p>
-        <div className="mt-5 flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={onCancel}
-            className="rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-sm text-[#0F1B2D] hover:bg-neutral-50"
-          >
+    <div
+      role="dialog"
+      aria-modal="true"
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 70,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      <div
+        onClick={onCancel}
+        style={{
+          position: 'absolute',
+          inset: 0,
+          background: 'rgba(15,37,64,0.5)',
+        }}
+      />
+      <div
+        style={{
+          position: 'relative',
+          width: '100%',
+          maxWidth: 420,
+          background: '#FFFFFF',
+          border: `1px solid ${ADMIN_COLORS.border}`,
+          borderRadius: 12,
+          padding: 22,
+          boxShadow: '0 12px 32px rgba(0,0,0,0.18)',
+          margin: 16,
+        }}
+      >
+        <h3
+          style={{
+            margin: 0,
+            fontSize: 16,
+            fontWeight: 700,
+            color: ADMIN_COLORS.textHeading,
+          }}
+        >
+          {title}
+        </h3>
+        <p
+          style={{
+            margin: '8px 0 0',
+            fontSize: 13,
+            color: ADMIN_COLORS.textBody,
+          }}
+        >
+          {body}
+        </p>
+        <div
+          style={{
+            marginTop: 18,
+            display: 'flex',
+            gap: 8,
+            justifyContent: 'flex-end',
+          }}
+        >
+          <button type="button" onClick={onCancel} style={adminButtonGhost}>
             {cancelLabel}
           </button>
           <button
             type="button"
             onClick={onConfirm}
-            className={
-              'rounded-md px-3 py-1.5 text-sm font-medium text-white transition ' +
-              (destructive
-                ? 'bg-red-600 hover:bg-red-700'
-                : 'bg-[#1B3A5F] hover:bg-[#0F2540]')
-            }
+            style={destructive ? adminButtonDanger : adminButtonPrimary}
           >
             {confirmLabel}
           </button>

@@ -6,6 +6,14 @@ import { signIn } from 'next-auth/react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 
+import {
+  ADMIN_COLORS,
+  adminButtonPrimary,
+  adminButtonPrimaryDisabled,
+  adminInput,
+  adminLabel,
+} from '@/lib/admin/styles';
+
 const loginSchema = z.object({
   email: z.string().trim().toLowerCase().email('Enter a valid email address.'),
   password: z.string().min(1, 'Password is required.'),
@@ -55,13 +63,16 @@ export function LoginForm() {
     router.refresh();
   };
 
+  const inputStyle = { ...adminInput, padding: '10px 12px', fontSize: 14 };
+
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-5" noValidate>
+    <form
+      onSubmit={handleSubmit(onSubmit)}
+      noValidate
+      style={{ display: 'flex', flexDirection: 'column', gap: 18 }}
+    >
       <div>
-        <label
-          htmlFor="email"
-          className="block text-xs font-medium tracking-[0.14em] uppercase text-[#0F2540]"
-        >
+        <label htmlFor="email" style={adminLabel}>
           Email
         </label>
         <input
@@ -70,18 +81,17 @@ export function LoginForm() {
           autoComplete="email"
           autoFocus
           {...register('email')}
-          className="mt-2 block w-full rounded-md border border-neutral-300 bg-white px-3 py-2.5 text-[15px] text-[#0F1B2D] outline-none transition focus:border-[#1B3A5F] focus:ring-2 focus:ring-[#1B3A5F]/15"
+          style={inputStyle}
         />
         {errors.email && (
-          <p className="mt-1.5 text-xs text-red-600">{errors.email.message}</p>
+          <p style={{ margin: '6px 0 0', fontSize: 12, color: ADMIN_COLORS.danger }}>
+            {errors.email.message}
+          </p>
         )}
       </div>
 
       <div>
-        <label
-          htmlFor="password"
-          className="block text-xs font-medium tracking-[0.14em] uppercase text-[#0F2540]"
-        >
+        <label htmlFor="password" style={adminLabel}>
           Password
         </label>
         <input
@@ -89,17 +99,26 @@ export function LoginForm() {
           type="password"
           autoComplete="current-password"
           {...register('password')}
-          className="mt-2 block w-full rounded-md border border-neutral-300 bg-white px-3 py-2.5 text-[15px] text-[#0F1B2D] outline-none transition focus:border-[#1B3A5F] focus:ring-2 focus:ring-[#1B3A5F]/15"
+          style={inputStyle}
         />
         {errors.password && (
-          <p className="mt-1.5 text-xs text-red-600">{errors.password.message}</p>
+          <p style={{ margin: '6px 0 0', fontSize: 12, color: ADMIN_COLORS.danger }}>
+            {errors.password.message}
+          </p>
         )}
       </div>
 
       {submitError && (
         <div
           role="alert"
-          className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
+          style={{
+            background: ADMIN_COLORS.dangerBg,
+            border: `1px solid #FECACA`,
+            borderRadius: 8,
+            padding: '10px 12px',
+            fontSize: 13,
+            color: ADMIN_COLORS.danger,
+          }}
         >
           {submitError}
         </div>
@@ -108,7 +127,12 @@ export function LoginForm() {
       <button
         type="submit"
         disabled={submitting}
-        className="w-full rounded-md bg-[#1B3A5F] px-4 py-3 text-sm font-medium tracking-wide text-white transition hover:bg-[#0F2540] disabled:cursor-not-allowed disabled:opacity-60"
+        style={{
+          ...(submitting ? adminButtonPrimaryDisabled : adminButtonPrimary),
+          padding: '11px 20px',
+          width: '100%',
+          fontSize: 13,
+        }}
       >
         {submitting ? 'Signing in…' : 'Sign in'}
       </button>

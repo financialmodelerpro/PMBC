@@ -5,6 +5,15 @@ import { ArrowUpRight } from 'lucide-react';
 import { AdminPageHeader } from '@/components/admin/AdminPageHeader';
 import { fetchPages } from '@/lib/cms/pages';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import {
+  ADMIN_COLORS,
+  adminBadge,
+  adminPageMain,
+  adminTable,
+  adminTd,
+  adminTh,
+  adminThead,
+} from '@/lib/admin/styles';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,90 +38,116 @@ function formatDate(iso: string | null): string {
 export default async function PagesAdminPage() {
   const pages = await fetchPages();
 
-  // Pull section counts in one round trip.
   const supabase = createSupabaseServerClient();
-  const { data: rows } = await supabase
-    .from('page_sections')
-    .select('page_slug');
+  const { data: rows } = await supabase.from('page_sections').select('page_slug');
   const counts = new Map<string, number>();
   for (const r of rows ?? []) {
     counts.set(r.page_slug, (counts.get(r.page_slug) ?? 0) + 1);
   }
 
   return (
-    <div className="mx-auto max-w-5xl">
-      <AdminPageHeader
-        eyebrow="Admin"
-        title="Pages"
-        description="Every CMS-managed page. Open the page builder to edit sections, reorder, or change visibility."
-      />
+    <div style={adminPageMain}>
+      <div style={{ maxWidth: 1100, margin: '0 auto' }}>
+        <AdminPageHeader
+          eyebrow="Admin"
+          title="Pages"
+          description="Every CMS-managed page. Open the page builder to edit sections, reorder, or change visibility."
+        />
 
-      {pages.length === 0 ? (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900">
-          No cms_pages rows. Run migration 005.
-        </div>
-      ) : (
-        <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-[0_1px_2px_rgba(15,27,45,0.04)]">
-          <table className="w-full text-sm">
-            <thead className="bg-neutral-50 text-left text-[11px] font-medium tracking-[0.16em] uppercase text-neutral-500">
-              <tr>
-                <th className="px-5 py-3">Slug</th>
-                <th className="px-5 py-3">Title</th>
-                <th className="px-5 py-3">Status</th>
-                <th className="px-5 py-3">Sections</th>
-                <th className="px-5 py-3">Last updated</th>
-                <th className="px-5 py-3 text-right">Open</th>
-              </tr>
-            </thead>
-            <tbody>
-              {pages.map((p) => {
-                const builderHref = `/admin/page-builder/${p.slug}`;
-                return (
-                  <tr key={p.id} className="border-t border-neutral-100">
-                    <td className="px-5 py-3 font-mono text-[13px] text-[#0F1B2D]">{p.slug}</td>
-                    <td className="px-5 py-3 text-[#0F1B2D]">{p.title}</td>
-                    <td className="px-5 py-3">
-                      <StatusBadge status={p.status} />
-                    </td>
-                    <td className="px-5 py-3 text-neutral-600">
-                      {counts.get(p.slug) ?? 0}
-                    </td>
-                    <td className="px-5 py-3 text-neutral-600">
-                      {formatDate(p.updated_at)}
-                    </td>
-                    <td className="px-5 py-3 text-right">
-                      <Link
-                        href={builderHref}
-                        className="inline-flex items-center gap-1 rounded-md border border-neutral-200 px-2.5 py-1.5 text-xs font-medium text-[#0F2540] hover:border-[#1B3A5F] hover:text-[#1B3A5F]"
+        {pages.length === 0 ? (
+          <div
+            style={{
+              background: ADMIN_COLORS.warningBg,
+              border: '1px solid #FBBF24',
+              borderRadius: 12,
+              padding: 18,
+              fontSize: 13,
+              color: ADMIN_COLORS.warning,
+            }}
+          >
+            No cms_pages rows. Run migration 005.
+          </div>
+        ) : (
+          <div
+            style={{
+              background: '#FFFFFF',
+              border: `1px solid ${ADMIN_COLORS.border}`,
+              borderRadius: 12,
+              overflow: 'hidden',
+            }}
+          >
+            <table style={adminTable}>
+              <thead style={adminThead}>
+                <tr>
+                  <th style={adminTh}>Slug</th>
+                  <th style={adminTh}>Title</th>
+                  <th style={adminTh}>Status</th>
+                  <th style={adminTh}>Sections</th>
+                  <th style={adminTh}>Last updated</th>
+                  <th style={{ ...adminTh, textAlign: 'right' }}>Open</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pages.map((p, i) => {
+                  const last = i === pages.length - 1;
+                  const cellStyle = last
+                    ? { ...adminTd, borderBottom: 'none' }
+                    : adminTd;
+                  return (
+                    <tr key={p.id}>
+                      <td
+                        style={{
+                          ...cellStyle,
+                          fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+                          color: ADMIN_COLORS.textHeading,
+                        }}
                       >
-                        Builder
-                        <ArrowUpRight className="h-3.5 w-3.5" />
-                      </Link>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
+                        {p.slug}
+                      </td>
+                      <td style={{ ...cellStyle, color: ADMIN_COLORS.textHeading }}>
+                        {p.title}
+                      </td>
+                      <td style={cellStyle}>
+                        <span
+                          style={
+                            p.status === 'published'
+                              ? adminBadge('success')
+                              : adminBadge('neutral')
+                          }
+                        >
+                          {p.status}
+                        </span>
+                      </td>
+                      <td style={cellStyle}>{counts.get(p.slug) ?? 0}</td>
+                      <td style={cellStyle}>{formatDate(p.updated_at)}</td>
+                      <td style={{ ...cellStyle, textAlign: 'right' }}>
+                        <Link
+                          href={`/admin/page-builder/${p.slug}`}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 4,
+                            padding: '6px 12px',
+                            border: `1px solid ${ADMIN_COLORS.border}`,
+                            borderRadius: 7,
+                            fontSize: 12,
+                            fontWeight: 600,
+                            color: ADMIN_COLORS.primaryDeep,
+                            textDecoration: 'none',
+                          }}
+                        >
+                          Builder
+                          <ArrowUpRight size={13} />
+                        </Link>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
-  );
-}
-
-function StatusBadge({ status }: { status: string }) {
-  const tone =
-    status === 'published'
-      ? 'bg-[#E5F1EA] text-[#1B6B3F]'
-      : 'bg-neutral-100 text-neutral-600';
-  return (
-    <span
-      className={
-        'inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium tracking-wide ' +
-        tone
-      }
-    >
-      {status}
-    </span>
   );
 }

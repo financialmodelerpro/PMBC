@@ -4,6 +4,14 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 
 import { SaveStatus, type SaveState } from '@/components/admin/SaveStatus';
+import {
+  ADMIN_COLORS,
+  adminButtonPrimary,
+  adminButtonPrimaryDisabled,
+  adminCard,
+  adminInput,
+  adminLabel,
+} from '@/lib/admin/styles';
 import type { SiteSettings } from '@/lib/cms/settings';
 
 type FormValues = Required<{
@@ -17,9 +25,6 @@ type FormValues = Required<{
   default_og_image_url: string;
   google_analytics_id: string;
 }>;
-
-const inputCls =
-  'block w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-[14px] text-[#0F1B2D] outline-none focus:border-[#1B3A5F] focus:ring-2 focus:ring-[#1B3A5F]/15';
 
 function defaults(initial: SiteSettings): FormValues {
   return {
@@ -64,49 +69,60 @@ export function SettingsForm({ initial }: { initial: SiteSettings }) {
   };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+    <form
+      onSubmit={handleSubmit(onSubmit)}
+      style={{ display: 'flex', flexDirection: 'column', gap: 18 }}
+    >
       <Section title="Contact">
         <Field label="Contact email" hint="Public-facing">
-          <input type="email" {...register('contact_email')} className={inputCls} />
+          <input type="email" {...register('contact_email')} style={adminInput} />
         </Field>
         <Field label="Admin email" hint="Where contact-form notifications go">
-          <input type="email" {...register('admin_email')} className={inputCls} />
+          <input type="email" {...register('admin_email')} style={adminInput} />
         </Field>
         <Field label="Phone number">
-          <input type="tel" {...register('phone_number')} className={inputCls} />
+          <input type="tel" {...register('phone_number')} style={adminInput} />
         </Field>
         <Field label="WhatsApp number">
-          <input type="tel" {...register('whatsapp_number')} className={inputCls} />
+          <input type="tel" {...register('whatsapp_number')} style={adminInput} />
         </Field>
         <Field label="Office location text">
-          <input type="text" {...register('office_location_text')} className={inputCls} />
+          <input type="text" {...register('office_location_text')} style={adminInput} />
         </Field>
       </Section>
 
       <Section title="Social">
         <Field label="LinkedIn URL">
-          <input type="url" {...register('social_linkedin')} className={inputCls} />
+          <input type="url" {...register('social_linkedin')} style={adminInput} />
         </Field>
         <Field label="X / Twitter URL">
-          <input type="url" {...register('social_twitter')} className={inputCls} />
+          <input type="url" {...register('social_twitter')} style={adminInput} />
         </Field>
       </Section>
 
       <Section title="SEO and analytics">
         <Field label="Default OG image URL" hint="Used when a page has no specific image">
-          <input type="text" {...register('default_og_image_url')} className={inputCls} />
+          <input type="text" {...register('default_og_image_url')} style={adminInput} />
         </Field>
         <Field label="Google Analytics ID" hint="e.g. G-XXXXXXXXXX">
-          <input type="text" {...register('google_analytics_id')} className={inputCls} />
+          <input type="text" {...register('google_analytics_id')} style={adminInput} />
         </Field>
       </Section>
 
-      <div className="flex items-center justify-between border-t border-neutral-200 pt-5">
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          paddingTop: 18,
+          borderTop: `1px solid ${ADMIN_COLORS.border}`,
+        }}
+      >
         <SaveStatus state={state} message={errMsg} />
         <button
           type="submit"
           disabled={state === 'saving'}
-          className="rounded-md bg-[#1B3A5F] px-4 py-2 text-sm font-medium text-white hover:bg-[#0F2540] disabled:cursor-not-allowed disabled:opacity-60"
+          style={state === 'saving' ? adminButtonPrimaryDisabled : adminButtonPrimary}
         >
           {state === 'saving' ? 'Saving…' : 'Save settings'}
         </button>
@@ -117,9 +133,18 @@ export function SettingsForm({ initial }: { initial: SiteSettings }) {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-lg border border-neutral-200 bg-white p-5 shadow-[0_1px_2px_rgba(15,27,45,0.04)]">
-      <h2 className="mb-4 text-sm font-semibold text-[#0F1B2D]">{title}</h2>
-      <div className="space-y-4">{children}</div>
+    <section style={adminCard}>
+      <h2
+        style={{
+          margin: '0 0 14px',
+          fontSize: 14,
+          fontWeight: 700,
+          color: ADMIN_COLORS.textHeading,
+        }}
+      >
+        {title}
+      </h2>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>{children}</div>
     </section>
   );
 }
@@ -134,10 +159,18 @@ function Field({
   children: React.ReactNode;
 }) {
   return (
-    <label className="block">
-      <div className="mb-1.5 flex items-baseline justify-between gap-3">
-        <span className="text-xs font-medium text-[#0F2540]">{label}</span>
-        {hint && <span className="text-[11px] text-neutral-400">{hint}</span>}
+    <label style={{ display: 'block' }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'baseline',
+          justifyContent: 'space-between',
+          gap: 12,
+          marginBottom: 6,
+        }}
+      >
+        <span style={adminLabel}>{label}</span>
+        {hint && <span style={{ fontSize: 11, color: ADMIN_COLORS.textMicro }}>{hint}</span>}
       </div>
       {children}
     </label>

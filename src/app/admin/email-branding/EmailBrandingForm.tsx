@@ -4,12 +4,17 @@ import { useState } from 'react';
 
 import { SaveStatus, type SaveState } from '@/components/admin/SaveStatus';
 import { RichTextEditor } from '@/components/admin/RichTextEditor';
+import {
+  ADMIN_COLORS,
+  adminButtonPrimary,
+  adminButtonPrimaryDisabled,
+  adminCard,
+  adminInput,
+  adminLabel,
+} from '@/lib/admin/styles';
 import type { EmailBranding } from '@/lib/cms/emailBranding';
 
 const HEX = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
-
-const inputCls =
-  'block w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-[14px] text-[#0F1B2D] outline-none focus:border-[#1B3A5F] focus:ring-2 focus:ring-[#1B3A5F]/15';
 
 export function EmailBrandingForm({ initial }: { initial: EmailBranding }) {
   const [logoUrl, setLogoUrl] = useState(initial.logo_url ?? '');
@@ -53,45 +58,80 @@ export function EmailBrandingForm({ initial }: { initial: EmailBranding }) {
   };
 
   return (
-    <div className="grid gap-6 xl:grid-cols-[1fr_420px]">
-      <div className="space-y-5">
-        <section className="rounded-lg border border-neutral-200 bg-white p-5 shadow-[0_1px_2px_rgba(15,27,45,0.04)]">
-          <h2 className="mb-4 text-sm font-semibold text-[#0F1B2D]">Header</h2>
-          <label className="block">
-            <span className="mb-1.5 block text-xs font-medium text-[#0F2540]">Logo URL</span>
+    <div
+      style={{
+        display: 'grid',
+        gap: 18,
+        gridTemplateColumns: 'minmax(0, 1fr) 420px',
+        alignItems: 'start',
+      }}
+    >
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+        <section style={adminCard}>
+          <h2
+            style={{
+              margin: '0 0 14px',
+              fontSize: 14,
+              fontWeight: 700,
+              color: ADMIN_COLORS.textHeading,
+            }}
+          >
+            Header
+          </h2>
+          <label style={{ display: 'block' }}>
+            <span style={adminLabel}>Logo URL</span>
             <input
               type="text"
               value={logoUrl}
               onChange={(e) => setLogoUrl(e.target.value)}
               placeholder="https://… or /logo-email.png"
-              className={inputCls}
+              style={adminInput}
             />
           </label>
-          <label className="mt-4 block">
-            <span className="mb-1.5 block text-xs font-medium text-[#0F2540]">Primary color</span>
-            <div className="flex items-center gap-2">
+          <label style={{ display: 'block', marginTop: 14 }}>
+            <span style={adminLabel}>Primary color</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <input
                 type="color"
                 value={colorValid ? primaryColor : '#1B3A5F'}
                 onChange={(e) => setPrimaryColor(e.target.value)}
-                className="h-10 w-12 cursor-pointer rounded border border-neutral-300 bg-white p-1"
+                style={{
+                  width: 44,
+                  height: 36,
+                  padding: 2,
+                  border: `1px solid ${ADMIN_COLORS.borderInput}`,
+                  borderRadius: 7,
+                  background: '#FFFFFF',
+                  cursor: 'pointer',
+                }}
               />
               <input
                 type="text"
                 value={primaryColor}
                 onChange={(e) => setPrimaryColor(e.target.value)}
-                className={inputCls}
+                style={adminInput}
               />
             </div>
             {!colorValid && (
-              <p className="mt-1 text-[11px] text-red-600">Use a hex value like #1B3A5F</p>
+              <p style={{ margin: '6px 0 0', fontSize: 11, color: ADMIN_COLORS.danger }}>
+                Use a hex value like #1B3A5F
+              </p>
             )}
           </label>
         </section>
 
-        <section className="rounded-lg border border-neutral-200 bg-white p-5 shadow-[0_1px_2px_rgba(15,27,45,0.04)]">
-          <h2 className="mb-2 text-sm font-semibold text-[#0F1B2D]">Signature</h2>
-          <p className="mb-3 text-xs text-neutral-500">
+        <section style={adminCard}>
+          <h2
+            style={{
+              margin: '0 0 6px',
+              fontSize: 14,
+              fontWeight: 700,
+              color: ADMIN_COLORS.textHeading,
+            }}
+          >
+            Signature
+          </h2>
+          <p style={{ margin: '0 0 12px', fontSize: 12, color: ADMIN_COLORS.textMuted }}>
             Appended to outgoing transactional emails (above the footer).
           </p>
           <RichTextEditor
@@ -101,9 +141,18 @@ export function EmailBrandingForm({ initial }: { initial: EmailBranding }) {
           />
         </section>
 
-        <section className="rounded-lg border border-neutral-200 bg-white p-5 shadow-[0_1px_2px_rgba(15,27,45,0.04)]">
-          <h2 className="mb-2 text-sm font-semibold text-[#0F1B2D]">Footer</h2>
-          <p className="mb-3 text-xs text-neutral-500">
+        <section style={adminCard}>
+          <h2
+            style={{
+              margin: '0 0 6px',
+              fontSize: 14,
+              fontWeight: 700,
+              color: ADMIN_COLORS.textHeading,
+            }}
+          >
+            Footer
+          </h2>
+          <p style={{ margin: '0 0 12px', fontSize: 12, color: ADMIN_COLORS.textMuted }}>
             Renders in a muted block at the bottom of every transactional email.
           </p>
           <RichTextEditor
@@ -113,21 +162,38 @@ export function EmailBrandingForm({ initial }: { initial: EmailBranding }) {
           />
         </section>
 
-        <div className="flex items-center justify-between border-t border-neutral-200 pt-5">
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            paddingTop: 18,
+            borderTop: `1px solid ${ADMIN_COLORS.border}`,
+          }}
+        >
           <SaveStatus state={state} message={errMsg} />
           <button
             type="button"
             onClick={onSave}
             disabled={state === 'saving'}
-            className="rounded-md bg-[#1B3A5F] px-4 py-2 text-sm font-medium text-white hover:bg-[#0F2540] disabled:cursor-not-allowed disabled:opacity-60"
+            style={state === 'saving' ? adminButtonPrimaryDisabled : adminButtonPrimary}
           >
             {state === 'saving' ? 'Saving…' : 'Save email branding'}
           </button>
         </div>
       </div>
 
-      <aside className="xl:sticky xl:top-20 xl:self-start">
-        <p className="mb-2 text-[11px] font-medium tracking-[0.16em] uppercase text-neutral-500">
+      <aside style={{ position: 'sticky', top: 24, alignSelf: 'start' }}>
+        <p
+          style={{
+            margin: '0 0 8px',
+            fontSize: 11,
+            fontWeight: 700,
+            letterSpacing: '0.1em',
+            textTransform: 'uppercase',
+            color: ADMIN_COLORS.textMuted,
+          }}
+        >
           Preview
         </p>
         <EmailPreview
@@ -153,43 +219,76 @@ function EmailPreview({
   footerHtml: string;
 }) {
   return (
-    <div className="overflow-hidden rounded-lg border border-neutral-200 bg-neutral-100 p-4">
+    <div
+      style={{
+        background: '#F4F7FC',
+        border: `1px solid ${ADMIN_COLORS.border}`,
+        borderRadius: 12,
+        padding: 16,
+      }}
+    >
       <div
-        className="overflow-hidden rounded-md bg-white shadow-sm"
-        style={{ fontFamily: 'system-ui, -apple-system, Segoe UI, Arial, sans-serif' }}
+        style={{
+          background: '#FFFFFF',
+          borderRadius: 8,
+          overflow: 'hidden',
+          boxShadow: '0 1px 2px rgba(0,0,0,0.06)',
+          fontFamily: "system-ui, -apple-system, 'Segoe UI', Arial, sans-serif",
+        }}
       >
         <div
-          className="px-5 py-4 text-center"
-          style={{ background: primaryColor, color: 'white' }}
+          style={{
+            background: primaryColor,
+            color: '#FFFFFF',
+            textAlign: 'center',
+            padding: '16px 20px',
+          }}
         >
           {logoUrl ? (
             <img
               src={logoUrl}
               alt=""
-              style={{ height: 28, margin: '0 auto' }}
+              style={{ height: 28, margin: '0 auto', display: 'block' }}
               onError={(e) => {
                 (e.currentTarget as HTMLImageElement).style.display = 'none';
               }}
             />
           ) : (
-            <span style={{ fontSize: 14, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+            <span
+              style={{
+                fontSize: 14,
+                letterSpacing: '0.08em',
+                textTransform: 'uppercase',
+              }}
+            >
               PaceMakers
             </span>
           )}
         </div>
-        <div className="px-5 py-5 text-sm text-[#0F1B2D]">
-          <p>This is a preview of how the email body will render.</p>
-          <p className="mt-3">A real message would appear in this column.</p>
+        <div style={{ padding: 20, fontSize: 14, color: ADMIN_COLORS.textHeading }}>
+          <p style={{ margin: 0 }}>This is a preview of how the email body will render.</p>
+          <p style={{ margin: '12px 0 0' }}>A real message would appear in this column.</p>
           {signatureHtml && (
             <div
-              className="prose prose-sm mt-5 max-w-none border-t border-neutral-200 pt-4"
+              style={{
+                marginTop: 18,
+                paddingTop: 14,
+                borderTop: `1px solid ${ADMIN_COLORS.border}`,
+                fontSize: 13,
+              }}
               dangerouslySetInnerHTML={{ __html: signatureHtml }}
             />
           )}
         </div>
         {footerHtml && (
           <div
-            className="prose prose-sm max-w-none border-t border-neutral-200 bg-neutral-50 px-5 py-4 text-xs text-neutral-500"
+            style={{
+              borderTop: `1px solid ${ADMIN_COLORS.border}`,
+              background: '#F9FAFB',
+              padding: '14px 20px',
+              fontSize: 12,
+              color: ADMIN_COLORS.textMuted,
+            }}
             dangerouslySetInnerHTML={{ __html: footerHtml }}
           />
         )}

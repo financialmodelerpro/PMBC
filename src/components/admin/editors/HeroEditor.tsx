@@ -1,16 +1,19 @@
 'use client';
 
-import type { SectionEditorProps } from './types';
+import {
+  ADMIN_COLORS,
+  adminInput,
+  adminLabel,
+  adminTextarea,
+} from '@/lib/admin/styles';
 
-const inputCls =
-  'block w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-[14px] text-[#0F1B2D] outline-none focus:border-[#1B3A5F] focus:ring-2 focus:ring-[#1B3A5F]/15';
+import type { SectionEditorProps } from './types';
 
 function s(v: unknown): string {
   return typeof v === 'string' ? v : '';
 }
 
 export function HeroEditor({ content, onChange }: SectionEditorProps) {
-  // Backwards-compat: read legacy `badge` if `badge_text` is missing.
   const badge_text = s(content.badge_text) || s(content.badge);
   const headline = s(content.headline);
   const subtitle = s(content.subtitle);
@@ -38,13 +41,13 @@ export function HeroEditor({ content, onChange }: SectionEditorProps) {
   };
 
   return (
-    <div className="space-y-5">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
       <Field label="Badge text" hint="Small uppercase eyebrow above the headline">
         <input
           type="text"
           value={badge_text}
           onChange={(e) => update({ badge_text: e.target.value })}
-          className={inputCls}
+          style={adminInput}
         />
       </Field>
 
@@ -53,7 +56,7 @@ export function HeroEditor({ content, onChange }: SectionEditorProps) {
           type="text"
           value={headline}
           onChange={(e) => update({ headline: e.target.value })}
-          className={inputCls}
+          style={adminInput}
         />
       </Field>
 
@@ -62,19 +65,18 @@ export function HeroEditor({ content, onChange }: SectionEditorProps) {
           value={subtitle}
           onChange={(e) => update({ subtitle: e.target.value })}
           rows={3}
-          className={inputCls + ' resize-y'}
+          style={adminTextarea}
         />
       </Field>
 
-      <fieldset className="rounded-md border border-neutral-200 p-4">
-        <legend className="px-1 text-xs font-medium text-[#0F2540]">Primary CTA</legend>
-        <div className="grid gap-3 sm:grid-cols-2">
+      <Fieldset legend="Primary CTA">
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           <Field label="Label">
             <input
               type="text"
               value={cta_label}
               onChange={(e) => update({ cta_label: e.target.value })}
-              className={inputCls}
+              style={adminInput}
             />
           </Field>
           <Field label="Link">
@@ -82,21 +84,20 @@ export function HeroEditor({ content, onChange }: SectionEditorProps) {
               type="text"
               value={cta_href}
               onChange={(e) => update({ cta_href: e.target.value })}
-              className={inputCls}
+              style={adminInput}
             />
           </Field>
         </div>
-      </fieldset>
+      </Fieldset>
 
-      <fieldset className="rounded-md border border-neutral-200 p-4">
-        <legend className="px-1 text-xs font-medium text-[#0F2540]">Secondary CTA (optional)</legend>
-        <div className="grid gap-3 sm:grid-cols-2">
+      <Fieldset legend="Secondary CTA (optional)">
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           <Field label="Label">
             <input
               type="text"
               value={cta_secondary_label}
               onChange={(e) => update({ cta_secondary_label: e.target.value })}
-              className={inputCls}
+              style={adminInput}
             />
           </Field>
           <Field label="Link">
@@ -104,14 +105,14 @@ export function HeroEditor({ content, onChange }: SectionEditorProps) {
               type="text"
               value={cta_secondary_href}
               onChange={(e) => update({ cta_secondary_href: e.target.value })}
-              className={inputCls}
+              style={adminInput}
             />
           </Field>
         </div>
-      </fieldset>
+      </Fieldset>
 
       <Field label="Background style">
-        <div className="flex gap-2">
+        <div style={{ display: 'flex', gap: 8 }}>
           {(['light', 'dark'] as const).map((option) => {
             const active = background_style === option;
             return (
@@ -119,12 +120,18 @@ export function HeroEditor({ content, onChange }: SectionEditorProps) {
                 key={option}
                 type="button"
                 onClick={() => update({ background_style: option })}
-                className={
-                  'rounded-md border px-3 py-1.5 text-xs font-medium capitalize transition ' +
-                  (active
-                    ? 'border-[#1B3A5F] bg-[#1B3A5F] text-white'
-                    : 'border-neutral-300 bg-white text-[#0F2540] hover:border-[#1B3A5F]')
-                }
+                style={{
+                  padding: '6px 14px',
+                  borderRadius: 7,
+                  fontSize: 12,
+                  fontWeight: 700,
+                  textTransform: 'capitalize',
+                  border: `1px solid ${active ? ADMIN_COLORS.primary : ADMIN_COLORS.borderInput}`,
+                  background: active ? ADMIN_COLORS.primary : '#FFFFFF',
+                  color: active ? '#FFFFFF' : ADMIN_COLORS.primaryDeep,
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                }}
               >
                 {option}
               </button>
@@ -133,6 +140,33 @@ export function HeroEditor({ content, onChange }: SectionEditorProps) {
         </div>
       </Field>
     </div>
+  );
+}
+
+function Fieldset({ legend, children }: { legend: string; children: React.ReactNode }) {
+  return (
+    <fieldset
+      style={{
+        border: `1px solid ${ADMIN_COLORS.border}`,
+        borderRadius: 10,
+        padding: 14,
+        margin: 0,
+      }}
+    >
+      <legend
+        style={{
+          padding: '0 6px',
+          fontSize: 11,
+          fontWeight: 700,
+          letterSpacing: '0.05em',
+          textTransform: 'uppercase',
+          color: ADMIN_COLORS.textBody,
+        }}
+      >
+        {legend}
+      </legend>
+      {children}
+    </fieldset>
   );
 }
 
@@ -146,10 +180,20 @@ function Field({
   children: React.ReactNode;
 }) {
   return (
-    <label className="block">
-      <div className="mb-1.5 flex items-baseline justify-between gap-3">
-        <span className="text-xs font-medium text-[#0F2540]">{label}</span>
-        {hint && <span className="text-[11px] text-neutral-400">{hint}</span>}
+    <label style={{ display: 'block' }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'baseline',
+          justifyContent: 'space-between',
+          gap: 12,
+          marginBottom: 6,
+        }}
+      >
+        <span style={adminLabel}>{label}</span>
+        {hint && (
+          <span style={{ fontSize: 11, color: ADMIN_COLORS.textMicro }}>{hint}</span>
+        )}
       </div>
       {children}
     </label>

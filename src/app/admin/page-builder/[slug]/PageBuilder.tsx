@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -32,6 +32,12 @@ import {
 
 import { SaveStatus, type SaveState } from '@/components/admin/SaveStatus';
 import { ConfirmDialog } from '@/components/admin/ConfirmDialog';
+import {
+  ADMIN_COLORS,
+  adminButtonGhost,
+  adminButtonPrimary,
+  adminButtonPrimaryDisabled,
+} from '@/lib/admin/styles';
 import { getSectionMeta } from '@/lib/cms/sectionTypes';
 import { sectionFromRow, type LocalSection } from '@/lib/cms/serializers';
 import type { Tables } from '@/types/database';
@@ -64,7 +70,6 @@ export function PageBuilder({
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
   const [previewKey, setPreviewKey] = useState(0);
 
-  // Warn before navigating away with unsaved changes.
   useEffect(() => {
     if (!dirty) return;
     const handler = (e: BeforeUnloadEvent) => {
@@ -127,7 +132,6 @@ export function PageBuilder({
       const local = sectionFromRow(section);
       setSections((arr) => [...arr, local]);
       setSelectedId(local.id);
-      // Don't mark dirty — section was created on the server already.
       setPreviewKey((k) => k + 1);
     } catch (e) {
       setSaveState('error');
@@ -184,7 +188,6 @@ export function PageBuilder({
       setSaveState('saved');
       setPreviewKey((k) => k + 1);
       setTimeout(() => setSaveState('idle'), 2500);
-      // Refresh server data on page navigation.
       router.refresh();
     } catch (e) {
       setSaveState('error');
@@ -193,19 +196,71 @@ export function PageBuilder({
   };
 
   return (
-    <div className="-mx-4 lg:-mx-8">
-      <div className="sticky top-14 z-30 flex flex-wrap items-center gap-3 border-b border-neutral-200 bg-white/95 px-4 py-3 backdrop-blur lg:px-8">
-        <div className="min-w-0 flex-1">
-          <p className="text-[10px] font-medium tracking-[0.16em] uppercase text-neutral-500">
-            Page builder · <span className="font-mono">{pageSlug}</span> · {pageStatus}
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: 12,
+          padding: '12px 24px',
+          background: '#FFFFFF',
+          borderBottom: `1px solid ${ADMIN_COLORS.border}`,
+          position: 'sticky',
+          top: 0,
+          zIndex: 30,
+        }}
+      >
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p
+            style={{
+              margin: 0,
+              fontSize: 10,
+              fontWeight: 700,
+              letterSpacing: '0.16em',
+              textTransform: 'uppercase',
+              color: ADMIN_COLORS.textMuted,
+            }}
+          >
+            Page builder ·{' '}
+            <span
+              style={{
+                fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+                textTransform: 'none',
+              }}
+            >
+              {pageSlug}
+            </span>{' '}
+            · {pageStatus}
           </p>
-          <h1 className="mt-0.5 truncate text-base font-semibold text-[#0F1B2D]">
+          <h1
+            style={{
+              margin: '2px 0 0',
+              fontSize: 16,
+              fontWeight: 700,
+              color: ADMIN_COLORS.textHeading,
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+            }}
+          >
             {pageTitle}
           </h1>
         </div>
-        <div className="flex items-center gap-3">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
           {dirty && (
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2 py-1 text-[11px] font-medium text-amber-800">
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                padding: '4px 10px',
+                borderRadius: 999,
+                background: ADMIN_COLORS.warningBg,
+                color: ADMIN_COLORS.warning,
+                fontSize: 11,
+                fontWeight: 600,
+              }}
+            >
               Unsaved changes
             </span>
           )}
@@ -214,30 +269,62 @@ export function PageBuilder({
             href={previewHref}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex items-center gap-1 rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-xs font-medium text-[#0F2540] hover:border-[#1B3A5F] hover:text-[#1B3A5F]"
+            style={{
+              ...adminButtonGhost,
+              textDecoration: 'none',
+            }}
           >
             Open preview
-            <ArrowUpRight className="h-3.5 w-3.5" />
+            <ArrowUpRight size={13} />
           </Link>
           <button
             type="button"
             onClick={handleSave}
             disabled={!dirty || saveState === 'saving'}
-            className="rounded-md bg-[#1B3A5F] px-4 py-1.5 text-sm font-medium text-white hover:bg-[#0F2540] disabled:cursor-not-allowed disabled:opacity-60"
+            style={
+              !dirty || saveState === 'saving'
+                ? adminButtonPrimaryDisabled
+                : adminButtonPrimary
+            }
           >
             {saveState === 'saving' ? 'Saving…' : 'Save'}
           </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-0 lg:grid-cols-[280px_minmax(0,1fr)_minmax(380px,1fr)]">
-        {/* Left pane — section list */}
-        <div className="border-r border-neutral-200 bg-white px-4 py-4 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto">
-          <p className="mb-3 text-[11px] font-medium tracking-[0.16em] uppercase text-neutral-500">
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: '280px minmax(0, 1fr) minmax(380px, 1fr)',
+          flex: 1,
+          minHeight: 0,
+        }}
+      >
+        <div
+          style={{
+            background: '#FFFFFF',
+            borderRight: `1px solid ${ADMIN_COLORS.border}`,
+            padding: 14,
+            maxHeight: 'calc(100vh - 64px)',
+            overflowY: 'auto',
+          }}
+        >
+          <p
+            style={{
+              margin: '0 0 10px',
+              fontSize: 11,
+              fontWeight: 700,
+              letterSpacing: '0.1em',
+              textTransform: 'uppercase',
+              color: ADMIN_COLORS.textMuted,
+            }}
+          >
             Sections ({ordered.length})
           </p>
           {ordered.length === 0 ? (
-            <p className="text-xs text-neutral-500">No sections yet. Add one below.</p>
+            <p style={{ fontSize: 12, color: ADMIN_COLORS.textMuted }}>
+              No sections yet. Add one below.
+            </p>
           ) : (
             <DndContext
               sensors={sensors}
@@ -248,16 +335,23 @@ export function PageBuilder({
                 items={ordered.map((s) => s.id)}
                 strategy={verticalListSortingStrategy}
               >
-                <ul className="space-y-1.5">
+                <ul
+                  style={{
+                    listStyle: 'none',
+                    margin: 0,
+                    padding: 0,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 6,
+                  }}
+                >
                   {ordered.map((s) => (
                     <SortableSectionItem
                       key={s.id}
                       section={s}
                       active={s.id === selectedId}
                       onSelect={() => setSelectedId(s.id)}
-                      onToggleVisible={() =>
-                        updateSection(s.id, { visible: !s.visible })
-                      }
+                      onToggleVisible={() => updateSection(s.id, { visible: !s.visible })}
                       onRequestDelete={() => setPendingDelete(s.id)}
                     />
                   ))}
@@ -268,26 +362,72 @@ export function PageBuilder({
           <button
             type="button"
             onClick={() => setPickerOpen(true)}
-            className="mt-4 inline-flex w-full items-center justify-center gap-1.5 rounded-md border border-dashed border-neutral-300 px-3 py-2 text-xs font-medium text-[#0F2540] hover:border-[#1B3A5F] hover:bg-neutral-50 hover:text-[#1B3A5F]"
+            style={{
+              marginTop: 12,
+              width: '100%',
+              padding: '8px 12px',
+              border: `1px dashed ${ADMIN_COLORS.borderInput}`,
+              borderRadius: 8,
+              background: '#FFFFFF',
+              color: ADMIN_COLORS.primaryDeep,
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 6,
+              fontFamily: 'inherit',
+            }}
           >
-            <Plus className="h-3.5 w-3.5" />
+            <Plus size={13} />
             Add section
           </button>
         </div>
 
-        {/* Center pane — editor */}
-        <div className="border-r border-neutral-200 bg-[#F7F9FC] px-5 py-5 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto">
+        <div
+          style={{
+            background: ADMIN_COLORS.pageBg,
+            borderRight: `1px solid ${ADMIN_COLORS.border}`,
+            padding: 20,
+            maxHeight: 'calc(100vh - 64px)',
+            overflowY: 'auto',
+          }}
+        >
           {selected ? (
             <>
-              <div className="mb-4">
-                <p className="text-[10px] font-medium tracking-[0.16em] uppercase text-neutral-500">
+              <div style={{ marginBottom: 14 }}>
+                <p
+                  style={{
+                    margin: 0,
+                    fontSize: 10,
+                    fontWeight: 700,
+                    letterSpacing: '0.16em',
+                    textTransform: 'uppercase',
+                    color: ADMIN_COLORS.textMuted,
+                  }}
+                >
                   Editing
                 </p>
-                <p className="mt-0.5 text-sm font-semibold text-[#0F1B2D]">
+                <p
+                  style={{
+                    margin: '2px 0 0',
+                    fontSize: 13,
+                    fontWeight: 700,
+                    color: ADMIN_COLORS.textHeading,
+                  }}
+                >
                   {getSectionMeta(selected.section_type)?.label ?? selected.section_type}
                 </p>
               </div>
-              <div className="rounded-lg border border-neutral-200 bg-white p-5 shadow-[0_1px_2px_rgba(15,27,45,0.04)]">
+              <div
+                style={{
+                  background: '#FFFFFF',
+                  border: `1px solid ${ADMIN_COLORS.border}`,
+                  borderRadius: 12,
+                  padding: 20,
+                }}
+              >
                 <SectionEditorPanel
                   sectionType={selected.section_type}
                   content={selected.content}
@@ -296,37 +436,80 @@ export function PageBuilder({
               </div>
             </>
           ) : (
-            <p className="text-sm text-neutral-500">Select a section to edit.</p>
+            <p style={{ fontSize: 13, color: ADMIN_COLORS.textMuted }}>
+              Select a section to edit.
+            </p>
           )}
         </div>
 
-        {/* Right pane — preview iframe */}
-        <div className="flex flex-col bg-neutral-100 lg:max-h-[calc(100vh-7rem)]">
-          <div className="flex items-center justify-between border-b border-neutral-200 bg-white px-4 py-2">
-            <p className="text-[10px] font-medium tracking-[0.16em] uppercase text-neutral-500">
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            background: '#F3F4F6',
+            maxHeight: 'calc(100vh - 64px)',
+          }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '8px 12px',
+              background: '#FFFFFF',
+              borderBottom: `1px solid ${ADMIN_COLORS.border}`,
+            }}
+          >
+            <p
+              style={{
+                margin: 0,
+                fontSize: 10,
+                fontWeight: 700,
+                letterSpacing: '0.16em',
+                textTransform: 'uppercase',
+                color: ADMIN_COLORS.textMuted,
+              }}
+            >
               Preview
             </p>
             <button
               type="button"
               onClick={() => setPreviewKey((k) => k + 1)}
-              className="inline-flex items-center gap-1 rounded-md border border-neutral-200 bg-white px-2 py-1 text-[11px] text-[#0F2540] hover:border-[#1B3A5F] hover:text-[#1B3A5F]"
+              style={{
+                ...adminButtonGhost,
+                padding: '4px 10px',
+                fontSize: 11,
+              }}
               aria-label="Refresh preview"
               title="Refresh preview"
             >
-              <RefreshCw className="h-3 w-3" />
-              Refresh
+              <RefreshCw size={12} /> Refresh
             </button>
           </div>
           <iframe
             key={previewKey}
             src={previewHref}
             title={`Preview of ${pageSlug}`}
-            className="h-full min-h-[60vh] w-full bg-white"
+            style={{
+              flex: 1,
+              minHeight: '60vh',
+              width: '100%',
+              background: '#FFFFFF',
+              border: 'none',
+            }}
           />
           {dirty && (
-            <p className="border-t border-neutral-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-900">
-              Preview reflects the last <strong>saved</strong> state. Unsaved edits will appear
-              after Save.
+            <p
+              style={{
+                margin: 0,
+                padding: '8px 12px',
+                background: ADMIN_COLORS.warningBg,
+                color: ADMIN_COLORS.warning,
+                fontSize: 11,
+                borderTop: `1px solid ${ADMIN_COLORS.border}`,
+              }}
+            >
+              Preview reflects the last <strong>saved</strong> state. Unsaved edits will appear after Save.
             </p>
           )}
         </div>
@@ -368,43 +551,82 @@ function SortableSectionItem({
     useSortable({ id: section.id });
   const meta = getSectionMeta(section.section_type);
 
-  const style: React.CSSProperties = {
+  const style: CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.6 : 1,
+    display: 'flex',
+    alignItems: 'center',
+    gap: 4,
+    padding: '6px 8px',
+    background: '#FFFFFF',
+    border: `1px solid ${active ? ADMIN_COLORS.primary : ADMIN_COLORS.border}`,
+    borderRadius: 8,
+    boxShadow: active ? `0 0 0 2px rgba(27,58,95,0.18)` : 'none',
+  };
+
+  const iconBtn: CSSProperties = {
+    width: 26,
+    height: 26,
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    background: 'transparent',
+    border: 'none',
+    color: ADMIN_COLORS.textMicro,
+    cursor: 'pointer',
+    borderRadius: 4,
   };
 
   return (
-    <li
-      ref={setNodeRef}
-      style={style}
-      className={
-        'group flex items-center gap-1 rounded-md border bg-white px-2 py-1.5 ' +
-        (active ? 'border-[#1B3A5F] ring-1 ring-[#1B3A5F]/20' : 'border-neutral-200')
-      }
-    >
+    <li ref={setNodeRef} style={style}>
       <button
         type="button"
         {...attributes}
         {...listeners}
         aria-label="Drag to reorder"
-        className="inline-flex h-7 w-5 cursor-grab items-center justify-center text-neutral-400 hover:text-[#0F2540] active:cursor-grabbing"
+        style={{ ...iconBtn, cursor: 'grab' }}
       >
-        <GripVertical className="h-3.5 w-3.5" />
+        <GripVertical size={13} />
       </button>
       <button
         type="button"
         onClick={onSelect}
-        className="min-w-0 flex-1 text-left"
+        style={{
+          minWidth: 0,
+          flex: 1,
+          textAlign: 'left',
+          background: 'transparent',
+          border: 'none',
+          padding: 0,
+          cursor: 'pointer',
+          fontFamily: 'inherit',
+        }}
       >
         <p
-          className={
-            'truncate text-sm font-medium ' + (active ? 'text-[#1B3A5F]' : 'text-[#0F1B2D]')
-          }
+          style={{
+            margin: 0,
+            fontSize: 13,
+            fontWeight: 600,
+            color: active ? ADMIN_COLORS.primary : ADMIN_COLORS.textHeading,
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}
         >
           {meta?.label ?? section.section_type}
         </p>
-        <p className="truncate font-mono text-[10px] text-neutral-500">
+        <p
+          style={{
+            margin: '1px 0 0',
+            fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+            fontSize: 10,
+            color: ADMIN_COLORS.textMuted,
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}
+        >
           {section.section_type}
         </p>
       </button>
@@ -413,21 +635,18 @@ function SortableSectionItem({
         onClick={onToggleVisible}
         title={section.visible ? 'Visible' : 'Hidden'}
         aria-label={section.visible ? 'Hide section' : 'Show section'}
-        className={
-          'inline-flex h-7 w-7 items-center justify-center rounded text-neutral-400 hover:text-[#0F2540] ' +
-          (section.visible ? '' : 'text-neutral-300')
-        }
+        style={iconBtn}
       >
-        {section.visible ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
+        {section.visible ? <Eye size={13} /> : <EyeOff size={13} />}
       </button>
       <button
         type="button"
         onClick={onRequestDelete}
         title="Delete section"
         aria-label="Delete section"
-        className="inline-flex h-7 w-7 items-center justify-center rounded text-neutral-400 hover:bg-red-50 hover:text-red-600"
+        style={iconBtn}
       >
-        <Trash2 className="h-3.5 w-3.5" />
+        <Trash2 size={13} />
       </button>
     </li>
   );

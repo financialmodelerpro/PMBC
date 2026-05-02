@@ -1,6 +1,7 @@
 'use client';
 
 import { RichTextEditor } from '@/components/admin/RichTextEditor';
+import { adminLabel } from '@/lib/admin/styles';
 
 import type { SectionEditorProps } from './types';
 
@@ -8,7 +9,7 @@ export function ParagraphsEditor({ content, onChange }: SectionEditorProps) {
   const html = typeof content.html === 'string' ? content.html : '';
   return (
     <div>
-      <p className="mb-2 text-xs font-medium text-[#0F2540]">Body</p>
+      <p style={adminLabel}>Body</p>
       <RichTextEditor
         value={html}
         onChange={(next) => onChange({ ...content, html: next })}

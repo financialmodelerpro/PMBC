@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 
 import { fetchPage, fetchPageSections } from '@/lib/cms/pages';
 import { sectionFromRow } from '@/lib/cms/serializers';
+import { ADMIN_COLORS } from '@/lib/admin/styles';
 
 import { PageBuilder } from './PageBuilder';
 
@@ -30,11 +31,21 @@ export default async function PageBuilderPage(props: { params: Promise<Params> }
   const initial = sections.map(sectionFromRow);
 
   return (
-    <PageBuilder
-      pageSlug={page.slug}
-      pageTitle={page.title}
-      pageStatus={page.status}
-      initialSections={initial}
-    />
+    <div
+      style={{
+        flex: 1,
+        background: ADMIN_COLORS.pageBg,
+        display: 'flex',
+        flexDirection: 'column',
+        minHeight: '100vh',
+      }}
+    >
+      <PageBuilder
+        pageSlug={page.slug}
+        pageTitle={page.title}
+        pageStatus={page.status}
+        initialSections={initial}
+      />
+    </div>
   );
 }

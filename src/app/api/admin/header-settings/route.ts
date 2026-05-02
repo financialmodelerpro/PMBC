@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { getAdminSession } from '@/lib/auth/requireAdmin';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { writeAudit } from '@/lib/audit';
+import type { TablesInsert } from '@/types/database';
 
 const navItemSchema = z.object({
   label: z.string().min(1),
@@ -18,7 +19,7 @@ const configSchema = z.object({
   mobile_menu_enabled: z.boolean(),
 });
 
-export async function POST(req: Request) {
+async function handleMutation(req: Request) {
   const session = await getAdminSession();
   if (!session) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -40,17 +41,45 @@ export async function POST(req: Request) {
   }
 
   const supabase = createSupabaseServerClient();
+  const now = new Date().toISOString();
+
+  // Per FMP namespace convention: each setting is its own (section, key) row.
+  const upserts: TablesInsert<'cms_content'>[] = [
+    {
+      section: 'header_settings',
+      key: 'nav_items',
+      value: JSON.stringify(parsed.data.nav_items),
+      updated_at: now,
+    },
+    {
+      section: 'header_settings',
+      key: 'cta_label',
+      value: parsed.data.cta_label,
+      updated_at: now,
+    },
+    {
+      section: 'header_settings',
+      key: 'cta_href',
+      value: parsed.data.cta_href,
+      updated_at: now,
+    },
+    {
+      section: 'header_settings',
+      key: 'show_cta',
+      value: parsed.data.show_cta ? 'true' : 'false',
+      updated_at: now,
+    },
+    {
+      section: 'header_settings',
+      key: 'mobile_menu_enabled',
+      value: parsed.data.mobile_menu_enabled ? 'true' : 'false',
+      updated_at: now,
+    },
+  ];
+
   const { error } = await supabase
     .from('cms_content')
-    .upsert(
-      {
-        section: 'header_settings',
-        key: 'config',
-        value: JSON.stringify(parsed.data),
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: 'section,key' },
-    );
+    .upsert(upserts, { onConflict: 'section,key' });
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -60,9 +89,15 @@ export async function POST(req: Request) {
     adminId: session.user.id,
     action: 'update',
     entityType: 'header_settings',
-    entityId: 'config',
-    metadata: { nav_count: parsed.data.nav_items.length },
+    entityId: 'all',
+    metadata: {
+      nav_count: parsed.data.nav_items.length,
+      keys: upserts.map((u) => u.key),
+    },
   });
 
   return NextResponse.json({ ok: true });
 }
+
+export const PATCH = handleMutation;
+export const POST = handleMutation;

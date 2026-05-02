@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 
 import { AdminPageHeader } from '@/components/admin/AdminPageHeader';
 import { fetchAllContent } from '@/lib/cms/content';
+import { adminPageMain } from '@/lib/admin/styles';
 
 import { ContentEditor } from './ContentEditor';
 
@@ -13,21 +14,24 @@ export const metadata: Metadata = {
 };
 
 export default async function ContentAdminPage() {
-  // Header settings live in cms_content too, but they're managed via /admin/header-settings
-  // because the value is a JSON blob. Hide that single key here to avoid confusion.
+  // Header navigation lives in cms_content under (header_settings, nav_items) but
+  // is edited via the dedicated /admin/header-settings UI. Hide that one row here
+  // to avoid double-editing.
   const all = await fetchAllContent();
   const visible = all.filter(
-    (r) => !(r.section === 'header_settings' && r.key === 'config'),
+    (r) => !(r.section === 'header_settings' && r.key === 'nav_items'),
   );
 
   return (
-    <div className="mx-auto max-w-5xl">
-      <AdminPageHeader
-        eyebrow="Admin"
-        title="Content"
-        description="Key-value content for the public site. Grouped by section. Header navigation is edited under Header Settings."
-      />
-      <ContentEditor initial={visible} />
+    <div style={adminPageMain}>
+      <div style={{ maxWidth: 1100, margin: '0 auto' }}>
+        <AdminPageHeader
+          eyebrow="Admin"
+          title="Content"
+          description="Key-value content for the public site. Grouped by section. Header navigation is edited under Header Settings."
+        />
+        <ContentEditor initial={visible} />
+      </div>
     </div>
   );
 }

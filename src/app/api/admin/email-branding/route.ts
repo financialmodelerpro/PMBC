@@ -14,7 +14,7 @@ const bodySchema = z.object({
   footer_html: z.string().nullable(),
 });
 
-export async function POST(req: Request) {
+async function handleMutation(req: Request) {
   const session = await getAdminSession();
   if (!session) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -55,3 +55,6 @@ export async function POST(req: Request) {
 
   return NextResponse.json({ ok: true });
 }
+
+export const PATCH = handleMutation;
+export const POST = handleMutation;

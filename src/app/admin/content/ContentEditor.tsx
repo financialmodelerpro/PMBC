@@ -1,10 +1,19 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type CSSProperties } from 'react';
 import { ChevronDown, Plus, Trash2 } from 'lucide-react';
 
 import { SaveStatus, type SaveState } from '@/components/admin/SaveStatus';
 import { ConfirmDialog } from '@/components/admin/ConfirmDialog';
+import {
+  ADMIN_COLORS,
+  adminButtonGhost,
+  adminButtonIcon,
+  adminButtonPrimary,
+  adminButtonPrimaryDisabled,
+  adminInput,
+  adminTextarea,
+} from '@/lib/admin/styles';
 import type { ContentRow } from '@/lib/cms/content';
 
 type Row = {
@@ -17,7 +26,7 @@ type Row = {
 
 type SectionState = {
   rows: Row[];
-  deletes: string[]; // original keys to delete on save
+  deletes: string[];
   state: SaveState;
   errMsg?: string;
   open: boolean;
@@ -90,10 +99,7 @@ export function ContentEditor({ initial }: { initial: ContentRow[] }) {
         ...s,
         [section]: {
           ...sec,
-          rows: [
-            ...sec.rows,
-            { key: '', value: '', multiline: false, isNew: true },
-          ],
+          rows: [...sec.rows, { key: '', value: '', multiline: false, isNew: true }],
         },
       };
     });
@@ -120,7 +126,6 @@ export function ContentEditor({ initial }: { initial: ContentRow[] }) {
   const saveSection = async (section: string) => {
     const sec = sections[section];
 
-    // Validate keys: non-empty, no duplicates, valid characters.
     const seen = new Set<string>();
     for (const r of sec.rows) {
       if (!r.key || !KEY_RX.test(r.key)) {
@@ -137,7 +142,6 @@ export function ContentEditor({ initial }: { initial: ContentRow[] }) {
       seen.add(r.key);
     }
 
-    // For renamed keys, the original goes into deletes; the new key is upserted.
     const extraDeletes: string[] = [];
     for (const r of sec.rows) {
       if (r.originalKey && r.originalKey !== r.key) {
@@ -148,7 +152,7 @@ export function ContentEditor({ initial }: { initial: ContentRow[] }) {
     updateSection(section, { state: 'saving', errMsg: undefined });
     try {
       const res = await fetch('/api/admin/content', {
-        method: 'POST',
+        method: 'PATCH',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           section,
@@ -160,7 +164,6 @@ export function ContentEditor({ initial }: { initial: ContentRow[] }) {
         const body = await res.json().catch(() => ({}));
         throw new Error(body.error ?? 'Save failed');
       }
-      // Mark new rows as no-longer-new and reset deletes; align originalKey.
       setSections((s) => {
         const cur = s[section];
         return {
@@ -181,7 +184,16 @@ export function ContentEditor({ initial }: { initial: ContentRow[] }) {
 
   if (grouped.length === 0) {
     return (
-      <div className="rounded-lg border border-neutral-200 bg-white p-6 text-sm text-neutral-500">
+      <div
+        style={{
+          background: '#FFFFFF',
+          border: `1px solid ${ADMIN_COLORS.border}`,
+          borderRadius: 12,
+          padding: 24,
+          fontSize: 13,
+          color: ADMIN_COLORS.textMuted,
+        }}
+      >
         No cms_content rows found. Run migration 006 to seed defaults.
       </div>
     );
@@ -189,39 +201,71 @@ export function ContentEditor({ initial }: { initial: ContentRow[] }) {
 
   return (
     <>
-      <div className="space-y-4">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         {grouped.map(([sectionName]) => {
           const sec = sections[sectionName];
           return (
             <div
               key={sectionName}
-              className="overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-[0_1px_2px_rgba(15,27,45,0.04)]"
+              style={{
+                background: '#FFFFFF',
+                border: `1px solid ${ADMIN_COLORS.border}`,
+                borderRadius: 12,
+                overflow: 'hidden',
+              }}
             >
               <button
                 type="button"
                 onClick={() => updateSection(sectionName, { open: !sec.open })}
-                className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left"
+                style={accordionToggleStyle}
               >
                 <div>
-                  <p className="text-[10px] font-medium tracking-[0.18em] uppercase text-neutral-500">
+                  <p
+                    style={{
+                      margin: 0,
+                      fontSize: 10,
+                      fontWeight: 700,
+                      letterSpacing: '0.18em',
+                      textTransform: 'uppercase',
+                      color: ADMIN_COLORS.textMuted,
+                    }}
+                  >
                     Section
                   </p>
-                  <p className="mt-0.5 font-mono text-sm text-[#0F1B2D]">{sectionName}</p>
+                  <p
+                    style={{
+                      margin: '2px 0 0',
+                      fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+                      fontSize: 13,
+                      color: ADMIN_COLORS.textHeading,
+                    }}
+                  >
+                    {sectionName}
+                  </p>
                 </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-xs text-neutral-500">{sec.rows.length} keys</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <span style={{ fontSize: 12, color: ADMIN_COLORS.textMuted }}>
+                    {sec.rows.length} keys
+                  </span>
                   <ChevronDown
-                    className={
-                      'h-4 w-4 text-neutral-400 transition-transform ' +
-                      (sec.open ? 'rotate-180' : '')
-                    }
+                    size={16}
+                    style={{
+                      color: ADMIN_COLORS.textMicro,
+                      transform: sec.open ? 'rotate(180deg)' : 'rotate(0deg)',
+                      transition: 'transform 120ms ease',
+                    }}
                   />
                 </div>
               </button>
 
               {sec.open && (
-                <div className="border-t border-neutral-200 px-5 py-4">
-                  <div className="space-y-3">
+                <div
+                  style={{
+                    padding: 18,
+                    borderTop: `1px solid ${ADMIN_COLORS.border}`,
+                  }}
+                >
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                     {sec.rows.map((r, idx) => (
                       <RowEditor
                         key={`${sectionName}-${idx}`}
@@ -231,22 +275,36 @@ export function ContentEditor({ initial }: { initial: ContentRow[] }) {
                       />
                     ))}
                   </div>
-                  <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-neutral-100 pt-4">
+                  <div
+                    style={{
+                      marginTop: 14,
+                      paddingTop: 14,
+                      borderTop: `1px solid #F3F4F6`,
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 12,
+                    }}
+                  >
                     <button
                       type="button"
                       onClick={() => addRow(sectionName)}
-                      className="inline-flex items-center gap-1.5 rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-xs font-medium text-[#0F2540] hover:border-[#1B3A5F] hover:text-[#1B3A5F]"
+                      style={adminButtonGhost}
                     >
-                      <Plus className="h-3.5 w-3.5" />
-                      Add key
+                      <Plus size={13} /> Add key
                     </button>
-                    <div className="flex items-center gap-3">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                       <SaveStatus state={sec.state} message={sec.errMsg} />
                       <button
                         type="button"
                         onClick={() => saveSection(sectionName)}
                         disabled={sec.state === 'saving'}
-                        className="rounded-md bg-[#1B3A5F] px-4 py-1.5 text-sm font-medium text-white hover:bg-[#0F2540] disabled:cursor-not-allowed disabled:opacity-60"
+                        style={
+                          sec.state === 'saving'
+                            ? adminButtonPrimaryDisabled
+                            : adminButtonPrimary
+                        }
                       >
                         {sec.state === 'saving' ? 'Saving…' : 'Save section'}
                       </button>
@@ -272,6 +330,20 @@ export function ContentEditor({ initial }: { initial: ContentRow[] }) {
   );
 }
 
+const accordionToggleStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: 12,
+  width: '100%',
+  padding: '14px 18px',
+  background: '#FFFFFF',
+  border: 'none',
+  cursor: 'pointer',
+  textAlign: 'left',
+  fontFamily: 'inherit',
+};
+
 function RowEditor({
   row,
   onChange,
@@ -282,25 +354,45 @@ function RowEditor({
   onDelete: () => void;
 }) {
   const keyValid = !row.key || KEY_RX.test(row.key);
+  const keyInputStyle: CSSProperties = {
+    ...adminInput,
+    fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+    fontSize: 12,
+    border: `1px solid ${keyValid ? ADMIN_COLORS.borderInput : '#FCA5A5'}`,
+  };
+
   return (
-    <div className="grid grid-cols-1 gap-2 md:grid-cols-[220px_1fr_auto] md:items-start">
+    <div
+      style={{
+        display: 'grid',
+        gridTemplateColumns: '220px 1fr auto',
+        gap: 8,
+        alignItems: 'start',
+      }}
+    >
       <div>
         <input
           type="text"
           value={row.key}
           onChange={(e) => onChange({ key: e.target.value })}
           placeholder="key_name"
-          className={
-            'block w-full rounded-md border bg-white px-3 py-2 font-mono text-[13px] outline-none focus:ring-2 focus:ring-[#1B3A5F]/15 ' +
-            (keyValid ? 'border-neutral-300 focus:border-[#1B3A5F]' : 'border-red-300 focus:border-red-500')
-          }
+          style={keyInputStyle}
         />
-        <label className="mt-1.5 inline-flex items-center gap-1.5 text-[11px] text-neutral-500">
+        <label
+          style={{
+            marginTop: 6,
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            fontSize: 11,
+            color: ADMIN_COLORS.textMuted,
+          }}
+        >
           <input
             type="checkbox"
             checked={row.multiline}
             onChange={(e) => onChange({ multiline: e.target.checked })}
-            className="h-3 w-3"
+            style={{ width: 12, height: 12 }}
           />
           Multiline
         </label>
@@ -311,25 +403,25 @@ function RowEditor({
             value={row.value}
             onChange={(e) => onChange({ value: e.target.value })}
             rows={4}
-            className="block w-full resize-y rounded-md border border-neutral-300 bg-white px-3 py-2 text-[14px] text-[#0F1B2D] outline-none focus:border-[#1B3A5F] focus:ring-2 focus:ring-[#1B3A5F]/15"
+            style={adminTextarea}
           />
         ) : (
           <input
             type="text"
             value={row.value}
             onChange={(e) => onChange({ value: e.target.value })}
-            className="block w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-[14px] text-[#0F1B2D] outline-none focus:border-[#1B3A5F] focus:ring-2 focus:ring-[#1B3A5F]/15"
+            style={adminInput}
           />
         )}
       </div>
       <button
         type="button"
         onClick={onDelete}
-        className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-neutral-200 text-neutral-500 transition hover:border-red-200 hover:bg-red-50 hover:text-red-600"
+        style={adminButtonIcon}
         aria-label="Delete row"
         title="Delete row"
       >
-        <Trash2 className="h-4 w-4" />
+        <Trash2 size={15} />
       </button>
     </div>
   );

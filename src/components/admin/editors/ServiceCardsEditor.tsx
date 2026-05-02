@@ -1,5 +1,6 @@
 'use client';
 
+import { type CSSProperties } from 'react';
 import {
   DndContext,
   closestCenter,
@@ -19,6 +20,15 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { GripVertical, Plus, Trash2 } from 'lucide-react';
 
+import {
+  ADMIN_COLORS,
+  adminButtonGhost,
+  adminButtonIcon,
+  adminInput,
+  adminLabel,
+  adminTextarea,
+} from '@/lib/admin/styles';
+
 import type { SectionEditorProps } from './types';
 
 type Card = {
@@ -28,9 +38,6 @@ type Card = {
   description: string;
   link: string;
 };
-
-const inputCls =
-  'block w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-[14px] text-[#0F1B2D] outline-none focus:border-[#1B3A5F] focus:ring-2 focus:ring-[#1B3A5F]/15';
 
 let nextId = 0;
 const nid = () => `card_${++nextId}_${Date.now()}`;
@@ -101,34 +108,34 @@ export function ServiceCardsEditor({ content, onChange }: SectionEditorProps) {
   };
 
   return (
-    <div className="space-y-5">
-      <label className="block">
-        <span className="mb-1.5 block text-xs font-medium text-[#0F2540]">
-          Intro (optional)
-        </span>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+      <label style={{ display: 'block' }}>
+        <span style={adminLabel}>Intro (optional)</span>
         <textarea
           value={intro}
           onChange={(e) => writeBack({ intro: e.target.value })}
           rows={2}
-          className={inputCls + ' resize-y'}
+          style={adminTextarea}
         />
       </label>
 
       <div>
-        <div className="mb-2 flex items-center justify-between">
-          <p className="text-xs font-medium text-[#0F2540]">Cards</p>
-          <button
-            type="button"
-            onClick={addCard}
-            className="inline-flex items-center gap-1.5 rounded-md border border-neutral-300 bg-white px-2.5 py-1 text-xs font-medium text-[#0F2540] hover:border-[#1B3A5F] hover:text-[#1B3A5F]"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            Add card
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginBottom: 8,
+          }}
+        >
+          <p style={{ ...adminLabel, marginBottom: 0 }}>Cards</p>
+          <button type="button" onClick={addCard} style={adminButtonGhost}>
+            <Plus size={13} /> Add card
           </button>
         </div>
 
         {cards.length === 0 ? (
-          <p className="text-xs text-neutral-500">No cards yet.</p>
+          <p style={{ fontSize: 12, color: ADMIN_COLORS.textMuted }}>No cards yet.</p>
         ) : (
           <DndContext
             sensors={sensors}
@@ -139,7 +146,16 @@ export function ServiceCardsEditor({ content, onChange }: SectionEditorProps) {
               items={cards.map((c) => c.id)}
               strategy={verticalListSortingStrategy}
             >
-              <ul className="space-y-2">
+              <ul
+                style={{
+                  listStyle: 'none',
+                  margin: 0,
+                  padding: 0,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 8,
+                }}
+              >
                 {cards.map((card) => (
                   <SortableCard
                     key={card.id}
@@ -169,42 +185,66 @@ function SortableCard({
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: card.id });
 
-  const style: React.CSSProperties = {
+  const style: CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.6 : 1,
+    background: '#FFFFFF',
+    border: `1px solid ${ADMIN_COLORS.border}`,
+    borderRadius: 10,
+    padding: 12,
+  };
+
+  const dragBtn: CSSProperties = {
+    width: 26,
+    height: 28,
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    background: 'transparent',
+    border: 'none',
+    color: ADMIN_COLORS.textMicro,
+    cursor: 'grab',
+    marginTop: 4,
   };
 
   return (
-    <li
-      ref={setNodeRef}
-      style={style}
-      className="rounded-md border border-neutral-200 bg-white p-3"
-    >
-      <div className="flex items-start gap-2">
+    <li style={style} ref={setNodeRef}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
         <button
           type="button"
           {...attributes}
           {...listeners}
           aria-label="Drag to reorder"
-          className="mt-1 inline-flex h-7 w-6 cursor-grab items-center justify-center text-neutral-400 hover:text-[#0F2540] active:cursor-grabbing"
+          style={dragBtn}
         >
-          <GripVertical className="h-4 w-4" />
+          <GripVertical size={15} />
         </button>
-        <div className="grid flex-1 grid-cols-[80px_1fr] gap-2">
+        <div
+          style={{
+            flex: 1,
+            display: 'grid',
+            gridTemplateColumns: '80px 1fr',
+            gap: 8,
+          }}
+        >
           <input
             type="text"
             value={card.number}
             onChange={(e) => onUpdate({ number: e.target.value })}
             placeholder="01"
-            className={inputCls + ' text-center font-mono'}
+            style={{
+              ...adminInput,
+              textAlign: 'center',
+              fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+            }}
           />
           <input
             type="text"
             value={card.title}
             onChange={(e) => onUpdate({ title: e.target.value })}
             placeholder="Title"
-            className={inputCls}
+            style={adminInput}
           />
           <div />
           <textarea
@@ -212,7 +252,7 @@ function SortableCard({
             onChange={(e) => onUpdate({ description: e.target.value })}
             rows={2}
             placeholder="Description"
-            className={inputCls + ' resize-y'}
+            style={adminTextarea}
           />
           <div />
           <input
@@ -220,16 +260,16 @@ function SortableCard({
             value={card.link}
             onChange={(e) => onUpdate({ link: e.target.value })}
             placeholder="/services/financial-modeling"
-            className={inputCls}
+            style={adminInput}
           />
         </div>
         <button
           type="button"
           onClick={onRemove}
           aria-label="Remove card"
-          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-neutral-200 text-neutral-500 hover:border-red-200 hover:bg-red-50 hover:text-red-600"
+          style={adminButtonIcon}
         >
-          <Trash2 className="h-4 w-4" />
+          <Trash2 size={15} />
         </button>
       </div>
     </li>

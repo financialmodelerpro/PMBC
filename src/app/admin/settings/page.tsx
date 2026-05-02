@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 
 import { AdminPageHeader } from '@/components/admin/AdminPageHeader';
 import { fetchSiteSettings } from '@/lib/cms/settings';
+import { adminPageMain } from '@/lib/admin/styles';
 
 import { SettingsForm } from './SettingsForm';
 
@@ -15,13 +16,15 @@ export const metadata: Metadata = {
 export default async function SettingsAdminPage() {
   const settings = await fetchSiteSettings();
   return (
-    <div className="mx-auto max-w-3xl">
-      <AdminPageHeader
-        eyebrow="Admin"
-        title="Site Settings"
-        description="Contact details, social links, default OG image, and analytics. Stored as a single JSONB blob."
-      />
-      <SettingsForm initial={settings} />
+    <div style={adminPageMain}>
+      <div style={{ maxWidth: 720, margin: '0 auto' }}>
+        <AdminPageHeader
+          eyebrow="Admin"
+          title="Site Settings"
+          description="Contact details, social links, default OG image, and analytics. Stored as a single JSONB blob."
+        />
+        <SettingsForm initial={settings} />
+      </div>
     </div>
   );
 }

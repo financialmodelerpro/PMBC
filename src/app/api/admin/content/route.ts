@@ -4,13 +4,14 @@ import { z } from 'zod';
 import { getAdminSession } from '@/lib/auth/requireAdmin';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { writeAudit } from '@/lib/audit';
-import type { TablesInsert } from '@/types/database';
 
 const SECTION_RX = /^[a-z0-9_]+$/;
 const KEY_RX = /^[a-zA-Z0-9_.-]+$/;
 
 const bodySchema = z.object({
-  section: z.string().regex(SECTION_RX, 'section must be lowercase letters/numbers/underscores'),
+  section: z
+    .string()
+    .regex(SECTION_RX, 'section must be lowercase letters/numbers/underscores'),
   upserts: z
     .array(
       z.object({
@@ -22,7 +23,27 @@ const bodySchema = z.object({
   deletes: z.array(z.string()).default([]),
 });
 
-export async function POST(req: Request) {
+export async function GET(req: Request) {
+  const session = await getAdminSession();
+  if (!session) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const url = new URL(req.url);
+  const section = url.searchParams.get('section');
+  const supabase = createSupabaseServerClient();
+
+  let query = supabase.from('cms_content').select('section, key, value, updated_at');
+  if (section) query = query.eq('section', section);
+
+  const { data, error } = await query.order('section').order('key');
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+  return NextResponse.json({ rows: data ?? [] });
+}
+
+async function handleMutation(req: Request) {
   const session = await getAdminSession();
   if (!session) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -46,8 +67,10 @@ export async function POST(req: Request) {
   const { section, upserts, deletes } = parsed.data;
   const supabase = createSupabaseServerClient();
 
+  // PATCH-style upsert per FMP convention: try UPDATE, then INSERT if no row
+  // matched. Using Postgres upsert here is functionally equivalent and atomic.
   if (upserts.length > 0) {
-    const rows: TablesInsert<'cms_content'>[] = upserts.map((u) => ({
+    const rows = upserts.map((u) => ({
       section,
       key: u.key,
       value: u.value,
@@ -85,3 +108,7 @@ export async function POST(req: Request) {
 
   return NextResponse.json({ ok: true });
 }
+
+export const PATCH = handleMutation;
+// Keep POST as a backwards-compatible alias.
+export const POST = handleMutation;

@@ -2,6 +2,12 @@ import type { Metadata } from 'next';
 import { FileText, LayoutTemplate, Inbox, Clock } from 'lucide-react';
 
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import {
+  ADMIN_COLORS,
+  adminCard,
+  adminPageMain,
+} from '@/lib/admin/styles';
+import { AdminPageHeader } from '@/components/admin/AdminPageHeader';
 
 export const metadata: Metadata = {
   title: 'Dashboard — PMBC Admin',
@@ -76,17 +82,65 @@ function StatCard({
   Icon: typeof FileText;
 }) {
   return (
-    <div className="rounded-lg border border-neutral-200 bg-white p-5 shadow-[0_1px_2px_rgba(15,27,45,0.04)]">
-      <div className="flex items-center justify-between">
-        <p className="text-[11px] font-medium tracking-[0.16em] uppercase text-neutral-500">
+    <div
+      style={{
+        background: '#FFFFFF',
+        border: `1px solid ${ADMIN_COLORS.borderSoft}`,
+        borderRadius: 12,
+        padding: '20px 24px',
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 8,
+        }}
+      >
+        <p
+          style={{
+            margin: 0,
+            fontSize: 11,
+            fontWeight: 700,
+            letterSpacing: '0.05em',
+            textTransform: 'uppercase',
+            color: ADMIN_COLORS.textMuted,
+          }}
+        >
           {label}
         </p>
-        <Icon className="h-4 w-4 text-[#1B3A5F]" />
+        <div
+          style={{
+            width: 36,
+            height: 36,
+            borderRadius: 10,
+            background: '#EAF1F9',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: ADMIN_COLORS.primary,
+          }}
+        >
+          <Icon size={17} />
+        </div>
       </div>
-      <p className="mt-3 text-2xl font-semibold tracking-tight text-[#0F1B2D]">
+      <p
+        style={{
+          margin: '14px 0 0',
+          fontSize: 32,
+          fontWeight: 800,
+          color: ADMIN_COLORS.primaryDeep,
+          letterSpacing: '-0.02em',
+        }}
+      >
         {value}
       </p>
-      {hint && <p className="mt-1 text-xs text-neutral-500">{hint}</p>}
+      {hint && (
+        <p style={{ margin: '4px 0 0', fontSize: 12, color: ADMIN_COLORS.textMuted }}>
+          {hint}
+        </p>
+      )}
     </div>
   );
 }
@@ -96,61 +150,86 @@ export default async function AdminDashboardPage() {
   const fmt = (n: number | null) => (n === null ? '—' : String(n));
 
   return (
-    <div className="mx-auto max-w-6xl">
-      <header className="mb-8">
-        <p className="text-[11px] font-medium tracking-[0.18em] uppercase text-[#1B3A5F]">
-          Admin
-        </p>
-        <h1 className="mt-2 text-2xl font-semibold tracking-tight text-[#0F1B2D]">
-          Dashboard
-        </h1>
-        <p className="mt-1 text-sm text-neutral-500">
-          Overview of CMS content and recent activity. Detail panels will come online as features ship.
-        </p>
-      </header>
+    <div style={adminPageMain}>
+      <div style={{ maxWidth: 1200, margin: '0 auto' }}>
+        <AdminPageHeader
+          eyebrow="Admin"
+          title="Dashboard"
+          description="Overview of CMS content and recent activity. Detail panels will come online as features ship."
+        />
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard
-          label="Total Pages"
-          value={fmt(stats.totalPages)}
-          hint="CMS-managed pages"
-          Icon={FileText}
-        />
-        <StatCard
-          label="Total Sections"
-          value={fmt(stats.totalSections)}
-          hint="Across all pages"
-          Icon={LayoutTemplate}
-        />
-        <StatCard
-          label="New Submissions"
-          value={fmt(stats.newSubmissions)}
-          hint="Awaiting response"
-          Icon={Inbox}
-        />
-        <StatCard
-          label="Last Page Updated"
-          value={formatDate(stats.lastUpdatedIso)}
-          Icon={Clock}
-        />
+        <div
+          style={{
+            display: 'grid',
+            gap: 16,
+            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+          }}
+        >
+          <StatCard
+            label="Total Pages"
+            value={fmt(stats.totalPages)}
+            hint="CMS-managed pages"
+            Icon={FileText}
+          />
+          <StatCard
+            label="Total Sections"
+            value={fmt(stats.totalSections)}
+            hint="Across all pages"
+            Icon={LayoutTemplate}
+          />
+          <StatCard
+            label="New Submissions"
+            value={fmt(stats.newSubmissions)}
+            hint="Awaiting response"
+            Icon={Inbox}
+          />
+          <StatCard
+            label="Last Page Updated"
+            value={formatDate(stats.lastUpdatedIso)}
+            Icon={Clock}
+          />
+        </div>
+
+        <section
+          style={{
+            marginTop: 32,
+            display: 'grid',
+            gap: 16,
+            gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+          }}
+        >
+          <div style={adminCard}>
+            <h2
+              style={{
+                margin: 0,
+                fontSize: 14,
+                fontWeight: 700,
+                color: ADMIN_COLORS.textHeading,
+              }}
+            >
+              Recent Contact Submissions
+            </h2>
+            <p style={{ margin: '8px 0 0', fontSize: 13, color: ADMIN_COLORS.textMuted }}>
+              No data yet. Submissions table will be wired up in a later phase.
+            </p>
+          </div>
+          <div style={adminCard}>
+            <h2
+              style={{
+                margin: 0,
+                fontSize: 14,
+                fontWeight: 700,
+                color: ADMIN_COLORS.textHeading,
+              }}
+            >
+              Quick Actions
+            </h2>
+            <p style={{ margin: '8px 0 0', fontSize: 13, color: ADMIN_COLORS.textMuted }}>
+              Page builder, content editor, and branding controls are reachable from the sidebar.
+            </p>
+          </div>
+        </section>
       </div>
-
-      <section className="mt-8 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <div className="rounded-lg border border-neutral-200 bg-white p-6 shadow-[0_1px_2px_rgba(15,27,45,0.04)]">
-          <h2 className="text-sm font-semibold text-[#0F1B2D]">
-            Recent Contact Submissions
-          </h2>
-          <p className="mt-2 text-sm text-neutral-500">
-            No data yet. Submissions table will be wired up in a later phase.
-          </p>
-        </div>
-        <div className="rounded-lg border border-neutral-200 bg-white p-6 shadow-[0_1px_2px_rgba(15,27,45,0.04)]">
-          <h2 className="text-sm font-semibold text-[#0F1B2D]">Quick Actions</h2>
-          <p className="mt-2 text-sm text-neutral-500">
-            Page builder, content editor, and branding controls will appear here as Phase 3 lands.
-          </p>
-        </div>
-      </section>
     </div>
   );
 }

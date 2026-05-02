@@ -2,6 +2,10 @@
 
 import { useEffect } from 'react';
 
+import {
+  ADMIN_COLORS,
+  adminButtonGhost,
+} from '@/lib/admin/styles';
 import { SECTION_TYPES } from '@/lib/cms/sectionTypes';
 
 export function SectionPickerDialog({
@@ -26,49 +30,154 @@ export function SectionPickerDialog({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center"
       role="dialog"
       aria-modal="true"
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 70,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
     >
-      <div className="absolute inset-0 bg-[#0F2540]/50" onClick={onClose} />
-      <div className="relative w-full max-w-2xl overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-lg">
-        <div className="border-b border-neutral-200 px-5 py-4">
-          <h3 className="text-base font-semibold text-[#0F1B2D]">Add section</h3>
-          <p className="mt-1 text-xs text-neutral-500">
+      <div
+        onClick={onClose}
+        style={{
+          position: 'absolute',
+          inset: 0,
+          background: 'rgba(15,37,64,0.5)',
+        }}
+      />
+      <div
+        style={{
+          position: 'relative',
+          width: '100%',
+          maxWidth: 720,
+          margin: 16,
+          background: '#FFFFFF',
+          border: `1px solid ${ADMIN_COLORS.border}`,
+          borderRadius: 12,
+          overflow: 'hidden',
+          boxShadow: '0 12px 32px rgba(0,0,0,0.18)',
+        }}
+      >
+        <div
+          style={{
+            padding: '16px 20px',
+            borderBottom: `1px solid ${ADMIN_COLORS.border}`,
+          }}
+        >
+          <h3
+            style={{
+              margin: 0,
+              fontSize: 15,
+              fontWeight: 700,
+              color: ADMIN_COLORS.textHeading,
+            }}
+          >
+            Add section
+          </h3>
+          <p
+            style={{
+              margin: '4px 0 0',
+              fontSize: 12,
+              color: ADMIN_COLORS.textMuted,
+            }}
+          >
             Pick a section type. Editors marked Phase 6 still create rows but render as
             placeholders for now.
           </p>
         </div>
-        <ul className="grid max-h-[60vh] grid-cols-1 gap-px overflow-y-auto bg-neutral-100 sm:grid-cols-2">
+        <ul
+          style={{
+            listStyle: 'none',
+            margin: 0,
+            padding: 0,
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+            gap: 1,
+            background: ADMIN_COLORS.border,
+            maxHeight: '60vh',
+            overflowY: 'auto',
+          }}
+        >
           {SECTION_TYPES.map((meta) => (
             <li key={meta.type}>
               <button
                 type="button"
                 onClick={() => onPick(meta.type)}
-                className="flex h-full w-full flex-col items-start gap-1 bg-white p-4 text-left transition hover:bg-neutral-50"
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  textAlign: 'left',
+                  background: '#FFFFFF',
+                  border: 'none',
+                  padding: 14,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 4,
+                  fontFamily: 'inherit',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = ADMIN_COLORS.altBg;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = '#FFFFFF';
+                }}
               >
-                <div className="flex items-center gap-2">
-                  <span className="font-mono text-[11px] text-neutral-500">
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span
+                    style={{
+                      fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+                      fontSize: 11,
+                      color: ADMIN_COLORS.textMuted,
+                    }}
+                  >
                     {meta.type}
                   </span>
                   {!meta.implemented && (
-                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-800">
+                    <span
+                      style={{
+                        padding: '1px 8px',
+                        borderRadius: 999,
+                        background: ADMIN_COLORS.warningBg,
+                        color: ADMIN_COLORS.warning,
+                        fontSize: 10,
+                        fontWeight: 600,
+                      }}
+                    >
                       Phase 6
                     </span>
                   )}
                 </div>
-                <p className="text-sm font-medium text-[#0F1B2D]">{meta.label}</p>
-                <p className="text-xs text-neutral-500">{meta.description}</p>
+                <p
+                  style={{
+                    margin: 0,
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: ADMIN_COLORS.textHeading,
+                  }}
+                >
+                  {meta.label}
+                </p>
+                <p style={{ margin: 0, fontSize: 12, color: ADMIN_COLORS.textMuted }}>
+                  {meta.description}
+                </p>
               </button>
             </li>
           ))}
         </ul>
-        <div className="flex justify-end border-t border-neutral-200 px-5 py-3">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-sm text-[#0F1B2D] hover:bg-neutral-50"
-          >
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'flex-end',
+            padding: '12px 20px',
+            borderTop: `1px solid ${ADMIN_COLORS.border}`,
+          }}
+        >
+          <button type="button" onClick={onClose} style={adminButtonGhost}>
             Cancel
           </button>
         </div>

@@ -19,7 +19,24 @@ const bodySchema = z.object({
   accent_color: z.string().regex(HEX, 'accent_color must be a hex'),
 });
 
-export async function POST(req: Request) {
+export async function GET() {
+  const session = await getAdminSession();
+  if (!session) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  const supabase = createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from('branding_config')
+    .select('*')
+    .eq('id', 1)
+    .maybeSingle();
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+  return NextResponse.json({ row: data });
+}
+
+async function handleMutation(req: Request) {
   const session = await getAdminSession();
   if (!session) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -41,10 +58,12 @@ export async function POST(req: Request) {
   }
 
   const supabase = createSupabaseServerClient();
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('branding_config')
     .update({ ...parsed.data, updated_at: new Date().toISOString() })
-    .eq('id', 1);
+    .eq('id', 1)
+    .select('*')
+    .maybeSingle();
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -58,5 +77,8 @@ export async function POST(req: Request) {
     metadata: { fields: Object.keys(parsed.data) },
   });
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ row: data });
 }
+
+export const PATCH = handleMutation;
+export const POST = handleMutation;

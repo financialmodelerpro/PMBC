@@ -5,6 +5,7 @@ import { ParagraphsEditor } from '@/components/admin/editors/ParagraphsEditor';
 import { StatsBlockEditor } from '@/components/admin/editors/StatsBlockEditor';
 import { ServiceCardsEditor } from '@/components/admin/editors/ServiceCardsEditor';
 import type { SectionEditorProps } from '@/components/admin/editors/types';
+import { ADMIN_COLORS } from '@/lib/admin/styles';
 import { getSectionMeta } from '@/lib/cms/sectionTypes';
 
 const EDITORS: Record<string, (props: SectionEditorProps) => React.ReactElement> = {
@@ -28,20 +29,60 @@ export function SectionEditorPanel({
 
   if (!Editor) {
     return (
-      <div className="rounded-lg border border-dashed border-neutral-300 bg-neutral-50 p-6">
-        <p className="text-[10px] font-medium tracking-[0.18em] uppercase text-neutral-500">
+      <div
+        style={{
+          background: '#F9FAFB',
+          border: `1px dashed ${ADMIN_COLORS.borderInput}`,
+          borderRadius: 10,
+          padding: 22,
+        }}
+      >
+        <p
+          style={{
+            margin: 0,
+            fontSize: 10,
+            fontWeight: 700,
+            letterSpacing: '0.18em',
+            textTransform: 'uppercase',
+            color: ADMIN_COLORS.textMuted,
+          }}
+        >
           {meta?.label ?? sectionType}
         </p>
-        <p className="mt-2 text-sm text-neutral-600">
-          Editor for <code className="font-mono">{sectionType}</code> ships in Phase 6. The
-          section row exists in the database; reorder, visibility, and delete still work for
-          it.
+        <p
+          style={{
+            margin: '8px 0 0',
+            fontSize: 13,
+            color: ADMIN_COLORS.textBody,
+          }}
+        >
+          Editor for{' '}
+          <code
+            style={{
+              fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+            }}
+          >
+            {sectionType}
+          </code>{' '}
+          ships in Phase 6. The section row exists in the database; reorder, visibility, and
+          delete still work for it.
         </p>
-        <details className="mt-4">
-          <summary className="cursor-pointer text-xs text-neutral-500">
+        <details style={{ marginTop: 14 }}>
+          <summary style={{ cursor: 'pointer', fontSize: 12, color: ADMIN_COLORS.textMuted }}>
             Inspect raw JSON
           </summary>
-          <pre className="mt-2 max-h-64 overflow-auto rounded bg-neutral-900 p-3 text-[11px] text-neutral-100">
+          <pre
+            style={{
+              marginTop: 8,
+              maxHeight: 256,
+              overflow: 'auto',
+              background: '#0F172A',
+              color: '#F1F5F9',
+              padding: 12,
+              borderRadius: 6,
+              fontSize: 11,
+            }}
+          >
             {JSON.stringify(content, null, 2)}
           </pre>
         </details>

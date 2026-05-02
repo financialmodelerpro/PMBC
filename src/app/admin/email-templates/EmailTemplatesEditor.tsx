@@ -1,9 +1,17 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type CSSProperties } from 'react';
 
 import { SaveStatus, type SaveState } from '@/components/admin/SaveStatus';
 import { RichTextEditor } from '@/components/admin/RichTextEditor';
+import {
+  ADMIN_COLORS,
+  adminButtonPrimary,
+  adminButtonPrimaryDisabled,
+  adminCard,
+  adminInput,
+  adminLabel,
+} from '@/lib/admin/styles';
 import type { EmailTemplate } from '@/lib/cms/emailTemplates';
 import { TEMPLATE_VARIABLES } from '@/lib/cms/emailTemplates';
 
@@ -11,9 +19,6 @@ const TEMPLATE_LABELS: Record<string, string> = {
   contact_notification: 'Contact form — admin notification',
   contact_acknowledgement: 'Contact form — sender acknowledgement',
 };
-
-const inputCls =
-  'block w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-[14px] text-[#0F1B2D] outline-none focus:border-[#1B3A5F] focus:ring-2 focus:ring-[#1B3A5F]/15';
 
 type LocalTemplate = {
   template_key: string;
@@ -66,41 +71,69 @@ export function EmailTemplatesEditor({ initial }: { initial: EmailTemplate[] }) 
 
   if (templates.length === 0) {
     return (
-      <div className="rounded-lg border border-neutral-200 bg-white p-6 text-sm text-neutral-500">
+      <div
+        style={{
+          background: '#FFFFFF',
+          border: `1px solid ${ADMIN_COLORS.border}`,
+          borderRadius: 12,
+          padding: 22,
+          fontSize: 13,
+          color: ADMIN_COLORS.textMuted,
+        }}
+      >
         No email templates found. Run migration 008 to seed defaults.
       </div>
     );
   }
 
   return (
-    <div className="grid gap-6 xl:grid-cols-[220px_1fr_240px]">
+    <div
+      style={{
+        display: 'grid',
+        gap: 18,
+        gridTemplateColumns: '220px minmax(0, 1fr) 240px',
+        alignItems: 'start',
+      }}
+    >
       <aside>
-        <p className="mb-2 text-[11px] font-medium tracking-[0.16em] uppercase text-neutral-500">
+        <p
+          style={{
+            margin: '0 0 8px',
+            fontSize: 11,
+            fontWeight: 700,
+            letterSpacing: '0.1em',
+            textTransform: 'uppercase',
+            color: ADMIN_COLORS.textMuted,
+          }}
+        >
           Templates
         </p>
-        <ul className="space-y-1">
+        <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
           {templates.map((t) => {
             const isActive = t.template_key === activeKey;
             return (
-              <li key={t.template_key}>
+              <li key={t.template_key} style={{ marginBottom: 4 }}>
                 <button
                   type="button"
                   onClick={() => setActiveKey(t.template_key)}
-                  className={
-                    'block w-full rounded-md px-3 py-2 text-left text-sm transition ' +
-                    (isActive
-                      ? 'bg-[#1B3A5F] text-white'
-                      : 'text-[#0F1B2D] hover:bg-neutral-100')
-                  }
+                  style={tplButtonStyle(isActive)}
                 >
-                  <p className="font-medium">
+                  <p
+                    style={{
+                      margin: 0,
+                      fontSize: 13,
+                      fontWeight: 600,
+                    }}
+                  >
                     {TEMPLATE_LABELS[t.template_key] ?? t.template_key}
                   </p>
                   <p
-                    className={
-                      'mt-0.5 font-mono text-[11px] ' +
-                      (isActive ? 'text-white/70' : 'text-neutral-500')
-                    }
+                    style={{
+                      margin: '2px 0 0',
+                      fontFamily: 'ui-monospace, monospace',
+                      fontSize: 11,
+                      color: isActive ? 'rgba(255,255,255,0.7)' : ADMIN_COLORS.textMuted,
+                    }}
                   >
                     {t.template_key}
                   </p>
@@ -112,33 +145,55 @@ export function EmailTemplatesEditor({ initial }: { initial: EmailTemplate[] }) 
       </aside>
 
       {active ? (
-        <div className="space-y-5">
-          <section className="rounded-lg border border-neutral-200 bg-white p-5 shadow-[0_1px_2px_rgba(15,27,45,0.04)]">
-            <div className="flex items-center justify-between gap-4">
-              <h2 className="text-sm font-semibold text-[#0F1B2D]">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+          <section style={adminCard}>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 12,
+              }}
+            >
+              <h2
+                style={{
+                  margin: 0,
+                  fontSize: 14,
+                  fontWeight: 700,
+                  color: ADMIN_COLORS.textHeading,
+                }}
+              >
                 {TEMPLATE_LABELS[active.template_key] ?? active.template_key}
               </h2>
-              <label className="inline-flex items-center gap-2 text-xs text-[#0F1B2D]">
+              <label
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  fontSize: 12,
+                  color: ADMIN_COLORS.textHeading,
+                }}
+              >
                 <input
                   type="checkbox"
                   checked={active.enabled}
                   onChange={(e) => update(active.template_key, { enabled: e.target.checked })}
-                  className="h-4 w-4"
+                  style={{ width: 14, height: 14 }}
                 />
                 Enabled
               </label>
             </div>
-            <label className="mt-4 block">
-              <span className="mb-1.5 block text-xs font-medium text-[#0F2540]">Subject</span>
+            <label style={{ display: 'block', marginTop: 14 }}>
+              <span style={adminLabel}>Subject</span>
               <input
                 type="text"
                 value={active.subject}
                 onChange={(e) => update(active.template_key, { subject: e.target.value })}
-                className={inputCls}
+                style={adminInput}
               />
             </label>
-            <div className="mt-4">
-              <p className="mb-1.5 text-xs font-medium text-[#0F2540]">Body</p>
+            <div style={{ marginTop: 14 }}>
+              <p style={adminLabel}>Body</p>
               <RichTextEditor
                 value={active.body_html}
                 onChange={(html) => update(active.template_key, { body_html: html })}
@@ -148,52 +203,120 @@ export function EmailTemplatesEditor({ initial }: { initial: EmailTemplate[] }) 
             </div>
           </section>
 
-          <div className="flex items-center justify-between border-t border-neutral-200 pt-5">
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              paddingTop: 18,
+              borderTop: `1px solid ${ADMIN_COLORS.border}`,
+            }}
+          >
             <SaveStatus state={state} message={errMsg} />
             <button
               type="button"
               onClick={onSave}
               disabled={state === 'saving'}
-              className="rounded-md bg-[#1B3A5F] px-4 py-2 text-sm font-medium text-white hover:bg-[#0F2540] disabled:cursor-not-allowed disabled:opacity-60"
+              style={state === 'saving' ? adminButtonPrimaryDisabled : adminButtonPrimary}
             >
               {state === 'saving' ? 'Saving…' : 'Save all templates'}
             </button>
           </div>
         </div>
       ) : (
-        <div className="text-sm text-neutral-500">Select a template.</div>
+        <div style={{ fontSize: 13, color: ADMIN_COLORS.textMuted }}>Select a template.</div>
       )}
 
       <aside>
-        <p className="mb-2 text-[11px] font-medium tracking-[0.16em] uppercase text-neutral-500">
+        <p
+          style={{
+            margin: '0 0 8px',
+            fontSize: 11,
+            fontWeight: 700,
+            letterSpacing: '0.1em',
+            textTransform: 'uppercase',
+            color: ADMIN_COLORS.textMuted,
+          }}
+        >
           Available variables
         </p>
-        <div className="rounded-lg border border-neutral-200 bg-white p-4">
+        <div
+          style={{
+            background: '#FFFFFF',
+            border: `1px solid ${ADMIN_COLORS.border}`,
+            borderRadius: 12,
+            padding: 14,
+          }}
+        >
           {active && (TEMPLATE_VARIABLES[active.template_key] ?? []).length > 0 ? (
             <>
-              <p className="mb-2 text-xs text-neutral-500">
-                Use <code className="rounded bg-neutral-100 px-1 py-0.5">{'{{name}}'}</code> syntax
-                inside subject or body. They are substituted at send time.
+              <p
+                style={{
+                  margin: '0 0 10px',
+                  fontSize: 12,
+                  color: ADMIN_COLORS.textMuted,
+                }}
+              >
+                Use{' '}
+                <code
+                  style={{
+                    background: '#F3F4F6',
+                    padding: '1px 6px',
+                    borderRadius: 4,
+                    fontSize: 11,
+                  }}
+                >
+                  {'{{name}}'}
+                </code>{' '}
+                syntax inside subject or body. They are substituted at send time.
               </p>
-              <ul className="space-y-1">
+              <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
                 {(TEMPLATE_VARIABLES[active.template_key] ?? []).map((v) => (
                   <li
                     key={v}
-                    className="flex items-center justify-between rounded border border-neutral-200 bg-neutral-50 px-2.5 py-1.5"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '6px 10px',
+                      background: '#F9FAFB',
+                      border: `1px solid ${ADMIN_COLORS.border}`,
+                      borderRadius: 6,
+                      marginBottom: 4,
+                    }}
                   >
-                    <code className="text-[12px] text-[#0F1B2D]">{`{{${v}}}`}</code>
+                    <code style={{ fontSize: 12, color: ADMIN_COLORS.textHeading }}>
+                      {`{{${v}}}`}
+                    </code>
                     <CopyButton text={`{{${v}}}`} />
                   </li>
                 ))}
               </ul>
             </>
           ) : (
-            <p className="text-xs text-neutral-500">No variables defined for this template.</p>
+            <p style={{ margin: 0, fontSize: 12, color: ADMIN_COLORS.textMuted }}>
+              No variables defined for this template.
+            </p>
           )}
         </div>
       </aside>
     </div>
   );
+}
+
+function tplButtonStyle(active: boolean): CSSProperties {
+  return {
+    width: '100%',
+    textAlign: 'left',
+    padding: '10px 12px',
+    border: `1px solid ${active ? ADMIN_COLORS.primary : ADMIN_COLORS.border}`,
+    background: active ? ADMIN_COLORS.primary : '#FFFFFF',
+    color: active ? '#FFFFFF' : ADMIN_COLORS.textHeading,
+    borderRadius: 8,
+    cursor: 'pointer',
+    fontFamily: 'inherit',
+    transition: 'background 120ms ease, color 120ms ease',
+  };
 }
 
 function CopyButton({ text }: { text: string }) {
@@ -206,7 +329,15 @@ function CopyButton({ text }: { text: string }) {
         setCopied(true);
         setTimeout(() => setCopied(false), 1200);
       }}
-      className="text-[10px] uppercase tracking-wider text-neutral-500 hover:text-[#1B3A5F]"
+      style={{
+        background: 'transparent',
+        border: 'none',
+        fontSize: 10,
+        letterSpacing: '0.08em',
+        textTransform: 'uppercase',
+        color: copied ? ADMIN_COLORS.success : ADMIN_COLORS.textMuted,
+        cursor: 'pointer',
+      }}
     >
       {copied ? 'Copied' : 'Copy'}
     </button>

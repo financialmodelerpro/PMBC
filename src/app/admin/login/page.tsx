@@ -1,6 +1,8 @@
 import { Suspense } from 'react';
 import type { Metadata } from 'next';
 
+import { ADMIN_COLORS } from '@/lib/admin/styles';
+
 import { LoginForm } from './LoginForm';
 
 export const metadata: Metadata = {
@@ -10,27 +12,79 @@ export const metadata: Metadata = {
 
 export default function AdminLoginPage() {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#F7F9FC] px-6 py-16">
-      <div className="w-full max-w-md">
-        <div className="mb-8 text-center">
-          <p className="text-[11px] font-medium tracking-[0.22em] uppercase text-[#1B3A5F]">
+    <main
+      style={{
+        minHeight: '100vh',
+        background: ADMIN_COLORS.pageBg,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '64px 24px',
+        fontFamily:
+          "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif",
+        color: ADMIN_COLORS.textHeading,
+      }}
+    >
+      <div style={{ width: '100%', maxWidth: 420 }}>
+        <div style={{ textAlign: 'center', marginBottom: 32 }}>
+          <p
+            style={{
+              margin: 0,
+              fontSize: 11,
+              fontWeight: 700,
+              letterSpacing: '0.22em',
+              textTransform: 'uppercase',
+              color: ADMIN_COLORS.primary,
+            }}
+          >
             PaceMakers Business Consultants
           </p>
-          <h1 className="mt-3 text-2xl font-semibold tracking-tight text-[#0F1B2D]">
+          <h1
+            style={{
+              margin: '12px 0 0',
+              fontSize: 24,
+              fontWeight: 800,
+              color: ADMIN_COLORS.primaryDeep,
+              letterSpacing: '-0.01em',
+            }}
+          >
             Admin sign in
           </h1>
-          <p className="mt-2 text-sm text-neutral-500">
+          <p
+            style={{
+              margin: '8px 0 0',
+              fontSize: 13,
+              color: ADMIN_COLORS.textMuted,
+            }}
+          >
             Authorized personnel only.
           </p>
         </div>
 
-        <div className="rounded-lg border border-neutral-200 bg-white p-7 shadow-[0_1px_2px_rgba(15,27,45,0.04)]">
+        <div
+          style={{
+            background: '#FFFFFF',
+            border: `1px solid ${ADMIN_COLORS.border}`,
+            borderRadius: 12,
+            padding: 28,
+            boxShadow: '0 1px 2px rgba(15,27,45,0.04)',
+          }}
+        >
           <Suspense fallback={null}>
             <LoginForm />
           </Suspense>
         </div>
 
-        <p className="mt-6 text-center text-[11px] tracking-wider uppercase text-neutral-400">
+        <p
+          style={{
+            marginTop: 24,
+            textAlign: 'center',
+            fontSize: 11,
+            letterSpacing: '0.16em',
+            textTransform: 'uppercase',
+            color: ADMIN_COLORS.textMicro,
+          }}
+        >
           Advisory from Structure to Exit
         </p>
       </div>

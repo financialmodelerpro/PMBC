@@ -1,9 +1,17 @@
 'use client';
 
-import { useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useState, type CSSProperties } from 'react';
+import { useForm, type UseFormRegister } from 'react-hook-form';
 
 import { SaveStatus, type SaveState } from '@/components/admin/SaveStatus';
+import {
+  ADMIN_COLORS,
+  adminButtonPrimary,
+  adminButtonPrimaryDisabled,
+  adminCard,
+  adminInput,
+  adminLabel,
+} from '@/lib/admin/styles';
 import type { BrandingConfig } from '@/lib/cms/branding';
 
 type FormValues = {
@@ -72,29 +80,25 @@ export function BrandingForm({ initial }: { initial: BrandingConfig }) {
   };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="grid gap-8 lg:grid-cols-[1fr_320px]">
-      <div className="space-y-7">
+    <form
+      onSubmit={handleSubmit(onSubmit)}
+      style={{
+        display: 'grid',
+        gap: 24,
+        gridTemplateColumns: 'minmax(0, 1fr) 320px',
+        alignItems: 'start',
+      }}
+    >
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
         <Section title="Identity">
           <Field label="Brand name" hint="Full legal display name">
-            <input
-              {...register('brand_name', { required: true })}
-              className={inputCls}
-              type="text"
-            />
+            <input {...register('brand_name', { required: true })} style={adminInput} type="text" />
           </Field>
           <Field label="Short name" hint="Used in nav and compact contexts">
-            <input
-              {...register('short_name', { required: true })}
-              className={inputCls}
-              type="text"
-            />
+            <input {...register('short_name', { required: true })} style={adminInput} type="text" />
           </Field>
           <Field label="Tagline">
-            <input
-              {...register('tagline', { required: true })}
-              className={inputCls}
-              type="text"
-            />
+            <input {...register('tagline', { required: true })} style={adminInput} type="text" />
           </Field>
         </Section>
 
@@ -102,7 +106,7 @@ export function BrandingForm({ initial }: { initial: BrandingConfig }) {
           <Field label="Logo URL" hint="External URL or /path under public/">
             <input
               {...register('logo_url')}
-              className={inputCls}
+              style={adminInput}
               type="text"
               placeholder="/logo.svg or https://…"
             />
@@ -110,7 +114,7 @@ export function BrandingForm({ initial }: { initial: BrandingConfig }) {
           <Field label="Dark logo URL" hint="Used on dark backgrounds (optional)">
             <input
               {...register('logo_dark_url')}
-              className={inputCls}
+              style={adminInput}
               type="text"
               placeholder="/logo-dark.svg or https://…"
             />
@@ -118,7 +122,7 @@ export function BrandingForm({ initial }: { initial: BrandingConfig }) {
           <Field label="Favicon URL">
             <input
               {...register('favicon_url')}
-              className={inputCls}
+              style={adminInput}
               type="text"
               placeholder="/favicon.ico"
             />
@@ -126,26 +130,57 @@ export function BrandingForm({ initial }: { initial: BrandingConfig }) {
         </Section>
 
         <Section title="Color tokens">
-          <ColorField label="Primary" name="primary_color" register={register} value={v.primary_color} />
+          <ColorField
+            label="Primary"
+            name="primary_color"
+            register={register}
+            value={v.primary_color}
+          />
           <ColorField
             label="Secondary"
             name="secondary_color"
             register={register}
             value={v.secondary_color}
           />
-          <ColorField label="Accent" name="accent_color" register={register} value={v.accent_color} />
+          <ColorField
+            label="Accent"
+            name="accent_color"
+            register={register}
+            value={v.accent_color}
+          />
         </Section>
 
-        <div className="flex items-center justify-between border-t border-neutral-200 pt-5">
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            paddingTop: 20,
+            borderTop: `1px solid ${ADMIN_COLORS.border}`,
+          }}
+        >
           <SaveStatus state={state} message={errMsg} />
-          <button type="submit" disabled={state === 'saving'} className={primaryBtnCls}>
+          <button
+            type="submit"
+            disabled={state === 'saving'}
+            style={state === 'saving' ? adminButtonPrimaryDisabled : adminButtonPrimary}
+          >
             {state === 'saving' ? 'Saving…' : 'Save changes'}
           </button>
         </div>
       </div>
 
-      <aside className="lg:sticky lg:top-20 lg:self-start">
-        <p className="mb-2 text-[11px] font-medium tracking-[0.16em] uppercase text-neutral-500">
+      <aside style={{ position: 'sticky', top: 24, alignSelf: 'start' }}>
+        <p
+          style={{
+            margin: '0 0 8px',
+            fontSize: 11,
+            fontWeight: 700,
+            letterSpacing: '0.1em',
+            textTransform: 'uppercase',
+            color: ADMIN_COLORS.textMuted,
+          }}
+        >
           Preview
         </p>
         <BrandPreview values={v} />
@@ -154,17 +189,20 @@ export function BrandingForm({ initial }: { initial: BrandingConfig }) {
   );
 }
 
-const inputCls =
-  'block w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-[14px] text-[#0F1B2D] outline-none transition focus:border-[#1B3A5F] focus:ring-2 focus:ring-[#1B3A5F]/15';
-
-const primaryBtnCls =
-  'rounded-md bg-[#1B3A5F] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#0F2540] disabled:cursor-not-allowed disabled:opacity-60';
-
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-lg border border-neutral-200 bg-white p-5 shadow-[0_1px_2px_rgba(15,27,45,0.04)]">
-      <h2 className="mb-4 text-sm font-semibold text-[#0F1B2D]">{title}</h2>
-      <div className="space-y-4">{children}</div>
+    <section style={adminCard}>
+      <h2
+        style={{
+          margin: '0 0 16px',
+          fontSize: 14,
+          fontWeight: 700,
+          color: ADMIN_COLORS.textHeading,
+        }}
+      >
+        {title}
+      </h2>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>{children}</div>
     </section>
   );
 }
@@ -179,10 +217,18 @@ function Field({
   children: React.ReactNode;
 }) {
   return (
-    <label className="block">
-      <div className="mb-1.5 flex items-baseline justify-between gap-3">
-        <span className="text-xs font-medium text-[#0F2540]">{label}</span>
-        {hint && <span className="text-[11px] text-neutral-400">{hint}</span>}
+    <label style={{ display: 'block' }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'baseline',
+          justifyContent: 'space-between',
+          gap: 12,
+          marginBottom: 6,
+        }}
+      >
+        <span style={adminLabel}>{label}</span>
+        {hint && <span style={{ fontSize: 11, color: ADMIN_COLORS.textMicro }}>{hint}</span>}
       </div>
       {children}
     </label>
@@ -197,32 +243,48 @@ function ColorField({
 }: {
   label: string;
   name: 'primary_color' | 'secondary_color' | 'accent_color';
-  register: ReturnType<typeof useForm<FormValues>>['register'];
+  register: UseFormRegister<FormValues>;
   value: string;
 }) {
   const valid = HEX.test(value);
   return (
     <Field label={label}>
-      <div className="flex items-center gap-2">
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         <input
           type="color"
           {...register(name)}
-          className="h-10 w-12 cursor-pointer rounded border border-neutral-300 bg-white p-1"
+          style={{
+            width: 44,
+            height: 36,
+            padding: 2,
+            border: `1px solid ${ADMIN_COLORS.borderInput}`,
+            borderRadius: 7,
+            background: '#FFFFFF',
+            cursor: 'pointer',
+          }}
         />
         <input
           type="text"
           {...register(name, { pattern: HEX })}
-          className={inputCls}
+          style={adminInput}
           placeholder="#1B3A5F"
         />
         <span
-          className="h-8 w-8 shrink-0 rounded border border-neutral-200"
-          style={{ background: valid ? value : 'transparent' }}
           aria-hidden
+          style={{
+            width: 32,
+            height: 32,
+            flexShrink: 0,
+            borderRadius: 6,
+            border: `1px solid ${ADMIN_COLORS.border}`,
+            background: valid ? value : 'transparent',
+          }}
         />
       </div>
       {!valid && (
-        <p className="mt-1 text-[11px] text-red-600">Use a hex value like #1B3A5F</p>
+        <p style={{ margin: '6px 0 0', fontSize: 11, color: ADMIN_COLORS.danger }}>
+          Use a hex value like #1B3A5F
+        </p>
       )}
     </Field>
   );
@@ -231,61 +293,91 @@ function ColorField({
 function BrandPreview({ values }: { values: FormValues }) {
   const primary = HEX.test(values.primary_color) ? values.primary_color : '#1B3A5F';
   const accent = HEX.test(values.accent_color) ? values.accent_color : '#D4A93A';
+  const secondary = HEX.test(values.secondary_color) ? values.secondary_color : '#3FA663';
+
+  const chip: CSSProperties = {
+    display: 'inline-flex',
+    alignItems: 'center',
+    padding: '6px 12px',
+    borderRadius: 6,
+    fontSize: 12,
+    fontWeight: 600,
+    color: '#FFFFFF',
+  };
 
   return (
-    <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-[0_1px_2px_rgba(15,27,45,0.04)]">
-      <div className="flex items-center gap-3 px-5 py-4" style={{ background: primary }}>
+    <div
+      style={{
+        background: '#FFFFFF',
+        border: `1px solid ${ADMIN_COLORS.border}`,
+        borderRadius: 12,
+        overflow: 'hidden',
+      }}
+    >
+      <div
+        style={{
+          background: primary,
+          padding: '14px 18px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12,
+        }}
+      >
         {values.logo_url ? (
           <img
             src={values.logo_url}
             alt=""
-            className="h-7 w-auto"
+            style={{ height: 28, width: 'auto' }}
             onError={(e) => {
               (e.currentTarget as HTMLImageElement).style.display = 'none';
             }}
           />
         ) : (
           <span
-            className="text-[10px] tracking-[0.18em] uppercase"
-            style={{ color: '#E8EEF5' }}
+            style={{
+              fontSize: 10,
+              fontWeight: 700,
+              letterSpacing: '0.18em',
+              textTransform: 'uppercase',
+              color: '#E8EEF5',
+            }}
           >
             {values.short_name || 'Logo'}
           </span>
         )}
-        <div className="ml-auto h-px w-10" style={{ background: accent }} />
-        <span className="text-xs text-white/80">Sample header</span>
+        <div style={{ marginLeft: 'auto', height: 1, width: 40, background: accent }} />
+        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)' }}>Sample header</span>
       </div>
-      <div className="px-5 py-5">
-        <p className="text-[10px] tracking-[0.18em] uppercase text-neutral-500">
+      <div style={{ padding: 18 }}>
+        <p
+          style={{
+            margin: 0,
+            fontSize: 10,
+            fontWeight: 700,
+            letterSpacing: '0.16em',
+            textTransform: 'uppercase',
+            color: ADMIN_COLORS.textMuted,
+          }}
+        >
           {values.short_name || 'Short name'}
         </p>
-        <h3 className="mt-2 text-lg font-semibold tracking-tight text-[#0F1B2D]">
+        <h3
+          style={{
+            margin: '6px 0 0',
+            fontSize: 18,
+            fontWeight: 700,
+            color: ADMIN_COLORS.textHeading,
+          }}
+        >
           {values.brand_name || 'Brand name'}
         </h3>
-        <p className="mt-1 text-sm text-neutral-500">
+        <p style={{ margin: '4px 0 0', fontSize: 13, color: ADMIN_COLORS.textMuted }}>
           {values.tagline || 'Tagline appears here'}
         </p>
-        <div className="mt-4 flex gap-2">
-          <span
-            className="inline-flex items-center rounded-md px-3 py-1.5 text-xs font-medium text-white"
-            style={{ background: primary }}
-          >
-            Primary
-          </span>
-          <span
-            className="inline-flex items-center rounded-md px-3 py-1.5 text-xs font-medium text-white"
-            style={{
-              background: HEX.test(values.secondary_color)
-                ? values.secondary_color
-                : '#3FA663',
-            }}
-          >
-            Secondary
-          </span>
-          <span
-            className="inline-flex items-center rounded-md px-3 py-1.5 text-xs font-medium text-[#0F1B2D]"
-            style={{ background: accent }}
-          >
+        <div style={{ marginTop: 14, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          <span style={{ ...chip, background: primary }}>Primary</span>
+          <span style={{ ...chip, background: secondary }}>Secondary</span>
+          <span style={{ ...chip, background: accent, color: ADMIN_COLORS.primaryDeep }}>
             Accent
           </span>
         </div>
