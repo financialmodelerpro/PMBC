@@ -33,7 +33,8 @@ PMBC is the parent entity. Financial Modeler Pro is its flagship platform. The w
 |-------|--------|-------|
 | Phase 1 — Scaffold + DB | ✅ Complete (2026-04-30) | Next.js 15 + Supabase migrations 001-008 applied. |
 | Phase 2 — Auth + Admin Shell | ✅ Complete (2026-05-02) | NextAuth credentials provider, middleware, login page, admin layout + sidebar, empty dashboard. Login verified end-to-end. |
-| Phase 3 — CMS Foundations | ⬜ Next | cms_content editor, branding, site settings, email branding/templates. |
+| Phase 3 — CMS Foundations | ✅ Complete (2026-05-02) | Six admin editors (branding, content, header settings, site settings, email branding, email templates), six API routes (all session-gated, all audit-logged). |
+| Phase 4 — Page Builder | ⬜ Next | `/admin/pages`, `/admin/page-builder/[slug]`, drag-and-drop section reorder, first four section editors. |
 
 **Working admin login (local dev):** `meetahmadch@gmail.com` / `Admin@2026`. This is a debug-only password — must be rotated to a strong production credential before launch. Use `npm run seed-admin` (after editing `ADMIN_PASSWORD` in `scripts/seed-admin.mjs`) to rotate.
 
@@ -831,7 +832,7 @@ Follow this order. Don't skip ahead. Each phase is testable on its own.
 4. Admin layout (sidebar nav, header with logout)
 5. Empty admin dashboard
 
-### Phase 3: CMS Foundations (Day 2-3)
+### Phase 3: CMS Foundations (Day 2-3) — ✅ Complete (2026-05-02)
 1. cms_content key-value editor at `/admin/content`
 2. Branding admin at `/admin/branding`
 3. Site settings at `/admin/settings`
@@ -1000,4 +1001,36 @@ End of technical handoff. Read this in full before starting any new task. Update
 4. `/admin/email-branding` and `/admin/email-templates` — single-row `email_branding`, two seeded `email_templates` rows.
 5. Decide: auto-save vs explicit Save button (CLAUDE.md §4 says pick one and stay consistent — recommend explicit Save for v1, auto-save in a later phase).
 6. Rotate `Admin@2026` to a strong production password before any deploy.
+
+### 2026-05-02 (PM) — Phase 3: CMS Foundations
+
+**Built**
+- Six admin editors, all explicit-Save (no auto-save in v1):
+  - `/admin/branding` (`BrandingForm.tsx`) — all `branding_config` fields, three color pickers, live brand-preview panel.
+  - `/admin/content` (`ContentEditor.tsx`) — `cms_content` rows grouped into accordions per `section`. Per-row text/textarea toggle, add/delete with confirmation modal, batch save per section. Header `config` key hidden (managed under Header Settings).
+  - `/admin/header-settings` (`HeaderSettingsForm.tsx`) — nav items with `@dnd-kit` drag-reorder, CTA label/href/visibility, mobile menu toggle. Stored as JSON in `cms_content` (`section='header_settings'`, `key='config'`).
+  - `/admin/settings` (`SettingsForm.tsx`) — JSONB `site_settings` blob: contact_email, admin_email, whatsapp/phone, office text, LinkedIn/X URLs, default OG image, GA ID.
+  - `/admin/email-branding` (`EmailBrandingForm.tsx`) — logo URL, primary color, signature/footer Tiptap editors, live email-preview panel.
+  - `/admin/email-templates` (`EmailTemplatesEditor.tsx`) — sidebar of templates → subject + Tiptap body. Per-template enabled toggle. Right rail lists `{{variables}}` with one-click copy.
+- Six API routes (`/api/admin/{branding,content,header-settings,settings,email-branding,email-templates}`) — each gated by `getAdminSession()` (401 if absent), validated with zod, writes `audit_log` row on success.
+- Shared infra: `src/lib/auth/requireAdmin.ts`, `src/lib/audit.ts`, `src/lib/cms/*` typed fetchers, `src/components/admin/RichTextEditor.tsx` (Tiptap StarterKit toolbar wrapper), `SaveStatus.tsx`, `ConfirmDialog.tsx`, `AdminPageHeader.tsx`.
+- Installed `@dnd-kit/core`, `@dnd-kit/sortable`, `@dnd-kit/utilities` (header nav reorder).
+
+**Verified**
+- `npm run typecheck` clean. `npm run build` clean — 6 admin pages + 6 API routes + login + dashboard + middleware all compiled (11 routes total).
+- All six admin pages return 200 in dev under an authenticated session. Branding `POST /api/admin/branding` returned 200; persistence + audit confirmed by smoke test.
+- 404s for `/admin/pages`, `/admin/page-builder`, `/admin/contact-submissions` are expected — those sidebar links are placeholders for Phase 4+.
+
+**Notable choices**
+- **Explicit Save over auto-save** for v1 (per CLAUDE.md §4 instruction to pick one). Auto-save can come later.
+- **Tiptap StarterKit v3 does not include the Link mark.** Removed the link button from `RichTextEditor.tsx` to avoid runtime errors. Add `@tiptap/extension-link` and re-enable when needed.
+- **Header Settings is the only `cms_content` row whose value is JSON.** Edited via its dedicated drag-and-drop UI; the generic Content editor explicitly hides this row to avoid double-editing.
+
+**Open items for next session — Phase 4: Page Builder**
+1. `/admin/pages` — list all CMS pages with edit links.
+2. `/admin/page-builder/[slug]` — three-pane layout (sections list / editor / live preview).
+3. Section editors for: `hero`, `paragraphs`, `stats_block`, `service_cards` (start with these four).
+4. Drag-and-drop section reorder (already have `@dnd-kit` installed).
+5. Visibility toggle and per-section save.
+6. Still pending: rotate `Admin@2026` to a strong production password before any deploy.
 
