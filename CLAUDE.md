@@ -27,6 +27,18 @@ PMBC is the parent entity. Financial Modeler Pro is its flagship platform. The w
 
 ---
 
+## Current Status
+
+| Phase | Status | Notes |
+|-------|--------|-------|
+| Phase 1 — Scaffold + DB | ✅ Complete (2026-04-30) | Next.js 15 + Supabase migrations 001-008 applied. |
+| Phase 2 — Auth + Admin Shell | ✅ Complete (2026-05-02) | NextAuth credentials provider, middleware, login page, admin layout + sidebar, empty dashboard. Login verified end-to-end. |
+| Phase 3 — CMS Foundations | ⬜ Next | cms_content editor, branding, site settings, email branding/templates. |
+
+**Working admin login (local dev):** `meetahmadch@gmail.com` / `Admin@2026`. This is a debug-only password — must be rotated to a strong production credential before launch. Use `npm run seed-admin` (after editing `ADMIN_PASSWORD` in `scripts/seed-admin.mjs`) to rotate.
+
+---
+
 ## 2. Architecture Overview
 
 Single Next.js application, single domain (pacemakersglobal.com), no subdomain routing. Public marketing site plus admin CMS. No student auth, no public registration, no payment flows, no third-party integrations beyond Resend and Supabase.
@@ -44,7 +56,7 @@ Single Next.js application, single domain (pacemakersglobal.com), no subdomain r
 | Email | Resend | ^6 | Contact form notifications |
 | Image | sharp | ^0.34 | OG image logo conversion |
 | OG Images | next/og (satori ImageResponse) | built-in | Dynamic OG cards |
-| Icons | lucide-react | latest | Same as FMP |
+| Icons | lucide-react | ^1 | Lucide moved to a 1.x major in 2024. v1.x is current and correct — do **not** "downgrade" to 0.x. |
 | Forms | react-hook-form + zod | latest | Contact form validation |
 | Rich Text | @tiptap/react | latest | Admin content editing |
 | Captcha | @hcaptcha/react-hcaptcha | ^2 | Contact form spam protection |
@@ -804,7 +816,7 @@ NEXT_PUBLIC_GA_ID=
 
 Follow this order. Don't skip ahead. Each phase is testable on its own.
 
-### Phase 1: Scaffold and Database (Day 1)
+### Phase 1: Scaffold and Database (Day 1) — ✅ Complete (2026-04-30)
 1. `npx create-next-app@latest` with TypeScript, Tailwind, App Router, src/ directory, Turbopack
 2. Install dependencies (see Section 2)
 3. Set up Supabase project, get keys, populate `.env.local`
@@ -812,7 +824,7 @@ Follow this order. Don't skip ahead. Each phase is testable on its own.
 5. Insert one admin user via SQL with bcrypt hash
 6. Verify Supabase connection from a server component
 
-### Phase 2: Auth and Admin Shell (Day 1-2)
+### Phase 2: Auth and Admin Shell (Day 1-2) — ✅ Complete (2026-05-02)
 1. NextAuth config with credentials provider hitting admin_users
 2. Middleware protecting `/admin/*`
 3. Admin login page
@@ -952,3 +964,40 @@ Conventional Commits style: `feat:`, `fix:`, `chore:`, `docs:`, `refactor:`. Kee
 ---
 
 End of technical handoff. Read this in full before starting any new task. Update this file as architectural decisions are made or change.
+
+---
+
+## Session Log
+
+### 2026-05-02 — Phase 2: Auth + Admin Shell
+
+**Built**
+- `src/lib/auth/config.ts` — NextAuth options. Credentials provider, JWT strategy (1h `maxAge` on session and JWT), bcrypt compare against `admin_users.password_hash`. On success: stamps `last_login_at`, inserts `audit_log` row (`action='login'`). JWT/session callbacks expose `id` and `role`.
+- `src/types/next-auth.d.ts` — module augmentation so `session.user.role` and `token.role` are typed.
+- `src/app/api/auth/[...nextauth]/route.ts` — App Router NextAuth handler.
+- `src/middleware.ts` — matches `/admin/:path*`, lets `/admin/login` through, requires `token.role === 'admin'`. Forwards `x-pathname` header to RSC so the layout can detect the login route.
+- `src/app/admin/login/page.tsx` + `LoginForm.tsx` — react-hook-form + zod, generic "Invalid email or password" error, redirects to `callbackUrl` (default `/admin`) on success. Form wrapped in `Suspense` (uses `useSearchParams`).
+- `src/app/admin/layout.tsx` — server component. Reads `x-pathname`, renders bare for `/admin/login`, otherwise enforces session via `getServerSession` (defense-in-depth alongside middleware) and renders the chrome.
+- `src/components/admin/AdminSidebar.tsx`, `AdminMobileNav.tsx`, `LogoutButton.tsx` — sidebar with active-route highlighting, mobile drawer, signOut button.
+- `src/app/admin/page.tsx` — dashboard with four stat cards backed by real `count: 'exact', head: true` queries.
+- `scripts/seed-admin.mjs` + `npm run seed-admin` — hashes a known password in JS (no shell escaping), upserts `admin_users` row for `meetahmadch@gmail.com`, reads back, and verifies via `bcrypt.compareSync`.
+
+**Verified end-to-end**
+- `npm run typecheck` clean. `npm run build` clean (5 routes, middleware compiled).
+- `/admin` while logged out → middleware redirects to `/admin/login`.
+- Sign in → lands on `/admin` dashboard. `audit_log` row created with `action='login'`.
+- Sign out from top bar → back to `/admin/login`.
+
+**Notable detours / lessons**
+- First login attempts 401'd because `.env.local` did not exist. Fix: created it from `npx supabase projects api-keys --project-ref yackrfoesinnothbltlc -o env` plus a generated `NEXTAUTH_SECRET`. The `[next-auth][warn][NEXTAUTH_URL]` and `[NO_SECRET]` warnings in dev output are reliable signals that env loading is broken.
+- Hydration warning on `<body>` was caused by Grammarly browser extension (`data-new-gr-c-s-check-loaded`). Fixed with `suppressHydrationWarning` on `<body>` in `src/app/layout.tsx`.
+- `lucide-react@^1` is **current** (Lucide moved to a 1.x major in 2024). Do not "downgrade" to 0.x.
+
+**Open items for next session — Phase 3: CMS Foundations**
+1. `/admin/content` — key-value editor for `cms_content` (grouped by section).
+2. `/admin/branding` — logo, brand name, tagline, color tokens (single-row `branding_config`).
+3. `/admin/settings` — JSONB `site_settings` editor (admin email, social URLs, GA ID, etc.).
+4. `/admin/email-branding` and `/admin/email-templates` — single-row `email_branding`, two seeded `email_templates` rows.
+5. Decide: auto-save vs explicit Save button (CLAUDE.md §4 says pick one and stay consistent — recommend explicit Save for v1, auto-save in a later phase).
+6. Rotate `Admin@2026` to a strong production password before any deploy.
+
