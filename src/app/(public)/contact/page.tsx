@@ -12,8 +12,9 @@ export const dynamic = 'force-dynamic';
 export async function generateMetadata(): Promise<Metadata> {
   const page = await fetchPage('contact');
   if (!page) return { title: 'Contact' };
+  const title = page.meta_title ?? page.title;
   return {
-    title: page.meta_title ?? page.title,
+    title: { absolute: title },
     description: page.meta_description ?? undefined,
   };
 }
@@ -23,6 +24,13 @@ export default async function ContactPage(props: {
 }) {
   const search = await props.searchParams;
   const isPreview = search.preview === '1';
+
+  // /services/[slug] CTAs link here as `?service=<slug>` — pre-fill the
+  // service-interest dropdown with the matching service title when present.
+  const rawService = search.service;
+  const serviceSlug = typeof rawService === 'string' ? rawService : '';
+  const defaultServiceTitle =
+    SERVICES.find((s) => s.slug === serviceSlug)?.title ?? undefined;
 
   const [sections, settings] = await Promise.all([
     fetchPageSections('contact', { onlyVisible: !isPreview }),
@@ -57,6 +65,7 @@ export default async function ContactPage(props: {
                   <ContactForm
                     services={SERVICES.map((s) => ({ slug: s.slug, title: s.title }))}
                     hcaptchaSiteKey={hcaptchaSiteKey}
+                    defaultServiceTitle={defaultServiceTitle}
                   />
                 </div>
               </div>

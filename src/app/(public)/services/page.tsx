@@ -11,8 +11,9 @@ export const dynamic = 'force-dynamic';
 export async function generateMetadata(): Promise<Metadata> {
   const page = await fetchPage('services');
   if (!page) return { title: 'Services' };
+  const title = page.meta_title ?? page.title;
   return {
-    title: page.meta_title ?? page.title,
+    title: { absolute: title },
     description: page.meta_description ?? undefined,
   };
 }

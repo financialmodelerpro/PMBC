@@ -38,7 +38,8 @@ PMBC is the parent entity. Financial Modeler Pro is its flagship platform. The w
 | Phase 4.5 — Admin Refactor (FMP alignment) | ✅ Complete (2026-05-02) | New `CmsAdminNav` (240/64 collapse, off-canvas, gold-accent active border, matchPaths, external links to live site + FMP). Tailwind→inline styles across all admin pages with shared tokens at `src/lib/admin/styles.ts`. API routes accept both `PATCH` and `POST`; `cms_content` GET added; branding mutations return `{ row }`. `(header_settings, config)` JSON blob split into discrete keys via migration 009. |
 | Phase 5 — Public Pages (core) | ✅ Complete (2026-05-03) | Public root layout with CMS-driven Navbar + Footer, fonts (Inter + Source Serif 4) wired via `next/font`, services overview with config-driven 9-card grid, contact page + form + `/api/contact` route, Resend wrapper with graceful fallback, branded email shell, hardcoded Privacy + Terms. |
 | Phase 6 — Remaining Section Types | ✅ Complete (2026-05-03) | Public renderers + admin editors for the 9 outstanding types: sector_grid, process_steps, network_partners, founder_block, text_image, cta_block, quote, fmp_intro, service_detail. Curated 21-icon lucide registry shared between sector editor + renderer. `SECTION_TYPES` now has `implemented: true` for all 13 types. |
-| Phase 7 — Remaining Pages | ⬜ Next | Wire `/services/[slug]` route, populate sectors / approach / network / about / FMP / individual service pages with real content via the page builder. |
+| Phase 7 — Remaining Pages | ✅ Complete (2026-05-03) | Bespoke routes for /about, /sectors, /approach, /network, /financial-modeler-pro replace the catch-all `[slug]`. New `/services/[slug]` route renders all 9 service details from `cms_content` namespace `service_<slug>`. Migration 010 seeds 36 rows (4 fields × 9 services). `/admin/content` groups the service-prefixed sections into a "Service detail content" block. `sitemap.ts` lists all 19 public URLs; `robots.ts` blocks /admin and /api. `title: { absolute }` fix removes doubled brand suffix from `<title>` across bespoke pages. `/contact?service=<slug>` pre-selects the service dropdown at SSR. |
+| Phase 8 — SEO & Polish | ⬜ Next | OG image route, JSON-LD organization schema, 404 page polish. |
 
 **Working admin login (local dev):** `meetahmadch@gmail.com` / `Admin@2026`. This is a debug-only password — must be rotated to a strong production credential before launch. Use `npm run seed-admin` (after editing `ADMIN_PASSWORD` in `scripts/seed-admin.mjs`) to rotate.
 
@@ -892,8 +893,8 @@ Follow this order. Don't skip ahead. Each phase is testable on its own.
 ### Phase 6: Remaining Section Types (Day 7-9) — ✅ Complete (2026-05-03)
 Editors + public renderers shipped for the 9 outstanding types: `sector_grid`, `process_steps`, `network_partners`, `founder_block`, `text_image`, `cta_block`, `quote`, `fmp_intro`, `service_detail`. All marked `implemented: true` in `SECTION_TYPES`; `SectionRenderer` and `SectionEditorPanel` registries cover all 13 types. Shared 21-icon lucide registry at `src/lib/cms/sectorIcons.tsx` powers both the sector-grid editor dropdown and the public renderer.
 
-### Phase 7: Remaining Pages (Day 9-11)
-Sectors, Approach, Network, About, Financial Modeler Pro, individual service detail pages.
+### Phase 7: Remaining Pages (Day 9-11) — ✅ Complete (2026-05-03)
+Bespoke routes shipped at `src/app/(public)/{about,sectors,approach,network,financial-modeler-pro}/page.tsx`, plus `src/app/(public)/services/[slug]/page.tsx` for the 9 service detail pages. The catch-all `(public)/[slug]/page.tsx` was deleted — all CMS-managed pages now have explicit routes; missing pages 404 explicitly rather than silently rendering an unconfigured slug. Service-detail content lives in `cms_content` under namespace `service_<slug>` (migration 010); the route renderer parses `deliverables` robustly (JSON first, newline-split fallback). `src/app/sitemap.ts` and `src/app/robots.ts` shipped alongside.
 
 ### Phase 8: SEO and Polish (Day 11-13)
 1. OG image route
@@ -1214,4 +1215,53 @@ Aligned the admin CMS structurally with FMP's patterns (per `CMS_REFERENCE.md` p
 2. Populate page sections for sectors, approach, network, about, financial-modeler-pro, and the 9 service-detail pages with real content via the page builder (the smoke-seed rows can be deleted by re-running `seed-phase6` with an emptied `SEEDS` array, or kept as starter content).
 3. Add `images.remotePatterns` to `next.config.ts` for the host(s) where partner logos and founder/team photos will live, so the image-bearing renderers can load real assets.
 4. Still pending: `/admin/contact-submissions` inbox · apply migration 009 against production Supabase · rotate `Admin@2026` to a strong production password before any deploy.
+
+### 2026-05-03 (late) — Phase 7: Remaining Pages
+
+**Approach decision — service-detail content lives in `cms_content`, not `page_sections`.** The Phase 6 `service_detail` *section type* (which reads from a `page_sections.content` blob) stays in place for any page builder use, but `/services/[slug]` does NOT use it. Instead each service has its own `cms_content` namespace `service_<slug>` with discrete keys (`full_description`, `deliverables`, `timeline_text`, `target_audience_text`). This keeps service detail content editable from the existing `/admin/content` UI without forcing the admin to find a `service_detail` block on a hidden CMS page. Discrete keys also match the namespace convention from CLAUDE.md §4 ("discrete keys preferred over bundled JSON blobs"). The exception is `deliverables`, which is naturally a list and is stored as a JSON array; `parseDeliverables` in `src/lib/cms/serviceContent.ts` tries `JSON.parse` first and falls back to newline-split, so an admin can also edit it as a plain newline-separated list and the page still renders.
+
+**Built**
+- 5 bespoke firm-page routes — `src/app/(public)/{about,sectors,approach,network,financial-modeler-pro}/page.tsx`. Each is a server component with its own `generateMetadata` (reads `cms_pages` for `meta_title` / `meta_description` / `og_image_url`), supports `?preview=1` (passes through to `fetchPageSections({ onlyVisible: !isPreview })`), and uses the shared `FirmPageBody` helper to render sections — prepending a `PageHeroFallback` only when the first section is not a `hero`. Page-specific fallback hero copy is hard-coded in each route file (e.g. /sectors → "Where we deliver depth, not breadth"); when an admin adds a hero block via the page builder, that block takes over and the fallback is no longer rendered.
+- `src/app/(public)/services/[slug]/page.tsx` — service detail route. `generateStaticParams` returns all 9 slugs from `src/config/services.ts`; `notFound()` for unknown slugs (acceptance: `/services/bogus-slug` → 404). Calls `fetchServiceDetailFields(slug)` which reads `cms_content` rows for `section = service_<slug>`, builds a content blob, and reuses the existing `ServiceDetail` renderer. Appends a navy CTA panel linking to `/contact?service=<slug>`. `dynamic = 'force-dynamic'` on the route — Next 15's build output marks the route SSG with the 9 enumerated paths, but at request time `force-dynamic` re-fetches; verified empirically by writing an `EDIT-MARKER-…` value to `cms_content` and re-curling the page.
+- `src/components/public/PageHeroFallback.tsx` and `src/components/public/FirmPageBody.tsx` — shared primitives for the firm-page routes.
+- `src/lib/cms/serviceContent.ts` — `serviceContentSection(slug)`, `findService(slug)`, `fetchServiceDetailFields(slug)`, plus the robust `parseDeliverables` parser.
+- `src/app/sitemap.ts` — Next.js Metadata Route returning 19 URLs (10 firm + 9 service detail). Uses `NEXT_PUBLIC_SITE_URL` with a `https://pacemakersglobal.com` fallback. Serves at `/sitemap.xml`.
+- `src/app/robots.ts` — allow `/`, disallow `/admin` and `/api`, points to `/sitemap.xml`.
+- `supabase/migrations/010_seed_service_detail_content.sql` — 36 rows (4 fields × 9 services). Idempotent via `ON CONFLICT (section, key) DO NOTHING`.
+- `scripts/seed-service-content.mjs` + `npm run seed-service-content` — JS-side equivalent of migration 010 for dev runs without touching the SQL editor. Idempotent by default; pass `--force` to delete-and-reinsert (used during the live-edit acceptance test to restore originals).
+
+**Modified**
+- `src/components/public/ContactForm.tsx` — accepts optional `defaultServiceTitle` prop. Set as `defaultValue` on the `<select>` so SSR HTML carries `selected="…"` and the dropdown is pre-selected at first paint (no hydration flicker). Also dropped the redundant hardcoded `defaultValue=""` on the select since react-hook-form already manages defaults via `useForm({ defaultValues })`.
+- `src/app/(public)/contact/page.tsx` — reads `?service=<slug>` from `searchParams`, maps slug → service title via `SERVICES`, passes `defaultServiceTitle` to `ContactForm`.
+- `src/app/admin/content/page.tsx` — splits cms_content rows into "General" and "Service detail content" groups by section-name prefix (`service_*`). Each group is rendered by its own `ContentEditor` instance under a labelled divider so the 9 service accordions don't visually drown the small set of header / footer / SEO sections.
+- All bespoke pages (plus `/services` and `/contact` for consistency) — `generateMetadata` now uses `title: { absolute: page.meta_title }` to bypass the root layout's `'%s | PaceMakers Business Consultants'` template. Without this, every cms_pages-driven `meta_title` (which already ends in "— PaceMakers Business Consultants") rendered as a doubled "X — PaceMakers Business Consultants | PaceMakers Business Consultants" `<title>`. Fixed.
+- `package.json` — adds `seed-service-content` script.
+
+**Deleted**
+- `src/app/(public)/[slug]/page.tsx` — the catch-all is gone. **Decision**: every CMS-managed page now needs an explicit route, which means missing pages 404 explicitly (instead of silently rendering an unconfigured slug if someone seeds a stray `cms_pages` row). The CMS isn't designed to spawn arbitrary URLs from the admin UI anyway — pages are seeded in migrations and need a route file, so the catch-all was paying an ambiguity cost without earning a real benefit.
+- `src/app/(public)/services/[slug]/.gitkeep` — replaced by `page.tsx`.
+
+**Stranded data — Phase 6 smoke seed for `/service-business-valuation`**
+The Phase 6 `seed-phase6-sections.mjs` placed a `service_detail` `page_sections` row on the `service-business-valuation` *page slug*, which the deleted catch-all served at `/service-business-valuation` (note: no `/services/` prefix). After Phase 7 that URL is unreachable — there's no route matching it. The row remains in `page_sections` but renders nowhere. Harmless. Cleanup query when desired: `DELETE FROM page_sections WHERE styles->>'smoke' = 'phase6' AND page_slug = 'service-business-valuation';`. The other smoke seeds (on /approach, /sectors, /network, /about, /financial-modeler-pro) are still reachable via the new bespoke routes and serve as starter content.
+
+**Verified**
+- `npm run typecheck` clean. `npm run build` clean — 35 routes total, including 9 SSG-enumerated `/services/[slug]` paths plus `/sitemap.xml` and `/robots.txt`.
+- All 16 valid public routes returned 200; `/services/bogus-slug` returned 404; sitemap.xml + robots.txt both 200.
+- Titles unique per page (verified with `curl | grep <title>`); brand suffix appears once now.
+- Live-edit acceptance: updated `service_cfo-advisory.full_description` to `<p>EDIT-MARKER-…</p>` via supabase-js → `curl /services/cfo-advisory` reflected the marker on the next request → restored originals via `npm run seed-service-content -- --force`.
+- `/contact?service=cfo-advisory` SSR HTML: `<option value="CFO Advisory" selected="">CFO Advisory</option>`.
+- `/sitemap.xml` returns 19 `<loc>` entries.
+
+**Notable detours / lessons**
+- **Stale `.next/types/validator.ts` after deleting a route.** First typecheck after removing the catch-all errored with `Cannot find module '../../src/app/(public)/[slug]/page.js'`. Fix is the same as the Phase 5 entry: `rm -rf .next` and re-run. Documented at the top-level pattern level here so future work on route deletion doesn't have to re-discover it.
+- **Doubled `<title>` from cms_pages × root template.** `cms_pages.meta_title` already includes "— PaceMakers Business Consultants"; the root layout's `metadata.title.template = '%s | PaceMakers Business Consultants'` doubles it. Fix is `title: { absolute: page.meta_title }`. Applied across the new bespoke routes plus the existing `/services` and `/contact` for consistency.
+- **`force-dynamic` + `generateStaticParams` in Next 15.** The build output marks `/services/[slug]` as `●` (SSG) and lists the 9 enumerated paths, but at request time the route still hits the database — confirmed by the live-edit test. The two annotations don't conflict here; `generateStaticParams` is providing the slug list (used for build-time validation and as a 404 hint), while `force-dynamic` ensures fresh data each request.
+- **react-hook-form pre-fill needs `defaultValue` on the element, not just `defaultValues` on the form.** With only `useForm({ defaultValues: { service_interest: 'CFO Advisory' } })`, the SSR HTML rendered the select with no `selected` option — RHF sets the value via ref imperatively after mount, which would cause a brief hydration flicker. Adding `defaultValue={defaultServiceTitle ?? ''}` on the `<select>` itself fixes the SSR.
+
+**Open items for next session — Phase 8: SEO & Polish**
+1. OG image route at `/api/og` (Next.js `next/og` ImageResponse). 1200×630, navy background, white text, logo top-left, headline center, tagline below. Pattern matches FMP's `/api/og/main`. Hook into `cms_pages.og_image_url` so admins can override per-page.
+2. JSON-LD organization schema in the root layout (`@type: FinancialService`).
+3. 404 page (`src/app/not-found.tsx`) with proper PMBC chrome instead of the default Next 404.
+4. Decide and apply: add a `production` cms_pages row update for the `service-{slug}` titles to drop the brand suffix (so the absolute-title fix gives consistent results across both data shapes), OR keep current data and rely on the title-absolute approach unchanged. Either is fine.
+5. Still pending: `/admin/contact-submissions` inbox · apply migrations 009 & 010 against production Supabase · `images.remotePatterns` in `next.config.ts` · rotate `Admin@2026` to a strong production password before any deploy.
 

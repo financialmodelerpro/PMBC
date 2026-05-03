@@ -36,9 +36,11 @@ type Status =
 export function ContactForm({
   services,
   hcaptchaSiteKey,
+  defaultServiceTitle,
 }: {
   services: Service[];
   hcaptchaSiteKey: string | null;
+  defaultServiceTitle?: string;
 }) {
   const pathname = usePathname();
   const [status, setStatus] = useState<Status>({ kind: 'idle' });
@@ -50,7 +52,11 @@ export function ContactForm({
     handleSubmit,
     reset,
     formState: { errors },
-  } = useForm<FormValues>();
+  } = useForm<FormValues>({
+    defaultValues: defaultServiceTitle
+      ? { service_interest: defaultServiceTitle }
+      : undefined,
+  });
 
   // Allow another submission after success message has been shown for a while.
   useEffect(() => {
@@ -148,7 +154,11 @@ export function ContactForm({
           </select>
         </Field>
         <Field label="Service of interest">
-          <select className={inputCls} defaultValue="" {...register('service_interest')}>
+          <select
+            className={inputCls}
+            defaultValue={defaultServiceTitle ?? ''}
+            {...register('service_interest')}
+          >
             <option value="">Select a service</option>
             {services.map((s) => (
               <option key={s.slug} value={s.title}>
