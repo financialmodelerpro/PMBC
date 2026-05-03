@@ -1,12 +1,24 @@
+import Link from 'next/link';
+
 type Step = { number: string; title: string; description: string };
 
 function s(v: unknown): string {
   return typeof v === 'string' ? v : '';
 }
 
-function pickSteps(c: Record<string, unknown>): { intro: string; heading: string; steps: Step[] } {
+function pickSteps(c: Record<string, unknown>): {
+  eyebrow: string;
+  intro: string;
+  heading: string;
+  steps: Step[];
+  footer_cta_label: string;
+  footer_cta_href: string;
+} {
+  const eyebrow = s(c.eyebrow);
   const intro = s(c.intro);
-  const heading = s(c.heading);
+  const heading = s(c.heading) || s(c.headline);
+  const footer_cta_label = s(c.footer_cta_label);
+  const footer_cta_href = s(c.footer_cta_href);
   const raw = Array.isArray(c.steps) ? (c.steps as unknown[]) : [];
   const steps: Step[] = raw
     .map((row, idx) => {
@@ -18,21 +30,28 @@ function pickSteps(c: Record<string, unknown>): { intro: string; heading: string
       if (!title && !description) return null;
       return { number, title, description };
     })
-    .filter((s): s is Step => s !== null);
-  return { intro, heading, steps };
+    .filter((step): step is Step => step !== null);
+  return { eyebrow, intro, heading, steps, footer_cta_label, footer_cta_href };
 }
 
 export function ProcessSteps({ content }: { content: Record<string, unknown> }) {
-  const { intro, heading, steps } = pickSteps(content ?? {});
-  if (steps.length === 0 && !heading && !intro) return null;
+  const { eyebrow, intro, heading, steps, footer_cta_label, footer_cta_href } = pickSteps(
+    content ?? {},
+  );
+  if (steps.length === 0 && !heading && !intro && !eyebrow) return null;
 
   return (
     <section className="bg-[#F7F9FC] px-6 py-20 lg:py-24">
       <div className="mx-auto max-w-6xl">
-        {(heading || intro) && (
+        {(eyebrow || heading || intro) && (
           <div className="mx-auto max-w-3xl text-center">
+            {eyebrow && (
+              <p className="text-[11px] font-medium tracking-[0.22em] uppercase text-[#1B3A5F]">
+                {eyebrow}
+              </p>
+            )}
             {heading && (
-              <h2 className="font-serif text-3xl font-semibold tracking-tight text-[#0F1B2D] sm:text-4xl">
+              <h2 className="mt-3 font-serif text-3xl font-semibold tracking-tight text-[#0F1B2D] sm:text-4xl">
                 {heading}
               </h2>
             )}
@@ -70,6 +89,17 @@ export function ProcessSteps({ content }: { content: Record<string, unknown> }) 
               </li>
             ))}
           </ol>
+        )}
+
+        {footer_cta_label && footer_cta_href && (
+          <div className="mt-12 text-center">
+            <Link
+              href={footer_cta_href}
+              className="inline-flex items-center rounded-md border border-neutral-300 bg-white px-5 py-2.5 text-sm font-medium text-[#0F1B2D] transition hover:border-[#1B3A5F] hover:text-[#1B3A5F]"
+            >
+              {footer_cta_label}
+            </Link>
+          </div>
         )}
       </div>
     </section>

@@ -40,7 +40,7 @@ PMBC is the parent entity. Financial Modeler Pro is its flagship platform. The w
 | Phase 6 — Remaining Section Types | ✅ Complete (2026-05-03) | Public renderers + admin editors for the 9 outstanding types: sector_grid, process_steps, network_partners, founder_block, text_image, cta_block, quote, fmp_intro, service_detail. Curated 21-icon lucide registry shared between sector editor + renderer. `SECTION_TYPES` now has `implemented: true` for all 13 types. |
 | Phase 7 — Remaining Pages | ✅ Complete (2026-05-03) | Bespoke routes for /about, /sectors, /approach, /network, /financial-modeler-pro replace the catch-all `[slug]`. New `/services/[slug]` route renders all 9 service details from `cms_content` namespace `service_<slug>`. Migration 010 seeds 36 rows (4 fields × 9 services). `/admin/content` groups the service-prefixed sections into a "Service detail content" block. `sitemap.ts` lists all 19 public URLs; `robots.ts` blocks /admin and /api. `title: { absolute }` fix removes doubled brand suffix from `<title>` across bespoke pages. `/contact?service=<slug>` pre-selects the service dropdown at SSR. |
 | Phase 8 — SEO & Polish | ✅ Complete (2026-05-03) | Dynamic OG image route at `/api/og` (navy/gold satori card with branding-driven logo + tagline). Shared `buildPageMetadata` helper drives unique `<title>` / canonical / OG / twitter meta on every public page, auto-routing OG images to `/api/og?title=…&subtitle=…` when no override is set. Schema.org `@graph` with FinancialService + Organization + WebSite mounted in the public layout; per-service `Service` JSON-LD on `/services/[slug]` with `provider: { @id: '#organization' }`. Branded 404 (both `(public)` and root) and `error.tsx` boundary. Privacy + Terms fleshed out with named processors and "Subject to legal review" badge. `next.config.ts` adds Supabase + Cloudinary `remotePatterns` and `poweredByHeader: false`. `/admin/og-preview` admin tool shows live previews for every page with per-page override-URL save. |
-| Phase 9 — Content Population & Launch | ⬜ Next | Real copy across cms_content + page_sections, DNS + SSL on Vercel, sitemap submitted to Search Console. |
+| Phase 9 — Content Population & Launch | 🟡 In progress | Home page production content shipped (2026-05-03). Remaining: about, sectors, approach, network, financial-modeler-pro, services overview, contact + 9 service-detail pages. Then DNS + SSL on Vercel, sitemap submitted to Search Console. |
 
 **Working admin login (local dev):** `meetahmadch@gmail.com` / `Admin@2026`. This is a debug-only password — must be rotated to a strong production credential before launch. Use `npm run seed-admin` (after editing `ADMIN_PASSWORD` in `scripts/seed-admin.mjs`) to rotate.
 
@@ -1311,4 +1311,46 @@ The Phase 6 `seed-phase6-sections.mjs` placed a `service_detail` `page_sections`
 6. Counsel review of `/privacy` and `/terms`; remove the "Subject to legal review" badge once approved.
 7. Build `/admin/contact-submissions` inbox so admin can triage form submissions.
 8. Rotate `Admin@2026` to a strong production password before any deploy.
+
+### 2026-05-03 (overnight) — Phase 9 part 1: Home page production content
+
+**Shipped**
+- `supabase/migrations/011_seed_home_page_content.sql` — wraps a `BEGIN;…COMMIT;` around `DELETE FROM page_sections WHERE page_slug='home'` plus 9 INSERTs at `display_order` 10/20/30/40/50/60/70/80/90: `hero` → `founder_block` → `stats_block` → `service_cards` (What we do, 6 capabilities) → `service_cards` (Who we serve, 4 audiences) → `process_steps` (Understand/Analyse/Model/Advise) → `text_image` (Strategic Network) → `quote` (founder pull quote) → `cta_block` (Have a mandate?). Migration also bumps `cms_pages.updated_at` for `home` and merges `site_settings.settings` with `contact_email`/`admin_email`/`office_location_text` via `||` JSONB concat (preserves existing keys).
+- `scripts/seed-home-page.mjs` + `node scripts/seed-home-page.mjs` — JS-side equivalent so the migration can be applied against the shared dev/prod Supabase without the SQL editor. Idempotent (DELETE-then-INSERT). Already executed: 2 placeholder rows deleted, 9 production rows inserted, site_settings merged.
+
+**Renderer extensions — additive, preserves existing seeded content**
+The user's content schema introduced fields the existing renderers didn't read (eyebrows, section-level headlines on grids, footer CTAs under sections, nested CTA shapes). Rather than dropping content, the 5 affected renderers were extended additively. Existing seeded rows continue to render unchanged because the new fields default to empty.
+- `ServiceCards.tsx` — now renders `eyebrow`, section `headline`, and `footer_cta_label`/`footer_cta_href` button (centered above intro / below cards respectively).
+- `ProcessSteps.tsx` — adds `eyebrow` (above heading), aliases `headline` → `heading`, adds `footer_cta_label`/`footer_cta_href` button (below steps).
+- `TextImage.tsx` — adds `eyebrow` above heading; aliases nested `cta: {label, href}` → flat `cta_label`/`cta_href`.
+- `FounderBlock.tsx` — adds optional centered preamble (`eyebrow` + section `headline`) above the founder card; founder `name` demoted from `<h2>` to `<h3>` so the section headline owns the h2 slot. Aliases nested `cta_primary: {label, href}` and `cta_secondary: {label, href}`.
+- `CtaBlock.tsx` — aliases nested `primary_cta`/`secondary_cta` AND `cta_primary`/`cta_secondary` shapes.
+
+**Migration's JSONB writes the canonical flat shape** (since renderer aliases now exist): `heading` (not `headline`) for process_steps; flat `cta_*_label`/`cta_*_href` for founder_block, text_image, cta_block. Future admin-edits via the page builder will read/write the canonical shape.
+
+**Verified — same Supabase backs dev and prod**
+- Migration applied: 9 rows at display_order 10..90 returned by `SELECT display_order, section_type FROM page_sections WHERE page_slug='home' ORDER BY display_order`.
+- `npm run typecheck` clean.
+- `curl http://localhost:3002/` → HTTP 200, ~195KB. All 9 sections present in rendered HTML (verified by string match for each section's signature copy: "PACEMAKERS BUSINESS CONSULTANTS", "LED BY THE FOUNDER", "ACCA Member (UK)", "100+", "SAR 20B+", "WHAT WE DO", "Built for transactions that need", "WHO WE SERVE", "Family Offices", "HOW WE WORK", "four-step engagement model", "STRATEGIC NETWORK", "focused network across the Gulf", "Sky Gulf", "Lynkers", "good financial model is not just", "Have a mandate to discuss").
+- All 7 CTA hrefs verified: `/contact`, `/services` (×2), `/about`, `/approach`, `/network`, `mailto:info@pacemakersglobal.com`. (`Start a Conversation`→`/contact` appears 3× — navbar + hero + final cta_block.)
+- Dev server log clean, no errors/warnings during home render.
+
+**Notable choice**
+- **Extending renderers vs. flattening JSONB.** User's note said "fix field name mismatches in the migration before applying," but several of the user's fields had no flat-renderer equivalent at all (eyebrows, section-level headlines on grids, footer CTAs). Dropping them would have lost real visual intent. So I extended renderers additively for the genuinely new visual primitives, and used the new aliases only as bridges where the user's nested CTA shapes carried identical info to the flat keys — meaning the migration writes the canonical flat shape (no content lost, future admin-edits stay consistent). The renderer aliases also pay forward: they're permissive against several common content shapes editors might write.
+
+**Asset gaps for later**
+- `home.founder_block.photo_url` is empty — section renders a neutral grey placeholder. Drop in a portrait when ready.
+- `home.text_image.image_url` is empty — same fallback. A network/region image would lift section 70 substantially.
+
+**Remaining Phase 9 page-content work (7 firm pages + 9 service-detail pages)**
+1. `/about` — page_sections (founder bio in detail, credentials, career, philosophy)
+2. `/sectors` — page_sections (sector_grid + supporting copy)
+3. `/approach` — page_sections (process_steps in depth, principles, deliverables)
+4. `/network` — page_sections (network_partners cards for Sky Gulf + Lynkers, why-the-network rationale)
+5. `/financial-modeler-pro` — page_sections (fmp_intro + value-prop blocks + cross-link CTA)
+6. `/services` — overview page_sections (intro + sector context above the config-driven 9-card grid)
+7. `/contact` — page_sections (intro/eyebrow + commitment-to-respond copy above the form)
+8. `/services/[slug]` × 9 — `cms_content` rows under `section='service_<slug>'` keys `full_description`, `deliverables`, `timeline_text`, `target_audience_text`. Migration 010 already seeded placeholder copy; replace with the production write-up per service.
+
+After page content: `/admin/contact-submissions` inbox · DNS+SSL on Vercel · production env vars · sitemap to Search Console · counsel review of Privacy/Terms · rotate `Admin@2026`.
 

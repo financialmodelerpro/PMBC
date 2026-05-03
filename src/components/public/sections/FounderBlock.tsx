@@ -6,6 +6,8 @@ function s(v: unknown): string {
 }
 
 type FounderContent = {
+  eyebrow: string;
+  section_headline: string;
   photo_url: string;
   name: string;
   credentials_line: string;
@@ -19,27 +21,49 @@ type FounderContent = {
 
 function pick(c: Record<string, unknown>): FounderContent {
   const layout = c.layout === 'image_right' ? 'image_right' : 'image_left';
+  const primaryObj = (c.cta_primary && typeof c.cta_primary === 'object'
+    ? c.cta_primary
+    : {}) as Record<string, unknown>;
+  const secondaryObj = (c.cta_secondary && typeof c.cta_secondary === 'object'
+    ? c.cta_secondary
+    : {}) as Record<string, unknown>;
   return {
+    eyebrow: s(c.eyebrow),
+    section_headline: s(c.headline),
     photo_url: s(c.photo_url),
     name: s(c.name),
     credentials_line: s(c.credentials_line) || s(c.title),
     bio_html: s(c.bio_html) || s(c.bio),
-    cta_primary_label: s(c.cta_primary_label),
-    cta_primary_href: s(c.cta_primary_href),
-    cta_secondary_label: s(c.cta_secondary_label),
-    cta_secondary_href: s(c.cta_secondary_href),
+    cta_primary_label: s(c.cta_primary_label) || s(primaryObj.label),
+    cta_primary_href: s(c.cta_primary_href) || s(primaryObj.href),
+    cta_secondary_label: s(c.cta_secondary_label) || s(secondaryObj.label),
+    cta_secondary_href: s(c.cta_secondary_href) || s(secondaryObj.href),
     layout,
   };
 }
 
 export function FounderBlock({ content }: { content: Record<string, unknown> }) {
   const c = pick(content ?? {});
-  if (!c.name && !c.bio_html && !c.photo_url) return null;
+  if (!c.name && !c.bio_html && !c.photo_url && !c.section_headline && !c.eyebrow) return null;
   const imageRight = c.layout === 'image_right';
 
   return (
     <section className="px-6 py-20 lg:py-24">
       <div className="mx-auto max-w-6xl">
+        {(c.eyebrow || c.section_headline) && (
+          <div className="mx-auto mb-12 max-w-3xl text-center">
+            {c.eyebrow && (
+              <p className="text-[11px] font-medium tracking-[0.22em] uppercase text-[#1B3A5F]">
+                {c.eyebrow}
+              </p>
+            )}
+            {c.section_headline && (
+              <h2 className="mt-3 font-serif text-3xl font-semibold tracking-tight text-[#0F1B2D] sm:text-4xl">
+                {c.section_headline}
+              </h2>
+            )}
+          </div>
+        )}
         <div
           className={
             'grid items-center gap-10 lg:grid-cols-[minmax(280px,420px)_minmax(0,1fr)] lg:gap-16 ' +
@@ -68,9 +92,9 @@ export function FounderBlock({ content }: { content: Record<string, unknown> }) 
 
           <div>
             {c.name && (
-              <h2 className="font-serif text-3xl font-semibold tracking-tight text-[#0F1B2D] sm:text-4xl">
+              <h3 className="font-serif text-3xl font-semibold tracking-tight text-[#0F1B2D] sm:text-4xl">
                 {c.name}
-              </h2>
+              </h3>
             )}
             {c.credentials_line && (
               <p className="mt-3 text-[12px] font-semibold tracking-[0.18em] uppercase text-[#1B3A5F]">

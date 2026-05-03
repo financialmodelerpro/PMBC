@@ -16,13 +16,23 @@ type CtaContent = {
 
 function pick(c: Record<string, unknown>): CtaContent {
   const bg = c.background_style;
+  const primaryObj = (c.primary_cta && typeof c.primary_cta === 'object'
+    ? c.primary_cta
+    : c.cta_primary && typeof c.cta_primary === 'object'
+      ? c.cta_primary
+      : {}) as Record<string, unknown>;
+  const secondaryObj = (c.secondary_cta && typeof c.secondary_cta === 'object'
+    ? c.secondary_cta
+    : c.cta_secondary && typeof c.cta_secondary === 'object'
+      ? c.cta_secondary
+      : {}) as Record<string, unknown>;
   return {
     headline: s(c.headline),
     subhead: s(c.subhead),
-    cta_primary_label: s(c.cta_primary_label) || s(c.cta_label),
-    cta_primary_href: s(c.cta_primary_href) || s(c.cta_href),
-    cta_secondary_label: s(c.cta_secondary_label),
-    cta_secondary_href: s(c.cta_secondary_href),
+    cta_primary_label: s(c.cta_primary_label) || s(c.cta_label) || s(primaryObj.label),
+    cta_primary_href: s(c.cta_primary_href) || s(c.cta_href) || s(primaryObj.href),
+    cta_secondary_label: s(c.cta_secondary_label) || s(secondaryObj.label),
+    cta_secondary_href: s(c.cta_secondary_href) || s(secondaryObj.href),
     background_style: bg === 'dark' || bg === 'accent' ? bg : 'light',
   };
 }

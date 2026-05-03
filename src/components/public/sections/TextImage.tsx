@@ -6,6 +6,7 @@ function s(v: unknown): string {
 }
 
 type TextImageContent = {
+  eyebrow: string;
   heading: string;
   body_html: string;
   image_url: string;
@@ -17,21 +18,23 @@ type TextImageContent = {
 };
 
 function pick(c: Record<string, unknown>): TextImageContent {
+  const ctaObj = (c.cta && typeof c.cta === 'object' ? c.cta : {}) as Record<string, unknown>;
   return {
+    eyebrow: s(c.eyebrow),
     heading: s(c.heading),
     body_html: s(c.body_html) || s(c.body),
     image_url: s(c.image_url),
     image_alt: s(c.image_alt),
     image_caption: s(c.image_caption),
     image_position: c.image_position === 'left' ? 'left' : 'right',
-    cta_label: s(c.cta_label),
-    cta_href: s(c.cta_href),
+    cta_label: s(c.cta_label) || s(ctaObj.label),
+    cta_href: s(c.cta_href) || s(ctaObj.href),
   };
 }
 
 export function TextImage({ content }: { content: Record<string, unknown> }) {
   const c = pick(content ?? {});
-  if (!c.heading && !c.body_html && !c.image_url) return null;
+  if (!c.heading && !c.body_html && !c.image_url && !c.eyebrow) return null;
   const imageLeft = c.image_position === 'left';
 
   return (
@@ -64,8 +67,13 @@ export function TextImage({ content }: { content: Record<string, unknown> }) {
             )}
           </div>
           <div>
+            {c.eyebrow && (
+              <p className="text-[11px] font-medium tracking-[0.22em] uppercase text-[#1B3A5F]">
+                {c.eyebrow}
+              </p>
+            )}
             {c.heading && (
-              <h2 className="font-serif text-3xl font-semibold tracking-tight text-[#0F1B2D] sm:text-4xl">
+              <h2 className={`font-serif text-3xl font-semibold tracking-tight text-[#0F1B2D] sm:text-4xl ${c.eyebrow ? 'mt-3' : ''}`}>
                 {c.heading}
               </h2>
             )}
