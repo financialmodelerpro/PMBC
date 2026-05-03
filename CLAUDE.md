@@ -35,7 +35,9 @@ PMBC is the parent entity. Financial Modeler Pro is its flagship platform. The w
 | Phase 2 — Auth + Admin Shell | ✅ Complete (2026-05-02) | NextAuth credentials provider, middleware, login page, admin layout + sidebar, empty dashboard. Login verified end-to-end. |
 | Phase 3 — CMS Foundations | ✅ Complete (2026-05-02) | Six admin editors (branding, content, header settings, site settings, email branding, email templates), six API routes (all session-gated, all audit-logged). |
 | Phase 4 — Page Builder | ✅ Complete (2026-05-02) | `/admin/pages`, three-pane `/admin/page-builder/[slug]` with dnd reorder + visibility + delete, four section editors (hero, paragraphs, stats_block, service_cards), public `/[slug]` route + home wired up. |
-| Phase 5 — Public Pages (core) | ⬜ Next | Root layout with CMS-driven Navbar + Footer, contact form + API route + email templates wired up. |
+| Phase 4.5 — Admin Refactor (FMP alignment) | ✅ Complete (2026-05-02) | New `CmsAdminNav` (240/64 collapse, off-canvas, gold-accent active border, matchPaths, external links to live site + FMP). Tailwind→inline styles across all admin pages with shared tokens at `src/lib/admin/styles.ts`. API routes accept both `PATCH` and `POST`; `cms_content` GET added; branding mutations return `{ row }`. `(header_settings, config)` JSON blob split into discrete keys via migration 009. |
+| Phase 5 — Public Pages (core) | ✅ Complete (2026-05-03) | Public root layout with CMS-driven Navbar + Footer, fonts (Inter + Source Serif 4) wired via `next/font`, services overview with config-driven 9-card grid, contact page + form + `/api/contact` route, Resend wrapper with graceful fallback, branded email shell, hardcoded Privacy + Terms. |
+| Phase 6 — Remaining Section Types | ⬜ Next | Editors + renderers for sector_grid, process_steps, network_partners, founder_block, text_image, cta_block, quote, fmp_intro, service_detail. |
 
 **Working admin login (local dev):** `meetahmadch@gmail.com` / `Admin@2026`. This is a debug-only password — must be rotated to a strong production credential before launch. Use `npm run seed-admin` (after editing `ADMIN_PASSWORD` in `scripts/seed-admin.mjs`) to rotate.
 
@@ -410,6 +412,12 @@ For v1, only two template_key rows are needed: `contact_notification` (sent to a
 006_seed_default_content.sql      -- INSERT cms_content rows for header/footer/contact
 007_seed_default_sections.sql     -- INSERT page_sections placeholders
 008_seed_email_templates.sql      -- INSERT email template rows
+009_split_header_settings.sql     -- Split (header_settings, config) JSON blob into
+                                  --   (header_settings, nav_items)            JSON array
+                                  --   (header_settings, cta_label / cta_href) text
+                                  --   (header_settings, show_cta)             text bool
+                                  --   (header_settings, mobile_menu_enabled)  text bool
+                                  -- Idempotent. Migrates any existing blob, then drops it.
 ```
 
 After running migrations, manually insert one admin_users row via SQL with a bcrypt hash for the password.
@@ -423,6 +431,8 @@ After running migrations, manually insert one admin_users row via SQL with a bcr
 PMBC uses the same two-layer CMS pattern as FMP:
 
 **Layer 1: cms_content (key-value)** — for content that doesn't belong to a specific page or section. Logo URLs, brand name, contact email, footer copyright, default SEO description, social URLs. Section + key + value structure. Read once, cached for the request.
+
+**Namespace convention:** one row per atomic key. JSON-array values (e.g. `(header_settings, nav_items)`) are allowed when the value is naturally a list, but discrete keys are preferred over bundled JSON blobs — `(header_settings, cta_label)`, `(header_settings, show_cta)`, etc., not a single `config` row that contains all of them. Migration 009 splits the legacy `config` blob accordingly.
 
 **Layer 2: page_sections (block-based)** — for the main body content of each page. One row per content block, ordered by `display_order`, rendered through a section-type registry. Editable via drag-and-drop page builder.
 
@@ -598,14 +608,39 @@ export default async function middleware(req) {
 | `/admin/email-templates` | Edit email subject and body for the two templates |
 | `/admin/settings` | Misc site settings (analytics IDs, social URLs, etc.) |
 
+### Sidebar (`src/components/admin/CmsAdminNav.tsx`)
+
+Single component handling both desktop and mobile chrome (no separate `AdminSidebar` / `AdminMobileNav` / `LogoutButton` components — those were collapsed into this one in Phase 4.5).
+
+- 240px expanded · 64px collapsed (icons only)
+- Collapse persisted to `localStorage['pmbcAdminSidebarCollapsed']`
+- Scroll position persisted to `sessionStorage['admin_sidebar_scroll']`, restored on `pathname` change
+- Off-canvas drawer below 768px viewport with hamburger button + body-scroll lock + click-backdrop-to-close
+- Active state by exact-match OR prefix-match against per-item `matchPaths` (e.g. "Pages" stays highlighted while inside `/admin/page-builder/...`)
+- Active item gets `#1B3A5F` background + **3px gold (`#D4A93A`) left border**
+- Group dividers labeled `Content` / `Inbox` / `Email` / `System`
+- Footer: external links to `https://www.pacemakersglobal.com` (View Live Site) and `https://www.financialmodelerpro.com` (Visit FMP), both `target="_blank"`. Sign-out lives below those.
+
+### Admin styling
+
+All admin pages use **inline styles**, not Tailwind utility classes. Shared design tokens live in `src/lib/admin/styles.ts` — colors, layout constants, and ready-made `CSSProperties` presets (`adminCard`, `adminInput`, `adminButtonPrimary`, etc.). This intentionally isolates the admin console from the public-site theme so future public-site work can't accidentally restyle the dashboard. The PMBC palette (deep navy `#0F2540` sidebar, navy `#1B3A5F` primary, gold `#D4A93A` accent, page bg `#F4F7FC`) is anchored here.
+
+### Admin API conventions
+
+- All `/api/admin/*` routes session-gate via `getAdminSession()` (401 if absent), zod-validate the body, and write an `audit_log` row on success.
+- Mutations accept both `PATCH` (FMP-style) and `POST` (legacy alias) on `/api/admin/{content,branding,settings,email-branding,email-templates,header-settings}`.
+- `/api/admin/content` GET returns `{ rows: [...] }`; PATCH does upsert (try update, then insert) on `(section, key)` pairs.
+- `/api/admin/branding` GET returns `{ row: ... }`; mutations return the updated row in `{ row: ... }`.
+- Errors always: `{ error: string }` + non-2xx status.
+
 ### Page Builder
 
 Three-pane layout matching FMP's pattern:
 - **Left pane**: list of sections on the current page with drag handles, visibility toggle, delete button, and "Add Section" button at bottom
 - **Center pane**: editor for the currently selected section (the appropriate editor component from `editors/`)
-- **Right pane**: live preview iframe pointed at the page (with `?preview=1` query to bypass cache)
+- **Right pane**: live preview iframe pointed at the page (with `?preview=1` query to bypass cache). PMBC kept the iframe rather than FMP's "open in new tab" — preview re-keys after every Save / Add / Delete.
 
-Save button at the top right. Auto-save toggle in admin settings (default off for v1).
+Save button at the top right. **Explicit-save** model for v1 (no auto-save).
 
 ---
 
@@ -1066,8 +1101,87 @@ End of technical handoff. Read this in full before starting any new task. Update
 - **Add section creates immediately on the server** (so it has a stable id for editing). That's why "Add section" doesn't mark the page dirty — the row is already persisted.
 
 **Open items for next session — Phase 5: Public Pages (core)**
-1. Root layout with CMS-driven Navbar + Footer (read from `cms_content` `header_settings`/`footer_settings` and the new `header_settings.config` JSON blob).
+1. Root layout with CMS-driven Navbar + Footer (read from `cms_content` `header_settings`/`footer_settings` discrete keys per the 009 split).
 2. Contact page form + `/api/contact` route + email templates wired up via Resend.
 3. Per-page metadata pulling from `cms_pages` (`meta_title` already wired in `(public)/[slug]/page.tsx`; needs root layout title template + the home slug variant).
 4. Still pending: rotate `Admin@2026` to a strong production password before any deploy.
+
+### 2026-05-02 (late) — Phase 4.5: Admin Refactor (FMP alignment)
+
+Aligned the admin CMS structurally with FMP's patterns (per `CMS_REFERENCE.md` placed at the repo root) while keeping PMBC's distinct institutional palette and skipping FMP features PMBC doesn't need.
+
+**New files**
+- `src/components/admin/CmsAdminNav.tsx` — single sidebar component handling desktop + mobile (240/64 collapse with `localStorage['pmbcAdminSidebarCollapsed']`, `sessionStorage['admin_sidebar_scroll']` restore-on-pathname-change, off-canvas drawer below 768px with body-scroll lock + backdrop-click-to-close, active state by exact match OR `matchPaths` prefix, **3px gold (`#D4A93A`) left border** on active item, group dividers, bottom external links to the public site + FMP, sign-out folded into footer).
+- `src/lib/admin/styles.ts` — shared admin design tokens (`ADMIN_COLORS`, `ADMIN_LAYOUT`) + ready-made `CSSProperties` presets (`adminCard`, `adminInput`, `adminButtonPrimary`, `adminButtonGhost`, `adminTable`, `adminBadge`, etc.).
+- `supabase/migrations/009_split_header_settings.sql` — splits the legacy `(header_settings, config)` JSON blob into discrete keys: `nav_items` (JSON array), `cta_label`, `cta_href`, `show_cta`, `mobile_menu_enabled`. Idempotent: pulls values from any existing blob, inserts discrete rows with `ON CONFLICT DO NOTHING`, drops the legacy row last.
+- `scripts/smoke-admin.mjs` — extends the existing builder smoke script to hit every top-level admin route (10 pages) post-login.
+- `CMS_REFERENCE.md` — the FMP admin CMS reference doc placed at the repo root for future contextual reads. Treat as frozen spec, not behavioral contract.
+
+**Deleted (folded into `CmsAdminNav.tsx`)**
+- `src/components/admin/AdminSidebar.tsx`
+- `src/components/admin/AdminMobileNav.tsx`
+- `src/components/admin/LogoutButton.tsx`
+
+**Modified**
+- All admin pages converted from Tailwind utility classes to inline styles using the new `src/lib/admin/styles.ts` tokens: `src/app/admin/{page,layout}.tsx`, `login/{page,LoginForm}.tsx`, `branding/{page,BrandingForm}.tsx`, `content/{page,ContentEditor}.tsx`, `header-settings/{page,HeaderSettingsForm}.tsx`, `settings/{page,SettingsForm}.tsx`, `email-branding/{page,EmailBrandingForm}.tsx`, `email-templates/{page,EmailTemplatesEditor}.tsx`, `pages/page.tsx`, `page-builder/[slug]/{page,PageBuilder,SectionEditorPanel,SectionPickerDialog}.tsx`.
+- All four section editors converted: `src/components/admin/editors/{HeroEditor,ParagraphsEditor,StatsBlockEditor,ServiceCardsEditor}.tsx`.
+- Shared admin components converted: `AdminPageHeader.tsx`, `SaveStatus.tsx`, `ConfirmDialog.tsx`, `RichTextEditor.tsx`.
+- `src/lib/cms/headerSettings.ts` — fetcher now reads discrete cms_content rows under `header_settings` with backwards-compat fallback to legacy `config` JSON for unmigrated databases.
+- API routes: `/api/admin/content` adds `GET` (returns `{ rows: [...] }`) and `PATCH` (upsert; `POST` kept as legacy alias). `/api/admin/branding` adds `GET` (returns `{ row }`) and now returns `{ row }` from mutations. `/api/admin/{settings,email-branding,email-templates,header-settings}` accept both `PATCH` and `POST`. `/api/admin/header-settings` writes discrete `cms_content` rows per the 009 namespace split.
+
+**No new packages.** No new tables or migrations beyond 009. No new public-facing routes.
+
+**Verified**
+- `npm run typecheck` clean.
+- `npm run build` clean — 12 admin routes + 9 admin API routes compiled.
+- `node scripts/smoke-admin.mjs` against `npm run dev`: 10/10 admin pages returned HTTP 200 under an authenticated session (`/admin/contact-submissions` returned 404 as expected — Phase 5 placeholder).
+
+**Notable choices**
+- **Kept iframe preview** in the page builder rather than FMP's "open in new tab" pattern; iframe re-keys after every Save / Add / Delete.
+- **Kept `SaveStatus` / `ConfirmDialog` / `AdminPageHeader`** as shared primitives — FMP's CMS_REFERENCE flagged the absence of these as "the first thing worth extracting" if mirrored.
+- **Skipped per-field VF / ItemVF / ItemBar visibility wrappers** for v1 — section editors take a flat `content` blob.
+- **Skipped Media Library and Smart Routing for column types** — neither is justified by current PMBC scope.
+
+**Open items for next session — Phase 5: Public Pages (core)**
+1. Apply migration 009 against the Supabase project (the fetcher tolerates the unmigrated state in dev, but production needs the discrete rows).
+2. Root layout with CMS-driven Navbar + Footer reading the post-009 discrete `header_settings` keys.
+3. Contact page form + `/api/contact` route + email templates wired up via Resend.
+4. Still pending: rotate `Admin@2026` to a strong production password before any deploy.
+
+### 2026-05-03 — Phase 5: Public Pages (core)
+
+**Built**
+- `src/app/(public)/layout.tsx` — public route group layout: `<NavbarServer />` + `<main>` + `<FooterServer />`. Home moved from `src/app/page.tsx` → `src/app/(public)/page.tsx` so it inherits the same chrome.
+- `src/app/layout.tsx` — loads Inter (body) + Source Serif 4 (headings) via `next/font/google`, exposes them as `--font-inter` / `--font-source-serif` CSS variables on `<html>`. Added a `{ default, template: '%s | …' }` title.
+- `src/app/globals.css` — registers PMBC brand tokens (`--pmbc-primary`, `--pmbc-primary-deep`, `--pmbc-secondary`, `--pmbc-accent`, `--pmbc-text`, `--pmbc-text-on-dark`, `--pmbc-muted`, `--pmbc-surface`, `--pmbc-surface-alt`, `--pmbc-border`) plus a Tailwind 4 `@theme inline` block that maps `--font-serif` / `--font-sans` and `--color-pmbc-*` for utility-class consumption. `.font-serif` opt-in helper.
+- `src/components/layout/{NavbarServer,Navbar}.tsx` — server fetches `branding_config` + post-009 `header_settings`, client renders sticky 72px bar (subtle shadow on scroll past 8px), logo→home, desktop nav with active-route highlighting, primary CTA on the right, mobile hamburger with slide-down menu, body-scroll lock while open, auto-close on `pathname` change.
+- `src/components/layout/{FooterServer,Footer}.tsx` — server fetches `branding_config` + `cms_content` section `footer_settings` + `site_settings`. Deep-navy bg with gold hairline. Four columns (Brand+tagline / Services from `src/config/services.ts` / Firm / Contact) + bottom strip with `{year}`-replaced copyright + Privacy/Terms links. Inline LinkedIn SVG (lucide-react 1.x ships no brand icons).
+- `src/config/services.ts` — all 9 services with `slug` / `number` / `title` / hardcoded `summary`. Single source of truth for the services grid + footer column + form dropdown.
+- `src/app/(public)/services/page.tsx` — renders any CMS sections for slug `services`, then a fixed 3-col grid of all 9 services from config. Each card → `/services/{slug}` (detail routes are still Phase 7).
+- `src/app/(public)/contact/page.tsx` — CMS sections + two-column layout (form left, direct contact info right). Reads `site_settings` for email/WhatsApp/office display.
+- `src/components/public/ContactForm.tsx` — react-hook-form, all `contact_submissions` fields, Country dropdown (KSA/UAE/QA/KW/BH/OM/Other), Service dropdown from config, **hCaptcha gated behind `NEXT_PUBLIC_HCAPTCHA_SITE_KEY` presence** (renders only if env present), POSTs JSON to `/api/contact`, inline success/error states, captcha auto-resets after submit.
+- `src/app/api/contact/route.ts` — zod-validates body, server-side hCaptcha verify (no-op if `HCAPTCHA_SECRET_KEY` unset), inserts into `contact_submissions`, fires both emails in parallel. Email failures logged but do NOT 500 the request — the submission is already saved and visible to the admin inbox once Phase 5+ adds it.
+- `src/lib/email/send.ts` — Resend wrapper with **graceful fallback**: missing `RESEND_API_KEY`/`EMAIL_FROM_DEFAULT` → log + return `{ ok: false, reason: 'not_configured' }`, never throws. Caches the `Resend` client.
+- `src/lib/email/templates/_base.ts` — `baseLayoutBranded(content)` reads `email_branding`, builds a 600px branded shell (header logo-or-wordmark on primary color, body, signature, footer) using table-based markup for email-client safety.
+- `src/lib/email/render.ts` — `{{var}}` substitution. `renderTemplate` HTML-escapes values (used for body); `renderSubject` does not. Unknown vars are left in place.
+- `src/app/(public)/{privacy,terms}/page.tsx` — hardcoded with "to be reviewed by counsel" placeholder. PMBC-specific copy (LLP wording, engagement-letter-governs-mandates clause, etc.).
+
+**Verified**
+- `npm run typecheck` clean.
+- `npm run build` clean — 28 routes total: home, `/[slug]`, `/services`, `/contact`, `/privacy`, `/terms`, all admin routes, `/api/contact`, all admin API routes. `/privacy` and `/terms` correctly statically prerendered (○); home + services + `/[slug]` + contact dynamic (ƒ) due to CMS reads.
+
+**Notable detours / lessons**
+- **`lucide-react@1.x` ships no brand icons.** Imported `Linkedin` from `lucide-react` and got `TS2305: Module '"lucide-react"' has no exported member 'Linkedin'`. Fix: inline a 24×24 path-only SVG component. (Confirmed via `Object.keys(require('lucide-react')).filter(s => /linke/i.test(s))` → 0 matches.) Memory note already says lucide 1.x is current — don't try to "downgrade" past that as a workaround.
+- **Stale `.next/types/validator.ts`** kept failing typecheck with `Cannot find module '../../src/app/page.js'` after moving `page.tsx` into the `(public)` group. Fix: `rm -rf .next` then re-run `npm run typecheck`. Don't run `npm run build` while `npm run dev` is active on the same project (already documented above).
+- **Home page belongs in the route group.** Initial `src/app/page.tsx` lived OUTSIDE `(public)` so it would NOT have inherited `(public)/layout.tsx`. Moving it to `src/app/(public)/page.tsx` keeps `/` mapped correctly and gives it the navbar/footer chrome.
+- **CSS-vars-as-Tailwind-arbitrary-values** (`bg-[color:var(--pmbc-primary)]`) is the cleanest way to consume the brand tokens from inside Tailwind utility-class strings without juggling a parallel Tailwind theme file.
+- **Form-vs-API HTML escaping.** Body templates pass through `renderTemplate` (escaped) so the user-supplied `message` field can't inject HTML into the admin notification email; subject lines pass through `renderSubject` (raw) since email clients do not render HTML in subjects.
+
+**Open items for next session — Phase 6: Remaining Section Types + admin contact inbox**
+1. Section editors + public renderers for `sector_grid`, `process_steps`, `network_partners`, `founder_block`, `text_image`, `cta_block`, `quote`, `fmp_intro`, `service_detail`. Update `SECTION_REGISTRY` in `src/components/public/SectionRenderer.tsx` and `sectionTypes.ts` (`implemented: true`).
+2. Add `/admin/contact-submissions` (currently a 404 sidebar placeholder) — list + view + status change + notes for the rows the contact form is now writing.
+3. Detail pages for individual services at `/services/[slug]` (currently `.gitkeep` only).
+4. Resend domain verification + `RESEND_API_KEY` / `EMAIL_FROM_DEFAULT` / `EMAIL_FROM_CONTACT` / `EMAIL_TO_ADMIN` populated in `.env.local` so the contact form actually emails.
+5. Apply migration 009 against the production Supabase project (still pending from Phase 4.5).
+6. Still pending: rotate `Admin@2026` to a strong production password before any deploy.
 
