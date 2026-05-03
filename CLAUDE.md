@@ -37,7 +37,8 @@ PMBC is the parent entity. Financial Modeler Pro is its flagship platform. The w
 | Phase 4 — Page Builder | ✅ Complete (2026-05-02) | `/admin/pages`, three-pane `/admin/page-builder/[slug]` with dnd reorder + visibility + delete, four section editors (hero, paragraphs, stats_block, service_cards), public `/[slug]` route + home wired up. |
 | Phase 4.5 — Admin Refactor (FMP alignment) | ✅ Complete (2026-05-02) | New `CmsAdminNav` (240/64 collapse, off-canvas, gold-accent active border, matchPaths, external links to live site + FMP). Tailwind→inline styles across all admin pages with shared tokens at `src/lib/admin/styles.ts`. API routes accept both `PATCH` and `POST`; `cms_content` GET added; branding mutations return `{ row }`. `(header_settings, config)` JSON blob split into discrete keys via migration 009. |
 | Phase 5 — Public Pages (core) | ✅ Complete (2026-05-03) | Public root layout with CMS-driven Navbar + Footer, fonts (Inter + Source Serif 4) wired via `next/font`, services overview with config-driven 9-card grid, contact page + form + `/api/contact` route, Resend wrapper with graceful fallback, branded email shell, hardcoded Privacy + Terms. |
-| Phase 6 — Remaining Section Types | ⬜ Next | Editors + renderers for sector_grid, process_steps, network_partners, founder_block, text_image, cta_block, quote, fmp_intro, service_detail. |
+| Phase 6 — Remaining Section Types | ✅ Complete (2026-05-03) | Public renderers + admin editors for the 9 outstanding types: sector_grid, process_steps, network_partners, founder_block, text_image, cta_block, quote, fmp_intro, service_detail. Curated 21-icon lucide registry shared between sector editor + renderer. `SECTION_TYPES` now has `implemented: true` for all 13 types. |
+| Phase 7 — Remaining Pages | ⬜ Next | Wire `/services/[slug]` route, populate sectors / approach / network / about / FMP / individual service pages with real content via the page builder. |
 
 **Working admin login (local dev):** `meetahmadch@gmail.com` / `Admin@2026`. This is a debug-only password — must be rotated to a strong production credential before launch. Use `npm run seed-admin` (after editing `ADMIN_PASSWORD` in `scripts/seed-admin.mjs`) to rotate.
 
@@ -888,8 +889,8 @@ Follow this order. Don't skip ahead. Each phase is testable on its own.
 4. Services overview page
 5. Contact page with form, contact API route, email templates wired up
 
-### Phase 6: Remaining Section Types (Day 7-9)
-Add editors and renderers for: sector_grid, process_steps, network_partners, founder_block, text_image, cta_block, quote, fmp_intro, service_detail.
+### Phase 6: Remaining Section Types (Day 7-9) — ✅ Complete (2026-05-03)
+Editors + public renderers shipped for the 9 outstanding types: `sector_grid`, `process_steps`, `network_partners`, `founder_block`, `text_image`, `cta_block`, `quote`, `fmp_intro`, `service_detail`. All marked `implemented: true` in `SECTION_TYPES`; `SectionRenderer` and `SectionEditorPanel` registries cover all 13 types. Shared 21-icon lucide registry at `src/lib/cms/sectorIcons.tsx` powers both the sector-grid editor dropdown and the public renderer.
 
 ### Phase 7: Remaining Pages (Day 9-11)
 Sectors, Approach, Network, About, Financial Modeler Pro, individual service detail pages.
@@ -1184,4 +1185,33 @@ Aligned the admin CMS structurally with FMP's patterns (per `CMS_REFERENCE.md` p
 4. Resend domain verification + `RESEND_API_KEY` / `EMAIL_FROM_DEFAULT` / `EMAIL_FROM_CONTACT` / `EMAIL_TO_ADMIN` populated in `.env.local` so the contact form actually emails.
 5. Apply migration 009 against the production Supabase project (still pending from Phase 4.5).
 6. Still pending: rotate `Admin@2026` to a strong production password before any deploy.
+
+### 2026-05-03 (PM) — Phase 6: Remaining Section Types
+
+**Built**
+- 9 public renderers in `src/components/public/sections/`: `SectorGrid`, `ProcessSteps`, `NetworkPartners`, `FounderBlock`, `TextImage`, `CtaBlock`, `Quote`, `FmpIntro`, `ServiceDetail`. Tailwind classes, brand tokens (`#1B3A5F`/`#0F2540`/`#D4A93A`/`#3FA663`), serif headlines (`font-serif`), Inter body, mobile-responsive throughout. All renderers tolerate empty/legacy fields and fall back gracefully (e.g. neutral-tinted placeholder boxes when `image_url` is empty so layouts can be verified pre-asset-upload).
+- 9 admin editors in `src/components/admin/editors/`: `SectorGridEditor`, `ProcessStepsEditor`, `NetworkPartnersEditor`, `FounderEditor`, `TextImageEditor`, `CtaBlockEditor`, `QuoteEditor`, `FmpIntroEditor`, `ServiceDetailEditor`. Inline-styles (per `src/lib/admin/styles.ts` tokens), explicit-save, Tiptap for rich text (founder bio, text-image body, FMP description, service full-description), `@dnd-kit` for array reorder (sectors, steps, partners, FMP feature points, deliverables), discrete dropdowns for icon picker / service picker / layout / image-position / background-style / alignment buttons. Each editor reads legacy field aliases (`bio` → `bio_html`, `body` → `body_html`, `description` → `full_description_html`, `quote` → `quote_text`, etc.) so any pre-existing `defaultContent` or hand-written rows continue to render.
+- Shared `src/lib/cms/sectorIcons.tsx` — curated 21-icon lucide registry (`Building2`, `Factory`, `Zap`, `Hospital`, `ShoppingBag`, `Plane`, `Hammer`, `Server`, `Droplet`, `Trees`, `Truck`, `Wheat`, `Cpu`, `Banknote`, `GraduationCap`, `HeartPulse`, `Hotel`, `Mountain`, `Ship`, `Wrench`, `Building`) with `SectorIconKey` type, `SECTOR_ICONS` array (used by editor dropdown), and `resolveSectorIcon(key)` helper (used by the public renderer). Module is `.tsx` so server components can import the resolved component directly.
+- Registries wired:
+  - `src/lib/cms/sectionTypes.ts` — all 13 types now `implemented: true`. Process-steps `defaultContent` seeded with the canonical 4-step `Understand → Analyse → Model → Advise` scaffold so a freshly-added section already shows the firm's methodology.
+  - `src/components/public/SectionRenderer.tsx` — `REGISTRY` maps all 13 section types; the dashed `Placeholder` is now only reachable for unknown/legacy types.
+  - `src/app/admin/page-builder/[slug]/SectionEditorPanel.tsx` — `EDITORS` maps all 13 types; raw-JSON inspector fallback retained for unknown types.
+- `scripts/seed-phase6-sections.mjs` + `npm run seed-phase6` — idempotent smoke-test seed. Tags every inserted row with `styles.smoke = 'phase6'`, deletes prior phase-6 rows via `.filter('styles->>smoke', 'eq', 'phase6')` before re-inserting. Spreads the 9 new section types across 6 existing CMS pages: `/approach` (process_steps + quote + cta_block), `/sectors` (sector_grid), `/network` (network_partners), `/about` (founder_block + text_image), `/financial-modeler-pro` (fmp_intro), `/service-business-valuation` (service_detail). Display order starts at 1000 so seeded rows sort after any pre-existing real sections.
+
+**Verified**
+- `npm run typecheck` clean. `npm run build` clean — 27 routes total.
+- `npm run seed-phase6` ran clean, inserted 9 rows across 6 page slugs.
+
+**Notable choices**
+- **Dropdown icon picker, not a search modal.** With only ~21 curated sector-relevant icons in scope, a labelled `<select>` is faster and clearer than a fuzzy-search picker. Each option pairs the lucide icon's natural name with a sector-specific label (e.g. `building2 → "Real estate"`, `droplet → "Oil, gas & water"`).
+- **`fmp_intro` and CTA defaults** point to `https://www.financialmodelerpro.com` (with the `www.` prefix) so cross-site links match the canonical FMP host.
+- **`service_detail` stays renderer-only for now** — it does NOT itself produce a route. Phase 7 will wire `/services/[slug]` to read `cms_pages` row `service-{slug}` and render its sections, at which point the seeded `/service-business-valuation` data becomes the smoke test for the route too.
+- **Image-bearing renderers (`NetworkPartners`, `FounderBlock`, `TextImage`, `Quote`, `FmpIntro`) use `next/image`.** Seeded rows leave the URLs empty for now — `next.config.ts` has no `images.remotePatterns` configured yet, so loading remote images would fail. Add hosts to `next.config.ts` before populating real photo/logo URLs via the admin editors.
+- **Layout buttons over selects** for binary/ternary visual choices (image_left/right, alignment, background_style) — matches the existing `HeroEditor` pattern and keeps the editor visually compact.
+
+**Open items for next session — Phase 7: Remaining Pages**
+1. `/services/[slug]` route — read `cms_pages` row keyed `service-{slug}` and render its `page_sections`. The `service_detail` renderer is already registry-ready.
+2. Populate page sections for sectors, approach, network, about, financial-modeler-pro, and the 9 service-detail pages with real content via the page builder (the smoke-seed rows can be deleted by re-running `seed-phase6` with an emptied `SEEDS` array, or kept as starter content).
+3. Add `images.remotePatterns` to `next.config.ts` for the host(s) where partner logos and founder/team photos will live, so the image-bearing renderers can load real assets.
+4. Still pending: `/admin/contact-submissions` inbox · apply migration 009 against production Supabase · rotate `Admin@2026` to a strong production password before any deploy.
 

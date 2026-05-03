@@ -4,6 +4,15 @@ import { HeroEditor } from '@/components/admin/editors/HeroEditor';
 import { ParagraphsEditor } from '@/components/admin/editors/ParagraphsEditor';
 import { StatsBlockEditor } from '@/components/admin/editors/StatsBlockEditor';
 import { ServiceCardsEditor } from '@/components/admin/editors/ServiceCardsEditor';
+import { SectorGridEditor } from '@/components/admin/editors/SectorGridEditor';
+import { ProcessStepsEditor } from '@/components/admin/editors/ProcessStepsEditor';
+import { NetworkPartnersEditor } from '@/components/admin/editors/NetworkPartnersEditor';
+import { FounderEditor } from '@/components/admin/editors/FounderEditor';
+import { TextImageEditor } from '@/components/admin/editors/TextImageEditor';
+import { CtaBlockEditor } from '@/components/admin/editors/CtaBlockEditor';
+import { QuoteEditor } from '@/components/admin/editors/QuoteEditor';
+import { FmpIntroEditor } from '@/components/admin/editors/FmpIntroEditor';
+import { ServiceDetailEditor } from '@/components/admin/editors/ServiceDetailEditor';
 import type { SectionEditorProps } from '@/components/admin/editors/types';
 import { ADMIN_COLORS } from '@/lib/admin/styles';
 import { getSectionMeta } from '@/lib/cms/sectionTypes';
@@ -13,6 +22,15 @@ const EDITORS: Record<string, (props: SectionEditorProps) => React.ReactElement>
   paragraphs: ParagraphsEditor,
   stats_block: StatsBlockEditor,
   service_cards: ServiceCardsEditor,
+  sector_grid: SectorGridEditor,
+  process_steps: ProcessStepsEditor,
+  network_partners: NetworkPartnersEditor,
+  founder_block: FounderEditor,
+  text_image: TextImageEditor,
+  cta_block: CtaBlockEditor,
+  quote: QuoteEditor,
+  fmp_intro: FmpIntroEditor,
+  service_detail: ServiceDetailEditor,
 };
 
 export function SectionEditorPanel({
