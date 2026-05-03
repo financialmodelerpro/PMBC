@@ -2,18 +2,21 @@ import type { Metadata } from 'next';
 
 import { fetchPage, fetchPageSections } from '@/lib/cms/pages';
 import { FirmPageBody } from '@/components/public/FirmPageBody';
+import { buildPageMetadata } from '@/lib/seo/metadata';
 
 export const dynamic = 'force-dynamic';
 
 export async function generateMetadata(): Promise<Metadata> {
   const page = await fetchPage('approach');
-  if (!page) return { title: 'Our Approach' };
-  const title = page.meta_title ?? page.title;
-  return {
-    title: { absolute: title },
-    description: page.meta_description ?? undefined,
-    openGraph: page.og_image_url ? { images: [page.og_image_url] } : undefined,
-  };
+  return buildPageMetadata({
+    path: '/approach',
+    cmsPage: page,
+    fallback: {
+      title: 'Engagement Approach — PaceMakers Business Consultants',
+      description: 'How we engage: understand, analyse, model, advise.',
+      ogSubtitle: 'Understand. Analyse. Model. Advise.',
+    },
+  });
 }
 
 export default async function ApproachPage(props: {

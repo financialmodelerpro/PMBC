@@ -7,6 +7,8 @@ import { fetchPage } from '@/lib/cms/pages';
 import { fetchServiceDetailFields, findService } from '@/lib/cms/serviceContent';
 import { SERVICES } from '@/config/services';
 import { ServiceDetail } from '@/components/public/sections/ServiceDetail';
+import { buildPageMetadata, siteUrl } from '@/lib/seo/metadata';
+import { ServiceJsonLd } from '@/components/seo/ServiceJsonLd';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,13 +28,16 @@ export async function generateMetadata(props: {
   // cms_pages row keyed `service-{slug}` carries the meta_title and
   // meta_description for each detail page (seeded by migration 005).
   const page = await fetchPage(`service-${slug}`);
-  const title =
-    page?.meta_title ?? `${service.title} — PaceMakers Business Consultants`;
-  return {
-    title: { absolute: title },
-    description: page?.meta_description ?? service.summary,
-    openGraph: page?.og_image_url ? { images: [page.og_image_url] } : undefined,
-  };
+  return buildPageMetadata({
+    path: `/services/${slug}`,
+    cmsPage: page,
+    fallback: {
+      title: `${service.title} — PaceMakers Business Consultants`,
+      description: service.summary,
+      ogSubtitle: service.summary,
+    },
+    ogSubtitleOverride: service.summary,
+  });
 }
 
 export default async function ServiceDetailPage(props: {
@@ -43,9 +48,16 @@ export default async function ServiceDetailPage(props: {
   if (!service) notFound();
 
   const fields = await fetchServiceDetailFields(slug);
+  const canonical = `${siteUrl()}/services/${slug}`;
 
   return (
     <>
+      <ServiceJsonLd
+        slug={service.slug}
+        name={service.title}
+        description={service.summary}
+        url={canonical}
+      />
       <ServiceDetail
         content={{
           service_slug: service.slug,

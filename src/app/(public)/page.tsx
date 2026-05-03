@@ -3,16 +3,22 @@ import type { Metadata } from 'next';
 
 import { fetchPage, fetchPageSections } from '@/lib/cms/pages';
 import { SectionRenderer } from '@/components/public/SectionRenderer';
+import { buildPageMetadata } from '@/lib/seo/metadata';
 
 export const dynamic = 'force-dynamic';
 
 export async function generateMetadata(): Promise<Metadata> {
   const page = await fetchPage('home');
-  if (!page) return {};
-  return {
-    title: page.meta_title ?? page.title,
-    description: page.meta_description ?? undefined,
-  };
+  return buildPageMetadata({
+    path: '/',
+    cmsPage: page,
+    fallback: {
+      title: 'PaceMakers Business Consultants — Advisory from Structure to Exit',
+      description:
+        'Boutique corporate finance and transaction advisory firm serving KSA, GCC, and worldwide mandates.',
+      ogSubtitle: 'Advisory from Structure to Exit',
+    },
+  });
 }
 
 export default async function HomePage(props: {

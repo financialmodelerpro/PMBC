@@ -6,17 +6,21 @@ import { fetchSiteSettings } from '@/lib/cms/settings';
 import { SectionRenderer } from '@/components/public/SectionRenderer';
 import { SERVICES } from '@/config/services';
 import { ContactForm } from '@/components/public/ContactForm';
+import { buildPageMetadata } from '@/lib/seo/metadata';
 
 export const dynamic = 'force-dynamic';
 
 export async function generateMetadata(): Promise<Metadata> {
   const page = await fetchPage('contact');
-  if (!page) return { title: 'Contact' };
-  const title = page.meta_title ?? page.title;
-  return {
-    title: { absolute: title },
-    description: page.meta_description ?? undefined,
-  };
+  return buildPageMetadata({
+    path: '/contact',
+    cmsPage: page,
+    fallback: {
+      title: 'Contact — PaceMakers Business Consultants',
+      description: 'Start a conversation about your mandate.',
+      ogSubtitle: 'Tell us about the mandate.',
+    },
+  });
 }
 
 export default async function ContactPage(props: {

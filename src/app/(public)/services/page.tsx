@@ -5,17 +5,22 @@ import { ArrowUpRight } from 'lucide-react';
 import { fetchPage, fetchPageSections } from '@/lib/cms/pages';
 import { SectionRenderer } from '@/components/public/SectionRenderer';
 import { SERVICES } from '@/config/services';
+import { buildPageMetadata } from '@/lib/seo/metadata';
 
 export const dynamic = 'force-dynamic';
 
 export async function generateMetadata(): Promise<Metadata> {
   const page = await fetchPage('services');
-  if (!page) return { title: 'Services' };
-  const title = page.meta_title ?? page.title;
-  return {
-    title: { absolute: title },
-    description: page.meta_description ?? undefined,
-  };
+  return buildPageMetadata({
+    path: '/services',
+    cmsPage: page,
+    fallback: {
+      title: 'Services — PaceMakers Business Consultants',
+      description:
+        'Financial modeling, valuation, due diligence, M&A, and CFO advisory across KSA and GCC mandates.',
+      ogSubtitle: 'Nine disciplines, one standard of work.',
+    },
+  });
 }
 
 export default async function ServicesPage(props: {
