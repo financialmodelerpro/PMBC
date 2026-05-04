@@ -36,7 +36,7 @@ export default function PublicError({
           We hit an unexpected snag
         </h1>
         <p className="mt-5 text-base leading-relaxed text-neutral-600 sm:text-lg">
-          The page didn&apos;t load as expected. Try again — and if the issue
+          The page didn&apos;t load as expected. Try again. If the issue
           persists, let us know and we&apos;ll look into it.
         </p>
 

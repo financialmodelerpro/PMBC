@@ -13,7 +13,7 @@ export async function generateMetadata(): Promise<Metadata> {
     path: '/',
     cmsPage: page,
     fallback: {
-      title: 'PaceMakers Business Consultants — Advisory from Structure to Exit',
+      title: 'PaceMakers Business Consultants | Advisory from Structure to Exit',
       description:
         'Boutique corporate finance and transaction advisory firm serving KSA, GCC, and worldwide mandates.',
       ogSubtitle: 'Advisory from Structure to Exit',

@@ -9,7 +9,7 @@ import { ContentEditor } from './ContentEditor';
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: 'Content — PMBC Admin',
+  title: 'Content | PMBC Admin',
   robots: { index: false, follow: false },
 };
 

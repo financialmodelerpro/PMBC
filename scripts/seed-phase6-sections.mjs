@@ -75,7 +75,7 @@ const SEEDS = [
               number: '04',
               title: 'Advise',
               description:
-                'Findings, recommendations, and negotiation support — not just a deliverable, an opinion.',
+                'Findings, recommendations, and negotiation support. Not just a deliverable, an opinion.',
             },
           ],
         },
@@ -132,7 +132,7 @@ const SEEDS = [
               icon_name: 'server',
               title: 'Data centers',
               description:
-                'Hyperscale and enterprise builds — power, cooling, fit-out, and tenancy underwriting.',
+                'Hyperscale and enterprise builds: power, cooling, fit-out, and tenancy underwriting.',
             },
             {
               icon_name: 'factory',
@@ -218,7 +218,7 @@ const SEEDS = [
           name: 'Ahmad Din',
           credentials_line: 'Founder · Corporate finance · Transaction advisory',
           bio_html:
-            '<p>Ahmad founded PaceMakers to bring senior, analytically grounded advisory to mandates the bulge-bracket firms either skip or under-staff. His background spans biofuel, oil &amp; gas, waste management, data center, construction, and industrial services transactions across KSA and the GCC.</p><p>For the full professional bio — including platforms, prior firms, and selected mandates — see his page on Financial Modeler Pro.</p>',
+            '<p>Ahmad founded PaceMakers to bring senior, analytically grounded advisory to mandates the bulge-bracket firms either skip or under-staff. His background spans biofuel, oil &amp; gas, waste management, data center, construction, and industrial services transactions across KSA and the GCC.</p><p>For the full professional bio (including platforms, prior firms, and selected mandates), see his page on Financial Modeler Pro.</p>',
           cta_primary_label: 'Full bio on FMP',
           cta_primary_href: 'https://www.financialmodelerpro.com/about/ahmad-din',
           cta_secondary_label: 'Start a conversation',
@@ -231,7 +231,7 @@ const SEEDS = [
         content: {
           heading: 'A boutique by design',
           body_html:
-            '<p>PaceMakers is deliberately small. Every engagement is led by a senior who has personally underwritten transactions on the buy-side, sell-side, and lender-side. We do not run a leverage model where work cascades to first-year analysts.</p><p>The result is fewer, deeper mandates — and clients who come back.</p>',
+            '<p>PaceMakers is deliberately small. Every engagement is led by a senior who has personally underwritten transactions on the buy-side, sell-side, and lender-side. We do not run a leverage model where work cascades to first-year analysts.</p><p>The result is fewer, deeper mandates, and clients who come back.</p>',
           image_url: '',
           image_alt: '',
           image_caption: '',
@@ -250,7 +250,7 @@ const SEEDS = [
         content: {
           heading: 'The platform built by practitioners',
           description_html:
-            '<p>Financial Modeler Pro is PMBC&rsquo;s flagship platform — a learning environment, model library, and analyst toolkit built from the same engagement experience that drives the advisory practice.</p>',
+            '<p>Financial Modeler Pro is PMBC&rsquo;s flagship platform: a learning environment, model library, and analyst toolkit built from the same engagement experience that drives the advisory practice.</p>',
           feature_points: [
             'Institutional-grade model templates',
             'Structured learning tracks for analysts',
@@ -272,7 +272,7 @@ const SEEDS = [
         content: {
           service_slug: 'business-valuation',
           full_description_html:
-            '<p>We deliver independent business valuations used in transactions, fairness opinions, dispute settings, shareholder buyouts, and strategic planning. Every valuation triangulates DCF with comparable transactions and trading multiples — and explains, in writing, where the methods agree and disagree.</p><p>Our reports are written for a board, lender, or court audience. Methodology is defensible. Assumptions are sourced. Sensitivities are real.</p>',
+            '<p>We deliver independent business valuations used in transactions, fairness opinions, dispute settings, shareholder buyouts, and strategic planning. Every valuation triangulates DCF with comparable transactions and trading multiples, and explains, in writing, where the methods agree and disagree.</p><p>Our reports are written for a board, lender, or court audience. Methodology is defensible. Assumptions are sourced. Sensitivities are real.</p>',
           deliverables: [
             'Three-method valuation with reconciliation',
             'Standalone written report (board-ready)',

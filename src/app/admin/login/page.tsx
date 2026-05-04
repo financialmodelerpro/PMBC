@@ -6,7 +6,7 @@ import { ADMIN_COLORS } from '@/lib/admin/styles';
 import { LoginForm } from './LoginForm';
 
 export const metadata: Metadata = {
-  title: 'Admin sign in — PaceMakers Business Consultants',
+  title: 'Admin sign in | PaceMakers Business Consultants',
   robots: { index: false, follow: false },
 };
 

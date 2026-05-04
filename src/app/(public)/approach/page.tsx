@@ -12,7 +12,7 @@ export async function generateMetadata(): Promise<Metadata> {
     path: '/approach',
     cmsPage: page,
     fallback: {
-      title: 'Engagement Approach — PaceMakers Business Consultants',
+      title: 'Engagement Approach | PaceMakers Business Consultants',
       description: 'How we engage: understand, analyse, model, advise.',
       ogSubtitle: 'Understand. Analyse. Model. Advise.',
     },
@@ -34,7 +34,7 @@ export default async function ApproachPage(props: {
         eyebrow: 'Our Approach',
         headline: 'How we engage',
         tagline:
-          'Understand. Analyse. Model. Advise. Senior-led from first call to final advice — no black-box deliverables, no junior pass-throughs.',
+          'Understand. Analyse. Model. Advise. Senior-led from first call to final advice. No black-box deliverables, no junior pass-throughs.',
       }}
     />
   );

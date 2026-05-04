@@ -12,7 +12,7 @@ export async function generateMetadata(): Promise<Metadata> {
     path: '/sectors',
     cmsPage: page,
     fallback: {
-      title: 'Sector Coverage — PaceMakers Business Consultants',
+      title: 'Sector Coverage | PaceMakers Business Consultants',
       description:
         'Real estate, energy, industrial services, infrastructure, and family-office mandates.',
       ogSubtitle: 'Where we deliver depth, not breadth.',

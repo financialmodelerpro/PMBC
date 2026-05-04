@@ -32,7 +32,7 @@ export async function generateMetadata(props: {
     path: `/services/${slug}`,
     cmsPage: page,
     fallback: {
-      title: `${service.title} — PaceMakers Business Consultants`,
+      title: `${service.title} | PaceMakers Business Consultants`,
       description: service.summary,
       ogSubtitle: service.summary,
     },

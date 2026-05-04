@@ -2,7 +2,7 @@
 // JS-side equivalent of supabase/migrations/011_seed_home_page_content.sql.
 // Replaces all page_sections rows for page_slug='home' with the Phase 9
 // production content (9 sections, display_order 10..90), then merges
-// site_settings with the real contact details. Safe to re-run — the DELETE
+// site_settings with the real contact details. Safe to re-run; the DELETE
 // + INSERT is idempotent.
 //
 // Run: node scripts/seed-home-page.mjs
@@ -78,7 +78,7 @@ const SECTIONS = [
       credentials_line: 'ACCA Member (UK) · FMVA® Certified · 12+ Years · KSA, GCC, Pakistan',
       photo_url: '',
       bio_html:
-        "<p>At most boutique firms, the founder closes the engagement and hands the work to a junior team. PaceMakers operates differently. When you engage us, Ahmad leads the financial structuring, modeling, valuation, and advisory work directly — drawing on twelve years of experience on mandates including multi-billion riyal real estate portfolios, ACWA Power's Central Asia renewable infrastructure, and Saudi Aramco-backed industrial projects.</p><p>This is the model sophisticated capital allocators expect: senior judgment on every line of the model, every assumption, every recommendation.</p>",
+        "<p>At most boutique firms, the founder closes the engagement and hands the work to a junior team. PaceMakers operates differently. When you engage us, Ahmad leads the financial structuring, modeling, valuation, and advisory work directly, drawing on twelve years of experience on mandates including multi-billion riyal real estate portfolios, ACWA Power's Central Asia renewable infrastructure, and Saudi Aramco-backed industrial projects.</p><p>This is the model sophisticated capital allocators expect: senior judgment on every line of the model, every assumption, every recommendation.</p>",
       cta_primary_label: 'About Ahmad',
       cta_primary_href: '/about',
       cta_secondary_label: '',
@@ -106,13 +106,13 @@ const SECTIONS = [
       eyebrow: 'WHAT WE DO',
       headline: 'Built for transactions that need to hold up under scrutiny.',
       intro:
-        'Six core capabilities, applied to the moments that matter most — capital raises, acquisitions, structuring decisions, and exits. Each engagement is led by Ahmad and built on lender-grade modeling discipline.',
+        'Six core capabilities, applied to the moments that matter most: capital raises, acquisitions, structuring decisions, and exits. Each engagement is led by Ahmad and built on lender-grade modeling discipline.',
       cards: [
         {
           number: '01',
           title: 'Financial Modeling',
           description:
-            'Lender-grade operating, valuation, and project finance models — IRR, DSCR, debt sizing, and debt sculpting built to institutional standard.',
+            'Lender-grade operating, valuation, and project finance models. IRR, DSCR, debt sizing, and debt sculpting built to institutional standard.',
           link: '/services/financial-modeling',
         },
         {
@@ -133,7 +133,7 @@ const SECTIONS = [
           number: '04',
           title: 'Real Estate Modeling',
           description:
-            'Mixed-use development modeling — phased construction, installment-based revenue, debt waterfalls, IRR optimization, and DSCR-compliant lender models.',
+            'Mixed-use development modeling: phased construction, installment-based revenue, debt waterfalls, IRR optimization, and DSCR-compliant lender models.',
           link: '/services/real-estate-modeling',
         },
         {
@@ -147,7 +147,7 @@ const SECTIONS = [
           number: '06',
           title: 'Investment Memorandums',
           description:
-            'Investor-ready pitch decks, business plans, and information memorandums — the documentation capital actually closes on.',
+            'Investor-ready pitch decks, business plans, and information memorandums. The documentation capital actually closes on.',
           link: '/services/investment-memorandums',
         },
       ],
@@ -173,7 +173,7 @@ const SECTIONS = [
           number: '',
           title: 'Investment Offices',
           description:
-            'Deal-level modeling, valuation, and due diligence support — supplementing in-house teams on selective mandates.',
+            'Deal-level modeling, valuation, and due diligence support, supplementing in-house teams on selective mandates.',
           link: '',
         },
         {
@@ -204,7 +204,7 @@ const SECTIONS = [
           number: '01',
           title: 'Understand',
           description:
-            'We start by understanding the mandate, the decision it must support, and the audience the output must convince — board, lender, sponsor, or investor.',
+            'We start by understanding the mandate, the decision it must support, and the audience the output must convince: board, lender, sponsor, or investor.',
         },
         {
           number: '02',
@@ -222,7 +222,7 @@ const SECTIONS = [
           number: '04',
           title: 'Advise',
           description:
-            'Recommendations, structuring options, and capital-raising or transaction support — through to close.',
+            'Recommendations, structuring options, and capital-raising or transaction support, through to close.',
         },
       ],
       footer_cta_label: 'Read more about our approach',
@@ -236,7 +236,7 @@ const SECTIONS = [
       eyebrow: 'STRATEGIC NETWORK',
       heading: 'A focused network across the Gulf.',
       body_html:
-        '<p>PaceMakers is supported by two long-standing relationships that extend our reach across the GCC. Sky Gulf, headquartered in Al Khobar, brings industrial and project execution depth in the Eastern Province. Lynkers, based in Manama and a strategic equity shareholder in PaceMakers, provides Bahrain market access and capital-markets insight.</p><p>Together, the network gives clients a senior bench with regional presence — without the overhead of a tier-one firm.</p>',
+        '<p>PaceMakers is supported by two long-standing relationships that extend our reach across the GCC. Sky Gulf, headquartered in Al Khobar, brings industrial and project execution depth in the Eastern Province. Lynkers, based in Manama and a strategic equity shareholder in PaceMakers, provides Bahrain market access and capital-markets insight.</p><p>Together, the network gives clients a senior bench with regional presence, without the overhead of a tier-one firm.</p>',
       image_url: '',
       image_alt: 'PaceMakers strategic network across the GCC',
       image_position: 'right',
@@ -249,7 +249,7 @@ const SECTIONS = [
     section_type: 'quote',
     content: {
       quote_text:
-        "A good financial model is not just a calculation — it's a communication tool. Every assumption should be visible, every output should be traceable, and the final product should be something you'd be proud to present to a board or an investor committee without reformatting.",
+        "A good financial model is not just a calculation. It's a communication tool. Every assumption should be visible, every output should be traceable, and the final product should be something you'd be proud to present to a board or an investor committee without reformatting.",
       attribution_name: 'Ahmad Din',
       attribution_role: 'Founder, PaceMakers Business Consultants',
       attribution_photo_url: '',
@@ -262,7 +262,7 @@ const SECTIONS = [
     content: {
       headline: 'Have a mandate to discuss?',
       subhead:
-        "Whether you're raising capital, evaluating an acquisition, structuring a development, or preparing for an exit — we'd be glad to have a conversation.",
+        "Whether you're raising capital, evaluating an acquisition, structuring a development, or preparing for an exit, we'd be glad to have a conversation.",
       cta_primary_label: 'Start a Conversation',
       cta_primary_href: '/contact',
       cta_secondary_label: 'Email Ahmad Directly',
@@ -273,7 +273,7 @@ const SECTIONS = [
 ];
 
 async function main() {
-  console.log('Phase 9 — Seeding home page sections + site_settings');
+  console.log('Phase 9: Seeding home page sections + site_settings');
 
   console.log('  Deleting existing home page_sections rows...');
   const { error: delErr, count: delCount } = await sb

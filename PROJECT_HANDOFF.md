@@ -5,7 +5,7 @@
 **Domain:** pacemakersglobal.com
 **Vercel project:** pmbc (already created, domain attached)
 **Build path:** Self-built using Claude Code
-**Status:** Pre-development. Repo created fresh. Vercel project linked. No code committed yet.
+**Status:** Phases 1–4 + 4.5 complete (as of 2026-05-02). Scaffold + DB, NextAuth admin shell, six CMS editors, three-pane page builder with four section editors, and a full FMP-aligned admin refactor (sidebar, inline styling, namespace split, API conventions) all shipped. Phase 5 (public pages — core) is up next.
 
 ---
 
@@ -105,11 +105,12 @@ FMP is a learning and modeling platform with student auth, course content, quizz
 
 A 13-15 day full build, broken into 9 testable phases. Each phase is independently reviewable.
 
-1. Scaffold Next.js, install dependencies, set up Supabase, run migrations
-2. Auth + admin shell (NextAuth, middleware, login, dashboard)
-3. CMS foundations (cms_content editor, branding admin, settings)
-4. Page builder (admin pages list, three-pane editor, first 4 section types)
-5. Public pages — core (home, services overview, contact form with email)
+1. Scaffold Next.js, install dependencies, set up Supabase, run migrations ✅
+2. Auth + admin shell (NextAuth, middleware, login, dashboard) ✅
+3. CMS foundations (cms_content editor, branding admin, settings) ✅
+4. Page builder (admin pages list, three-pane editor, first 4 section types) ✅
+4.5. Admin refactor — FMP-aligned sidebar, inline-styled admin chrome, `cms_content` namespace split, `PATCH`/`POST` API parity ✅
+5. Public pages — core (home, services overview, contact form with email) ⬅ next
 6. Remaining section types (sector_grid, process_steps, network_partners, founder_block, text_image, cta_block, quote, fmp_intro, service_detail)
 7. Remaining pages (sectors, approach, network, about, FMP page, service detail)
 8. SEO and polish (OG, metadata, sitemap, structured data, 404)
@@ -129,6 +130,8 @@ A 13-15 day full build, broken into 9 testable phases. Each phase is independent
 | Multi-language | Not in v1. English only. |
 | Auth | Admin-only. No public users. |
 | Stack versions | Next.js 15, TypeScript 5, Tailwind 4, Supabase JS 2, NextAuth 4 |
+| Admin save model | Explicit Save (not auto-save). Confirmed in Phase 3, validated in Phase 4 page builder. |
+| Admin styling | Inline styles with shared tokens at `src/lib/admin/styles.ts`. Public-site Tailwind stays isolated from admin chrome. |
 
 ## Decisions Still Open
 
@@ -137,7 +140,6 @@ A 13-15 day full build, broken into 9 testable phases. Each phase is independent
 | Headline serif font | Source Serif Pro vs Playfair Display. Decide during Phase 5 polish. |
 | Resend account | Reuse FMP's account with new sender, or create new account for PMBC. Recommendation: separate account. |
 | Color tokens — exact hex values | Starting palette in CLAUDE.md is a draft. Refine against logo and brand once first pages render. |
-| Auto-save vs explicit save in page builder | Pick one and stay consistent. |
 | Founder photo on About page | Use the existing FMP profile photo, or shoot new institutional photography. |
 | Direct booking link | Microsoft Bookings (already used by FMP) vs Calendly vs WhatsApp-only. |
 
@@ -154,11 +156,11 @@ The FMP founder page (`financialmodelerpro.com/about/ahmad-din`) is the canonica
 
 ## What Happens Next
 
-1. **You** delete and recreate the GitHub repo if not already done. (Done.) Confirm Vercel relink. (Done.)
-2. **You** scaffold the Next.js project locally and push the initial commit.
-3. **You** run through Phase 1 of the build sequence (database setup, migrations, admin user seeding).
-4. **Claude (in chat)** drafts content for each page when you reach Phase 9 — section angles confirmed first, then full copy written, per your stated working preference.
-5. **Claude Code** handles all coding, scaffolding, and feature implementation against this handoff document.
+1. **Apply migration 009** (`supabase/migrations/009_split_header_settings.sql`) against the production Supabase project before any deploy. The fetcher tolerates the unmigrated state in dev, but production should be on the discrete-rows namespace.
+2. **Phase 5** — wire the public root layout to read header/footer from `cms_content`, build the contact form + `/api/contact` route, and connect the two transactional email templates via Resend.
+3. **Claude (in chat)** drafts content for each page when Phase 9 lands — section angles confirmed first, then full copy written, per stated working preference.
+4. **Claude Code** continues all coding, scaffolding, and feature implementation against `CLAUDE.md`.
+5. **Before launch:** rotate `Admin@2026` (the dev seed password for `meetahmadch@gmail.com`) to a strong production credential via `npm run seed-admin`.
 
 ## How to Use These Files
 

@@ -110,7 +110,7 @@ export function ServiceDetailEditor({ content, onChange }: SectionEditorProps) {
           onChange={(e) => writeBack({ service_slug: e.target.value })}
           style={adminInput}
         >
-          <option value="">— Select a service —</option>
+          <option value="">Select a service</option>
           {SERVICES.map((sv) => (
             <option key={sv.slug} value={sv.slug}>
               {sv.number} · {sv.title}

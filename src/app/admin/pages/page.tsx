@@ -18,14 +18,14 @@ import {
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: 'Pages — PMBC Admin',
+  title: 'Pages | PMBC Admin',
   robots: { index: false, follow: false },
 };
 
 function formatDate(iso: string | null): string {
-  if (!iso) return '—';
+  if (!iso) return '-';
   const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '—';
+  if (Number.isNaN(d.getTime())) return '-';
   return d.toLocaleString('en-GB', {
     day: '2-digit',
     month: 'short',

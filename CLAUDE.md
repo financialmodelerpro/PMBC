@@ -27,6 +27,24 @@ PMBC is the parent entity. Financial Modeler Pro is its flagship platform. The w
 
 ---
 
+## Content Style Rules
+
+These rules apply to **all** PMBC content: public copy, admin-facing strings, fallback text, error messages, email templates, migrations seeding `cms_content` or `page_sections`, button labels, hero subtitles, every JSONB blob. Anything a human reader could see, in either the public site or the admin console.
+
+1. **No em dashes (—).** Do not use the em dash anywhere. Replace with a comma, parenthesis, period, or colon depending on the relationship being expressed:
+   - **Pause / aside** (where you'd reach for an em dash): use a comma or parentheses. *"Senior-led, analytically grounded."* not *"Senior-led — analytically grounded."*
+   - **Strong break / new clause:** start a new sentence. *"We model. We advise."* not *"We model — we advise."*
+   - **List intro / explanation:** use a colon. *"Three things matter: clarity, rigor, judgment."* not *"Three things matter — clarity, rigor, judgment."*
+   - **Range** (where en dashes are sometimes used): write out the range words. *"4 to 6 weeks"* not *"4–6 weeks"* — and never *"4 — 6 weeks"*.
+
+   This applies to drafts you write yourself, content you generate during admin/page-builder workflows, fallback copy in route files, error pages (`not-found.tsx`, `error.tsx`), email subject and body templates, admin UI labels, badge text, captions, and alt text. Every string you author. When you find an em dash in *existing* content while doing other work, fix it as part of that work; don't carve out separate em-dash-only PRs.
+
+2. **No en dashes (–) in prose.** Same fix as em dash. Acceptable only inside numeric date ranges where the format requires it (rare in PMBC content), or inside copy the user explicitly hands over verbatim.
+
+Why this matters: PMBC is intentionally institutional, considered, calm. The em dash reads as energetic and digital-marketing-flavored, which is exactly the tone we are NOT going for. The substitutions above produce copy that scans as deliberate and senior. If a sentence feels like it *needs* an em dash, the sentence is usually doing too much; split it.
+
+---
+
 ## Current Status
 
 | Phase | Status | Notes |
@@ -1353,4 +1371,31 @@ The user's content schema introduced fields the existing renderers didn't read (
 8. `/services/[slug]` × 9 — `cms_content` rows under `section='service_<slug>'` keys `full_description`, `deliverables`, `timeline_text`, `target_audience_text`. Migration 010 already seeded placeholder copy; replace with the production write-up per service.
 
 After page content: `/admin/contact-submissions` inbox · DNS+SSL on Vercel · production env vars · sitemap to Search Console · counsel review of Privacy/Terms · rotate `Admin@2026`.
+
+### 2026-05-04 — End-of-session checkpoint
+
+**Recap of this multi-session sprint (2026-05-03 → 2026-05-04)**
+- Phase 5 — Public Pages (core): public root layout with CMS-driven Navbar + Footer, fonts via `next/font`, services overview with 9-card config grid, contact form + `/api/contact`, Resend wrapper with graceful fallback, branded email shell, hardcoded Privacy + Terms.
+- Phase 6 — Section Types: public renderers + admin editors for the 9 outstanding section types. All 13 types now `implemented: true`.
+- Phase 7 — Pages: bespoke routes for /about, /sectors, /approach, /network, /financial-modeler-pro replacing the catch-all; `/services/[slug]` for the 9 service detail pages reading `cms_content` namespace `service_<slug>`; sitemap.ts + robots.ts.
+- Phase 8 — SEO & Polish: dynamic OG image route, shared `buildPageMetadata` helper, Schema.org `@graph` JSON-LD, branded 404 + error.tsx, fleshed-out Privacy + Terms with named processors, `next.config.ts` remotePatterns, `/admin/og-preview` admin tool.
+- Phase 9 part 1 — Home page production content: migration 011 + JS seed script applied to Supabase; renderers extended additively for eyebrow / section-headline / footer-CTA / nested-CTA shapes. Live page renders all 9 sections cleanly with all 7 CTAs wired correctly.
+- New: **Content Style Rules** section added at top of this file (no em dashes anywhere in PMBC content). Memory note saved so it persists across future sessions.
+
+**Open items for the next session**
+1. **Review the home page on the live site** at `https://www.pacemakersglobal.com` and the `www.` apex (whichever DNS resolves) to confirm the production-Supabase data is rendering correctly through Vercel's deploy pipeline. Flag any visual issues that came from the renderer extensions.
+2. **Continue Phase 9 page-by-page content population**, in order:
+   1. `/about` — page_sections
+   2. `/sectors` — page_sections
+   3. `/approach` — page_sections
+   4. `/network` — page_sections
+   5. `/financial-modeler-pro` — page_sections
+   6. `/services` — overview page_sections (intro/eyebrow above the config-driven 9-card grid)
+   7. `/services/[slug]` × 9 — replace migration 010 placeholders in `cms_content` namespace `service_<slug>` with production copy
+   8. `/contact` — page_sections (intro/eyebrow + commitment-to-respond copy above the form)
+3. After all page content: `/admin/contact-submissions` inbox, DNS+SSL on Vercel, production env vars, sitemap to Search Console, counsel review of Privacy/Terms, rotate `Admin@2026`.
+
+**Style reminder for next session.** Every string drafted from now on must follow the **Content Style Rules** at the top of this file: no em dashes, no en dashes in prose. When generating section JSONB or fallback copy, scan once before saving.
+
+**Dev server.** Stopped cleanly at end of session.
 

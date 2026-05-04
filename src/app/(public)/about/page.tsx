@@ -12,7 +12,7 @@ export async function generateMetadata(): Promise<Metadata> {
     path: '/about',
     cmsPage: page,
     fallback: {
-      title: 'About — PaceMakers Business Consultants',
+      title: 'About | PaceMakers Business Consultants',
       description:
         'A boutique corporate finance firm. Senior-led, analytically grounded, commercially focused.',
       ogSubtitle: 'Senior-led, analytically grounded, commercially focused.',

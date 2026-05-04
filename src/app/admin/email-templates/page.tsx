@@ -9,7 +9,7 @@ import { EmailTemplatesEditor } from './EmailTemplatesEditor';
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: 'Email Templates — PMBC Admin',
+  title: 'Email Templates | PMBC Admin',
   robots: { index: false, follow: false },
 };
 

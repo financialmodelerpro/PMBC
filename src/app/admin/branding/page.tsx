@@ -9,7 +9,7 @@ import { BrandingForm } from './BrandingForm';
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: 'Branding — PMBC Admin',
+  title: 'Branding | PMBC Admin',
   robots: { index: false, follow: false },
 };
 

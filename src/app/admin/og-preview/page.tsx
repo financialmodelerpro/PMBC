@@ -10,7 +10,7 @@ import { OgPreviewBoard } from './OgPreviewBoard';
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: 'OG Previews — PMBC Admin',
+  title: 'OG Previews | PMBC Admin',
   robots: { index: false, follow: false },
 };
 
@@ -36,7 +36,7 @@ const FIRM_PAGE_OG_SUBTITLES: Record<string, string> = {
 };
 
 function stripBrandSuffix(s: string): string {
-  return s.replace(/\s*[—-]\s*PaceMakers Business Consultants\s*$/i, '');
+  return s.replace(/\s*[—|-]\s*PaceMakers Business Consultants\s*$/i, '');
 }
 
 export default async function OgPreviewAdminPage() {

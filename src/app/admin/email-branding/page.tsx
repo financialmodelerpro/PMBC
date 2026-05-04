@@ -9,7 +9,7 @@ import { EmailBrandingForm } from './EmailBrandingForm';
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: 'Email Branding — PMBC Admin',
+  title: 'Email Branding | PMBC Admin',
   robots: { index: false, follow: false },
 };
 

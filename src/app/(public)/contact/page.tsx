@@ -16,7 +16,7 @@ export async function generateMetadata(): Promise<Metadata> {
     path: '/contact',
     cmsPage: page,
     fallback: {
-      title: 'Contact — PaceMakers Business Consultants',
+      title: 'Contact | PaceMakers Business Consultants',
       description: 'Start a conversation about your mandate.',
       ogSubtitle: 'Tell us about the mandate.',
     },

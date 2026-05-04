@@ -15,7 +15,7 @@ export async function generateMetadata(): Promise<Metadata> {
     path: '/services',
     cmsPage: page,
     fallback: {
-      title: 'Services — PaceMakers Business Consultants',
+      title: 'Services | PaceMakers Business Consultants',
       description:
         'Financial modeling, valuation, due diligence, M&A, and CFO advisory across KSA and GCC mandates.',
       ogSubtitle: 'Nine disciplines, one standard of work.',

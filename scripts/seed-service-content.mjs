@@ -47,7 +47,7 @@ const SERVICES = [
   {
     slug: 'financial-modeling',
     full_description:
-      '<p>Institutional-grade financial models built for board, lender, and investor scrutiny. Three-statement, project-finance, and scenario models calibrated to the decision the model is meant to inform — not to a generic template.</p><p>Every workbook ships with a written methodology note, a transparent assumption sheet, and the live sensitivities a sophisticated reviewer will ask for.</p>',
+      '<p>Institutional-grade financial models built for board, lender, and investor scrutiny. Three-statement, project-finance, and scenario models calibrated to the decision the model is meant to inform, not to a generic template.</p><p>Every workbook ships with a written methodology note, a transparent assumption sheet, and the live sensitivities a sophisticated reviewer will ask for.</p>',
     deliverables: [
       'Three-statement integrated model',
       'Scenario and sensitivity layer',
@@ -59,12 +59,12 @@ const SERVICES = [
     timeline_text:
       'Typical engagement: 4–6 weeks for an institutional model, depending on data-room readiness and review cycles.',
     target_audience_text:
-      'Family offices, corporates, and lenders who need a model that survives diligence and supports a real decision — not a polished spreadsheet.',
+      'Family offices, corporates, and lenders who need a model that survives diligence and supports a real decision, not a polished spreadsheet.',
   },
   {
     slug: 'business-valuation',
     full_description:
-      '<p>Independent business valuations for transactions, fairness opinions, dispute settings, shareholder buyouts, and strategic planning. Every valuation triangulates DCF with comparable transactions and trading multiples — and explains, in writing, where the methods agree and disagree.</p><p>Reports are written for a board, lender, or court audience. Methodology is defensible. Assumptions are sourced. Sensitivities are real.</p>',
+      '<p>Independent business valuations for transactions, fairness opinions, dispute settings, shareholder buyouts, and strategic planning. Every valuation triangulates DCF with comparable transactions and trading multiples, and explains, in writing, where the methods agree and disagree.</p><p>Reports are written for a board, lender, or court audience. Methodology is defensible. Assumptions are sourced. Sensitivities are real.</p>',
     deliverables: [
       'Three-method valuation with reconciliation',
       'Standalone written report (board-ready)',
@@ -80,7 +80,7 @@ const SERVICES = [
   {
     slug: 'financial-due-diligence',
     full_description:
-      '<p>Buy-side and sell-side quality-of-earnings, working-capital, and net-debt analyses. We go beyond reconciling the trial balance to the audited statements — we surface the accounting treatments, one-off items, and run-rate adjustments that actually change the deal price.</p><p>Findings are written for the deal team. No filler. No 200-page decks no one reads.</p>',
+      '<p>Buy-side and sell-side quality-of-earnings, working-capital, and net-debt analyses. We go beyond reconciling the trial balance to the audited statements. We surface the accounting treatments, one-off items, and run-rate adjustments that actually change the deal price.</p><p>Findings are written for the deal team. No filler. No 200-page decks no one reads.</p>',
     deliverables: [
       'Quality-of-earnings analysis with adjustments',
       'Working capital normalisation',
@@ -96,7 +96,7 @@ const SERVICES = [
   {
     slug: 'transaction-advisory',
     full_description:
-      '<p>End-to-end deal support from screening through close. We sit on the deal team — not adjacent to it — and own the analytical workstream from term sheet through definitive documents.</p><p>This is the engagement clients return for: senior involvement at every step, no hand-offs to junior teams, and a single accountable advisor through closing.</p>',
+      '<p>End-to-end deal support from screening through close. We sit on the deal team, not adjacent to it, and own the analytical workstream from term sheet through definitive documents.</p><p>This is the engagement clients return for: senior involvement at every step, no hand-offs to junior teams, and a single accountable advisor through closing.</p>',
     deliverables: [
       'Target screening and prioritisation',
       'Indicative bid modelling and structuring',
@@ -105,14 +105,14 @@ const SERVICES = [
       'Close-mechanics modelling (working capital, leakage)',
     ],
     timeline_text:
-      'Engagement length tracks the deal — typically 3–9 months from mandate to close.',
+      'Engagement length tracks the deal: typically 3–9 months from mandate to close.',
     target_audience_text:
-      "Family offices, corporates, and sponsors who want a senior advisor embedded in the deal — not a vendor running a process at arm's length.",
+      "Family offices, corporates, and sponsors who want a senior advisor embedded in the deal, not a vendor running a process at arm's length.",
   },
   {
     slug: 'mergers-acquisitions',
     full_description:
-      '<p>Sell-side mandates, buy-side searches, and strategic combinations across the GCC and worldwide. We run focused, well-prepared processes — not auctions optimised for headline volume.</p><p>For sellers: a defensible information memorandum, a curated buyer list, and disciplined process management. For buyers: targeted searches calibrated to a specific investment thesis.</p>',
+      '<p>Sell-side mandates, buy-side searches, and strategic combinations across the GCC and worldwide. We run focused, well-prepared processes, not auctions optimised for headline volume.</p><p>For sellers: a defensible information memorandum, a curated buyer list, and disciplined process management. For buyers: targeted searches calibrated to a specific investment thesis.</p>',
     deliverables: [
       'Information memorandum or buyer thesis document',
       'Curated counterparty list',
@@ -144,7 +144,7 @@ const SERVICES = [
   {
     slug: 'project-finance',
     full_description:
-      '<p>Bankable models for infrastructure, energy, and industrial projects, structured for senior-debt sizing, DSCR covenants, and reserve accounts. Built to lender-modelling standards from day one — not converted from a corporate template.</p><p>Includes construction draw scheduling, debt service waterfalls, and the covenant testing lenders require during credit-committee review.</p>',
+      '<p>Bankable models for infrastructure, energy, and industrial projects, structured for senior-debt sizing, DSCR covenants, and reserve accounts. Built to lender-modelling standards from day one, not converted from a corporate template.</p><p>Includes construction draw scheduling, debt service waterfalls, and the covenant testing lenders require during credit-committee review.</p>',
     deliverables: [
       'Bankable project finance model',
       'Senior-debt sizing and DSCR sculpting',
@@ -160,7 +160,7 @@ const SERVICES = [
   {
     slug: 'investment-memorandums',
     full_description:
-      '<p>Information memoranda, teasers, and pitch decks calibrated to family offices, strategics, and institutional capital. Written by people who have been on the receiving end — we know what gets read, what gets skipped, and what raises a flag.</p><p>Each document is built backward from the questions a sophisticated investor will ask in the first thirty minutes.</p>',
+      '<p>Information memoranda, teasers, and pitch decks calibrated to family offices, strategics, and institutional capital. Written by people who have been on the receiving end. We know what gets read, what gets skipped, and what raises a flag.</p><p>Each document is built backward from the questions a sophisticated investor will ask in the first thirty minutes.</p>',
     deliverables: [
       'Investor-ready information memorandum',
       'One-page teaser for outreach',
@@ -176,7 +176,7 @@ const SERVICES = [
   {
     slug: 'cfo-advisory',
     full_description:
-      '<p>Fractional CFO engagements covering FP&amp;A, treasury, capital structure, and board reporting for growth-stage companies and family-office portfolio assets. Senior involvement on the cadence the business actually needs — not a templated weekly checklist.</p><p>Engagements typically run on a multi-quarter retainer with clearly scoped deliverables and review cadence.</p>',
+      '<p>Fractional CFO engagements covering FP&amp;A, treasury, capital structure, and board reporting for growth-stage companies and family-office portfolio assets. Senior involvement on the cadence the business actually needs, not a templated weekly checklist.</p><p>Engagements typically run on a multi-quarter retainer with clearly scoped deliverables and review cadence.</p>',
     deliverables: [
       'Monthly board pack and KPI dashboard',
       'Rolling 12-month forecast and cash management',

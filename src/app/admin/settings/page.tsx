@@ -9,7 +9,7 @@ import { SettingsForm } from './SettingsForm';
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: 'Settings — PMBC Admin',
+  title: 'Settings | PMBC Admin',
   robots: { index: false, follow: false },
 };
 

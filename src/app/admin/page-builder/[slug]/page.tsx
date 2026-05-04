@@ -16,7 +16,7 @@ export async function generateMetadata(props: {
 }): Promise<Metadata> {
   const { slug } = await props.params;
   return {
-    title: `${slug} — Page Builder`,
+    title: `${slug} | Page Builder`,
     robots: { index: false, follow: false },
   };
 }

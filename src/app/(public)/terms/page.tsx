@@ -5,7 +5,7 @@ import { buildPageMetadata } from '@/lib/seo/metadata';
 export const metadata: Metadata = buildPageMetadata({
   path: '/terms',
   fallback: {
-    title: 'Terms of Engagement — PaceMakers Business Consultants',
+    title: 'Terms of Engagement | PaceMakers Business Consultants',
     description:
       'Terms governing use of the PaceMakers Business Consultants website and the firm’s advisory engagements.',
     ogSubtitle: 'Terms governing use of this website.',
@@ -24,7 +24,7 @@ export default function TermsPage() {
         Terms of Engagement
       </h1>
       <p className="mt-4 inline-flex items-center rounded-md border border-[color:var(--pmbc-accent)]/40 bg-[color:var(--pmbc-accent)]/10 px-3 py-1.5 text-[12px] font-medium text-[color:var(--pmbc-text)]">
-        Subject to legal review — to be finalised by counsel before launch.
+        Subject to legal review. To be finalised by counsel before launch.
       </p>
       <p className="mt-3 text-[12px] text-[color:var(--pmbc-muted)]">
         Last updated: {LAST_UPDATED}
@@ -62,8 +62,8 @@ export default function TermsPage() {
         <h2>4. Engagement Letters Govern Mandates</h2>
         <p>
           All advisory work is carried out under a written engagement letter
-          executed by both parties. That engagement letter — and not this
-          Website — governs the scope, fees, deliverables, timelines,
+          executed by both parties. That engagement letter (and not this
+          Website) governs the scope, fees, deliverables, timelines,
           confidentiality, intellectual property, limitation of liability, and
           termination terms applicable to the mandate. Where a conflict arises
           between these Website terms and an engagement letter in respect of a

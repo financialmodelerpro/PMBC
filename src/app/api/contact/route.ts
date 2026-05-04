@@ -141,11 +141,11 @@ async function sendNotification(id: string, data: ContactData) {
   const vars: Record<string, string | undefined> = {
     name: data.name,
     email: data.email,
-    company: data.company || '—',
-    phone: data.phone || '—',
-    country: data.country || '—',
-    service_interest: data.service_interest || '—',
-    source_page: data.source_page || '—',
+    company: data.company || '-',
+    phone: data.phone || '-',
+    country: data.country || '-',
+    service_interest: data.service_interest || '-',
+    source_page: data.source_page || '-',
     message: data.message,
     submission_id: id,
   };

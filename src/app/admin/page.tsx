@@ -10,7 +10,7 @@ import {
 import { AdminPageHeader } from '@/components/admin/AdminPageHeader';
 
 export const metadata: Metadata = {
-  title: 'Dashboard — PMBC Admin',
+  title: 'Dashboard | PMBC Admin',
   robots: { index: false, follow: false },
 };
 
@@ -147,7 +147,7 @@ function StatCard({
 
 export default async function AdminDashboardPage() {
   const stats = await loadStats();
-  const fmt = (n: number | null) => (n === null ? '—' : String(n));
+  const fmt = (n: number | null) => (n === null ? '-' : String(n));
 
   return (
     <div style={adminPageMain}>

@@ -12,7 +12,7 @@ export async function generateMetadata(): Promise<Metadata> {
     path: '/financial-modeler-pro',
     cmsPage: page,
     fallback: {
-      title: 'Financial Modeler Pro — PaceMakers Business Consultants',
+      title: 'Financial Modeler Pro | PaceMakers Business Consultants',
       description:
         "PMBC's flagship platform for financial modeling education and tools.",
       ogSubtitle: 'The platform built by practitioners.',
@@ -37,7 +37,7 @@ export default async function FinancialModelerProPage(props: {
         eyebrow: 'Financial Modeler Pro',
         headline: 'The platform built by practitioners',
         tagline:
-          'PMBC’s flagship platform — a learning environment, model library, and analyst toolkit built from the same engagement experience that drives the advisory practice.',
+          'PMBC’s flagship platform: a learning environment, model library, and analyst toolkit built from the same engagement experience that drives the advisory practice.',
       }}
     />
   );

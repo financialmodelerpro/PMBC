@@ -12,7 +12,7 @@ export async function generateMetadata(): Promise<Metadata> {
     path: '/network',
     cmsPage: page,
     fallback: {
-      title: 'Strategic Network — PaceMakers Business Consultants',
+      title: 'Strategic Network | PaceMakers Business Consultants',
       description:
         'Sky Gulf in Al Khobar and Lynkers in Manama extend our GCC reach.',
       ogSubtitle: 'Reach extended through partners we trust.',

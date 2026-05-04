@@ -16,8 +16,8 @@ import type { EmailTemplate } from '@/lib/cms/emailTemplates';
 import { TEMPLATE_VARIABLES } from '@/lib/cms/emailTemplates';
 
 const TEMPLATE_LABELS: Record<string, string> = {
-  contact_notification: 'Contact form — admin notification',
-  contact_acknowledgement: 'Contact form — sender acknowledgement',
+  contact_notification: 'Contact form: admin notification',
+  contact_acknowledgement: 'Contact form: sender acknowledgement',
 };
 
 type LocalTemplate = {

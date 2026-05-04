@@ -61,7 +61,7 @@ export function buildPageMetadata(opts: BuildPageMetadataOpts): Metadata {
   // Strip "— PaceMakers Business Consultants" from the OG title so the OG
   // card itself doesn't carry the long suffix (the wordmark on the card
   // already says PaceMakers).
-  const ogTitle = title.replace(/\s*[—-]\s*PaceMakers Business Consultants\s*$/i, '');
+  const ogTitle = title.replace(/\s*[—|-]\s*PaceMakers Business Consultants\s*$/i, '');
   const ogSubtitle = ogSubtitleOverride ?? fallback.ogSubtitle ?? description;
 
   const ogImage = cmsPage?.og_image_url || ogImageFor({ title: ogTitle, subtitle: ogSubtitle });

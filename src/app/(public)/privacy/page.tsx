@@ -5,7 +5,7 @@ import { buildPageMetadata } from '@/lib/seo/metadata';
 export const metadata: Metadata = buildPageMetadata({
   path: '/privacy',
   fallback: {
-    title: 'Privacy Policy — PaceMakers Business Consultants',
+    title: 'Privacy Policy | PaceMakers Business Consultants',
     description:
       'How PaceMakers Business Consultants handles personal information.',
     ogSubtitle: 'How we handle your information.',
@@ -24,7 +24,7 @@ export default function PrivacyPage() {
         Privacy Policy
       </h1>
       <p className="mt-4 inline-flex items-center rounded-md border border-[color:var(--pmbc-accent)]/40 bg-[color:var(--pmbc-accent)]/10 px-3 py-1.5 text-[12px] font-medium text-[color:var(--pmbc-text)]">
-        Subject to legal review — to be finalised by counsel before launch.
+        Subject to legal review. To be finalised by counsel before launch.
       </p>
       <p className="mt-3 text-[12px] text-[color:var(--pmbc-muted)]">
         Last updated: {LAST_UPDATED}
@@ -48,17 +48,17 @@ export default function PrivacyPage() {
         <p>We collect:</p>
         <ul>
           <li>
-            <strong>Information you submit through our contact form</strong> — name,
+            <strong>Information you submit through our contact form:</strong> name,
             email, company, phone (optional), country, service of interest, and the
             message you write. Submitted via the form at <code>/contact</code>.
           </li>
           <li>
-            <strong>Limited technical information</strong> — IP address, browser
+            <strong>Limited technical information:</strong> IP address, browser
             type, device type, referring URL, and pages viewed. Used to operate the
             website securely and diagnose problems.
           </li>
           <li>
-            <strong>Information you send us directly</strong> — by email, WhatsApp,
+            <strong>Information you send us directly:</strong> by email, WhatsApp,
             phone, or LinkedIn. Treated according to the same standards as
             information submitted through the form.
           </li>
@@ -98,29 +98,29 @@ export default function PrivacyPage() {
         </p>
         <ul>
           <li>
-            <strong>Vercel, Inc.</strong> (United States) — website hosting and edge
+            <strong>Vercel, Inc.</strong> (United States): website hosting and edge
             delivery. Logs limited request data for security and operational
             monitoring.
           </li>
           <li>
-            <strong>Supabase, Inc.</strong> (United States) — managed Postgres
+            <strong>Supabase, Inc.</strong> (United States): managed Postgres
             database where contact form submissions and CMS content are stored. Data
             is held in a private project accessible only to authorised PMBC
             personnel.
           </li>
           <li>
-            <strong>Resend, Inc.</strong> (United States) — transactional email
+            <strong>Resend, Inc.</strong> (United States): transactional email
             delivery for contact-form notifications and acknowledgements. Resend
             processes the recipient address and message body for the limited purpose
             of email delivery and deliverability monitoring.
           </li>
           <li>
-            <strong>hCaptcha</strong> (Intuition Machines, Inc., United States) —
+            <strong>hCaptcha</strong> (Intuition Machines, Inc., United States):
             bot-protection on the contact form. May process limited browser
             information to verify a human visitor.
           </li>
           <li>
-            <strong>Google Fonts</strong> (Google LLC, United States) — typography
+            <strong>Google Fonts</strong> (Google LLC, United States): typography
             delivery via the public CDN. Fonts are served via standard CDN headers;
             no personal data is requested from your browser by us.
           </li>
