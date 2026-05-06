@@ -1399,3 +1399,56 @@ After page content: `/admin/contact-submissions` inbox · DNS+SSL on Vercel · p
 
 **Dev server.** Stopped cleanly at end of session.
 
+### 2026-05-04 (later) — Content Style Rule enforcement (em-dash cleanup)
+
+Single-purpose session: applied the new **Content Style Rules** retroactively across the codebase and the live database, then pushed to main.
+
+**Database (migration 012, applied to Supabase via JS apply script that mirrors the SQL exactly)**
+- `cms_pages.meta_title` × 16: ` — PaceMakers Business Consultants` brand suffix replaced with ` | PaceMakers Business Consultants`. Plus the special-case home title (`PaceMakers Business Consultants — Advisory from Structure to Exit` → ` | `, em dash mid-string rather than as suffix).
+- `email_templates.subject` × 2: `New contact submission — {{name}}` → `New contact submission: {{name}}`; `Thank you for reaching out — PaceMakers Business Consultants` → ` | `.
+- `cms_content` × 11 across the 9 `service_<slug>` namespaces: targeted per-key `REPLACE` for the em-dash phrases in `full_description`, `target_audience_text`, and one `timeline_text`. En dashes in numeric ranges (`3–9 months`, `4–6 weeks`, etc.) preserved per the rule's number-range exception.
+- `page_sections` (page_slug='home') × 7: per-section JSONB rewrites cast to text and back. Covers founder bio, service-cards "What we do" (intro + 3 card descriptions), service-cards "Who we serve" (Investment Offices), process_steps (Understand + Advise), text_image (Strategic Network), quote, and cta_block subhead.
+- `page_sections` Phase 6 smoke-seed rows × 6 (tagged `styles->>smoke = 'phase6'`): em dashes stripped from /approach process_steps, /sectors sector_grid, /about founder_block + text_image, /financial-modeler-pro fmp_intro, and /service-business-valuation service_detail.
+
+Final verification: zero em dashes remain in any content row across `cms_pages`, `cms_content`, `page_sections`, `email_templates`, and `site_settings`.
+
+**Source files** (every place a human reader would see the string)
+- Privacy + Terms hardcoded body copy: `<strong>Label</strong> — body` patterns rewritten to `<strong>Label:</strong> body`; "Subject to legal review — to be finalised" → ". To be finalised"; the parenthetical "engagement letter — and not this Website — governs" rewritten with parentheses.
+- `error.tsx`: "Try again — and if the issue persists" → "Try again. If the issue persists".
+- All 11 public-route `generateMetadata` `fallback.title` values: ` — PaceMakers Business Consultants` → ` | `.
+- All 11 admin route `metadata.title` values: ` — PMBC Admin` → ` | PMBC Admin`. Plus the dynamic page-builder title (`${slug} — Page Builder` → ` | `) and admin login title.
+- Fallback hero taglines on /approach and /financial-modeler-pro that contained an em dash mid-sentence.
+- `EmailTemplatesEditor` `TEMPLATE_LABELS`: `Contact form — admin notification` → `Contact form: admin notification` (and acknowledgement counterpart).
+- `ServiceDetailEditor`: `'— Select a service —'` → `'Select a service'`.
+- Null-value placeholders rendered to admins as `'—'` (admin dashboard fmt, pages-list `formatDate`, contact notification email field defaults) → `'-'` (ASCII hyphen).
+- `seo/metadata.ts` and `og-preview/page.tsx` `stripBrandSuffix` regexes widened from `[—-]` to `[—|-]` so the OG title strip continues to work for legacy data and for the new `|` separator.
+- Comments, JSDoc, console.warn strings, and the regex char-class itself were intentionally left alone (not user-visible).
+
+**Seed scripts updated in lockstep with the database** so a future `node scripts/seed-…` run does not reintroduce em dashes:
+- `scripts/seed-home-page.mjs` — 9 em-dash phrases rewritten to match the live home page rows exactly.
+- `scripts/seed-service-content.mjs` — 11 em-dash phrases rewritten across the 9 service namespaces (mirrors migration 010 + the cleanup).
+- `scripts/seed-phase6-sections.mjs` — 6 em-dash phrases rewritten in the smoke-seed rows.
+
+**Migration file shipped, apply scripts deleted.** Migration 012 (`supabase/migrations/012_strip_em_dashes.sql`) is the source of truth. The temporary JS apply / verify / residual-patch helpers were deleted from `scripts/` after the data was applied — keeping them around would just add noise (the work is one-time and the SQL captures the full operation for any fresh project setup).
+
+**Commit + push**
+- `190a305 chore: strip em dashes from content per style rule + checkpoint CLAUDE.md` — 33 files (all source + scripts + migration 012). Bundles the previously-uncommitted CLAUDE.md additions (Content Style Rules + Phase 9 part 1 + 2026-05-04 end-of-session checkpoint) and the PROJECT_HANDOFF.md edits, since they were the last "checkpoint" content from the prior session and made sense to ship together with the cleanup.
+- Pushed to `origin/main`. Vercel deploy expected to follow.
+
+**Decision notes worth keeping**
+- **Separator choice for titles**: ` | ` chosen as the brand-suffix separator. Aligns with the `template: '%s | PaceMakers Business Consultants'` already in the root layout, so all titles render with one consistent separator regardless of whether they came through the template or the absolute-title bypass.
+- **Number ranges kept with en dash** (`3–5 weeks`, `4–6 weeks`, `1–2 business days`). User explicitly granted this exception ("keep them in number ranges and similar formatting use") even though CLAUDE.md's stricter form would write them out as words. The user's instruction wins for live content.
+- **Why per-row REPLACE in the migration, not blanket regex**: em dashes in PMBC's content carry different roles in different sentences (mid-clause pause → comma; explanation → colon; strong break → period; parenthetical pair → parentheses). A blanket `' — '` → `, ` would produce wrong copy in roughly half the cases. So each row was hand-rewritten.
+
+**Open items for the next session**
+1. **Review the home page on the live site** at https://www.pacemakersglobal.com once Vercel finishes the deploy of `190a305`. Confirm:
+   - No em dashes anywhere on the rendered page (compare against the local server which already verified clean).
+   - Browser tab shows `PaceMakers Business Consultants | Advisory from Structure to Exit` (the new `|` separator).
+   - All 7 CTAs still resolve correctly.
+   - OG card auto-generated at `/api/og?…` reflects the cleaned-up title.
+2. **Continue Phase 9 page-by-page content population, starting with `/about`** — page_sections for the firm bio, founder section detail (already partially seeded as Phase 6 smoke content; replace with production copy), credentials, philosophy. Same pattern as the home page seed: write a `supabase/migrations/013_seed_about_page_content.sql` + companion `scripts/seed-about-page.mjs`, apply via the JS script, verify on `/about`.
+3. After /about, the remaining Phase 9 order: /sectors, /approach, /network, /financial-modeler-pro, /services overview, /services/[slug] × 9 (replace migration 010 placeholders), /contact intro section.
+4. Still pending: `/admin/contact-submissions` inbox · DNS+SSL on Vercel · production env vars · sitemap to Search Console · counsel review of Privacy/Terms · rotate `Admin@2026`.
+
+**Style reminder, doubled down.** From here forward, every string drafted, every JSONB blob, every fallback copy line in a route file must be em-dash-free at the moment of authoring. The cleanup migration is now in the repo as both a backstop and a record, but the discipline is to never need it again.
+
