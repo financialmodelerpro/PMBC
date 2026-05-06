@@ -1,6 +1,9 @@
 import Link from 'next/link';
 import Image from 'next/image';
 
+import { SectionContainer, SectionIntro } from '../SectionContainer';
+import { variantStyles, type PmbcVariant } from '@/lib/public/tokens';
+
 function s(v: unknown): string {
   return typeof v === 'string' ? v : '';
 }
@@ -42,94 +45,146 @@ function pick(c: Record<string, unknown>): FounderContent {
   };
 }
 
-export function FounderBlock({ content }: { content: Record<string, unknown> }) {
+function getInitials(name: string): string {
+  if (!name) return 'PM';
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return 'PM';
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+export function FounderBlock({
+  content,
+  variant = 'cream',
+}: {
+  content: Record<string, unknown>;
+  styles: Record<string, unknown>;
+  variant: PmbcVariant;
+}) {
   const c = pick(content ?? {});
   if (!c.name && !c.bio_html && !c.photo_url && !c.section_headline && !c.eyebrow) return null;
   const imageRight = c.layout === 'image_right';
+  const v = variantStyles(variant);
 
   return (
-    <section className="px-6 py-20 lg:py-24">
-      <div className="mx-auto max-w-6xl">
-        {(c.eyebrow || c.section_headline) && (
-          <div className="mx-auto mb-12 max-w-3xl text-center">
-            {c.eyebrow && (
-              <p className="text-[11px] font-medium tracking-[0.22em] uppercase text-[#1B3A5F]">
-                {c.eyebrow}
-              </p>
-            )}
-            {c.section_headline && (
-              <h2 className="mt-3 font-serif text-3xl font-semibold tracking-tight text-[#0F1B2D] sm:text-4xl">
-                {c.section_headline}
-              </h2>
-            )}
-          </div>
-        )}
-        <div
-          className={
-            'grid items-center gap-10 lg:grid-cols-[minmax(280px,420px)_minmax(0,1fr)] lg:gap-16 ' +
-            (imageRight ? 'lg:[&>div:first-child]:order-2' : '')
-          }
-        >
-          <div>
-            {c.photo_url ? (
-              <div className="relative aspect-[4/5] w-full overflow-hidden rounded-lg bg-neutral-100">
+    <SectionContainer variant={variant}>
+      <SectionIntro
+        eyebrow={c.eyebrow}
+        headline={c.section_headline}
+        variant={variant}
+      />
+
+      <div
+        className={
+          'mt-14 grid items-center gap-12 lg:grid-cols-[minmax(280px,440px)_minmax(0,1fr)] lg:gap-20 ' +
+          (imageRight ? 'lg:[&>div:first-child]:order-2' : '')
+        }
+      >
+        <div>
+          {c.photo_url ? (
+            <div className="relative aspect-[4/5] w-full">
+              {/* Gold frame */}
+              <div
+                aria-hidden
+                className="absolute -inset-2 border border-[#D4A93A]"
+              />
+              {/* Navy accent corner — bottom-right */}
+              <div
+                aria-hidden
+                className="absolute -right-2 -bottom-2 h-8 w-8"
+                style={{ background: '#153D64' }}
+              />
+              <div className="relative aspect-[4/5] w-full overflow-hidden bg-neutral-100">
                 <Image
                   src={c.photo_url}
                   alt={c.name || 'Founder portrait'}
                   fill
-                  sizes="(min-width: 1024px) 420px, 90vw"
+                  sizes="(min-width: 1024px) 440px, 90vw"
                   className="object-cover"
                 />
-                <div
-                  aria-hidden
-                  className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-[#D4A93A]"
-                />
               </div>
-            ) : (
-              <div className="aspect-[4/5] w-full rounded-lg bg-neutral-100" />
-            )}
-          </div>
-
-          <div>
-            {c.name && (
-              <h3 className="font-serif text-3xl font-semibold tracking-tight text-[#0F1B2D] sm:text-4xl">
-                {c.name}
-              </h3>
-            )}
-            {c.credentials_line && (
-              <p className="mt-3 text-[12px] font-semibold tracking-[0.18em] uppercase text-[#1B3A5F]">
-                {c.credentials_line}
-              </p>
-            )}
-            {c.bio_html && (
+            </div>
+          ) : (
+            <div className="relative aspect-[4/5] w-full">
               <div
-                className="prose prose-neutral mt-6 max-w-none text-[#0F1B2D]"
-                dangerouslySetInnerHTML={{ __html: c.bio_html }}
+                aria-hidden
+                className="absolute -inset-2 border border-[#D4A93A]"
               />
-            )}
-            {(c.cta_primary_label || c.cta_secondary_label) && (
-              <div className="mt-8 flex flex-wrap items-center gap-3">
-                {c.cta_primary_label && c.cta_primary_href && (
-                  <Link
-                    href={c.cta_primary_href}
-                    className="inline-flex items-center rounded-md bg-[#1B3A5F] px-5 py-2.5 text-sm font-medium text-white transition hover:bg-[#0F2540]"
-                  >
-                    {c.cta_primary_label}
-                  </Link>
-                )}
-                {c.cta_secondary_label && c.cta_secondary_href && (
-                  <Link
-                    href={c.cta_secondary_href}
-                    className="inline-flex items-center rounded-md border border-neutral-300 px-5 py-2.5 text-sm font-medium text-[#0F1B2D] transition hover:border-[#1B3A5F] hover:text-[#1B3A5F]"
-                  >
-                    {c.cta_secondary_label}
-                  </Link>
-                )}
+              <div
+                aria-hidden
+                className="absolute -right-2 -bottom-2 h-8 w-8"
+                style={{ background: '#153D64' }}
+              />
+              <div
+                className="flex aspect-[4/5] w-full items-center justify-center"
+                style={{ background: v.cardBg, color: '#153D64' }}
+              >
+                <span className="font-serif text-[80px] font-semibold tracking-tight">
+                  {getInitials(c.name)}
+                </span>
               </div>
-            )}
-          </div>
+            </div>
+          )}
+        </div>
+
+        <div>
+          {c.name && (
+            <h3
+              className="pmbc-display text-[32px] leading-[1.15] sm:text-[40px]"
+              style={{ color: v.text }}
+            >
+              {c.name}
+            </h3>
+          )}
+          {c.credentials_line && (
+            <p
+              className="mt-3 text-[11px] font-semibold uppercase"
+              style={{
+                letterSpacing: '0.18em',
+                color: v.eyebrow,
+              }}
+            >
+              {c.credentials_line}
+            </p>
+          )}
+          {c.bio_html && (
+            <div
+              className="prose prose-neutral mt-7 max-w-none"
+              style={{ color: v.text, fontSize: 17, lineHeight: 1.7 }}
+              dangerouslySetInnerHTML={{ __html: c.bio_html }}
+            />
+          )}
+          {(c.cta_primary_label || c.cta_secondary_label) && (
+            <div className="mt-9 flex flex-wrap items-center gap-6">
+              {c.cta_primary_label && c.cta_primary_href && (
+                <Link
+                  href={c.cta_primary_href}
+                  className="group inline-flex items-center gap-2 text-[13px] font-semibold uppercase text-[#153D64] transition hover:text-[#D4A93A]"
+                  style={{ letterSpacing: '0.12em' }}
+                >
+                  <span className="relative pb-1">
+                    {c.cta_primary_label}
+                    <span
+                      aria-hidden
+                      className="absolute right-0 bottom-0 left-0 h-px bg-[#D4A93A] transition-transform duration-200"
+                    />
+                  </span>
+                  <span aria-hidden className="text-[#D4A93A]">→</span>
+                </Link>
+              )}
+              {c.cta_secondary_label && c.cta_secondary_href && (
+                <Link
+                  href={c.cta_secondary_href}
+                  className="text-[13px] font-medium uppercase text-[#52606B] transition hover:text-[#153D64]"
+                  style={{ letterSpacing: '0.12em' }}
+                >
+                  {c.cta_secondary_label}
+                </Link>
+              )}
+            </div>
+          )}
         </div>
       </div>
-    </section>
+    </SectionContainer>
   );
 }

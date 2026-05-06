@@ -1,5 +1,8 @@
 import Link from 'next/link';
 
+import { SectionContainer, SectionIntro } from '../SectionContainer';
+import { variantStyles, type PmbcVariant } from '@/lib/public/tokens';
+
 type Card = { number: string; title: string; description: string; link: string };
 
 function s(v: unknown): string {
@@ -38,82 +41,118 @@ function pickCards(content: Record<string, unknown>): {
   return { eyebrow, headline, intro, cards, footer_cta_label, footer_cta_href };
 }
 
-export function ServiceCards({ content }: { content: Record<string, unknown> }) {
+export function ServiceCards({
+  content,
+  variant = 'cream',
+}: {
+  content: Record<string, unknown>;
+  styles: Record<string, unknown>;
+  variant: PmbcVariant;
+}) {
   const { eyebrow, headline, intro, cards, footer_cta_label, footer_cta_href } = pickCards(
     content ?? {},
   );
   if (cards.length === 0 && !intro && !headline && !eyebrow) return null;
 
+  const v = variantStyles(variant);
+  const dark = variant === 'navy_deep';
+
   return (
-    <section className="px-6 py-20">
-      <div className="mx-auto max-w-6xl">
-        {(eyebrow || headline || intro) && (
-          <div className="mx-auto max-w-3xl text-center">
-            {eyebrow && (
-              <p className="text-[11px] font-medium tracking-[0.22em] uppercase text-[#1B3A5F]">
-                {eyebrow}
-              </p>
-            )}
-            {headline && (
-              <h2 className="mt-3 font-serif text-3xl font-semibold tracking-tight text-[#0F1B2D] sm:text-4xl">
-                {headline}
-              </h2>
-            )}
-            {intro && (
-              <p className="mt-4 text-base text-neutral-600 sm:text-lg">{intro}</p>
-            )}
-          </div>
-        )}
-        {cards.length > 0 && (
-          <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {cards.map((card, i) => {
-              const inner = (
-                <>
-                  {card.number && (
-                    <p className="text-[11px] font-medium tracking-[0.18em] uppercase text-[#1B3A5F]">
-                      {card.number}
-                    </p>
-                  )}
-                  {card.title && (
-                    <h3 className="mt-3 text-lg font-semibold tracking-tight text-[#0F1B2D]">
-                      {card.title}
-                    </h3>
-                  )}
-                  {card.description && (
-                    <p className="mt-2 text-sm text-neutral-600">{card.description}</p>
-                  )}
-                </>
-              );
-              if (card.link) {
-                return (
-                  <Link
-                    key={i}
-                    href={card.link}
-                    className="group rounded-lg border border-neutral-200 bg-white p-6 transition hover:border-[#1B3A5F] hover:shadow-[0_2px_10px_rgba(15,27,45,0.06)]"
+    <SectionContainer variant={variant}>
+      <SectionIntro
+        eyebrow={eyebrow}
+        headline={headline}
+        intro={intro}
+        variant={variant}
+      />
+
+      {cards.length > 0 && (
+        <div className="mt-14 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {cards.map((card, i) => {
+            const inner = (
+              <>
+                {/* gold top accent */}
+                <span
+                  aria-hidden
+                  className="absolute top-0 left-0 right-0 h-[2px] transition-all duration-200 group-hover:h-[3px]"
+                  style={{ background: '#D4A93A' }}
+                />
+                {card.number && (
+                  <p
+                    className="font-serif text-[28px] font-semibold leading-none"
+                    style={{ color: dark ? '#D4A93A' : '#B89530' }}
                   >
-                    {inner}
-                  </Link>
-                );
-              }
+                    {card.number}
+                  </p>
+                )}
+                {card.title && (
+                  <h3
+                    className="mt-5 font-serif text-[22px] font-semibold leading-tight"
+                    style={{ color: v.text }}
+                  >
+                    {card.title}
+                  </h3>
+                )}
+                {card.description && (
+                  <p
+                    className="mt-4 text-[15px] leading-[1.7]"
+                    style={{ color: v.textMuted }}
+                  >
+                    {card.description}
+                  </p>
+                )}
+              </>
+            );
+
+            const baseClass =
+              'group relative flex h-full flex-col overflow-hidden p-9 transition duration-200';
+
+            const cardStyle: React.CSSProperties = {
+              background: v.cardBg,
+              border: `1px solid ${v.cardBorder}`,
+              color: v.text,
+            };
+
+            if (card.link) {
               return (
-                <div key={i} className="rounded-lg border border-neutral-200 bg-white p-6">
+                <Link
+                  key={i}
+                  href={card.link}
+                  className={
+                    baseClass +
+                    ' hover:-translate-y-0.5 hover:shadow-[0_12px_40px_rgba(15,37,64,0.08)]'
+                  }
+                  style={cardStyle}
+                >
                   {inner}
-                </div>
+                </Link>
               );
-            })}
-          </div>
-        )}
-        {footer_cta_label && footer_cta_href && (
-          <div className="mt-10 text-center">
-            <Link
-              href={footer_cta_href}
-              className="inline-flex items-center rounded-md border border-neutral-300 px-5 py-2.5 text-sm font-medium text-[#0F1B2D] transition hover:border-[#1B3A5F] hover:text-[#1B3A5F]"
-            >
-              {footer_cta_label}
-            </Link>
-          </div>
-        )}
-      </div>
-    </section>
+            }
+            return (
+              <div key={i} className={baseClass} style={cardStyle}>
+                {inner}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {footer_cta_label && footer_cta_href && (
+        <div className="mt-12 text-center">
+          <Link
+            href={footer_cta_href}
+            className={
+              'inline-flex items-center justify-center px-8 py-3.5 text-[12px] font-semibold uppercase transition duration-200 ' +
+              (dark
+                ? 'border border-[#E8DDC4]/40 text-[#E8DDC4] hover:border-[#D4A93A] hover:text-[#D4A93A]'
+                : 'border border-[#153D64]/30 text-[#153D64] hover:border-[#153D64] hover:bg-[#153D64] hover:text-white')
+            }
+            style={{ letterSpacing: '0.12em' }}
+          >
+            {footer_cta_label}
+          </Link>
+        </div>
+      )}
+    </SectionContainer>
   );
 }

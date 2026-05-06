@@ -1,6 +1,9 @@
 import Link from 'next/link';
 import Image from 'next/image';
 
+import { SectionContainer } from '../SectionContainer';
+import { variantStyles, type PmbcVariant } from '@/lib/public/tokens';
+
 function s(v: unknown): string {
   return typeof v === 'string' ? v : '';
 }
@@ -32,24 +35,39 @@ function pick(c: Record<string, unknown>): TextImageContent {
   };
 }
 
-export function TextImage({ content }: { content: Record<string, unknown> }) {
+export function TextImage({
+  content,
+  variant = 'cream',
+}: {
+  content: Record<string, unknown>;
+  styles: Record<string, unknown>;
+  variant: PmbcVariant;
+}) {
   const c = pick(content ?? {});
   if (!c.heading && !c.body_html && !c.image_url && !c.eyebrow) return null;
   const imageLeft = c.image_position === 'left';
+  const v = variantStyles(variant);
+  const dark = variant === 'navy_deep';
 
   return (
-    <section className="px-6 py-20 lg:py-24">
-      <div className="mx-auto max-w-6xl">
-        <div
-          className={
-            'grid items-center gap-10 lg:grid-cols-2 lg:gap-16 ' +
-            (imageLeft ? 'lg:[&>div:first-child]:order-1 lg:[&>div:last-child]:order-2' : 'lg:[&>div:first-child]:order-2 lg:[&>div:last-child]:order-1')
-          }
-        >
-          <div>
-            {c.image_url ? (
-              <figure>
-                <div className="relative aspect-[4/3] w-full overflow-hidden rounded-lg bg-neutral-100">
+    <SectionContainer variant={variant}>
+      <div
+        className={
+          'grid items-center gap-12 lg:grid-cols-2 lg:gap-20 ' +
+          (imageLeft
+            ? 'lg:[&>div:first-child]:order-1 lg:[&>div:last-child]:order-2'
+            : 'lg:[&>div:first-child]:order-2 lg:[&>div:last-child]:order-1')
+        }
+      >
+        <div>
+          {c.image_url ? (
+            <figure>
+              <div className="relative aspect-[4/3] w-full">
+                <div
+                  aria-hidden
+                  className="absolute -inset-2 border border-[#D4A93A]"
+                />
+                <div className="relative aspect-[4/3] w-full overflow-hidden bg-neutral-100">
                   <Image
                     src={c.image_url}
                     alt={c.image_alt || ''}
@@ -58,44 +76,86 @@ export function TextImage({ content }: { content: Record<string, unknown> }) {
                     className="object-cover"
                   />
                 </div>
-                {c.image_caption && (
-                  <figcaption className="mt-3 text-xs text-neutral-500">{c.image_caption}</figcaption>
-                )}
-              </figure>
-            ) : (
-              <div className="aspect-[4/3] w-full rounded-lg bg-neutral-100" />
-            )}
-          </div>
-          <div>
-            {c.eyebrow && (
-              <p className="text-[11px] font-medium tracking-[0.22em] uppercase text-[#1B3A5F]">
-                {c.eyebrow}
-              </p>
-            )}
-            {c.heading && (
-              <h2 className={`font-serif text-3xl font-semibold tracking-tight text-[#0F1B2D] sm:text-4xl ${c.eyebrow ? 'mt-3' : ''}`}>
-                {c.heading}
-              </h2>
-            )}
-            {c.body_html && (
-              <div
-                className="prose prose-neutral mt-5 max-w-none text-[#0F1B2D]"
-                dangerouslySetInnerHTML={{ __html: c.body_html }}
-              />
-            )}
-            {c.cta_label && c.cta_href && (
-              <div className="mt-7">
-                <Link
-                  href={c.cta_href}
-                  className="inline-flex items-center rounded-md bg-[#1B3A5F] px-5 py-2.5 text-sm font-medium text-white transition hover:bg-[#0F2540]"
-                >
-                  {c.cta_label}
-                </Link>
               </div>
-            )}
-          </div>
+              {c.image_caption && (
+                <figcaption
+                  className="mt-5 text-[11px] uppercase"
+                  style={{
+                    letterSpacing: '0.16em',
+                    color: dark ? v.textMuted : '#6B7280',
+                  }}
+                >
+                  {c.image_caption}
+                </figcaption>
+              )}
+            </figure>
+          ) : (
+            <div className="relative aspect-[4/3] w-full">
+              <div
+                aria-hidden
+                className="absolute -inset-2 border border-[#D4A93A]"
+              />
+              <div
+                className="aspect-[4/3] w-full"
+                style={{ background: v.cardBg }}
+              />
+            </div>
+          )}
+        </div>
+        <div>
+          <div
+            aria-hidden
+            className="h-px w-[60px]"
+            style={{ background: dark ? '#D4A93A' : '#B89530' }}
+          />
+          {c.eyebrow && (
+            <p
+              className="mt-5 text-[11px] font-semibold uppercase"
+              style={{
+                letterSpacing: '0.18em',
+                color: dark ? '#D4A93A' : '#B89530',
+              }}
+            >
+              {c.eyebrow}
+            </p>
+          )}
+          {c.heading && (
+            <h2
+              className="pmbc-display mt-4 text-[34px] leading-[1.12] sm:text-[42px] lg:text-[44px]"
+              style={{ color: dark ? '#FFFFFF' : v.text }}
+            >
+              {c.heading}
+            </h2>
+          )}
+          {c.body_html && (
+            <div
+              className="prose prose-neutral mt-6 max-w-none"
+              style={{
+                color: dark ? '#E8DDC4' : v.text,
+                fontSize: 17,
+                lineHeight: 1.75,
+              }}
+              dangerouslySetInnerHTML={{ __html: c.body_html }}
+            />
+          )}
+          {c.cta_label && c.cta_href && (
+            <div className="mt-9">
+              <Link
+                href={c.cta_href}
+                className={
+                  'inline-flex items-center justify-center px-8 py-3.5 text-[12px] font-semibold uppercase transition duration-200 ' +
+                  (dark
+                    ? 'border border-[#D4A93A] text-[#E8DDC4] hover:bg-[#D4A93A] hover:text-[#0F2F4F]'
+                    : 'border border-[#153D64] bg-[#153D64] text-white hover:bg-[#0F2F4F]')
+                }
+                style={{ letterSpacing: '0.12em' }}
+              >
+                {c.cta_label}
+              </Link>
+            </div>
+          )}
         </div>
       </div>
-    </section>
+    </SectionContainer>
   );
 }

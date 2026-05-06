@@ -66,32 +66,57 @@ export default async function ServiceDetailPage(props: {
           timeline_text: fields.timeline_text,
           target_audience_text: fields.target_audience_text,
         }}
+        styles={{}}
+        variant="white"
       />
 
       {/* CTA — links to /contact with the service pre-selected. */}
-      <section className="bg-[#0F2540] px-6 py-20 text-white lg:py-24">
-        <div className="mx-auto flex max-w-4xl flex-col items-center text-center">
-          <p className="text-[11px] font-semibold tracking-[0.22em] uppercase text-[#D4A93A]">
+      <section
+        className="px-6 py-24 text-white sm:py-28 lg:py-32"
+        style={{
+          background:
+            'radial-gradient(ellipse at 50% 40%, #173E63 0%, #102E4C 55%, #0C2741 100%)',
+        }}
+      >
+        <div className="mx-auto flex max-w-[860px] flex-col items-center text-center">
+          <div
+            aria-hidden
+            className="h-px w-[60px]"
+            style={{ background: '#D4A93A' }}
+          />
+          <p
+            className="mt-5 text-[11px] font-semibold uppercase"
+            style={{ letterSpacing: '0.18em', color: '#D4A93A' }}
+          >
             Engage PMBC
           </p>
-          <h2 className="mt-3 font-serif text-3xl font-semibold tracking-tight sm:text-4xl">
+          <h2 className="pmbc-display mt-5 text-[36px] leading-[1.12] sm:text-[44px] lg:text-[52px]">
             Discuss a {service.title.toLowerCase()} mandate
           </h2>
-          <p className="mt-4 max-w-2xl text-base text-[#E8EEF5]/80 sm:text-lg">
+          <p
+            className="mx-auto mt-5 max-w-[640px] text-[17px] leading-[1.7] sm:text-[18px]"
+            style={{ color: '#E8DDC4' }}
+          >
             Tell us about the engagement. We respond to every credible enquiry within
             one to two business days.
           </p>
-          <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+          <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
             <Link
               href={`/contact?service=${service.slug}`}
-              className="inline-flex items-center gap-1.5 rounded-md bg-white px-5 py-2.5 text-sm font-semibold text-[#0F2540] transition hover:bg-[#E8EEF5]"
+              className="inline-flex items-center gap-2 border border-[#D4A93A] px-8 py-3.5 text-[12px] font-semibold uppercase text-[#E8DDC4] transition-all duration-200 hover:bg-[#D4A93A] hover:text-[#0F2F4F]"
+              style={{ letterSpacing: '0.12em' }}
             >
               Start a conversation
               <ArrowRight size={14} />
             </Link>
             <Link
               href="/services"
-              className="inline-flex items-center rounded-md border border-white/30 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-white/5"
+              className="inline-flex items-center px-8 py-3.5 text-[12px] font-semibold uppercase transition-colors duration-200"
+              style={{
+                letterSpacing: '0.12em',
+                border: '1px solid rgba(232, 221, 196, 0.3)',
+                color: '#E8DDC4',
+              }}
             >
               See all services
             </Link>

@@ -1,6 +1,6 @@
 import type { Tables } from '@/types/database';
 
-import { SectionRenderer } from './SectionRenderer';
+import { SectionList } from './SectionRenderer';
 import { PageHeroFallback } from './PageHeroFallback';
 
 type Section = Tables<'page_sections'>;
@@ -28,9 +28,7 @@ export function FirmPageBody({
   return (
     <>
       {!firstIsHero && <PageHeroFallback {...fallbackHero} />}
-      {sections.map((s) => (
-        <SectionRenderer key={s.id} section={s} />
-      ))}
+      <SectionList sections={sections} />
     </>
   );
 }

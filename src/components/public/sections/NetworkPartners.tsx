@@ -2,6 +2,9 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { ArrowUpRight } from 'lucide-react';
 
+import { SectionContainer, SectionIntro } from '../SectionContainer';
+import { variantStyles, type PmbcVariant } from '@/lib/public/tokens';
+
 type Partner = {
   logo_url: string;
   name: string;
@@ -15,9 +18,15 @@ function s(v: unknown): string {
   return typeof v === 'string' ? v : '';
 }
 
-function pickPartners(c: Record<string, unknown>): { intro: string; heading: string; partners: Partner[] } {
+function pickPartners(c: Record<string, unknown>): {
+  intro: string;
+  heading: string;
+  eyebrow: string;
+  partners: Partner[];
+} {
   const intro = s(c.intro);
-  const heading = s(c.heading);
+  const heading = s(c.heading) || s(c.headline);
+  const eyebrow = s(c.eyebrow);
   const raw = Array.isArray(c.partners) ? (c.partners as unknown[]) : [];
   const partners: Partner[] = raw
     .map((row) => {
@@ -36,107 +45,158 @@ function pickPartners(c: Record<string, unknown>): { intro: string; heading: str
       };
     })
     .filter((p): p is Partner => p !== null);
-  return { intro, heading, partners };
+  return { intro, heading, eyebrow, partners };
 }
 
-export function NetworkPartners({ content }: { content: Record<string, unknown> }) {
-  const { intro, heading, partners } = pickPartners(content ?? {});
+export function NetworkPartners({
+  content,
+  variant = 'cream',
+}: {
+  content: Record<string, unknown>;
+  styles: Record<string, unknown>;
+  variant: PmbcVariant;
+}) {
+  const { intro, heading, eyebrow, partners } = pickPartners(content ?? {});
   if (partners.length === 0 && !heading && !intro) return null;
 
-  return (
-    <section className="px-6 py-20 lg:py-24">
-      <div className="mx-auto max-w-6xl">
-        {(heading || intro) && (
-          <div className="mx-auto max-w-3xl text-center">
-            {heading && (
-              <h2 className="font-serif text-3xl font-semibold tracking-tight text-[#0F1B2D] sm:text-4xl">
-                {heading}
-              </h2>
-            )}
-            {intro && (
-              <p className="mt-4 text-base text-neutral-600 sm:text-lg">{intro}</p>
-            )}
-          </div>
-        )}
+  const v = variantStyles(variant);
+  const dark = variant === 'navy_deep';
 
-        {partners.length > 0 && (
-          <div
-            className={
-              'mt-12 grid gap-6 ' +
-              (partners.length >= 3 ? 'md:grid-cols-3' : partners.length === 2 ? 'md:grid-cols-2' : 'md:grid-cols-1')
-            }
-          >
-            {partners.map((p, i) => {
-              const inner = (
-                <>
-                  <div className="flex items-start justify-between gap-3">
-                    {p.logo_url ? (
-                      <div className="relative h-12 w-32 flex-shrink-0">
-                        <Image
-                          src={p.logo_url}
-                          alt={p.name || 'Partner logo'}
-                          fill
-                          sizes="128px"
-                          className="object-contain object-left"
-                        />
-                      </div>
-                    ) : (
-                      <div className="h-12 w-32 rounded bg-neutral-100" />
-                    )}
-                    {p.role_tag && (
-                      <span className="inline-flex items-center rounded-full border border-[#D4A93A]/60 bg-[#D4A93A]/10 px-2.5 py-1 text-[10px] font-semibold tracking-[0.12em] uppercase text-[#8a6f1c]">
-                        {p.role_tag}
+  return (
+    <SectionContainer variant={variant}>
+      <SectionIntro
+        eyebrow={eyebrow}
+        headline={heading}
+        intro={intro}
+        variant={variant}
+      />
+
+      {partners.length > 0 && (
+        <div
+          className={
+            'mt-14 grid gap-6 ' +
+            (partners.length >= 3
+              ? 'md:grid-cols-3'
+              : partners.length === 2
+                ? 'md:grid-cols-2'
+                : 'md:grid-cols-1')
+          }
+        >
+          {partners.map((p, i) => {
+            const inner = (
+              <>
+                <span
+                  aria-hidden
+                  className="absolute top-0 left-0 right-0 h-[2px]"
+                  style={{ background: '#D4A93A' }}
+                />
+                <div className="flex items-start justify-between gap-3">
+                  {p.logo_url ? (
+                    <div className="relative h-14 w-36 flex-shrink-0">
+                      <Image
+                        src={p.logo_url}
+                        alt={p.name || 'Partner logo'}
+                        fill
+                        sizes="144px"
+                        className="object-contain object-left"
+                      />
+                    </div>
+                  ) : (
+                    <div
+                      className="flex h-14 w-36 items-center justify-start"
+                      style={{ color: dark ? v.textMuted : '#9CA3AF' }}
+                    >
+                      <span className="text-[10px] font-semibold uppercase tracking-[0.18em]">
+                        {p.name || 'Partner'}
                       </span>
-                    )}
-                  </div>
-                  {p.name && (
-                    <h3 className="mt-5 font-serif text-xl font-semibold tracking-tight text-[#0F1B2D]">
-                      {p.name}
-                    </h3>
+                    </div>
                   )}
-                  {p.location && (
-                    <p className="mt-1 text-[12px] font-medium tracking-[0.08em] uppercase text-[#1B3A5F]">
-                      {p.location}
-                    </p>
-                  )}
-                  {p.description && (
-                    <p className="mt-3 text-sm leading-relaxed text-neutral-600">
-                      {p.description}
-                    </p>
-                  )}
-                  {p.link && (
-                    <span className="mt-5 inline-flex items-center gap-1 text-[12px] font-semibold tracking-wide text-[#1B3A5F]">
-                      Visit site <ArrowUpRight size={12} />
+                  {p.role_tag && (
+                    <span
+                      className="inline-flex items-center px-2.5 py-1 text-[10px] font-semibold uppercase"
+                      style={{
+                        letterSpacing: '0.14em',
+                        border: '1px solid #D4A93A',
+                        color: '#B89530',
+                        background: 'transparent',
+                      }}
+                    >
+                      {p.role_tag}
                     </span>
                   )}
-                </>
-              );
-              const className =
-                'block h-full rounded-lg border border-neutral-200 bg-white p-6 transition' +
-                (p.link ? ' hover:border-[#1B3A5F] hover:shadow-[0_2px_10px_rgba(15,27,45,0.06)]' : '');
-              if (p.link) {
-                const external = /^https?:/i.test(p.link);
-                return (
-                  <Link
-                    key={i}
-                    href={p.link}
-                    className={className}
-                    target={external ? '_blank' : undefined}
-                    rel={external ? 'noreferrer' : undefined}
-                  >
-                    {inner}
-                  </Link>
-                );
-              }
-              return (
-                <div key={i} className={className}>
-                  {inner}
                 </div>
+                {p.name && (
+                  <h3
+                    className="mt-7 pmbc-display text-[22px] leading-tight"
+                    style={{ color: dark ? '#FFFFFF' : v.text }}
+                  >
+                    {p.name}
+                  </h3>
+                )}
+                {p.location && (
+                  <p
+                    className="mt-2 text-[11px] font-semibold uppercase"
+                    style={{
+                      letterSpacing: '0.14em',
+                      color: dark ? v.textMuted : v.eyebrow,
+                    }}
+                  >
+                    {p.location}
+                  </p>
+                )}
+                {p.description && (
+                  <p
+                    className="mt-4 text-[15px] leading-[1.7]"
+                    style={{ color: dark ? v.textMuted : '#52606B' }}
+                  >
+                    {p.description}
+                  </p>
+                )}
+                {p.link && (
+                  <span
+                    className="mt-7 inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase"
+                    style={{ letterSpacing: '0.16em', color: '#B89530' }}
+                  >
+                    Visit site <ArrowUpRight size={12} />
+                  </span>
+                )}
+              </>
+            );
+
+            const baseClass =
+              'group relative block h-full overflow-hidden p-9 transition duration-200';
+            const cardStyle: React.CSSProperties = {
+              background: v.cardBg,
+              border: `1px solid ${dark ? v.cardBorder : '#153D64'}`,
+              borderTopWidth: 0,
+            };
+
+            if (p.link) {
+              const external = /^https?:/i.test(p.link);
+              return (
+                <Link
+                  key={i}
+                  href={p.link}
+                  className={
+                    baseClass +
+                    ' hover:-translate-y-0.5 hover:shadow-[0_12px_40px_rgba(15,37,64,0.10)]'
+                  }
+                  style={cardStyle}
+                  target={external ? '_blank' : undefined}
+                  rel={external ? 'noreferrer' : undefined}
+                >
+                  {inner}
+                </Link>
               );
-            })}
-          </div>
-        )}
-      </div>
-    </section>
+            }
+            return (
+              <div key={i} className={baseClass} style={cardStyle}>
+                {inner}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </SectionContainer>
   );
 }

@@ -1,5 +1,8 @@
 import Image from 'next/image';
 
+import { SectionContainer } from '../SectionContainer';
+import { variantStyles, type PmbcVariant } from '@/lib/public/tokens';
+
 function s(v: unknown): string {
   return typeof v === 'string' ? v : '';
 }
@@ -22,40 +25,57 @@ function pick(c: Record<string, unknown>): QuoteContent {
   };
 }
 
-export function Quote({ content }: { content: Record<string, unknown> }) {
+export function Quote({
+  content,
+  variant = 'white',
+}: {
+  content: Record<string, unknown>;
+  styles: Record<string, unknown>;
+  variant: PmbcVariant;
+}) {
   const c = pick(content ?? {});
   if (!c.quote_text) return null;
   const left = c.alignment === 'left';
+  const v = variantStyles(variant);
+  const dark = variant === 'navy_deep';
 
   return (
-    <section className="px-6 py-20 lg:py-24">
+    <SectionContainer variant={variant}>
       <figure
-        className={
-          'mx-auto max-w-3xl ' + (left ? 'text-left' : 'text-center')
-        }
+        className={'mx-auto max-w-[800px] ' + (left ? 'text-left' : 'text-center')}
       >
         <span
           aria-hidden
-          className={
-            'block font-serif text-6xl leading-none text-[#D4A93A] ' +
-            (left ? '' : 'text-center')
-          }
+          className="font-serif"
+          style={{
+            display: 'block',
+            fontSize: 80,
+            lineHeight: 0.8,
+            color: dark ? '#D4A93A' : '#B89530',
+            textAlign: left ? 'left' : 'center',
+            fontWeight: 600,
+          }}
         >
-          “
+          &ldquo;
         </span>
         <blockquote
-          className={
-            'mt-2 font-serif text-2xl leading-relaxed text-[#0F1B2D] sm:text-3xl ' +
-            (left ? '' : 'text-center')
-          }
+          className="font-serif italic"
+          style={{
+            marginTop: 12,
+            fontSize: 28,
+            lineHeight: 1.5,
+            color: dark ? '#FFFFFF' : v.text,
+            fontWeight: 400,
+            textAlign: left ? 'left' : 'center',
+            letterSpacing: '-0.005em',
+          }}
         >
           {c.quote_text}
         </blockquote>
         {(c.attribution_name || c.attribution_role || c.attribution_photo_url) && (
           <figcaption
             className={
-              'mt-8 flex items-center gap-4 ' +
-              (left ? '' : 'justify-center')
+              'mt-10 flex items-center gap-4 ' + (left ? '' : 'justify-center')
             }
           >
             {c.attribution_photo_url && (
@@ -69,17 +89,38 @@ export function Quote({ content }: { content: Record<string, unknown> }) {
                 />
               </div>
             )}
-            <div className={left ? '' : 'text-left'}>
+            <div className={left ? '' : 'text-center'}>
+              <div
+                aria-hidden
+                className={(left ? '' : 'mx-auto ') + 'h-px w-[40px]'}
+                style={{ background: dark ? '#D4A93A' : '#B89530' }}
+              />
               {c.attribution_name && (
-                <p className="text-sm font-semibold text-[#0F1B2D]">{c.attribution_name}</p>
+                <p
+                  className="mt-3 text-[12px] font-semibold uppercase"
+                  style={{
+                    letterSpacing: '0.18em',
+                    color: dark ? '#FFFFFF' : v.text,
+                  }}
+                >
+                  {c.attribution_name}
+                </p>
               )}
               {c.attribution_role && (
-                <p className="text-xs text-neutral-500">{c.attribution_role}</p>
+                <p
+                  className="mt-1.5 text-[11px] uppercase"
+                  style={{
+                    letterSpacing: '0.16em',
+                    color: dark ? v.textMuted : '#6B7280',
+                  }}
+                >
+                  {c.attribution_role}
+                </p>
               )}
             </div>
           </figcaption>
         )}
       </figure>
-    </section>
+    </SectionContainer>
   );
 }

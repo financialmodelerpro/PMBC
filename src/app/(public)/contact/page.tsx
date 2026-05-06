@@ -3,7 +3,7 @@ import { Mail, MessageCircle, MapPin } from 'lucide-react';
 
 import { fetchPage, fetchPageSections } from '@/lib/cms/pages';
 import { fetchSiteSettings } from '@/lib/cms/settings';
-import { SectionRenderer } from '@/components/public/SectionRenderer';
+import { SectionList } from '@/components/public/SectionRenderer';
 import { SERVICES } from '@/config/services';
 import { ContactForm } from '@/components/public/ContactForm';
 import { buildPageMetadata } from '@/lib/seo/metadata';
@@ -45,11 +45,9 @@ export default async function ContactPage(props: {
 
   return (
     <>
-      {sections.map((s) => (
-        <SectionRenderer key={s.id} section={s} />
-      ))}
+      <SectionList sections={sections} />
 
-      <section className="bg-[color:var(--pmbc-surface-alt)] px-6 py-24 lg:py-28">
+      <section className="bg-[color:var(--pmbc-surface-cream)] px-6 py-24 lg:py-28">
         <div className="mx-auto max-w-[1200px]">
           <div className="grid gap-12 lg:grid-cols-12">
             {/* Form */}

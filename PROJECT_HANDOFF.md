@@ -5,7 +5,7 @@
 **Domain:** pacemakersglobal.com
 **Vercel project:** pmbc (already created, domain attached)
 **Build path:** Self-built using Claude Code
-**Status:** Phases 1–4 + 4.5 complete (as of 2026-05-02). Scaffold + DB, NextAuth admin shell, six CMS editors, three-pane page builder with four section editors, and a full FMP-aligned admin refactor (sidebar, inline styling, namespace split, API conventions) all shipped. Phase 5 (public pages — core) is up next.
+**Status:** Phases 1 through 8 complete; Phase 9 in progress; Phase 9.5 visual polish complete (as of 2026-05-06). Home page production content shipped (migration 011); all 13 section types implemented with editors and renderers; bespoke routes for every public page; dynamic OG images and Schema.org JSON-LD; branded 404 and error boundaries; Privacy and Terms drafted with named processors. Content style rule (no em dashes) applied retroactively across the codebase and live database (migration 012). Supabase RLS hardened with default-deny on all 10 public tables (migration 013) after Security Advisor flagged the issue. Phase 9.5 — boutique private bank visual polish — refreshed design tokens (warm navy `#153D64`, deep navy `#0F2F4F`, cream `#FAF7F2`, gold `#D4A93A`, muted gold `#B89530`, cream-on-navy `#E8DDC4`); built shared `SectionContainer` + `variantStyles` token layer; redesigned all 13 section renderers around three background variants (`navy_deep` / `cream` / `white`) with sequence-aware variant resolution so home rhythm is automatic; refined navbar (gold underline-on-hover, monogram fallback) and footer (deep navy, small-caps gold headlines, italic serif tagline). No content schema changes. Remaining: about, sectors, approach, network, financial-modeler-pro, services overview, contact intro, and 9 service-detail pages of production content; real logo / founder photo / partner logo asset uploads; admin contact-submissions inbox; DNS + SSL configuration; counsel review of Privacy and Terms; rotate the dev admin password.
 
 ---
 
@@ -109,12 +109,16 @@ A 13-15 day full build, broken into 9 testable phases. Each phase is independent
 2. Auth + admin shell (NextAuth, middleware, login, dashboard) ✅
 3. CMS foundations (cms_content editor, branding admin, settings) ✅
 4. Page builder (admin pages list, three-pane editor, first 4 section types) ✅
-4.5. Admin refactor — FMP-aligned sidebar, inline-styled admin chrome, `cms_content` namespace split, `PATCH`/`POST` API parity ✅
-5. Public pages — core (home, services overview, contact form with email) ⬅ next
-6. Remaining section types (sector_grid, process_steps, network_partners, founder_block, text_image, cta_block, quote, fmp_intro, service_detail)
-7. Remaining pages (sectors, approach, network, about, FMP page, service detail)
-8. SEO and polish (OG, metadata, sitemap, structured data, 404)
-9. Content population and launch
+4.5. Admin refactor, FMP-aligned sidebar, inline-styled admin chrome, `cms_content` namespace split, `PATCH`/`POST` API parity ✅
+5. Public pages, core (home, services overview, contact form with email) ✅
+6. Remaining section types (sector_grid, process_steps, network_partners, founder_block, text_image, cta_block, quote, fmp_intro, service_detail) ✅
+7. Remaining pages (sectors, approach, network, about, FMP page, 9 service-detail routes) ✅
+8. SEO and polish (dynamic OG, metadata helper, sitemap, robots, JSON-LD, branded 404, error boundary, OG-preview admin tool) ✅
+9. Content population and launch ⬅ in progress (home shipped; about next)
+
+Two single-purpose work streams have also landed since Phase 8:
+- Content style rule enforcement (migration 012, no em dashes anywhere) ✅
+- Supabase RLS hardening with default-deny on all public tables (migration 013) ✅
 
 ## Decisions Already Made
 
@@ -156,11 +160,17 @@ The FMP founder page (`financialmodelerpro.com/about/ahmad-din`) is the canonica
 
 ## What Happens Next
 
-1. **Apply migration 009** (`supabase/migrations/009_split_header_settings.sql`) against the production Supabase project before any deploy. The fetcher tolerates the unmigrated state in dev, but production should be on the discrete-rows namespace.
-2. **Phase 5** — wire the public root layout to read header/footer from `cms_content`, build the contact form + `/api/contact` route, and connect the two transactional email templates via Resend.
-3. **Claude (in chat)** drafts content for each page when Phase 9 lands — section angles confirmed first, then full copy written, per stated working preference.
+1. **Phase 9 page-by-page content population**, in order: about, sectors, approach, network, financial-modeler-pro, services overview, contact intro, and the 9 service-detail pages (replacing migration 010 placeholders). Each page follows the home-page seed pattern: a numbered migration plus a companion `scripts/seed-<page>-page.mjs` JS apply script. The next migration filename is `014_seed_about_page_content.sql` (migration 013 was used for the RLS hardening, not the about-page seed as previously sketched).
+2. **Build the `/admin/contact-submissions` inbox** so the contact-form rows are triageable in the admin console. Currently the only sidebar route returning 404.
+3. **Claude (in chat)** drafts content for each page as Phase 9 progresses, section angles confirmed first, then full copy written, per stated working preference.
 4. **Claude Code** continues all coding, scaffolding, and feature implementation against `CLAUDE.md`.
-5. **Before launch:** rotate `Admin@2026` (the dev seed password for `meetahmadch@gmail.com`) to a strong production credential via `npm run seed-admin`.
+5. **Before launch:**
+   - Rotate `Admin@2026` (the dev seed password for `meetahmadch@gmail.com`) to a strong production credential via `npm run seed-admin`. With RLS now on `admin_users`, the dashboard table editor cannot insert; the seed script (which uses the service-role key) is the right path.
+   - DNS + SSL on Vercel for the apex and `www`.
+   - Production env vars populated (`NEXT_PUBLIC_SITE_URL`, `RESEND_API_KEY`, `EMAIL_FROM_*`, `EMAIL_TO_ADMIN`, `HCAPTCHA_*`, Supabase service role key).
+   - Sitemap submitted to Google Search Console.
+   - Counsel review of `/privacy` and `/terms`; remove the "Subject to legal review" badge once approved.
+   - Refresh Supabase Security Advisor in the dashboard; confirm the 10 RLS errors are cleared.
 
 ## How to Use These Files
 

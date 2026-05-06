@@ -1,5 +1,8 @@
 import Link from 'next/link';
 
+import { SectionContainer, SectionIntro } from '../SectionContainer';
+import { variantStyles, type PmbcVariant } from '@/lib/public/tokens';
+
 type Step = { number: string; title: string; description: string };
 
 function s(v: unknown): string {
@@ -34,74 +37,102 @@ function pickSteps(c: Record<string, unknown>): {
   return { eyebrow, intro, heading, steps, footer_cta_label, footer_cta_href };
 }
 
-export function ProcessSteps({ content }: { content: Record<string, unknown> }) {
+export function ProcessSteps({
+  content,
+  variant = 'navy_deep',
+}: {
+  content: Record<string, unknown>;
+  styles: Record<string, unknown>;
+  variant: PmbcVariant;
+}) {
   const { eyebrow, intro, heading, steps, footer_cta_label, footer_cta_href } = pickSteps(
     content ?? {},
   );
   if (steps.length === 0 && !heading && !intro && !eyebrow) return null;
 
+  const v = variantStyles(variant);
+  const dark = variant === 'navy_deep';
+
   return (
-    <section className="bg-[#F7F9FC] px-6 py-20 lg:py-24">
-      <div className="mx-auto max-w-6xl">
-        {(eyebrow || heading || intro) && (
-          <div className="mx-auto max-w-3xl text-center">
-            {eyebrow && (
-              <p className="text-[11px] font-medium tracking-[0.22em] uppercase text-[#1B3A5F]">
-                {eyebrow}
-              </p>
-            )}
-            {heading && (
-              <h2 className="mt-3 font-serif text-3xl font-semibold tracking-tight text-[#0F1B2D] sm:text-4xl">
-                {heading}
-              </h2>
-            )}
-            {intro && (
-              <p className="mt-4 text-base text-neutral-600 sm:text-lg">{intro}</p>
-            )}
-          </div>
-        )}
+    <SectionContainer variant={variant}>
+      <SectionIntro
+        eyebrow={eyebrow}
+        headline={heading}
+        intro={intro}
+        variant={variant}
+      />
 
-        {steps.length > 0 && (
-          <ol className="relative mt-14 grid gap-10 lg:grid-cols-4 lg:gap-6">
-            {steps.map((step, i) => (
-              <li key={i} className="relative">
-                {i < steps.length - 1 && (
-                  <span
-                    aria-hidden
-                    className="absolute top-5 left-12 hidden h-px w-full -translate-y-1/2 bg-[#D4A93A]/40 lg:block"
-                  />
-                )}
-                <div className="relative">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full border border-[#D4A93A] bg-white text-sm font-semibold text-[#1B3A5F]">
-                    {step.number}
-                  </div>
-                  {step.title && (
-                    <h3 className="mt-4 font-serif text-xl font-semibold tracking-tight text-[#0F1B2D]">
-                      {step.title}
-                    </h3>
-                  )}
-                  {step.description && (
-                    <p className="mt-2 text-sm leading-relaxed text-neutral-600">
-                      {step.description}
-                    </p>
-                  )}
+      {steps.length > 0 && (
+        <ol
+          className={
+            'relative mt-16 grid gap-12 ' +
+            (steps.length === 4
+              ? 'lg:grid-cols-4 lg:gap-8'
+              : steps.length === 3
+                ? 'lg:grid-cols-3 lg:gap-10'
+                : 'lg:grid-cols-2 lg:gap-10')
+          }
+        >
+          {steps.map((step, i) => (
+            <li key={i} className="relative">
+              {/* Gold connector to next step on desktop */}
+              {i < steps.length - 1 && (
+                <span
+                  aria-hidden
+                  className="absolute top-[40px] left-[68px] right-[-32px] hidden h-px lg:block"
+                  style={{ background: dark ? 'rgba(212, 169, 58, 0.45)' : 'rgba(184, 149, 48, 0.5)' }}
+                />
+              )}
+              <div className="relative">
+                <div
+                  className="font-serif text-[56px] font-semibold leading-none sm:text-[64px]"
+                  style={{ color: dark ? '#D4A93A' : '#B89530' }}
+                >
+                  {step.number}
                 </div>
-              </li>
-            ))}
-          </ol>
-        )}
+                <div
+                  aria-hidden
+                  className="mt-4 h-px w-[40px]"
+                  style={{ background: dark ? 'rgba(212, 169, 58, 0.6)' : 'rgba(184, 149, 48, 0.6)' }}
+                />
+                {step.title && (
+                  <h3
+                    className="mt-5 pmbc-display text-[22px] leading-tight sm:text-[24px]"
+                    style={{ color: dark ? '#FFFFFF' : v.text }}
+                  >
+                    {step.title}
+                  </h3>
+                )}
+                {step.description && (
+                  <p
+                    className="mt-4 text-[15px] leading-[1.7]"
+                    style={{ color: dark ? v.textMuted : '#52606B' }}
+                  >
+                    {step.description}
+                  </p>
+                )}
+              </div>
+            </li>
+          ))}
+        </ol>
+      )}
 
-        {footer_cta_label && footer_cta_href && (
-          <div className="mt-12 text-center">
-            <Link
-              href={footer_cta_href}
-              className="inline-flex items-center rounded-md border border-neutral-300 bg-white px-5 py-2.5 text-sm font-medium text-[#0F1B2D] transition hover:border-[#1B3A5F] hover:text-[#1B3A5F]"
-            >
-              {footer_cta_label}
-            </Link>
-          </div>
-        )}
-      </div>
-    </section>
+      {footer_cta_label && footer_cta_href && (
+        <div className="mt-14 text-center">
+          <Link
+            href={footer_cta_href}
+            className={
+              'inline-flex items-center justify-center px-8 py-3.5 text-[12px] font-semibold uppercase transition duration-200 ' +
+              (dark
+                ? 'border border-[#D4A93A] text-[#E8DDC4] hover:bg-[#D4A93A] hover:text-[#0F2F4F]'
+                : 'border border-[#153D64] text-[#153D64] hover:bg-[#153D64] hover:text-white')
+            }
+            style={{ letterSpacing: '0.12em' }}
+          >
+            {footer_cta_label}
+          </Link>
+        </div>
+      )}
+    </SectionContainer>
   );
 }

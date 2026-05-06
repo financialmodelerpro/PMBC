@@ -37,12 +37,10 @@ export function Navbar({
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  // Close the mobile menu on every route change.
   useEffect(() => {
     setMobileOpen(false);
   }, [pathname]);
 
-  // Lock body scroll while mobile menu open.
   useEffect(() => {
     if (mobileOpen) {
       const prev = document.body.style.overflow;
@@ -61,49 +59,74 @@ export function Navbar({
   return (
     <header
       className={
-        'sticky top-0 z-40 w-full border-b transition-all ' +
+        'sticky top-0 z-40 w-full transition-all duration-200 ' +
         (scrolled
-          ? 'border-[color:var(--pmbc-border)] bg-white/95 shadow-sm backdrop-blur'
-          : 'border-transparent bg-white')
+          ? 'bg-white/95 shadow-[0_2px_12px_rgba(15,37,64,0.06)] backdrop-blur'
+          : 'bg-white')
       }
+      style={{
+        borderBottom: scrolled
+          ? '1px solid rgba(212, 169, 58, 0.18)'
+          : '1px solid transparent',
+      }}
     >
-      <div className="mx-auto flex h-[72px] w-full max-w-[1200px] items-center justify-between px-6">
+      <div className="mx-auto flex h-[80px] w-full max-w-[1280px] items-center justify-between px-6 lg:px-8">
         {/* Brand */}
         <Link
           href="/"
-          className="flex items-center gap-3 text-[color:var(--pmbc-primary-deep)] hover:opacity-80"
+          className="flex items-center gap-3 transition-opacity duration-200 hover:opacity-80"
         >
           {brand.logoUrl ? (
             <Image
               src={brand.logoUrl}
               alt={brand.name}
-              width={140}
-              height={36}
-              className="h-9 w-auto"
+              width={160}
+              height={40}
+              className="h-10 w-auto"
               priority
               unoptimized
             />
           ) : (
-            <span className="font-serif text-lg font-semibold tracking-tight">
-              {brand.shortName}
-            </span>
+            <div className="flex items-center gap-3">
+              <div
+                className="flex h-10 w-10 items-center justify-center"
+                style={{
+                  background: '#153D64',
+                  color: '#D4A93A',
+                  fontFamily: 'var(--font-source-serif), serif',
+                  fontWeight: 600,
+                  fontSize: 18,
+                  letterSpacing: '-0.02em',
+                }}
+              >
+                PM
+              </div>
+              <span
+                className="font-serif text-[18px] font-semibold tracking-tight text-[color:var(--pmbc-primary-deep)]"
+                style={{ letterSpacing: '-0.01em' }}
+              >
+                {brand.shortName}
+              </span>
+            </div>
           )}
         </Link>
 
         {/* Desktop nav */}
-        <nav className="hidden items-center gap-8 md:flex">
+        <nav className="hidden items-center gap-9 md:flex">
           {navItems.map((item) => {
             const active = isActive(item.href);
             return (
               <Link
                 key={item.href}
                 href={item.href}
+                data-active={active ? 'true' : undefined}
                 className={
-                  'text-[13.5px] font-medium tracking-wide transition ' +
+                  'pmbc-link-underline text-[13px] font-medium uppercase transition-colors duration-200 ' +
                   (active
                     ? 'text-[color:var(--pmbc-primary)]'
-                    : 'text-[color:var(--pmbc-text)]/80 hover:text-[color:var(--pmbc-primary)]')
+                    : 'text-[color:var(--pmbc-text)] hover:text-[color:var(--pmbc-primary)]')
                 }
+                style={{ letterSpacing: '0.08em' }}
               >
                 {item.label}
               </Link>
@@ -116,7 +139,20 @@ export function Navbar({
           {cta && (
             <Link
               href={cta.href}
-              className="hidden items-center rounded-md bg-[color:var(--pmbc-primary)] px-4 py-2 text-[13px] font-semibold text-white transition hover:bg-[color:var(--pmbc-primary-deep)] md:inline-flex"
+              className="hidden items-center justify-center px-5 py-2.5 text-[12px] font-semibold uppercase text-white transition-all duration-200 md:inline-flex"
+              style={{
+                background: '#153D64',
+                letterSpacing: '0.12em',
+                border: '1px solid #153D64',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = '#0F2F4F';
+                e.currentTarget.style.borderColor = '#D4A93A';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = '#153D64';
+                e.currentTarget.style.borderColor = '#153D64';
+              }}
             >
               {cta.label}
             </Link>
@@ -127,7 +163,8 @@ export function Navbar({
               aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
               aria-expanded={mobileOpen}
               onClick={() => setMobileOpen((v) => !v)}
-              className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-[color:var(--pmbc-border)] text-[color:var(--pmbc-primary-deep)] md:hidden"
+              className="inline-flex h-10 w-10 items-center justify-center text-[color:var(--pmbc-primary-deep)] transition-colors duration-200 hover:text-[color:var(--pmbc-accent)] md:hidden"
+              style={{ border: '1px solid var(--pmbc-border)' }}
             >
               {mobileOpen ? <X size={18} /> : <Menu size={18} />}
             </button>
@@ -137,20 +174,26 @@ export function Navbar({
 
       {/* Mobile slide-down */}
       {mobileMenuEnabled && mobileOpen && (
-        <div className="border-t border-[color:var(--pmbc-border)] bg-white md:hidden">
-          <nav className="mx-auto flex max-w-[1200px] flex-col gap-1 px-6 py-4">
+        <div
+          className="md:hidden"
+          style={{
+            background: '#FAF7F2',
+            borderTop: '1px solid var(--pmbc-border-warm)',
+          }}
+        >
+          <nav className="mx-auto flex max-w-[1280px] flex-col gap-1 px-6 py-5">
             {navItems.map((item) => {
               const active = isActive(item.href);
               return (
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={
-                    'rounded-md px-3 py-2.5 text-[15px] font-medium ' +
-                    (active
-                      ? 'bg-[color:var(--pmbc-surface-alt)] text-[color:var(--pmbc-primary)]'
-                      : 'text-[color:var(--pmbc-text)] hover:bg-[color:var(--pmbc-surface-alt)]')
-                  }
+                  className="px-3 py-3 text-[15px] font-medium transition-colors duration-200"
+                  style={{
+                    color: active ? '#153D64' : '#0F1B2D',
+                    borderLeft: active ? '2px solid #D4A93A' : '2px solid transparent',
+                    paddingLeft: active ? 14 : 12,
+                  }}
                 >
                   {item.label}
                 </Link>
@@ -159,7 +202,11 @@ export function Navbar({
             {cta && (
               <Link
                 href={cta.href}
-                className="mt-2 inline-flex items-center justify-center rounded-md bg-[color:var(--pmbc-primary)] px-4 py-3 text-[14px] font-semibold text-white"
+                className="mt-3 inline-flex items-center justify-center px-4 py-3 text-[12px] font-semibold uppercase text-white"
+                style={{
+                  background: '#153D64',
+                  letterSpacing: '0.12em',
+                }}
               >
                 {cta.label}
               </Link>

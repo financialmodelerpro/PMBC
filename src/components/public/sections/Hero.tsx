@@ -1,87 +1,117 @@
 import Link from 'next/link';
+import { ChevronDown } from 'lucide-react';
+
+import { variantStyles, type PmbcVariant } from '@/lib/public/tokens';
 
 type HeroContent = {
   badge_text?: string;
-  badge?: string; // legacy seeded key
   headline?: string;
   subtitle?: string;
   cta_label?: string;
   cta_href?: string;
   cta_secondary_label?: string;
   cta_secondary_href?: string;
-  background_style?: 'light' | 'dark';
 };
 
-function asString(v: unknown): string {
+function s(v: unknown): string {
   return typeof v === 'string' ? v : '';
 }
 
 function pick(c: Record<string, unknown>): HeroContent {
   return {
-    badge_text: asString(c.badge_text) || asString(c.badge),
-    headline: asString(c.headline),
-    subtitle: asString(c.subtitle),
-    cta_label: asString(c.cta_label),
-    cta_href: asString(c.cta_href),
-    cta_secondary_label: asString(c.cta_secondary_label),
-    cta_secondary_href: asString(c.cta_secondary_href),
-    background_style: c.background_style === 'dark' ? 'dark' : 'light',
+    badge_text: s(c.badge_text) || s(c.badge),
+    headline: s(c.headline),
+    subtitle: s(c.subtitle),
+    cta_label: s(c.cta_label),
+    cta_href: s(c.cta_href),
+    cta_secondary_label: s(c.cta_secondary_label),
+    cta_secondary_href: s(c.cta_secondary_href),
   };
 }
 
-export function Hero({ content }: { content: Record<string, unknown> }) {
+export function Hero({
+  content,
+  variant = 'navy_deep',
+}: {
+  content: Record<string, unknown>;
+  styles: Record<string, unknown>;
+  variant: PmbcVariant;
+}) {
   const c = pick(content ?? {});
-  const dark = c.background_style === 'dark';
+  const dark = variant === 'navy_deep';
+  const v = variantStyles(variant);
+
+  // Subtle radial gradient for the navy variant: lighter primary at center,
+  // deeper navy at edges. On non-navy variants the section is a flat surface.
+  const bg = dark
+    ? 'radial-gradient(ellipse at 50% 35%, #173E63 0%, #102E4C 55%, #0C2741 100%)'
+    : v.bg;
 
   return (
     <section
-      className={
-        'relative px-6 py-24 lg:py-32 ' +
-        (dark ? 'bg-[#0F2540] text-white' : 'bg-white text-[#0F1B2D]')
-      }
+      className="relative flex min-h-[88vh] items-center px-6 py-28 sm:py-32"
+      style={{ background: bg, color: v.text }}
     >
-      <div className="mx-auto max-w-5xl text-center">
+      {/* Faint diagonal pattern overlay — kept extremely subtle. */}
+      {dark && (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 opacity-[0.04]"
+          style={{
+            backgroundImage:
+              'repeating-linear-gradient(45deg, #D4A93A 0, #D4A93A 1px, transparent 1px, transparent 14px)',
+          }}
+        />
+      )}
+
+      <div className="relative mx-auto w-full max-w-[1100px] text-center">
+        <div
+          aria-hidden
+          className="mx-auto h-px w-[80px]"
+          style={{ background: v.eyebrow }}
+        />
         {c.badge_text && (
           <p
-            className={
-              'text-[11px] font-medium tracking-[0.22em] uppercase ' +
-              (dark ? 'text-[#E8EEF5]/70' : 'text-[#1B3A5F]')
-            }
+            className="mt-6 text-[11px] font-semibold uppercase"
+            style={{ letterSpacing: '0.18em', color: v.eyebrow }}
           >
             {c.badge_text}
           </p>
         )}
         {c.headline && (
           <h1
-            className={
-              'mt-5 text-4xl font-semibold tracking-tight sm:text-5xl lg:text-6xl ' +
-              (dark ? 'text-white' : 'text-[#0F1B2D]')
-            }
+            className="pmbc-display mt-6 text-[40px] leading-[1.05] sm:text-[56px] lg:text-[72px] xl:text-[80px]"
+            style={{
+              color: dark ? '#FFFFFF' : v.text,
+            }}
           >
             {c.headline}
           </h1>
         )}
         {c.subtitle && (
           <p
-            className={
-              'mx-auto mt-5 max-w-2xl text-base sm:text-lg ' +
-              (dark ? 'text-[#E8EEF5]/80' : 'text-neutral-600')
-            }
+            className="mx-auto mt-7 max-w-[720px] text-[18px] leading-[1.65] sm:text-[20px]"
+            style={{
+              color: dark ? v.textMuted : '#52606B',
+              fontWeight: 400,
+            }}
           >
             {c.subtitle}
           </p>
         )}
+
         {(c.cta_label || c.cta_secondary_label) && (
-          <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
+          <div className="mt-12 flex flex-wrap items-center justify-center gap-4">
             {c.cta_label && c.cta_href && (
               <Link
                 href={c.cta_href}
                 className={
-                  'inline-flex items-center rounded-md px-5 py-2.5 text-sm font-medium transition ' +
+                  'group inline-flex items-center justify-center px-8 py-3.5 text-[13px] font-semibold uppercase transition duration-200 ' +
                   (dark
-                    ? 'bg-white text-[#0F2540] hover:bg-[#E8EEF5]'
-                    : 'bg-[#1B3A5F] text-white hover:bg-[#0F2540]')
+                    ? 'border border-[#D4A93A] text-[#E8DDC4] hover:bg-[#D4A93A] hover:text-[#0F2F4F]'
+                    : 'border border-[#153D64] bg-[#153D64] text-white hover:bg-[#0F2F4F]')
                 }
+                style={{ letterSpacing: '0.12em' }}
               >
                 {c.cta_label}
               </Link>
@@ -90,17 +120,31 @@ export function Hero({ content }: { content: Record<string, unknown> }) {
               <Link
                 href={c.cta_secondary_href}
                 className={
-                  'inline-flex items-center rounded-md border px-5 py-2.5 text-sm font-medium transition ' +
+                  'inline-flex items-center justify-center px-8 py-3.5 text-[13px] font-semibold uppercase transition duration-200 ' +
                   (dark
-                    ? 'border-white/30 text-white hover:bg-white/5'
-                    : 'border-neutral-300 text-[#0F1B2D] hover:border-[#1B3A5F] hover:text-[#1B3A5F]')
+                    ? 'border border-[#E8DDC4]/30 text-[#E8DDC4] hover:border-[#D4A93A] hover:text-[#D4A93A]'
+                    : 'border border-[#153D64]/30 text-[#153D64] hover:border-[#153D64]')
                 }
+                style={{ letterSpacing: '0.12em' }}
               >
                 {c.cta_secondary_label}
               </Link>
             )}
           </div>
         )}
+      </div>
+
+      {/* Scroll indicator */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute bottom-8 left-1/2 -translate-x-1/2"
+      >
+        <ChevronDown
+          size={22}
+          strokeWidth={1.5}
+          style={{ color: dark ? '#B89530' : '#B89530' }}
+          className="opacity-60"
+        />
       </div>
     </section>
   );

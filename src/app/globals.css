@@ -2,16 +2,19 @@
 
 :root {
   /* PMBC brand tokens — see CLAUDE.md §9 */
-  --pmbc-primary: #1B3A5F;
-  --pmbc-primary-deep: #0F2540;
-  --pmbc-secondary: #3FA663;
-  --pmbc-accent: #D4A93A;
-  --pmbc-text-primary: #0F1B2D;
-  --pmbc-text-on-dark: #E8EEF5;
+  --pmbc-primary: #153D64;        /* primary navy (logo navy) */
+  --pmbc-primary-deep: #0F2F4F;   /* deeper navy for footers/dark sections */
+  --pmbc-secondary: #3FA663;      /* used sparingly (small accents, checkmarks) */
+  --pmbc-accent: #D4A93A;         /* gold — hairlines, dividers */
+  --pmbc-accent-muted: #B89530;   /* muted gold for eyebrow text, secondary accents */
+  --pmbc-text-primary: #0F1B2D;   /* body text on light */
+  --pmbc-text-on-dark: #E8DDC4;   /* warm cream on navy */
   --pmbc-muted: #6B7280;
-  --pmbc-surface: #FFFFFF;
-  --pmbc-surface-alt: #F7F9FC;
-  --pmbc-border: #E5E7EB;
+  --pmbc-surface: #FFFFFF;        /* clean section bg */
+  --pmbc-surface-cream: #FAF7F2;  /* warm alternating section bg */
+  --pmbc-surface-alt: #FAF7F2;    /* legacy alias for older callers */
+  --pmbc-border: #E5E7EB;         /* cool grey border for white sections */
+  --pmbc-border-warm: #E8E2D6;    /* warmer border for cream sections */
 }
 
 @theme inline {
@@ -22,12 +25,15 @@
   --color-pmbc-primary-deep: var(--pmbc-primary-deep);
   --color-pmbc-secondary: var(--pmbc-secondary);
   --color-pmbc-accent: var(--pmbc-accent);
+  --color-pmbc-accent-muted: var(--pmbc-accent-muted);
   --color-pmbc-text: var(--pmbc-text-primary);
   --color-pmbc-text-on-dark: var(--pmbc-text-on-dark);
   --color-pmbc-muted: var(--pmbc-muted);
   --color-pmbc-surface: var(--pmbc-surface);
+  --color-pmbc-surface-cream: var(--pmbc-surface-cream);
   --color-pmbc-surface-alt: var(--pmbc-surface-alt);
   --color-pmbc-border: var(--pmbc-border);
+  --color-pmbc-border-warm: var(--pmbc-border-warm);
 }
 
 html, body {
@@ -39,8 +45,39 @@ body {
   font-family: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: "kern", "liga", "calt";
 }
 
 .font-serif {
   font-family: var(--font-source-serif), "Source Serif 4", Georgia, serif;
+  font-feature-settings: "kern", "liga", "calt", "ss01";
+}
+
+/* Editorial display for hero/section serif headlines */
+.pmbc-display {
+  font-family: var(--font-source-serif), "Source Serif 4", Georgia, serif;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  font-feature-settings: "kern", "liga", "calt", "ss01";
+}
+
+/* Subtle gold underline on hover — used for nav items and inline links */
+.pmbc-link-underline {
+  position: relative;
+}
+.pmbc-link-underline::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -4px;
+  height: 1px;
+  background: var(--pmbc-accent);
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform 200ms ease;
+}
+.pmbc-link-underline:hover::after,
+.pmbc-link-underline[data-active="true"]::after {
+  transform: scaleX(1);
 }

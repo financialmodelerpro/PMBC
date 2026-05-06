@@ -2,7 +2,7 @@ import Link from 'next/link';
 import type { Metadata } from 'next';
 
 import { fetchPage, fetchPageSections } from '@/lib/cms/pages';
-import { SectionRenderer } from '@/components/public/SectionRenderer';
+import { SectionList } from '@/components/public/SectionRenderer';
 import { buildPageMetadata } from '@/lib/seo/metadata';
 
 export const dynamic = 'force-dynamic';
@@ -52,11 +52,5 @@ export default async function HomePage(props: {
     );
   }
 
-  return (
-    <>
-      {sections.map((s) => (
-        <SectionRenderer key={s.id} section={s} />
-      ))}
-    </>
-  );
+  return <SectionList sections={sections} />;
 }

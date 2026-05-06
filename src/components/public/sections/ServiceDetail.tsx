@@ -2,6 +2,8 @@ import Link from 'next/link';
 import { CheckCircle2, ArrowRight } from 'lucide-react';
 
 import { SERVICES } from '@/config/services';
+import { SectionContainer } from '../SectionContainer';
+import { variantStyles, type PmbcVariant } from '@/lib/public/tokens';
 
 function s(v: unknown): string {
   return typeof v === 'string' ? v : '';
@@ -30,7 +32,14 @@ function pick(c: Record<string, unknown>): ServiceDetailContent {
   };
 }
 
-export function ServiceDetail({ content }: { content: Record<string, unknown> }) {
+export function ServiceDetail({
+  content,
+  variant = 'white',
+}: {
+  content: Record<string, unknown>;
+  styles: Record<string, unknown>;
+  variant: PmbcVariant;
+}) {
   const c = pick(content ?? {});
   const service = SERVICES.find((sv) => sv.slug === c.service_slug);
   const number = service?.number ?? '';
@@ -43,45 +52,81 @@ export function ServiceDetail({ content }: { content: Record<string, unknown> })
     ? SERVICES.filter((sv) => sv.slug !== service.slug).slice(0, 3)
     : [];
 
+  const v = variantStyles(variant);
+
   return (
-    <section className="px-6 py-20 lg:py-24">
-      <div className="mx-auto max-w-5xl">
+    <SectionContainer variant={variant}>
+      <div className="mx-auto max-w-[1000px]">
+        <div
+          aria-hidden
+          className="h-px w-[60px]"
+          style={{ background: '#B89530' }}
+        />
         {number && (
-          <p className="text-[11px] font-semibold tracking-[0.22em] uppercase text-[#1B3A5F]">
+          <p
+            className="mt-5 text-[11px] font-semibold uppercase"
+            style={{ letterSpacing: '0.18em', color: '#B89530' }}
+          >
             Service · {number}
           </p>
         )}
         {title && (
-          <h1 className="mt-3 font-serif text-4xl font-semibold tracking-tight text-[#0F1B2D] sm:text-5xl">
+          <h1
+            className="pmbc-display mt-5 text-[40px] leading-[1.1] sm:text-[52px] lg:text-[60px]"
+            style={{ color: v.text }}
+          >
             {title}
           </h1>
         )}
         {summary && (
-          <p className="mt-5 max-w-3xl text-base leading-relaxed text-neutral-600 sm:text-lg">
+          <p
+            className="mt-6 max-w-[780px] text-[18px] leading-[1.7] sm:text-[20px]"
+            style={{ color: '#52606B' }}
+          >
             {summary}
           </p>
         )}
 
         {c.full_description_html && (
           <div
-            className="prose prose-neutral mt-10 max-w-3xl text-[#0F1B2D]"
+            className="prose prose-neutral mt-12 max-w-[780px]"
+            style={{ color: v.text, fontSize: 17, lineHeight: 1.75 }}
             dangerouslySetInnerHTML={{ __html: c.full_description_html }}
           />
         )}
 
-        <div className="mt-12 grid gap-8 lg:grid-cols-3">
+        <div className="mt-14 grid gap-6 lg:grid-cols-3">
           {c.deliverables.length > 0 && (
-            <div className="rounded-lg border border-neutral-200 bg-white p-6 lg:col-span-2">
-              <p className="text-[11px] font-semibold tracking-[0.18em] uppercase text-[#1B3A5F]">
+            <div
+              className="relative p-8 lg:col-span-2"
+              style={{
+                background: v.cardBg,
+                border: `1px solid ${v.cardBorder}`,
+              }}
+            >
+              <span
+                aria-hidden
+                className="absolute top-0 left-0 right-0 h-[2px]"
+                style={{ background: '#D4A93A' }}
+              />
+              <p
+                className="text-[11px] font-semibold uppercase"
+                style={{ letterSpacing: '0.18em', color: '#B89530' }}
+              >
                 Key deliverables
               </p>
-              <ul className="mt-4 space-y-2.5">
+              <ul className="mt-5 space-y-3">
                 {c.deliverables.map((d, i) => (
-                  <li key={i} className="flex items-start gap-2 text-sm text-[#0F1B2D]">
+                  <li
+                    key={i}
+                    className="flex items-start gap-3 text-[15px] leading-[1.6]"
+                    style={{ color: v.text }}
+                  >
                     <CheckCircle2
                       size={16}
-                      strokeWidth={1.75}
-                      className="mt-0.5 flex-shrink-0 text-[#3FA663]"
+                      strokeWidth={2}
+                      className="mt-1 flex-shrink-0"
+                      style={{ color: '#3FA663' }}
                     />
                     <span>{d}</span>
                   </li>
@@ -92,21 +137,55 @@ export function ServiceDetail({ content }: { content: Record<string, unknown> })
           {(c.timeline_text || c.target_audience_text) && (
             <div className="space-y-6">
               {c.timeline_text && (
-                <div className="rounded-lg border border-neutral-200 bg-white p-6">
-                  <p className="text-[11px] font-semibold tracking-[0.18em] uppercase text-[#1B3A5F]">
+                <div
+                  className="relative p-8"
+                  style={{
+                    background: v.cardBg,
+                    border: `1px solid ${v.cardBorder}`,
+                  }}
+                >
+                  <span
+                    aria-hidden
+                    className="absolute top-0 left-0 right-0 h-[2px]"
+                    style={{ background: '#D4A93A' }}
+                  />
+                  <p
+                    className="text-[11px] font-semibold uppercase"
+                    style={{ letterSpacing: '0.18em', color: '#B89530' }}
+                  >
                     Typical timeline
                   </p>
-                  <p className="mt-3 text-sm leading-relaxed text-[#0F1B2D]">
+                  <p
+                    className="mt-3 text-[15px] leading-[1.7]"
+                    style={{ color: v.text }}
+                  >
                     {c.timeline_text}
                   </p>
                 </div>
               )}
               {c.target_audience_text && (
-                <div className="rounded-lg border border-neutral-200 bg-white p-6">
-                  <p className="text-[11px] font-semibold tracking-[0.18em] uppercase text-[#1B3A5F]">
+                <div
+                  className="relative p-8"
+                  style={{
+                    background: v.cardBg,
+                    border: `1px solid ${v.cardBorder}`,
+                  }}
+                >
+                  <span
+                    aria-hidden
+                    className="absolute top-0 left-0 right-0 h-[2px]"
+                    style={{ background: '#D4A93A' }}
+                  />
+                  <p
+                    className="text-[11px] font-semibold uppercase"
+                    style={{ letterSpacing: '0.18em', color: '#B89530' }}
+                  >
                     Who it&apos;s for
                   </p>
-                  <p className="mt-3 text-sm leading-relaxed text-[#0F1B2D]">
+                  <p
+                    className="mt-3 text-[15px] leading-[1.7]"
+                    style={{ color: v.text }}
+                  >
                     {c.target_audience_text}
                   </p>
                 </div>
@@ -116,25 +195,45 @@ export function ServiceDetail({ content }: { content: Record<string, unknown> })
         </div>
 
         {related.length > 0 && (
-          <div className="mt-16 border-t border-neutral-200 pt-10">
-            <p className="text-[11px] font-semibold tracking-[0.18em] uppercase text-[#1B3A5F]">
+          <div
+            className="mt-20 pt-12"
+            style={{ borderTop: `1px solid ${v.border}` }}
+          >
+            <div
+              aria-hidden
+              className="h-px w-[40px]"
+              style={{ background: '#B89530' }}
+            />
+            <p
+              className="mt-4 text-[11px] font-semibold uppercase"
+              style={{ letterSpacing: '0.18em', color: '#B89530' }}
+            >
               Related services
             </p>
-            <div className="mt-5 grid gap-4 sm:grid-cols-3">
+            <div className="mt-6 grid gap-5 sm:grid-cols-3">
               {related.map((r) => (
                 <Link
                   key={r.slug}
                   href={`/services/${r.slug}`}
-                  className="group rounded-lg border border-neutral-200 bg-white p-5 transition hover:border-[#1B3A5F] hover:shadow-[0_2px_10px_rgba(15,27,45,0.06)]"
+                  className="group relative overflow-hidden p-7 transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_12px_36px_rgba(15,37,64,0.08)]"
+                  style={{
+                    background: v.cardBg,
+                    border: `1px solid ${v.cardBorder}`,
+                  }}
                 >
-                  <p className="text-[11px] font-semibold tracking-[0.18em] uppercase text-[#1B3A5F]">
+                  <span
+                    aria-hidden
+                    className="absolute top-0 left-0 right-0 h-[2px]"
+                    style={{ background: '#D4A93A' }}
+                  />
+                  <p className="font-serif text-[20px] font-semibold text-[#B89530]">
                     {r.number}
                   </p>
-                  <p className="mt-2 flex items-center gap-1.5 text-sm font-semibold text-[#0F1B2D]">
+                  <p className="mt-3 flex items-center gap-1.5 font-serif text-[16px] font-semibold text-[#0F1B2D]">
                     {r.title}
                     <ArrowRight
-                      size={13}
-                      className="text-neutral-400 transition group-hover:translate-x-0.5 group-hover:text-[#1B3A5F]"
+                      size={14}
+                      className="text-[#B89530] transition group-hover:translate-x-0.5"
                     />
                   </p>
                 </Link>
@@ -143,6 +242,6 @@ export function ServiceDetail({ content }: { content: Record<string, unknown> })
           </div>
         )}
       </div>
-    </section>
+    </SectionContainer>
   );
 }
