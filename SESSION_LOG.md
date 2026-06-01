@@ -593,3 +593,17 @@ The sidebar already carried the "Contact Submissions" link (`CmsAdminNav.tsx`), 
 
 **This closes the buildable side of Phase 9.** Everything still open is ops/review only: production env vars on Vercel (so the contact form actually emails via Resend), DNS + SSL, submit sitemap to Search Console, counsel review of Privacy + Terms, refresh Supabase Security Advisor, rotate `Admin@2026` via `npm run seed-admin`, and the copy/asset review noted above.
 
+### 2026-06-01 — Checkpoint: pausing here, launch to-do captured in CLAUDE.md
+
+Pausing the session with all buildable Phase 9 work done (page content + contact inbox). Recorded the remaining launch tasks as a **"Remaining Before Launch (next to do)"** checklist directly in `CLAUDE.md` (right under the Current Status table), so the next session sees it without having to open this log. Each item is tagged with who owns it (user / assistant). Also updated the Phase 9 status row to mark the inbox complete.
+
+**Next-session pickup order (full detail in the CLAUDE.md checklist):**
+1. Production env vars on Vercel (Resend, hCaptcha, NextAuth, Supabase, site URL) — without Resend the inbox still captures submissions but no emails send.
+2. Rotate `Admin@2026` via `npm run seed-admin` (assistant can set the password in the script first).
+3. DNS + SSL for `pacemakersglobal.com`.
+4. Counsel review of `/privacy` + `/terms`, then remove the "Subject to legal review" badge.
+5. Post-deploy: submit sitemap to Search Console, refresh Supabase Security Advisor (migration 013), verify OG cards, review live copy (`/about` bio + `/sectors` claims).
+6. Asset uploads (logo, founder photo, network image, partner logos) with `next.config.ts` host additions if needed.
+
+No code or schema changed in this checkpoint; docs only (`CLAUDE.md` + this entry).
+
