@@ -569,3 +569,27 @@ Continued Phase 9 page-by-page content population from where the prior session l
 3. Phase 9 launch operations still pending (not content): `/admin/contact-submissions` inbox, DNS + SSL on Vercel, production env vars, submit sitemap to Search Console, counsel review of Privacy + Terms, rotate `Admin@2026` via `npm run seed-admin`.
 4. Asset uploads remain the obvious next visual upgrade: real PMBC logo (`branding_config.logo_url`), Ahmad portrait (`home`/`about` founder photo), network/region images, partner logos. Add hosts to `next.config.ts` `images.remotePatterns` if not Supabase/Cloudinary.
 
+### 2026-06-01 — Admin contact-submissions inbox (last buildable Phase 9 feature)
+
+Built the `/admin/contact-submissions` inbox, the only remaining unbuilt feature in the spec. The public contact form has written to `contact_submissions` since Phase 5, but the admin route was a 404 placeholder, so submissions had no triage UI. CLAUDE.md §6 scope: list, view, change status (`new` / `read` / `responded` / `archived`), add internal notes.
+
+**Built**
+- `src/app/api/admin/contact-submissions/route.ts` — session-gated (`getAdminSession`, 401 if absent). GET lists rows (optional `?status=` filter, newest first), returns `{ rows }`. PATCH (with POST alias, matching the other admin routes) updates one submission by id: zod-validated body `{ id (uuid), status?, notes? }`, refined to require at least one of status/notes. Reads the current row first (404 if missing), then computes first-touch timestamps: `read_at` stamped once when status leaves `new`, `responded_at` stamped once when status becomes `responded`; neither is ever overwritten. Blank/whitespace notes are stored as `null`. Writes an `audit_log` row (`entity_type='contact_submission'`, with status_from/status_to/notes_changed metadata). Returns `{ row }`.
+- `src/app/admin/contact-submissions/page.tsx` — server component, `force-dynamic`, robots noindex. Loads all submissions server-side (graceful try/catch into `{ rows, error }`), computes the new-count for the header, renders `AdminPageHeader` + the client component.
+- `src/components/admin/ContactSubmissionsClient.tsx` — `'use client'` master-detail. Status filter tabs (All / New / Read / Responded / Archived) with per-status counts, a Refresh button (re-fetches the list), and a transient toast. Left pane is a scrollable list (name, email, 2-line message clamp, status badge, date; new rows bold with a gold left-border when selected). Right pane is the detail: all fields in a responsive grid, full message in a pre-wrap block, a status `<select>`, the first-read / responded timestamps, an internal-notes textarea, and a "Save changes" button (disabled until dirty). A "Reply by email" `mailto:` link prefills the subject. Selecting a `new` submission auto-marks it read (fires a PATCH on open; non-fatal if it fails). Responsive via flex-wrap (no media queries), all styling from `src/lib/admin/styles.ts` inline tokens.
+- `src/app/admin/page.tsx` — dashboard "Recent Contact Submissions" card had a stale "will be wired up in a later phase" line. Replaced with a live new-count message + an "Open inbox" link to the new route.
+
+The sidebar already carried the "Contact Submissions" link (`CmsAdminNav.tsx`), so no nav change was needed; its prefix-match activation lights it on this route automatically.
+
+**Verified**
+- `npm run typecheck` clean (twice: after the feature, and after the dashboard edit).
+- Unauthenticated gating: `/admin/contact-submissions` -> 307 redirect to login; API GET and PATCH -> 401.
+- Full authenticated end-to-end via a temporary smoke script (login via NextAuth credentials, seed a submission with the service-role client, then exercise the live API), all passed then cleaned up: authenticated page renders 200; list GET 200 and includes the seeded row; `?status=new` filter returns only new; PATCH to `responded` sets status, stamps both `read_at` and `responded_at`, and saves notes; blank notes store as `null`; an empty patch (no status/notes) is rejected 422; `audit_log` rows are written. Temp script deleted after use, per the repo precedent for one-off verifiers.
+
+**Decisions worth keeping**
+- **Read-then-update in the API** so first-touch timestamps are stamped exactly once and never overwritten, and so a missing id returns a clean 404. Returning the updated row lets the client patch its local state without a refetch.
+- **Auto-mark-read on open** (not on hover/scroll) keeps the `new` count meaningful as a real "needs first attention" signal, and is the natural use of `read_at`. Kept non-fatal so a failed PATCH never blocks reading the message.
+- **Service-role bypass is the whole reason this works under RLS** (migration 013). All reads/writes go through `createSupabaseServerClient()`; the anon key cannot touch `contact_submissions`.
+
+**This closes the buildable side of Phase 9.** Everything still open is ops/review only: production env vars on Vercel (so the contact form actually emails via Resend), DNS + SSL, submit sitemap to Search Console, counsel review of Privacy + Terms, refresh Supabase Security Advisor, rotate `Admin@2026` via `npm run seed-admin`, and the copy/asset review noted above.
+

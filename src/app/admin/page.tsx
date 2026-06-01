@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { FileText, LayoutTemplate, Inbox, Clock } from 'lucide-react';
 
 import { createSupabaseServerClient } from '@/lib/supabase/server';
@@ -207,11 +208,28 @@ export default async function AdminDashboardPage() {
                 color: ADMIN_COLORS.textHeading,
               }}
             >
-              Recent Contact Submissions
+              Contact Submissions
             </h2>
             <p style={{ margin: '8px 0 0', fontSize: 13, color: ADMIN_COLORS.textMuted }}>
-              No data yet. Submissions table will be wired up in a later phase.
+              {stats.newSubmissions === null
+                ? 'Triage enquiries from the public contact form.'
+                : stats.newSubmissions > 0
+                  ? `${stats.newSubmissions} new ${stats.newSubmissions === 1 ? 'enquiry' : 'enquiries'} awaiting response.`
+                  : 'No new enquiries. All caught up.'}
             </p>
+            <Link
+              href="/admin/contact-submissions"
+              style={{
+                display: 'inline-block',
+                marginTop: 12,
+                fontSize: 13,
+                fontWeight: 600,
+                color: ADMIN_COLORS.primary,
+                textDecoration: 'none',
+              }}
+            >
+              Open inbox
+            </Link>
           </div>
           <div style={adminCard}>
             <h2
