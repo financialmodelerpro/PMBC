@@ -26,6 +26,7 @@ export const ADMIN_COLORS = {
   pageBg: '#F4F7FC',
   cardBg: '#FFFFFF',
   altBg: '#F9FAFB',
+  inputBg: '#FFFBEB', // amber tint for editable inputs (FMP convention)
 
   // Borders
   border: '#E5E7EB',
@@ -80,7 +81,9 @@ export const adminInput: CSSProperties = {
   borderRadius: ADMIN_LAYOUT.inputRadius,
   fontSize: 13,
   color: ADMIN_COLORS.textHeading,
-  background: '#FFFFFF',
+  // FMP convention: editable inputs carry a faint amber tint (#FFFBEB) so
+  // admins recognise editable fields at a glance (CMS_REFERENCE.md §7.1).
+  background: ADMIN_COLORS.inputBg,
   outline: 'none',
   fontFamily: 'inherit',
   boxSizing: 'border-box',

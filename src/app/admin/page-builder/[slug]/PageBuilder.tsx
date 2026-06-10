@@ -102,6 +102,76 @@ export function PageBuilder({
     [],
   );
 
+  // Persist a given set of sections to the server. Used by the explicit Save
+  // button and by the auto-save paths (reorder + visibility toggle), which
+  // mirror FMP where structural changes save immediately.
+  const persist = useCallback(
+    async (list: LocalSection[]) => {
+      setSaveState('saving');
+      setErrMsg(undefined);
+      try {
+        const res = await fetch('/api/admin/page-sections', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            page_slug: pageSlug,
+            sections: list.map((s) => ({
+              id: s.id,
+              page_slug: s.page_slug,
+              section_type: s.section_type,
+              content: s.content,
+              styles: s.styles,
+              display_order: s.display_order,
+              visible: s.visible,
+            })),
+          }),
+        });
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error(body.error ?? 'Save failed');
+        }
+        setDirty(false);
+        setSaveState('saved');
+        setPreviewKey((k) => k + 1);
+        setTimeout(() => setSaveState('idle'), 2500);
+        router.refresh();
+      } catch (e) {
+        setSaveState('error');
+        setErrMsg((e as Error).message);
+      }
+    },
+    [pageSlug, router],
+  );
+
+  // Lightweight structural auto-save (order / visibility only). Crucially it
+  // does NOT clear `dirty`, so any in-progress content edit stays pending and
+  // is never flushed by a reorder or a visibility toggle.
+  const autosaveStructural = useCallback(
+    async (body: Record<string, unknown>) => {
+      setSaveState('saving');
+      setErrMsg(undefined);
+      try {
+        const res = await fetch('/api/admin/page-sections', {
+          method: 'PATCH',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ page_slug: pageSlug, ...body }),
+        });
+        if (!res.ok) {
+          const b = await res.json().catch(() => ({}));
+          throw new Error(b.error ?? 'Save failed');
+        }
+        setSaveState('saved');
+        setPreviewKey((k) => k + 1);
+        setTimeout(() => setSaveState('idle'), 2500);
+        router.refresh();
+      } catch (e) {
+        setSaveState('error');
+        setErrMsg((e as Error).message);
+      }
+    },
+    [pageSlug, router],
+  );
+
   const onDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
@@ -113,8 +183,27 @@ export function PageBuilder({
       display_order: i * 10,
     }));
     setSections(reordered);
-    setDirty(true);
+    // FMP parity: reorder auto-saves as soon as the drag is released, persisting
+    // order only (content edits stay pending).
+    void autosaveStructural({
+      action: 'reorder',
+      items: reordered.map((s) => ({ id: s.id, display_order: s.display_order })),
+    });
   };
+
+  const handleToggleVisible = useCallback(
+    (id: string) => {
+      const target = sections.find((s) => s.id === id);
+      if (!target) return;
+      const nextVisible = !target.visible;
+      setSections((arr) =>
+        arr.map((s) => (s.id === id ? { ...s, visible: nextVisible } : s)),
+      );
+      // Persist visibility immediately, content edits untouched.
+      void autosaveStructural({ action: 'set_visibility', id, visible: nextVisible });
+    },
+    [sections, autosaveStructural],
+  );
 
   const handleAddSection = async (sectionType: string) => {
     setPickerOpen(false);
@@ -160,40 +249,7 @@ export function PageBuilder({
     setPendingDelete(null);
   };
 
-  const handleSave = async () => {
-    setSaveState('saving');
-    setErrMsg(undefined);
-    try {
-      const res = await fetch('/api/admin/page-sections', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          page_slug: pageSlug,
-          sections: ordered.map((s) => ({
-            id: s.id,
-            page_slug: s.page_slug,
-            section_type: s.section_type,
-            content: s.content,
-            styles: s.styles,
-            display_order: s.display_order,
-            visible: s.visible,
-          })),
-        }),
-      });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.error ?? 'Save failed');
-      }
-      setDirty(false);
-      setSaveState('saved');
-      setPreviewKey((k) => k + 1);
-      setTimeout(() => setSaveState('idle'), 2500);
-      router.refresh();
-    } catch (e) {
-      setSaveState('error');
-      setErrMsg((e as Error).message);
-    }
-  };
+  const handleSave = () => persist(ordered);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
@@ -351,7 +407,7 @@ export function PageBuilder({
                       section={s}
                       active={s.id === selectedId}
                       onSelect={() => setSelectedId(s.id)}
-                      onToggleVisible={() => updateSection(s.id, { visible: !s.visible })}
+                      onToggleVisible={() => handleToggleVisible(s.id)}
                       onRequestDelete={() => setPendingDelete(s.id)}
                     />
                   ))}

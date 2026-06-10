@@ -39,9 +39,23 @@ async function handleMutation(req: Request) {
   }
 
   const supabase = createSupabaseServerClient();
+
+  // Merge into the existing blob rather than overwriting it, so a partial
+  // payload never drops keys it did not include.
+  const { data: existingRow } = await supabase
+    .from('site_settings')
+    .select('settings')
+    .eq('id', 1)
+    .maybeSingle();
+  const existing =
+    existingRow?.settings && typeof existingRow.settings === 'object' && !Array.isArray(existingRow.settings)
+      ? (existingRow.settings as Record<string, unknown>)
+      : {};
+  const merged = { ...existing, ...parsed.data };
+
   const { error } = await supabase
     .from('site_settings')
-    .update({ settings: parsed.data, updated_at: new Date().toISOString() })
+    .update({ settings: merged, updated_at: new Date().toISOString() })
     .eq('id', 1);
 
   if (error) {
