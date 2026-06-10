@@ -1,6 +1,10 @@
 import type { MetadataRoute } from 'next';
 
 import { SERVICES } from '@/config/services';
+import {
+  fetchPublishedCaseStudies,
+  fetchPublishedArticles,
+} from '@/lib/cms/collections';
 
 function baseUrl(): string {
   const fromEnv = process.env.NEXT_PUBLIC_SITE_URL;
@@ -8,7 +12,7 @@ function baseUrl(): string {
   return 'https://pacemakersglobal.com';
 }
 
-export default function sitemap(): MetadataRoute.Sitemap {
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const base = baseUrl();
   const now = new Date();
 
@@ -19,6 +23,9 @@ export default function sitemap(): MetadataRoute.Sitemap {
     '/approach',
     '/network',
     '/about',
+    '/team',
+    '/case-studies',
+    '/insights',
     '/financial-modeler-pro',
     '/contact',
     '/privacy',
@@ -27,7 +34,19 @@ export default function sitemap(): MetadataRoute.Sitemap {
 
   const serviceRoutes = SERVICES.map((s) => `/services/${s.slug}`);
 
-  return [...firmRoutes, ...serviceRoutes].map((path) => ({
+  const [studies, articles] = await Promise.all([
+    fetchPublishedCaseStudies(),
+    fetchPublishedArticles(),
+  ]);
+  const caseStudyRoutes = studies.map((s) => `/case-studies/${s.slug}`);
+  const insightRoutes = articles.map((a) => `/insights/${a.slug}`);
+
+  return [
+    ...firmRoutes,
+    ...serviceRoutes,
+    ...caseStudyRoutes,
+    ...insightRoutes,
+  ].map((path) => ({
     url: `${base}${path}`,
     lastModified: now,
     changeFrequency: 'monthly' as const,

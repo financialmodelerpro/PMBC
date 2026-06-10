@@ -5,6 +5,7 @@ import { ArrowUpRight } from 'lucide-react';
 import { fetchPage, fetchPageSections } from '@/lib/cms/pages';
 import { SectionList } from '@/components/public/SectionRenderer';
 import { SERVICES } from '@/config/services';
+import { fetchPublishedServices } from '@/lib/cms/collections';
 import { buildPageMetadata } from '@/lib/seo/metadata';
 
 export const dynamic = 'force-dynamic';
@@ -30,6 +31,23 @@ export default async function ServicesPage(props: {
   const isPreview = search.preview === '1';
 
   const sections = await fetchPageSections('services', { onlyVisible: !isPreview });
+
+  // Prefer the managed services collection; fall back to static config so the
+  // grid still renders before migration 021 is applied / rows are published.
+  const managed = await fetchPublishedServices();
+  const cards = managed.length
+    ? managed.map((s) => ({
+        slug: s.slug,
+        number: s.number ?? '',
+        title: s.title,
+        summary: s.summary ?? '',
+      }))
+    : SERVICES.map((s) => ({
+        slug: s.slug,
+        number: s.number,
+        title: s.title,
+        summary: s.summary,
+      }));
 
   return (
     <>
@@ -59,7 +77,7 @@ export default async function ServicesPage(props: {
           </div>
 
           <ul className="mt-14 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {SERVICES.map((s) => (
+            {cards.map((s) => (
               <li key={s.slug}>
                 <Link
                   href={`/services/${s.slug}`}

@@ -5,7 +5,7 @@ import { getAdminSession } from '@/lib/auth/requireAdmin';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { writeAudit } from '@/lib/audit';
 
-export const STATUSES = ['new', 'read', 'responded', 'archived'] as const;
+const STATUSES = ['new', 'read', 'responded', 'archived'] as const;
 type Status = (typeof STATUSES)[number];
 
 const SELECT_COLUMNS =

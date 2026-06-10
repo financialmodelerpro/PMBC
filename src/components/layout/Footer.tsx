@@ -140,7 +140,10 @@ export function Footer({
               <li><FooterLink href="/approach">Approach</FooterLink></li>
               <li><FooterLink href="/network">Network</FooterLink></li>
               <li><FooterLink href="/sectors">Sectors</FooterLink></li>
+              <li><FooterLink href="/case-studies">Case Studies</FooterLink></li>
+              <li><FooterLink href="/insights">Insights</FooterLink></li>
               <li><FooterLink href="/about">About</FooterLink></li>
+              <li><FooterLink href="/team">Team</FooterLink></li>
               <li><FooterLink href="/financial-modeler-pro">Financial Modeler Pro</FooterLink></li>
               <li><FooterLink href="/contact">Contact</FooterLink></li>
             </ul>
