@@ -75,12 +75,12 @@ export function ServiceCards({
                 <span
                   aria-hidden
                   className="absolute top-0 left-0 right-0 h-[2px] transition-all duration-200 group-hover:h-[3px]"
-                  style={{ background: '#D4A93A' }}
+                  style={{ background: '#C69C3E' }}
                 />
                 {card.number && (
                   <p
                     className="font-serif text-[28px] font-semibold leading-none"
-                    style={{ color: dark ? '#D4A93A' : '#B89530' }}
+                    style={{ color: dark ? '#C69C3E' : '#A88530' }}
                   >
                     {card.number}
                   </p>
@@ -144,8 +144,8 @@ export function ServiceCards({
             className={
               'inline-flex items-center justify-center px-8 py-3.5 text-[12px] font-semibold uppercase transition duration-200 ' +
               (dark
-                ? 'border border-[#E8DDC4]/40 text-[#E8DDC4] hover:border-[#D4A93A] hover:text-[#D4A93A]'
-                : 'border border-[#153D64]/30 text-[#153D64] hover:border-[#153D64] hover:bg-[#153D64] hover:text-white')
+                ? 'border border-[#E8DDC4]/40 text-[#E8DDC4] hover:border-[#C69C3E] hover:text-[#C69C3E]'
+                : 'border border-[#1B3A5F]/30 text-[#1B3A5F] hover:border-[#1B3A5F] hover:bg-[#1B3A5F] hover:text-white')
             }
             style={{ letterSpacing: '0.12em' }}
           >

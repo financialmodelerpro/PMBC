@@ -43,7 +43,7 @@ export default async function InsightDetailPage(props: { params: Promise<Params>
         className="px-6 pt-28 pb-14 text-white sm:pt-32"
         style={{
           background:
-            'radial-gradient(ellipse at 50% 30%, #173E63 0%, #102E4C 55%, #0C2741 100%)',
+            'radial-gradient(ellipse at 50% 30%, #1F4269 0%, #1B3A5F 55%, #14304F 100%)',
         }}
       >
         <div className="mx-auto max-w-[760px]">
@@ -57,7 +57,7 @@ export default async function InsightDetailPage(props: { params: Promise<Params>
           {article.category && (
             <p
               className="mt-8 text-[11px] font-semibold uppercase"
-              style={{ letterSpacing: '0.14em', color: '#D4A93A' }}
+              style={{ letterSpacing: '0.14em', color: '#C69C3E' }}
             >
               {article.category}
             </p>

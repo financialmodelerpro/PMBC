@@ -86,13 +86,13 @@ export function FounderBlock({
               {/* Gold frame */}
               <div
                 aria-hidden
-                className="absolute -inset-2 border border-[#D4A93A]"
+                className="absolute -inset-2 border border-[#C69C3E]"
               />
               {/* Navy accent corner — bottom-right */}
               <div
                 aria-hidden
                 className="absolute -right-2 -bottom-2 h-8 w-8"
-                style={{ background: '#153D64' }}
+                style={{ background: '#1B3A5F' }}
               />
               <div className="relative aspect-[4/5] w-full overflow-hidden bg-neutral-100">
                 <Image
@@ -108,16 +108,16 @@ export function FounderBlock({
             <div className="relative aspect-[4/5] w-full">
               <div
                 aria-hidden
-                className="absolute -inset-2 border border-[#D4A93A]"
+                className="absolute -inset-2 border border-[#C69C3E]"
               />
               <div
                 aria-hidden
                 className="absolute -right-2 -bottom-2 h-8 w-8"
-                style={{ background: '#153D64' }}
+                style={{ background: '#1B3A5F' }}
               />
               <div
                 className="flex aspect-[4/5] w-full items-center justify-center"
-                style={{ background: v.cardBg, color: '#153D64' }}
+                style={{ background: v.cardBg, color: '#1B3A5F' }}
               >
                 <span className="font-serif text-[80px] font-semibold tracking-tight">
                   {getInitials(c.name)}
@@ -159,23 +159,23 @@ export function FounderBlock({
               {c.cta_primary_label && c.cta_primary_href && (
                 <Link
                   href={c.cta_primary_href}
-                  className="group inline-flex items-center gap-2 text-[13px] font-semibold uppercase text-[#153D64] transition hover:text-[#D4A93A]"
+                  className="group inline-flex items-center gap-2 text-[13px] font-semibold uppercase text-[#1B3A5F] transition hover:text-[#C69C3E]"
                   style={{ letterSpacing: '0.12em' }}
                 >
                   <span className="relative pb-1">
                     {c.cta_primary_label}
                     <span
                       aria-hidden
-                      className="absolute right-0 bottom-0 left-0 h-px bg-[#D4A93A] transition-transform duration-200"
+                      className="absolute right-0 bottom-0 left-0 h-px bg-[#C69C3E] transition-transform duration-200"
                     />
                   </span>
-                  <span aria-hidden className="text-[#D4A93A]">→</span>
+                  <span aria-hidden className="text-[#C69C3E]">→</span>
                 </Link>
               )}
               {c.cta_secondary_label && c.cta_secondary_href && (
                 <Link
                   href={c.cta_secondary_href}
-                  className="text-[13px] font-medium uppercase text-[#52606B] transition hover:text-[#153D64]"
+                  className="text-[13px] font-medium uppercase text-[#52606B] transition hover:text-[#1B3A5F]"
                   style={{ letterSpacing: '0.12em' }}
                 >
                   {c.cta_secondary_label}

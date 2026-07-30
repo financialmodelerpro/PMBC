@@ -10,8 +10,8 @@ export const dynamic = 'force-dynamic';
 const WIDTH = 1200;
 const HEIGHT = 630;
 
-const FALLBACK_NAVY = '#0F2540';
-const FALLBACK_GOLD = '#D4A93A';
+const FALLBACK_NAVY = '#14304F';
+const FALLBACK_GOLD = '#C69C3E';
 const FALLBACK_BRAND = 'PaceMakers Business Consultants';
 const FALLBACK_TAGLINE = 'Advisory from Structure to Exit';
 

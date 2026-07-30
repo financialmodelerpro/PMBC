@@ -292,7 +292,7 @@ function ColorField({
 
 function BrandPreview({ values }: { values: FormValues }) {
   const primary = HEX.test(values.primary_color) ? values.primary_color : '#1B3A5F';
-  const accent = HEX.test(values.accent_color) ? values.accent_color : '#D4A93A';
+  const accent = HEX.test(values.accent_color) ? values.accent_color : '#C69C3E';
   const secondary = HEX.test(values.secondary_color) ? values.secondary_color : '#3FA663';
 
   const chip: CSSProperties = {

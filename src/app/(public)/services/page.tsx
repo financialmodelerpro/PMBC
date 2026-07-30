@@ -82,7 +82,7 @@ export default async function ServicesPage(props: {
                 <Link
                   href={`/services/${s.slug}`}
                   className="group flex h-full flex-col rounded-[2px] border border-t-2 border-[color:var(--pmbc-border-warm)] bg-white p-9 transition hover:-translate-y-0.5 hover:border-[color:var(--pmbc-primary)] hover:shadow-[0_12px_36px_rgba(15,37,64,0.08)]"
-                  style={{ borderTopColor: '#D4A93A' }}
+                  style={{ borderTopColor: '#C69C3E' }}
                 >
                   <div className="flex items-center justify-between">
                     <span className="font-serif text-2xl font-semibold text-[color:var(--pmbc-accent-muted)]">

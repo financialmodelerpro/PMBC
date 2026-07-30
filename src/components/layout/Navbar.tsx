@@ -66,7 +66,7 @@ export function Navbar({
       }
       style={{
         borderBottom: scrolled
-          ? '1px solid rgba(212, 169, 58, 0.18)'
+          ? '1px solid rgba(198, 156, 62, 0.18)'
           : '1px solid transparent',
       }}
     >
@@ -91,8 +91,8 @@ export function Navbar({
               <div
                 className="flex h-10 w-10 items-center justify-center"
                 style={{
-                  background: '#153D64',
-                  color: '#D4A93A',
+                  background: '#1B3A5F',
+                  color: '#C69C3E',
                   fontFamily: 'var(--font-source-serif), serif',
                   fontWeight: 600,
                   fontSize: 18,
@@ -141,17 +141,17 @@ export function Navbar({
               href={cta.href}
               className="hidden items-center justify-center px-5 py-2.5 text-[12px] font-semibold uppercase text-white transition-all duration-200 md:inline-flex"
               style={{
-                background: '#153D64',
+                background: '#1B3A5F',
                 letterSpacing: '0.12em',
-                border: '1px solid #153D64',
+                border: '1px solid #1B3A5F',
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.background = '#0F2F4F';
-                e.currentTarget.style.borderColor = '#D4A93A';
+                e.currentTarget.style.background = '#14304F';
+                e.currentTarget.style.borderColor = '#C69C3E';
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.background = '#153D64';
-                e.currentTarget.style.borderColor = '#153D64';
+                e.currentTarget.style.background = '#1B3A5F';
+                e.currentTarget.style.borderColor = '#1B3A5F';
               }}
             >
               {cta.label}
@@ -190,8 +190,8 @@ export function Navbar({
                   href={item.href}
                   className="px-3 py-3 text-[15px] font-medium transition-colors duration-200"
                   style={{
-                    color: active ? '#153D64' : '#0F1B2D',
-                    borderLeft: active ? '2px solid #D4A93A' : '2px solid transparent',
+                    color: active ? '#1B3A5F' : '#0F1B2D',
+                    borderLeft: active ? '2px solid #C69C3E' : '2px solid transparent',
                     paddingLeft: active ? 14 : 12,
                   }}
                 >
@@ -204,7 +204,7 @@ export function Navbar({
                 href={cta.href}
                 className="mt-3 inline-flex items-center justify-center px-4 py-3 text-[12px] font-semibold uppercase text-white"
                 style={{
-                  background: '#153D64',
+                  background: '#1B3A5F',
                   letterSpacing: '0.12em',
                 }}
               >

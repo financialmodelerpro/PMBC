@@ -28,14 +28,14 @@ export default async function TeamPage() {
         className="px-6 pt-28 pb-16 text-white sm:pt-32"
         style={{
           background:
-            'radial-gradient(ellipse at 50% 30%, #173E63 0%, #102E4C 55%, #0C2741 100%)',
+            'radial-gradient(ellipse at 50% 30%, #1F4269 0%, #1B3A5F 55%, #14304F 100%)',
         }}
       >
         <div className="mx-auto max-w-[860px] text-center">
-          <div aria-hidden className="mx-auto h-px w-[60px]" style={{ background: '#D4A93A' }} />
+          <div aria-hidden className="mx-auto h-px w-[60px]" style={{ background: '#C69C3E' }} />
           <p
             className="mt-5 text-[11px] font-semibold uppercase"
-            style={{ letterSpacing: '0.18em', color: '#D4A93A' }}
+            style={{ letterSpacing: '0.18em', color: '#C69C3E' }}
           >
             Team & Advisors
           </p>
@@ -64,14 +64,14 @@ export default async function TeamPage() {
                 >
                   <div
                     className="mb-5 h-40 w-full overflow-hidden rounded-[2px]"
-                    style={{ background: '#102E4C' }}
+                    style={{ background: '#1B3A5F' }}
                   >
                     {m.photo ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={m.photo} alt={m.name} className="h-full w-full object-cover" />
                     ) : (
                       <div className="flex h-full w-full items-center justify-center">
-                        <span className="font-serif text-3xl text-[#D4A93A]">
+                        <span className="font-serif text-3xl text-[#C69C3E]">
                           {m.name.split(' ').map((w) => w[0]).slice(0, 2).join('')}
                         </span>
                       </div>

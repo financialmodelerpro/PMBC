@@ -80,20 +80,20 @@ export function ProcessSteps({
                 <span
                   aria-hidden
                   className="absolute top-[40px] left-[68px] right-[-32px] hidden h-px lg:block"
-                  style={{ background: dark ? 'rgba(212, 169, 58, 0.45)' : 'rgba(184, 149, 48, 0.5)' }}
+                  style={{ background: dark ? 'rgba(198, 156, 62, 0.45)' : 'rgba(168, 133, 48, 0.5)' }}
                 />
               )}
               <div className="relative">
                 <div
                   className="font-serif text-[56px] font-semibold leading-none sm:text-[64px]"
-                  style={{ color: dark ? '#D4A93A' : '#B89530' }}
+                  style={{ color: dark ? '#C69C3E' : '#A88530' }}
                 >
                   {step.number}
                 </div>
                 <div
                   aria-hidden
                   className="mt-4 h-px w-[40px]"
-                  style={{ background: dark ? 'rgba(212, 169, 58, 0.6)' : 'rgba(184, 149, 48, 0.6)' }}
+                  style={{ background: dark ? 'rgba(198, 156, 62, 0.6)' : 'rgba(168, 133, 48, 0.6)' }}
                 />
                 {step.title && (
                   <h3
@@ -124,8 +124,8 @@ export function ProcessSteps({
             className={
               'inline-flex items-center justify-center px-8 py-3.5 text-[12px] font-semibold uppercase transition duration-200 ' +
               (dark
-                ? 'border border-[#D4A93A] text-[#E8DDC4] hover:bg-[#D4A93A] hover:text-[#0F2F4F]'
-                : 'border border-[#153D64] text-[#153D64] hover:bg-[#153D64] hover:text-white')
+                ? 'border border-[#C69C3E] text-[#E8DDC4] hover:bg-[#C69C3E] hover:text-[#14304F]'
+                : 'border border-[#1B3A5F] text-[#1B3A5F] hover:bg-[#1B3A5F] hover:text-white')
             }
             style={{ letterSpacing: '0.12em' }}
           >

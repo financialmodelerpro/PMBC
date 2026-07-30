@@ -607,3 +607,45 @@ Pausing the session with all buildable Phase 9 work done (page content + contact
 
 No code or schema changed in this checkpoint; docs only (`CLAUDE.md` + this entry).
 
+### 2026-07-30 — Phase 11: FMP-parity admin structure, route fixes, palette retune
+
+> **Log gap note:** the two 2026-06-10 sessions (Phase 10 advisory collections, and the page-builder auto-save + FMP-parity settings fix) were never written up here; they are captured in the `CLAUDE.md` Current Status table and in commits `d9bf27f` and `1488250`. This entry resumes the log.
+
+Started as a status check, became a structural fix. Three things were wrong or divergent from FMP, plus a palette that read badly on the live site.
+
+**Route fixes (the actual bug)**
+`/admin/page-builder` returned 404: the folder contained only `[slug]/`, no `page.tsx`. The sidebar's own "Page Builder" entry therefore pointed at a dead route, and the CMS pages list lived at `/admin/pages` instead. Fixed by mirroring FMP's split:
+- `src/app/admin/page-builder/page.tsx` (new). The CMS pages list: slug, title, status, section count, last updated, Builder button per row. Same table markup that was at `/admin/pages`.
+- `src/app/admin/pages/page.tsx` (rewritten). **Pages & Nav**, a navigation-menu editor only. Built on the existing `CollectionManager` so it inherits the field-driven list, reorder, and drawer editor from the Phase 10 collections rather than hand-rolling a fourth nav editor.
+- `src/app/api/admin/site-pages/route.ts` (new): session-gated, zod-validated, audit-logged CRUD through `createCollectionApi`.
+- `src/app/admin/leads/page.tsx` (new): redirect to `/admin/contact-submissions`, so the `/admin/leads` alias in the sidebar's `matchPaths` resolves instead of being dead config.
+- `supabase/migrations/027_site_pages_nav.sql` (new): `site_pages` (label, href, display_order, visible), RLS default-deny per the 013 pattern, seeded from the existing `(header_settings, nav_items)` JSON array via `jsonb_array_elements ... WITH ORDINALITY` so order is preserved, with a hardcoded six-item fallback. Seed guarded by `WHERE NOT EXISTS`, so re-running is a no-op.
+
+**Navbar source of truth**
+PMBC drove the navbar from a single `cms_content` row edited at `/admin/header-settings`. Promoting the nav to `site_pages` without touching that editor would have given the navbar two writers, so:
+- `fetchHeaderConfig()` now reads `site_pages` first, then the legacy JSON row, then `DEFAULT_HEADER_CONFIG`. The legacy row is deliberately **left in place, not dropped**. A partially-applied migration can never produce a navbar with no links.
+- The nav-item editor (dnd-kit list, ~120 lines) was removed from `HeaderSettingsForm`, which now owns only the header CTA and the mobile toggle. That matches FMP, where header-settings is branding/header and Pages & Nav owns `site_pages` (`CMS_REFERENCE.md` §1, rows 32 and 34). Both pages cross-link so the split is discoverable.
+- `nav_items` became **optional** in `/api/admin/header-settings` rather than being deleted, and is only written when supplied, so an older client or a manual call can still refresh the fallback row.
+
+**Sidebar regrouped** to FMP order: Dashboard, then Content (Page Builder, Header Settings, Header & Branding, Page Content, Pages & Nav, Insights, Testimonials, Media Library, OG Previews), Collections, Leads, Email, System. Removed the stale `matchPaths: ['/admin/page-builder']` from Pages & Nav (it now has its own item), added `/admin/leads` to Inquiries, and gave OG Previews its own icon (it shared `ImageIcon` with Media Library).
+
+**Palette retune** (§9): primary navy `#153D64` to `#1B3A5F`, deep navy `#0F2F4F` to `#14304F`, gold `#D4A93A` to `#C69C3E`, muted gold `#B89530` to `#A88530`, cream unchanged. Applied across `globals.css`, `tokens.ts`, all 13 section renderers, Navbar/Footer/PageHeroFallback, the public pages, `/api/og`, and `branding_config` + `email_branding` (migration 028). 32 files, ~164 hex occurrences.
+
+**Verified**
+- `npm run typecheck` and `npm run build` both clean; `/admin/page-builder`, `/admin/pages`, `/admin/leads`, `/api/admin/site-pages` all registered.
+- All **20 sidebar destinations 200** authenticated, zero 404s. All **14 public routes 200**. Navbar renders the same six items, now from `site_pages`.
+- Full CRUD round-trip on a throwaway row: 401 unauth, 422 invalid, create, update, **confirmed the new item reached the live public navbar**, delete. `site_pages` restored to exactly 6 rows, 3 `audit_log` entries written.
+- Post-migration re-verify (user applied 027 + 028 in the Supabase dashboard): 6 rows no duplicates, anon key returns 0 rows so RLS is enforced, `branding_config` matches 028.
+- Rendered HTML: **0 old colour values, 0 em dashes**; OG card 200.
+
+**Decisions worth keeping**
+- **Reuse `CollectionManager` for the nav editor.** A nav menu is a reorderable list of rows, which is exactly what the Phase 10 collection infrastructure already does. Writing a bespoke editor would have been a fourth implementation of drag-reorder in this repo.
+- **Fallback chain over a hard cutover.** Repointing the navbar at a brand-new table is the kind of change that silently empties a header in production. Reading `site_pages` then the old row then the hardcoded default means the worst case is stale nav, never no nav.
+- **The hero gradient was the real "too dark" complaint.** Its stops were `#173E63` / `#102E4C` / `#0C2741`, the darkest well below even the old primary, so swapping only the four named tokens would not have fixed the impression. Re-anchored to `#1F4269` / `#1B3A5F` / `#14304F`. Flagged separately at review time because it exceeded the literal request.
+- **`rgba()` equivalents must be swapped alongside the hex.** The golds also appear as `rgba(212,169,58,…)` and `rgba(184,149,48,…)` in 14 places; a hex-only find/replace would have left half the accents on the old colour.
+- **Kept the admin console's structural palette isolated but updated its accent gold.** `CLAUDE.md` isolates admin styling from the public theme, but the gold *is* the brand accent, so leaving the sidebar on `#D4A93A` would have visibly diverged. Sidebar navy `#0F2540` and `#1B4F8A` untouched.
+- **Kept a Collections group the brief omitted.** The requested sidebar order listed no Services / Case Studies / Team & Advisors; those are PMBC-only Phase 10 pages with no FMP counterpart (FMP has Modeling Hub / Training Hub there). Dropping them would have orphaned three working pages, so they were grouped rather than deleted.
+
+**Environment note:** a second checkout at `D:\PMBC - Cursor\PMBC-site` was running a dev server on port 3000 that hung mid-session; verification ran on a separate server on port 3100 from `D:\PMBC\PMBC-site`. The hung process was killed at end of session. Both checkouts were at the same commit.
+
+**Still open (unchanged by this session):** production env vars on Vercel, rotate `Admin@2026`, DNS + SSL, counsel review of `/privacy` + `/terms`, submit sitemap to Search Console, refresh the Supabase Security Advisor, real assets (logo, founder photo, network image, partner logos), and content for the four empty Phase 10 collections. Two inquiries are still sitting unread in `/admin/contact-submissions`, one of which looks genuine (dated 2026-06-21).

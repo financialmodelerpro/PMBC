@@ -60,12 +60,12 @@ export function ServiceDetail({
         <div
           aria-hidden
           className="h-px w-[60px]"
-          style={{ background: '#B89530' }}
+          style={{ background: '#A88530' }}
         />
         {number && (
           <p
             className="mt-5 text-[11px] font-semibold uppercase"
-            style={{ letterSpacing: '0.18em', color: '#B89530' }}
+            style={{ letterSpacing: '0.18em', color: '#A88530' }}
           >
             Service · {number}
           </p>
@@ -107,11 +107,11 @@ export function ServiceDetail({
               <span
                 aria-hidden
                 className="absolute top-0 left-0 right-0 h-[2px]"
-                style={{ background: '#D4A93A' }}
+                style={{ background: '#C69C3E' }}
               />
               <p
                 className="text-[11px] font-semibold uppercase"
-                style={{ letterSpacing: '0.18em', color: '#B89530' }}
+                style={{ letterSpacing: '0.18em', color: '#A88530' }}
               >
                 Key deliverables
               </p>
@@ -147,11 +147,11 @@ export function ServiceDetail({
                   <span
                     aria-hidden
                     className="absolute top-0 left-0 right-0 h-[2px]"
-                    style={{ background: '#D4A93A' }}
+                    style={{ background: '#C69C3E' }}
                   />
                   <p
                     className="text-[11px] font-semibold uppercase"
-                    style={{ letterSpacing: '0.18em', color: '#B89530' }}
+                    style={{ letterSpacing: '0.18em', color: '#A88530' }}
                   >
                     Typical timeline
                   </p>
@@ -174,11 +174,11 @@ export function ServiceDetail({
                   <span
                     aria-hidden
                     className="absolute top-0 left-0 right-0 h-[2px]"
-                    style={{ background: '#D4A93A' }}
+                    style={{ background: '#C69C3E' }}
                   />
                   <p
                     className="text-[11px] font-semibold uppercase"
-                    style={{ letterSpacing: '0.18em', color: '#B89530' }}
+                    style={{ letterSpacing: '0.18em', color: '#A88530' }}
                   >
                     Who it&apos;s for
                   </p>
@@ -202,11 +202,11 @@ export function ServiceDetail({
             <div
               aria-hidden
               className="h-px w-[40px]"
-              style={{ background: '#B89530' }}
+              style={{ background: '#A88530' }}
             />
             <p
               className="mt-4 text-[11px] font-semibold uppercase"
-              style={{ letterSpacing: '0.18em', color: '#B89530' }}
+              style={{ letterSpacing: '0.18em', color: '#A88530' }}
             >
               Related services
             </p>
@@ -224,16 +224,16 @@ export function ServiceDetail({
                   <span
                     aria-hidden
                     className="absolute top-0 left-0 right-0 h-[2px]"
-                    style={{ background: '#D4A93A' }}
+                    style={{ background: '#C69C3E' }}
                   />
-                  <p className="font-serif text-[20px] font-semibold text-[#B89530]">
+                  <p className="font-serif text-[20px] font-semibold text-[#A88530]">
                     {r.number}
                   </p>
                   <p className="mt-3 flex items-center gap-1.5 font-serif text-[16px] font-semibold text-[#0F1B2D]">
                     {r.title}
                     <ArrowRight
                       size={14}
-                      className="text-[#B89530] transition group-hover:translate-x-0.5"
+                      className="text-[#A88530] transition group-hover:translate-x-0.5"
                     />
                   </p>
                 </Link>

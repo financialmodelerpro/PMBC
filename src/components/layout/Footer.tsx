@@ -51,12 +51,12 @@ export function Footer({
   return (
     <footer
       className="mt-0 text-[#E8DDC4]"
-      style={{ background: '#0F2F4F' }}
+      style={{ background: '#14304F' }}
     >
       {/* gold hairline */}
       <div
         className="h-px w-full"
-        style={{ background: 'rgba(212, 169, 58, 0.45)' }}
+        style={{ background: 'rgba(198, 156, 62, 0.45)' }}
       />
 
       <div className="mx-auto max-w-[1280px] px-6 py-20 lg:px-8">
@@ -78,9 +78,9 @@ export function Footer({
                   <div
                     className="flex h-11 w-11 items-center justify-center"
                     style={{
-                      background: 'rgba(212, 169, 58, 0.12)',
-                      border: '1px solid #D4A93A',
-                      color: '#D4A93A',
+                      background: 'rgba(198, 156, 62, 0.12)',
+                      border: '1px solid #C69C3E',
+                      color: '#C69C3E',
                       fontFamily: 'var(--font-source-serif), serif',
                       fontWeight: 600,
                       fontSize: 18,
@@ -105,13 +105,13 @@ export function Footer({
               <div
                 aria-hidden
                 className="h-px w-[40px]"
-                style={{ background: '#D4A93A' }}
+                style={{ background: '#C69C3E' }}
               />
               <p
                 className="mt-3 text-[11px] font-semibold uppercase italic"
                 style={{
                   letterSpacing: '0.18em',
-                  color: '#D4A93A',
+                  color: '#C69C3E',
                   fontFamily: 'var(--font-source-serif), serif',
                   fontStyle: 'italic',
                 }}
@@ -158,7 +158,7 @@ export function Footer({
             >
               {settings.contact_email && (
                 <li className="flex items-start gap-2.5">
-                  <Mail size={14} className="mt-1" style={{ color: '#D4A93A' }} />
+                  <Mail size={14} className="mt-1" style={{ color: '#C69C3E' }} />
                   <a
                     href={`mailto:${settings.contact_email}`}
                     className="transition-colors duration-200 hover:text-white"
@@ -169,7 +169,7 @@ export function Footer({
               )}
               {settings.whatsapp_number && (
                 <li className="flex items-start gap-2.5">
-                  <MessageCircle size={14} className="mt-1" style={{ color: '#D4A93A' }} />
+                  <MessageCircle size={14} className="mt-1" style={{ color: '#C69C3E' }} />
                   <a
                     href={`https://wa.me/${settings.whatsapp_number.replace(/[^0-9]/g, '')}`}
                     target="_blank"
@@ -182,13 +182,13 @@ export function Footer({
               )}
               {settings.office_location_text && (
                 <li className="flex items-start gap-2.5">
-                  <MapPin size={14} className="mt-1" style={{ color: '#D4A93A' }} />
+                  <MapPin size={14} className="mt-1" style={{ color: '#C69C3E' }} />
                   <span>{settings.office_location_text}</span>
                 </li>
               )}
               {settings.social_linkedin && (
                 <li className="flex items-start gap-2.5">
-                  <span className="mt-1" style={{ color: '#D4A93A' }}>
+                  <span className="mt-1" style={{ color: '#C69C3E' }}>
                     <LinkedInIcon size={14} />
                   </span>
                   <a
@@ -209,7 +209,7 @@ export function Footer({
       {/* Bottom strip */}
       <div style={{ borderTop: '1px solid rgba(232, 221, 196, 0.12)' }}>
         <div className="mx-auto flex max-w-[1280px] flex-col items-start justify-between gap-3 px-6 py-6 text-[12px] sm:flex-row sm:items-center lg:px-8">
-          <p style={{ color: 'rgba(184, 149, 48, 0.85)' }}>{copyright}</p>
+          <p style={{ color: 'rgba(168, 133, 48, 0.85)' }}>{copyright}</p>
           <div className="flex items-center gap-6">
             <Link
               href="/privacy"
@@ -238,7 +238,7 @@ function FooterColumnLabel({ children }: { children: React.ReactNode }) {
       className="text-[11px] font-semibold uppercase"
       style={{
         letterSpacing: '0.2em',
-        color: '#D4A93A',
+        color: '#C69C3E',
       }}
     >
       {children}

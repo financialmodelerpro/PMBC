@@ -35,7 +35,7 @@ export function TestimonialsBlock({
             <li
               key={t.id}
               className="flex flex-col rounded-[2px] border border-t-2 border-[color:var(--pmbc-border-warm)] bg-[color:var(--pmbc-surface-cream)] p-8"
-              style={{ borderTopColor: '#D4A93A' }}
+              style={{ borderTopColor: '#C69C3E' }}
             >
               <span aria-hidden className="font-serif text-5xl leading-none text-[color:var(--pmbc-accent)]">
                 &ldquo;

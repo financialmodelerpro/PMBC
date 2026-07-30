@@ -61,7 +61,7 @@ export function FmpIntro({
         <span
           aria-hidden
           className="absolute top-0 left-0 right-0 h-[2px]"
-          style={{ background: '#D4A93A' }}
+          style={{ background: '#C69C3E' }}
         />
         {c.logo_url && (
           <div className="relative mb-7 h-12 w-48">
@@ -77,13 +77,13 @@ export function FmpIntro({
         <div
           aria-hidden
           className="h-px w-[60px]"
-          style={{ background: dark ? '#D4A93A' : '#B89530' }}
+          style={{ background: dark ? '#C69C3E' : '#A88530' }}
         />
         <p
           className="mt-5 text-[11px] font-semibold uppercase"
           style={{
             letterSpacing: '0.18em',
-            color: dark ? '#D4A93A' : '#B89530',
+            color: dark ? '#C69C3E' : '#A88530',
           }}
         >
           Financial Modeler Pro
@@ -135,8 +135,8 @@ export function FmpIntro({
               className={
                 'group inline-flex items-center gap-2 px-8 py-3.5 text-[12px] font-semibold uppercase transition duration-200 ' +
                 (dark
-                  ? 'border border-[#D4A93A] text-[#E8DDC4] hover:bg-[#D4A93A] hover:text-[#0F2F4F]'
-                  : 'border border-[#153D64] bg-[#153D64] text-white hover:bg-[#0F2F4F]')
+                  ? 'border border-[#C69C3E] text-[#E8DDC4] hover:bg-[#C69C3E] hover:text-[#14304F]'
+                  : 'border border-[#1B3A5F] bg-[#1B3A5F] text-white hover:bg-[#14304F]')
               }
               style={{ letterSpacing: '0.12em' }}
             >

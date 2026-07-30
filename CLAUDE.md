@@ -61,6 +61,7 @@ Why this matters: PMBC is intentionally institutional, considered, calm. The em 
 | Phase 9 — Content Population & Launch | 🟡 In progress | Page content COMPLETE + `/admin/contact-submissions` inbox COMPLETE (2026-06-01). Home (2026-05-03) + about, sectors, approach, network, financial-modeler-pro, services overview, contact all seeded via migrations 014-020 (+ companion `scripts/seed-<page>-page.mjs`); 9 service-detail pages kept their migration-010 copy (verified). Contact inbox: session-gated GET/PATCH API + master-detail admin UI (status, notes, audit, first-touch timestamps). All buildable work is now done; everything remaining is ops/review. See the "Remaining Before Launch" checklist below and the SESSION_LOG.md 2026-06-01 entries. |
 | Phase 9.5 — Visual Polish (boutique private bank aesthetic) | ✅ Complete (2026-05-06) | Refined design tokens (#153D64 primary navy, #0F2F4F deep navy, #FAF7F2 cream surface, #D4A93A gold, #B89530 muted gold, #E8DDC4 cream-on-navy text). New `src/lib/public/tokens.ts` + `SectionContainer` / `SectionIntro` primitives. All 13 section renderers redesigned around three background variants (`navy_deep` / `cream` / `white`); SectionRenderer extended with sequence-aware variant resolution so home page rhythm is automatic without DB changes. Hero is 88vh navy_deep with radial gradient, gold hairline, 80px serif headline, gold-bordered CTAs, scroll chevron. FounderBlock has gold-framed photo + navy accent corner + monogram fallback. StatsBlock uses 72px serif numbers with gold dividers. Process steps render in deep navy with gold connectors. Quote is editorial italic serif with 80px gold quote mark. Navbar refined with gold underline-on-hover and PM monogram fallback; Footer reframed at #0F2F4F with small-caps gold column headlines and italic-serif tagline. No content schema changes; all 11 public routes verified 200 in dev, build + typecheck clean. |
 | Phase 10 — Advisory Collections CMS (per `PACEMAKERS_ADMIN_CMS_SPEC.md`) | ✅ Complete (2026-06-10) | Five new managed collections as first-class admin sections + DB tables: **Services**, **Case Studies**, **Team & Advisors**, **Insights/Articles**, **Testimonials**. Migrations 021-026 (each table RLS-enabled default-deny per the 013 pattern; 021 seeds the 9 service lines published; 026 adds four public-read storage buckets `cms-assets` / `article-covers` / `case-study-images` / `team-photos` + a public-read storage policy). New table types hand-added to `src/types/database.ts`. Shared infra: `lib/admin/collectionApi.ts` (session-gated, zod-validated, audit-logged CRUD route factory with auto-slugify; operates through a loosely-typed client since the table name is dynamic), `lib/admin/slugify.ts`, `components/admin/CollectionManager.tsx` (one field-driven list + drag-reorder + drawer editor powering all five; field types text/textarea/richtext/media/select/number/checkbox/stringList/kvList), `components/admin/MediaPicker.tsx` (image field + library modal). Reuses the existing TipTap `RichTextEditor`. Thin API routes at `/api/admin/{services,case-studies,team,articles,testimonials}` + `/api/admin/media` (multipart upload/list/delete via service role). Admin pages at `/admin/{services,case-studies,team,articles,testimonials,media,audit}` (audit = read-only `audit_log` viewer). **Dashboard fully rebuilt** (spec §5.1): live KPI grid (leads new/month/total, services, pages, sections) + Recent Inquiries table + Quick Actions + Collections counts row, all resilient to missing tables. `CmsAdminNav` regrouped: Leads / Collections / Content / Email / System. Public: new `/case-studies`(+`[slug]`), `/team`, `/insights`(+`[slug]`); `/services` grid now reads the `services` table (config fallback); `/about` renders team grid + approved testimonials; `TestimonialsBlock` component; footer + dynamic `sitemap.xml` include the new routes. All public collection fetchers (`lib/cms/collections.ts`) degrade to empty on error. Existing `/services/[slug]` detail pages kept their richer migration-010 `cms_content` copy (table drives admin + grid only). Migrations applied to Supabase 2026-06-10; verified live: public routes 200, `/services` renders seeded rows, admin APIs 401 unauth, admin pages 307→login, build + typecheck clean. Also fixed a pre-existing `next build` blocker (non-route `STATUSES` export in the contact-submissions API route). |
+| Phase 11 — FMP-parity admin structure + palette retune | ✅ Complete (2026-07-30) | **Route fix:** `/admin/page-builder` was a 404 (the folder only held `[slug]/`) while the pages list sat at `/admin/pages`, so the sidebar's own "Page Builder" link was broken. The list moved to `/admin/page-builder/page.tsx`; `/admin/pages` was rebuilt as **Pages & Nav**, a navbar-menu editor over the new `site_pages` table (migration 027, RLS default-deny, seeded from `(header_settings, nav_items)`). New `/api/admin/site-pages` via the existing `createCollectionApi` factory; `/admin/leads` added as a redirect alias to the inquiries inbox. **Single source of truth for the navbar:** `fetchHeaderConfig()` now reads `site_pages`, falling back to the legacy `cms_content` JSON row and then `DEFAULT_HEADER_CONFIG`, so a partial migration can never render an empty navbar. The nav-item editor was **removed from `/admin/header-settings`** (which now owns only the header CTA + mobile toggle, matching FMP per `CMS_REFERENCE.md` §1); `nav_items` is optional in that API rather than deleted. **Sidebar regrouped** to FMP order: Dashboard, Content (Page Builder, Header Settings, Header & Branding, Page Content, Pages & Nav, Insights, Testimonials, Media Library, OG Previews), Collections (Services, Case Studies, Team & Advisors), Leads, Email, System. **Palette retuned** (see §9) across `globals.css`, `tokens.ts`, all 13 renderers, layout chrome, public pages, `/api/og`, and `branding_config` (migration 028). Verified: typecheck + build clean, all 20 sidebar destinations 200 authenticated with zero 404s, all 14 public routes 200, navbar renders the same 6 items from `site_pages`, full CRUD round-trip on a throwaway nav row (create to public-navbar to delete) with audit rows written and data restored, zero old colour values and zero em dashes in rendered HTML. |
 
 **Working admin login (local dev):** `meetahmadch@gmail.com` / `Admin@2026`. This is a debug-only password — must be rotated to a strong production credential before launch. Use `npm run seed-admin` (after editing `ADMIN_PASSWORD` in `scripts/seed-admin.mjs`) to rotate.
 
@@ -464,6 +465,14 @@ For v1, only two template_key rows are needed: `contact_notification` (sent to a
                                   --   (header_settings, show_cta)             text bool
                                   --   (header_settings, mobile_menu_enabled)  text bool
                                   -- Idempotent. Migrates any existing blob, then drops it.
+010-020                           -- Content seeds (service details, home, then the
+                                  --   six firm pages + services/contact intros).
+021-026                           -- Phase 10 advisory collections + storage buckets.
+027_site_pages_nav.sql            -- site_pages table (navbar menu items), RLS default-deny,
+                                  --   seeded from (header_settings, nav_items). Source of
+                                  --   truth for the navbar; edited at /admin/pages.
+028_retune_brand_colors.sql       -- branding_config + email_branding colour retune
+                                  --   (accent_color -> #C69C3E). Idempotent.
 ```
 
 After running migrations, manually insert one admin_users row via SQL with a bcrypt hash for the password.
@@ -644,8 +653,9 @@ export default async function middleware(req) {
 | Route | Purpose |
 |-------|---------|
 | `/admin` | Dashboard: recent contact submissions, page count, last updated timestamps |
-| `/admin/pages` | List all CMS pages with edit links |
+| `/admin/page-builder` | List all CMS pages with a Builder button per row (the pages list; was `/admin/pages` before Phase 11) |
 | `/admin/page-builder/[slug]` | Drag-and-drop section editor for one page |
+| `/admin/pages` | Pages & Nav: the navigation menu that drives the public navbar (`site_pages` rows). Nav links only, not page content |
 | `/admin/content` | Key-value editor for cms_content (grouped by section) |
 | `/admin/branding` | Logo, brand name, tagline, color tokens |
 | `/admin/header-settings` | Header-specific settings |
@@ -662,9 +672,9 @@ Single component handling both desktop and mobile chrome (no separate `AdminSide
 - Collapse persisted to `localStorage['pmbcAdminSidebarCollapsed']`
 - Scroll position persisted to `sessionStorage['admin_sidebar_scroll']`, restored on `pathname` change
 - Off-canvas drawer below 768px viewport with hamburger button + body-scroll lock + click-backdrop-to-close
-- Active state by exact-match OR prefix-match against per-item `matchPaths` (e.g. "Pages" stays highlighted while inside `/admin/page-builder/...`)
-- Active item gets `#1B3A5F` background + **3px gold (`#D4A93A`) left border**
-- Group dividers labeled `Content` / `Inbox` / `Email` / `System`
+- Active state by exact-match OR prefix-match against per-item `matchPaths` (e.g. "Page Builder" stays highlighted while inside `/admin/page-builder/...`, "Inquiries" also matches `/admin/leads`)
+- Active item gets `#1B3A5F` background + **3px gold (`#C69C3E`) left border**
+- Group dividers labeled `Content` / `Collections` / `Leads` / `Email` / `System` (FMP-parity order set in Phase 11). `Collections` holds the PMBC-only Phase 10 tables that have no FMP counterpart.
 - Footer: external links to `https://www.pacemakersglobal.com` (View Live Site) and `https://www.financialmodelerpro.com` (Visit FMP), both `target="_blank"`. Sign-out lives below those.
 
 ### Admin styling
@@ -825,9 +835,12 @@ Derived from the PMBC logo (navy + green + thin gold accent):
 | Token | Hex | Usage |
 |-------|-----|-------|
 | `--color-primary` | `#1B3A5F` | Navy. Primary background, headers, hero. |
-| `--color-primary-deep` | `#0F2540` | Deeper navy for contrast layers. |
+| `--color-primary-deep` | `#14304F` | Deeper navy for contrast layers, footers, panels. |
 | `--color-secondary` | `#3FA663` | Green. Accent for CTAs, success states, highlights. |
-| `--color-accent` | `#D4A93A` | Gold. Sparingly used for premium accent — borders, dividers, badges. |
+| `--color-accent` | `#C69C3E` | Gold. Sparingly used for premium accent: borders, dividers, badges. |
+| `--color-accent-muted` | `#A88530` | Muted gold for uppercase eyebrow text and secondary accents. |
+
+**Live token values are in `src/app/globals.css` (`--pmbc-*`) and mirrored in `src/lib/public/tokens.ts`. Keep the two in sync.** Phase 11 retuned the palette: primary navy `#153D64` to `#1B3A5F` (warmer, less black), deep navy `#0F2F4F` to `#14304F`, gold `#D4A93A` to `#C69C3E` (richer, less bright), muted gold `#B89530` to `#A88530`. Cream `#FAF7F2` unchanged. The hero radial gradient was re-anchored on these tokens (`#1F4269` / `#1B3A5F` / `#14304F`); its old stops bottomed out at `#0C2741`, which was the main reason the hero read as too dark.
 | `--color-text-primary` | `#0F1B2D` | Body text on light. |
 | `--color-text-on-dark` | `#E8EEF5` | Body text on navy. |
 | `--color-muted` | `#6B7280` | Secondary text, captions. |

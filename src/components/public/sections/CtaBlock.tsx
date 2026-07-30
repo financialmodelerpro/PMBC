@@ -59,14 +59,14 @@ export function CtaBlock({
         <div
           aria-hidden
           className="mx-auto h-px w-[60px]"
-          style={{ background: dark ? '#D4A93A' : '#B89530' }}
+          style={{ background: dark ? '#C69C3E' : '#A88530' }}
         />
         {c.eyebrow && (
           <p
             className="mt-5 text-[11px] font-semibold uppercase"
             style={{
               letterSpacing: '0.18em',
-              color: dark ? '#D4A93A' : '#B89530',
+              color: dark ? '#C69C3E' : '#A88530',
             }}
           >
             {c.eyebrow}
@@ -96,8 +96,8 @@ export function CtaBlock({
                 className={
                   'inline-flex items-center justify-center px-8 py-3.5 text-[12px] font-semibold uppercase transition duration-200 ' +
                   (dark
-                    ? 'border border-[#D4A93A] text-[#E8DDC4] hover:bg-[#D4A93A] hover:text-[#0F2F4F]'
-                    : 'border border-[#153D64] bg-[#153D64] text-white hover:bg-[#0F2F4F]')
+                    ? 'border border-[#C69C3E] text-[#E8DDC4] hover:bg-[#C69C3E] hover:text-[#14304F]'
+                    : 'border border-[#1B3A5F] bg-[#1B3A5F] text-white hover:bg-[#14304F]')
                 }
                 style={{ letterSpacing: '0.12em' }}
               >
@@ -110,8 +110,8 @@ export function CtaBlock({
                 className={
                   'inline-flex items-center justify-center px-8 py-3.5 text-[12px] font-semibold uppercase transition duration-200 ' +
                   (dark
-                    ? 'border border-[#E8DDC4]/30 text-[#E8DDC4] hover:border-[#D4A93A] hover:text-[#D4A93A]'
-                    : 'border border-[#153D64]/30 text-[#153D64] hover:border-[#153D64]')
+                    ? 'border border-[#E8DDC4]/30 text-[#E8DDC4] hover:border-[#C69C3E] hover:text-[#C69C3E]'
+                    : 'border border-[#1B3A5F]/30 text-[#1B3A5F] hover:border-[#1B3A5F]')
                 }
                 style={{ letterSpacing: '0.12em' }}
               >

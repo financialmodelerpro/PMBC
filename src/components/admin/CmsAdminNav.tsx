@@ -32,6 +32,7 @@ import {
   Palette,
   PanelTop,
   Settings,
+  Share2,
   Type,
   Users,
   X,
@@ -51,31 +52,20 @@ type NavDivider = { kind: 'divider'; label?: string };
 
 type NavEntry = NavItem | NavDivider;
 
+// Group order mirrors FMP's sidebar (CMS_REFERENCE.md §1): Dashboard, then
+// Content, then the leads/email/system tail. "Collections" holds the PMBC-only
+// Phase 10 tables that have no FMP counterpart (FMP has Modeling Hub / Training
+// Hub in that slot); it sits next to Content because they are content too.
 const NAV: NavEntry[] = [
   { kind: 'item', label: 'Dashboard', href: '/admin', icon: LayoutDashboard, matchExact: true },
-  { kind: 'divider', label: 'Leads' },
-  {
-    kind: 'item',
-    label: 'Inquiries',
-    href: '/admin/contact-submissions',
-    icon: Inbox,
-  },
-  { kind: 'divider', label: 'Collections' },
-  { kind: 'item', label: 'Services', href: '/admin/services', icon: Briefcase },
-  { kind: 'item', label: 'Case Studies', href: '/admin/case-studies', icon: FolderKanban },
-  { kind: 'item', label: 'Team & Advisors', href: '/admin/team', icon: Users },
-  { kind: 'item', label: 'Insights', href: '/admin/articles', icon: Newspaper },
-  { kind: 'item', label: 'Testimonials', href: '/admin/testimonials', icon: MessageSquareQuote },
   { kind: 'divider', label: 'Content' },
-  { kind: 'item', label: 'Page Builder', href: '/admin/page-builder', icon: LayoutTemplate },
   {
     kind: 'item',
-    label: 'Pages & Nav',
-    href: '/admin/pages',
-    icon: FileText,
-    matchPaths: ['/admin/page-builder'],
+    label: 'Page Builder',
+    href: '/admin/page-builder',
+    icon: LayoutTemplate,
   },
-  { kind: 'item', label: 'Page Content', href: '/admin/content', icon: Type },
+  { kind: 'item', label: 'Header Settings', href: '/admin/header-settings', icon: PanelTop },
   {
     kind: 'item',
     label: 'Header & Branding',
@@ -83,9 +73,24 @@ const NAV: NavEntry[] = [
     icon: Palette,
     matchPaths: ['/admin/brand'],
   },
-  { kind: 'item', label: 'Header Settings', href: '/admin/header-settings', icon: PanelTop },
+  { kind: 'item', label: 'Page Content', href: '/admin/content', icon: Type },
+  { kind: 'item', label: 'Pages & Nav', href: '/admin/pages', icon: FileText },
+  { kind: 'item', label: 'Insights', href: '/admin/articles', icon: Newspaper },
+  { kind: 'item', label: 'Testimonials', href: '/admin/testimonials', icon: MessageSquareQuote },
   { kind: 'item', label: 'Media Library', href: '/admin/media', icon: ImageIcon },
-  { kind: 'item', label: 'OG Previews', href: '/admin/og-preview', icon: ImageIcon },
+  { kind: 'item', label: 'OG Previews', href: '/admin/og-preview', icon: Share2 },
+  { kind: 'divider', label: 'Collections' },
+  { kind: 'item', label: 'Services', href: '/admin/services', icon: Briefcase },
+  { kind: 'item', label: 'Case Studies', href: '/admin/case-studies', icon: FolderKanban },
+  { kind: 'item', label: 'Team & Advisors', href: '/admin/team', icon: Users },
+  { kind: 'divider', label: 'Leads' },
+  {
+    kind: 'item',
+    label: 'Inquiries',
+    href: '/admin/contact-submissions',
+    icon: Inbox,
+    matchPaths: ['/admin/leads'],
+  },
   { kind: 'divider', label: 'Email' },
   { kind: 'item', label: 'Email Branding', href: '/admin/email-branding', icon: Mail },
   { kind: 'item', label: 'Email Templates', href: '/admin/email-templates', icon: FileCode2 },
@@ -107,7 +112,7 @@ const COLOR = {
   text: 'rgba(255,255,255,0.78)',
   textActive: '#FFFFFF',
   textMuted: 'rgba(255,255,255,0.5)',
-  accent: '#D4A93A',
+  accent: '#C69C3E',
 };
 
 const COLLAPSE_KEY = 'pmbcAdminSidebarCollapsed';

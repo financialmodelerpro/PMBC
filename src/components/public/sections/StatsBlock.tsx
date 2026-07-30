@@ -69,8 +69,8 @@ export function StatsBlock({
                   !isLast
                     ? ({
                         ['--sep' as never]: dark
-                          ? 'rgba(212, 169, 58, 0.35)'
-                          : 'rgba(184, 149, 48, 0.35)',
+                          ? 'rgba(198, 156, 62, 0.35)'
+                          : 'rgba(168, 133, 48, 0.35)',
                       } as React.CSSProperties)
                     : undefined
                 }
@@ -81,8 +81,8 @@ export function StatsBlock({
                     className="absolute top-2 right-0 bottom-2 hidden w-px lg:block"
                     style={{
                       background: dark
-                        ? 'rgba(212, 169, 58, 0.35)'
-                        : 'rgba(184, 149, 48, 0.35)',
+                        ? 'rgba(198, 156, 62, 0.35)'
+                        : 'rgba(168, 133, 48, 0.35)',
                     }}
                   />
                 )}
@@ -95,7 +95,7 @@ export function StatsBlock({
                 <div
                   aria-hidden
                   className="mx-auto mt-5 h-px w-[40px]"
-                  style={{ background: dark ? '#D4A93A' : '#B89530' }}
+                  style={{ background: dark ? '#C69C3E' : '#A88530' }}
                 />
                 <dt
                   className="mt-5 text-[11px] font-semibold uppercase"

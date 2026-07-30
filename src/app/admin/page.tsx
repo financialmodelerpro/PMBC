@@ -252,7 +252,7 @@ function StatCard({
             width: 34,
             height: 34,
             borderRadius: 10,
-            background: accent ? 'rgba(212,169,58,0.18)' : '#EAF1F9',
+            background: accent ? 'rgba(198,156,62,0.18)' : '#EAF1F9',
             display: 'inline-flex',
             alignItems: 'center',
             justifyContent: 'center',

@@ -22,7 +22,7 @@ export function PageHeroFallback({
       className="relative flex min-h-[72vh] items-center px-6 py-28 sm:py-32"
       style={{
         background:
-          'radial-gradient(ellipse at 50% 40%, #173E63 0%, #102E4C 55%, #0C2741 100%)',
+          'radial-gradient(ellipse at 50% 40%, #1F4269 0%, #1B3A5F 55%, #14304F 100%)',
         color: '#FFFFFF',
       }}
     >
@@ -31,18 +31,18 @@ export function PageHeroFallback({
         className="pointer-events-none absolute inset-0 opacity-[0.04]"
         style={{
           backgroundImage:
-            'repeating-linear-gradient(45deg, #D4A93A 0, #D4A93A 1px, transparent 1px, transparent 14px)',
+            'repeating-linear-gradient(45deg, #C69C3E 0, #C69C3E 1px, transparent 1px, transparent 14px)',
         }}
       />
       <div className="relative mx-auto w-full max-w-[1100px] text-center">
         <div
           aria-hidden
           className="mx-auto h-px w-[80px]"
-          style={{ background: '#D4A93A' }}
+          style={{ background: '#C69C3E' }}
         />
         <p
           className="mt-6 text-[11px] font-semibold uppercase"
-          style={{ letterSpacing: '0.18em', color: '#D4A93A' }}
+          style={{ letterSpacing: '0.18em', color: '#C69C3E' }}
         >
           {eyebrow}
         </p>
@@ -68,7 +68,7 @@ export function PageHeroFallback({
         <ChevronDown
           size={22}
           strokeWidth={1.5}
-          style={{ color: '#B89530' }}
+          style={{ color: '#A88530' }}
           className="opacity-60"
         />
       </div>

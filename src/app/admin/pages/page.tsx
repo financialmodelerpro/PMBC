@@ -1,152 +1,95 @@
-import type { Metadata } from 'next';
+'use client';
+
 import Link from 'next/link';
-import { ArrowUpRight } from 'lucide-react';
 
 import { AdminPageHeader } from '@/components/admin/AdminPageHeader';
-import { fetchPages } from '@/lib/cms/pages';
-import { createSupabaseServerClient } from '@/lib/supabase/server';
 import {
-  ADMIN_COLORS,
-  adminBadge,
-  adminPageMain,
-  adminTable,
-  adminTd,
-  adminTh,
-  adminThead,
-} from '@/lib/admin/styles';
+  CollectionManager,
+  type FieldDef,
+  type ListColumn,
+} from '@/components/admin/CollectionManager';
+import { ADMIN_COLORS, adminPageMain } from '@/lib/admin/styles';
 
-export const dynamic = 'force-dynamic';
+const FIELDS: FieldDef[] = [
+  {
+    key: 'label',
+    label: 'Menu label',
+    type: 'text',
+    hint: 'Shown in the navbar',
+    placeholder: 'Services',
+  },
+  {
+    key: 'href',
+    label: 'Link target',
+    type: 'text',
+    hint: 'Relative path such as /services, or a full external URL',
+    placeholder: '/services',
+  },
+  { key: 'display_order', label: 'Display order', type: 'number' },
+  { key: 'visible', label: 'Visible in navbar', type: 'checkbox' },
+];
 
-export const metadata: Metadata = {
-  title: 'Pages | PMBC Admin',
-  robots: { index: false, follow: false },
-};
+const COLUMNS: ListColumn[] = [
+  { key: 'label', label: 'Label' },
+  { key: 'href', label: 'Link' },
+  {
+    key: 'visible',
+    label: 'Visible',
+    badge: true,
+    width: 110,
+    render: (r) => (r.visible === false ? 'hidden' : 'visible'),
+  },
+];
 
-function formatDate(iso: string | null): string {
-  if (!iso) return '-';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '-';
-  return d.toLocaleString('en-GB', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
-
-export default async function PagesAdminPage() {
-  const pages = await fetchPages();
-
-  const supabase = createSupabaseServerClient();
-  const { data: rows } = await supabase.from('page_sections').select('page_slug');
-  const counts = new Map<string, number>();
-  for (const r of rows ?? []) {
-    counts.set(r.page_slug, (counts.get(r.page_slug) ?? 0) + 1);
-  }
-
+export default function AdminPagesNavPage() {
   return (
     <div style={adminPageMain}>
       <div style={{ maxWidth: 1100, margin: '0 auto' }}>
         <AdminPageHeader
-          eyebrow="Admin"
-          title="Pages"
-          description="Every CMS-managed page. Open the page builder to edit sections, reorder, or change visibility."
+          eyebrow="Content"
+          title="Pages and Nav"
+          description="The navigation menu that drives the public navbar. Reorder items, hide them, or point them somewhere else. Editing page content happens in Page Builder."
         />
 
-        {pages.length === 0 ? (
-          <div
-            style={{
-              background: ADMIN_COLORS.warningBg,
-              border: '1px solid #FBBF24',
-              borderRadius: 12,
-              padding: 18,
-              fontSize: 13,
-              color: ADMIN_COLORS.warning,
-            }}
+        <div
+          style={{
+            marginBottom: 18,
+            padding: '12px 16px',
+            background: '#FFFFFF',
+            border: `1px solid ${ADMIN_COLORS.border}`,
+            borderRadius: 10,
+            fontSize: 12.5,
+            color: ADMIN_COLORS.textMuted,
+            lineHeight: 1.6,
+          }}
+        >
+          This controls navbar links only. To edit the sections on a page, open{' '}
+          <Link
+            href="/admin/page-builder"
+            style={{ color: ADMIN_COLORS.primaryDeep, fontWeight: 600 }}
           >
-            No cms_pages rows. Run migration 005.
-          </div>
-        ) : (
-          <div
-            style={{
-              background: '#FFFFFF',
-              border: `1px solid ${ADMIN_COLORS.border}`,
-              borderRadius: 12,
-              overflow: 'hidden',
-            }}
+            Page Builder
+          </Link>
+          . The header CTA button and mobile-menu toggle live in{' '}
+          <Link
+            href="/admin/header-settings"
+            style={{ color: ADMIN_COLORS.primaryDeep, fontWeight: 600 }}
           >
-            <table style={adminTable}>
-              <thead style={adminThead}>
-                <tr>
-                  <th style={adminTh}>Slug</th>
-                  <th style={adminTh}>Title</th>
-                  <th style={adminTh}>Status</th>
-                  <th style={adminTh}>Sections</th>
-                  <th style={adminTh}>Last updated</th>
-                  <th style={{ ...adminTh, textAlign: 'right' }}>Open</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pages.map((p, i) => {
-                  const last = i === pages.length - 1;
-                  const cellStyle = last
-                    ? { ...adminTd, borderBottom: 'none' }
-                    : adminTd;
-                  return (
-                    <tr key={p.id}>
-                      <td
-                        style={{
-                          ...cellStyle,
-                          fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-                          color: ADMIN_COLORS.textHeading,
-                        }}
-                      >
-                        {p.slug}
-                      </td>
-                      <td style={{ ...cellStyle, color: ADMIN_COLORS.textHeading }}>
-                        {p.title}
-                      </td>
-                      <td style={cellStyle}>
-                        <span
-                          style={
-                            p.status === 'published'
-                              ? adminBadge('success')
-                              : adminBadge('neutral')
-                          }
-                        >
-                          {p.status}
-                        </span>
-                      </td>
-                      <td style={cellStyle}>{counts.get(p.slug) ?? 0}</td>
-                      <td style={cellStyle}>{formatDate(p.updated_at)}</td>
-                      <td style={{ ...cellStyle, textAlign: 'right' }}>
-                        <Link
-                          href={`/admin/page-builder/${p.slug}`}
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: 4,
-                            padding: '6px 12px',
-                            border: `1px solid ${ADMIN_COLORS.border}`,
-                            borderRadius: 7,
-                            fontSize: 12,
-                            fontWeight: 600,
-                            color: ADMIN_COLORS.primaryDeep,
-                            textDecoration: 'none',
-                          }}
-                        >
-                          Builder
-                          <ArrowUpRight size={13} />
-                        </Link>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
+            Header Settings
+          </Link>
+          .
+        </div>
+
+        <CollectionManager
+          apiBase="/api/admin/site-pages"
+          fields={FIELDS}
+          listColumns={COLUMNS}
+          enableReorder
+          newDefaults={{ label: '', href: '/', display_order: 0, visible: true }}
+          itemLabel={(r) => (r.label as string) || 'Menu item'}
+          statusTone={(r) => (r.visible === false ? 'neutral' : 'success')}
+          emptyHint="No navigation items. Add the first navbar link."
+        />
       </div>
     </div>
   );

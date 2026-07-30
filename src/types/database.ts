@@ -616,6 +616,36 @@ export type Database = {
         }
         Relationships: []
       }
+      site_pages: {
+        Row: {
+          id: string
+          label: string
+          href: string
+          display_order: number
+          visible: boolean
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          label: string
+          href: string
+          display_order?: number
+          visible?: boolean
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          label?: string
+          href?: string
+          display_order?: number
+          visible?: boolean
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

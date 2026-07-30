@@ -44,7 +44,7 @@ export function Hero({
   // Subtle radial gradient for the navy variant: lighter primary at center,
   // deeper navy at edges. On non-navy variants the section is a flat surface.
   const bg = dark
-    ? 'radial-gradient(ellipse at 50% 35%, #173E63 0%, #102E4C 55%, #0C2741 100%)'
+    ? 'radial-gradient(ellipse at 50% 35%, #1F4269 0%, #1B3A5F 55%, #14304F 100%)'
     : v.bg;
 
   return (
@@ -59,7 +59,7 @@ export function Hero({
           className="pointer-events-none absolute inset-0 opacity-[0.04]"
           style={{
             backgroundImage:
-              'repeating-linear-gradient(45deg, #D4A93A 0, #D4A93A 1px, transparent 1px, transparent 14px)',
+              'repeating-linear-gradient(45deg, #C69C3E 0, #C69C3E 1px, transparent 1px, transparent 14px)',
           }}
         />
       )}
@@ -108,8 +108,8 @@ export function Hero({
                 className={
                   'group inline-flex items-center justify-center px-8 py-3.5 text-[13px] font-semibold uppercase transition duration-200 ' +
                   (dark
-                    ? 'border border-[#D4A93A] text-[#E8DDC4] hover:bg-[#D4A93A] hover:text-[#0F2F4F]'
-                    : 'border border-[#153D64] bg-[#153D64] text-white hover:bg-[#0F2F4F]')
+                    ? 'border border-[#C69C3E] text-[#E8DDC4] hover:bg-[#C69C3E] hover:text-[#14304F]'
+                    : 'border border-[#1B3A5F] bg-[#1B3A5F] text-white hover:bg-[#14304F]')
                 }
                 style={{ letterSpacing: '0.12em' }}
               >
@@ -122,8 +122,8 @@ export function Hero({
                 className={
                   'inline-flex items-center justify-center px-8 py-3.5 text-[13px] font-semibold uppercase transition duration-200 ' +
                   (dark
-                    ? 'border border-[#E8DDC4]/30 text-[#E8DDC4] hover:border-[#D4A93A] hover:text-[#D4A93A]'
-                    : 'border border-[#153D64]/30 text-[#153D64] hover:border-[#153D64]')
+                    ? 'border border-[#E8DDC4]/30 text-[#E8DDC4] hover:border-[#C69C3E] hover:text-[#C69C3E]'
+                    : 'border border-[#1B3A5F]/30 text-[#1B3A5F] hover:border-[#1B3A5F]')
                 }
                 style={{ letterSpacing: '0.12em' }}
               >
@@ -142,7 +142,7 @@ export function Hero({
         <ChevronDown
           size={22}
           strokeWidth={1.5}
-          style={{ color: dark ? '#B89530' : '#B89530' }}
+          style={{ color: dark ? '#A88530' : '#A88530' }}
           className="opacity-60"
         />
       </div>

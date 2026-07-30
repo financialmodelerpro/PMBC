@@ -52,20 +52,46 @@ function parseNavItems(v: string | null | undefined): NavItem[] | null {
 }
 
 /**
- * Reads header settings from discrete cms_content rows under section
- * 'header_settings':
- *   - nav_items (JSON array)
+ * Reads the navigation menu from the `site_pages` table (migration 027), which
+ * is the source of truth edited at /admin/pages. Returns null when the table is
+ * empty or unreachable so the caller can fall back to the legacy cms_content
+ * JSON array, then to DEFAULT_HEADER_CONFIG. That chain means a missing or
+ * partially-applied migration can never render a navbar with no links.
+ */
+async function fetchSitePagesNav(): Promise<NavItem[] | null> {
+  try {
+    const supabase = createSupabaseServerClient();
+    const { data, error } = await supabase
+      .from('site_pages')
+      .select('label, href, visible, display_order')
+      .eq('visible', true)
+      .order('display_order', { ascending: true });
+    if (error) return null;
+    const items: NavItem[] = [];
+    for (const r of data ?? []) {
+      if (r.label && r.href) items.push({ label: r.label, href: r.href });
+    }
+    return items.length > 0 ? items : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Reads header settings. Nav items come from `site_pages`; the remaining keys
+ * come from discrete cms_content rows under section 'header_settings':
  *   - cta_label, cta_href (text)
  *   - show_cta, mobile_menu_enabled (text 'true'|'false')
+ *   - nav_items (JSON array) — legacy fallback only, no longer written
  *
  * Falls back to DEFAULT_HEADER_CONFIG for any missing/malformed key.
  */
 export async function fetchHeaderConfig(): Promise<HeaderConfig> {
   const supabase = createSupabaseServerClient();
-  const { data } = await supabase
-    .from('cms_content')
-    .select('key, value')
-    .eq('section', 'header_settings');
+  const [{ data }, sitePagesNav] = await Promise.all([
+    supabase.from('cms_content').select('key, value').eq('section', 'header_settings'),
+    fetchSitePagesNav(),
+  ]);
 
   const rows = new Map<string, string | null>();
   for (const r of data ?? []) {
@@ -88,6 +114,7 @@ export async function fetchHeaderConfig(): Promise<HeaderConfig> {
   const nav = parseNavItems(rows.get('nav_items') ?? null);
   return {
     nav_items:
+      sitePagesNav ??
       nav ??
       (Array.isArray(legacy?.nav_items) && legacy.nav_items.length > 0
         ? legacy.nav_items

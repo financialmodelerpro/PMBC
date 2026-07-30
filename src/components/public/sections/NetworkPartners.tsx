@@ -88,7 +88,7 @@ export function NetworkPartners({
                 <span
                   aria-hidden
                   className="absolute top-0 left-0 right-0 h-[2px]"
-                  style={{ background: '#D4A93A' }}
+                  style={{ background: '#C69C3E' }}
                 />
                 <div className="flex items-start justify-between gap-3">
                   {p.logo_url ? (
@@ -116,8 +116,8 @@ export function NetworkPartners({
                       className="inline-flex items-center px-2.5 py-1 text-[10px] font-semibold uppercase"
                       style={{
                         letterSpacing: '0.14em',
-                        border: '1px solid #D4A93A',
-                        color: '#B89530',
+                        border: '1px solid #C69C3E',
+                        color: '#A88530',
                         background: 'transparent',
                       }}
                     >
@@ -155,7 +155,7 @@ export function NetworkPartners({
                 {p.link && (
                   <span
                     className="mt-7 inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase"
-                    style={{ letterSpacing: '0.16em', color: '#B89530' }}
+                    style={{ letterSpacing: '0.16em', color: '#A88530' }}
                   >
                     Visit site <ArrowUpRight size={12} />
                   </span>
@@ -167,7 +167,7 @@ export function NetworkPartners({
               'group relative block h-full overflow-hidden p-9 transition duration-200';
             const cardStyle: React.CSSProperties = {
               background: v.cardBg,
-              border: `1px solid ${dark ? v.cardBorder : '#153D64'}`,
+              border: `1px solid ${dark ? v.cardBorder : '#1B3A5F'}`,
               borderTopWidth: 0,
             };
 

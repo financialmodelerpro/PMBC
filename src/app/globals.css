@@ -2,11 +2,11 @@
 
 :root {
   /* PMBC brand tokens — see CLAUDE.md §9 */
-  --pmbc-primary: #153D64;        /* primary navy (logo navy) */
-  --pmbc-primary-deep: #0F2F4F;   /* deeper navy for footers/dark sections */
+  --pmbc-primary: #1B3A5F;        /* primary navy (logo navy) */
+  --pmbc-primary-deep: #14304F;   /* deeper navy for footers/dark sections */
   --pmbc-secondary: #3FA663;      /* used sparingly (small accents, checkmarks) */
-  --pmbc-accent: #D4A93A;         /* gold — hairlines, dividers */
-  --pmbc-accent-muted: #B89530;   /* muted gold for eyebrow text, secondary accents */
+  --pmbc-accent: #C69C3E;         /* gold — hairlines, dividers */
+  --pmbc-accent-muted: #A88530;   /* muted gold for eyebrow text, secondary accents */
   --pmbc-text-primary: #0F1B2D;   /* body text on light */
   --pmbc-text-on-dark: #E8DDC4;   /* warm cream on navy */
   --pmbc-muted: #6B7280;

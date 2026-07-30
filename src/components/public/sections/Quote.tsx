@@ -51,7 +51,7 @@ export function Quote({
             display: 'block',
             fontSize: 80,
             lineHeight: 0.8,
-            color: dark ? '#D4A93A' : '#B89530',
+            color: dark ? '#C69C3E' : '#A88530',
             textAlign: left ? 'left' : 'center',
             fontWeight: 600,
           }}
@@ -93,7 +93,7 @@ export function Quote({
               <div
                 aria-hidden
                 className={(left ? '' : 'mx-auto ') + 'h-px w-[40px]'}
-                style={{ background: dark ? '#D4A93A' : '#B89530' }}
+                style={{ background: dark ? '#C69C3E' : '#A88530' }}
               />
               {c.attribution_name && (
                 <p

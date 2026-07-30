@@ -15,13 +15,13 @@ export function SectionPlaceholder({
       <div
         className="mx-auto max-w-[680px] p-7 text-center"
         style={{
-          border: '1px dashed #D4A93A',
-          background: 'rgba(212, 169, 58, 0.04)',
+          border: '1px dashed #C69C3E',
+          background: 'rgba(198, 156, 62, 0.04)',
         }}
       >
         <p
           className="text-[10px] font-semibold uppercase"
-          style={{ letterSpacing: '0.18em', color: '#B89530' }}
+          style={{ letterSpacing: '0.18em', color: '#A88530' }}
         >
           {meta?.label ?? sectionType}
         </p>

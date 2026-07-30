@@ -7,11 +7,11 @@
  * inline styles when a Tailwind arbitrary value is awkward.
  */
 export const PMBC = {
-  primary: '#153D64',
-  primaryDeep: '#0F2F4F',
+  primary: '#1B3A5F',
+  primaryDeep: '#14304F',
   secondary: '#3FA663',
-  accent: '#D4A93A',
-  accentMuted: '#B89530',
+  accent: '#C69C3E',
+  accentMuted: '#A88530',
   text: '#0F1B2D',
   textOnDark: '#E8DDC4',
   muted: '#6B7280',

@@ -66,13 +66,13 @@ export default async function AboutPage(props: {
             <ul className="mt-12 grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
               {team.slice(0, 6).map((m) => (
                 <li key={m.id} className="flex flex-col rounded-[2px] border border-[color:var(--pmbc-border-warm)] bg-white p-7">
-                  <div className="mb-5 h-36 w-full overflow-hidden rounded-[2px]" style={{ background: '#102E4C' }}>
+                  <div className="mb-5 h-36 w-full overflow-hidden rounded-[2px]" style={{ background: '#1B3A5F' }}>
                     {m.photo ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={m.photo} alt={m.name} className="h-full w-full object-cover" />
                     ) : (
                       <div className="flex h-full w-full items-center justify-center">
-                        <span className="font-serif text-3xl text-[#D4A93A]">
+                        <span className="font-serif text-3xl text-[#C69C3E]">
                           {m.name.split(' ').map((w) => w[0]).slice(0, 2).join('')}
                         </span>
                       </div>

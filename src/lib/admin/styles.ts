@@ -4,7 +4,7 @@
  * Admin pages intentionally use inline styles instead of Tailwind utility
  * classes — this isolates the admin console from any future public-site
  * theming changes. PMBC's admin palette is anchored on the deeper navy
- * (#0F2540) used in the sidebar plus the gold accent (#D4A93A) reserved for
+ * (#0F2540) used in the sidebar plus the gold accent (#C69C3E) reserved for
  * activation/highlight states.
  */
 import type { CSSProperties } from 'react';
@@ -14,7 +14,7 @@ export const ADMIN_COLORS = {
   primary: '#1B3A5F', // primary action, link, page heading accent
   primaryDeep: '#0F2540', // deep navy — body headings, sidebar bg
   sidebar: '#0F2540', // sidebar background
-  accent: '#D4A93A', // gold — active border, premium signal
+  accent: '#C69C3E', // gold — active border, premium signal
   success: '#1B6B3F', // saved toast text
   successBg: '#E5F1EA', // saved toast bg
   danger: '#DC2626',

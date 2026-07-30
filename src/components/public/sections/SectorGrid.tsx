@@ -75,8 +75,8 @@ export function SectorGrid({
                 <div
                   className="flex h-12 w-12 items-center justify-center"
                   style={{
-                    background: dark ? 'rgba(212, 169, 58, 0.12)' : 'rgba(184, 149, 48, 0.10)',
-                    color: dark ? '#D4A93A' : '#B89530',
+                    background: dark ? 'rgba(198, 156, 62, 0.12)' : 'rgba(168, 133, 48, 0.10)',
+                    color: dark ? '#C69C3E' : '#A88530',
                   }}
                 >
                   <Icon size={22} strokeWidth={1.5} />

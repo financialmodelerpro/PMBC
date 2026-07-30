@@ -36,14 +36,14 @@ export default async function InsightsPage() {
         className="px-6 pt-28 pb-16 text-white sm:pt-32"
         style={{
           background:
-            'radial-gradient(ellipse at 50% 30%, #173E63 0%, #102E4C 55%, #0C2741 100%)',
+            'radial-gradient(ellipse at 50% 30%, #1F4269 0%, #1B3A5F 55%, #14304F 100%)',
         }}
       >
         <div className="mx-auto max-w-[860px] text-center">
-          <div aria-hidden className="mx-auto h-px w-[60px]" style={{ background: '#D4A93A' }} />
+          <div aria-hidden className="mx-auto h-px w-[60px]" style={{ background: '#C69C3E' }} />
           <p
             className="mt-5 text-[11px] font-semibold uppercase"
-            style={{ letterSpacing: '0.18em', color: '#D4A93A' }}
+            style={{ letterSpacing: '0.18em', color: '#C69C3E' }}
           >
             Insights
           </p>
@@ -70,7 +70,7 @@ export default async function InsightsPage() {
                   href={`/insights/${lead.slug}`}
                   className="group mb-12 grid overflow-hidden rounded-[2px] border border-[color:var(--pmbc-border-warm)] bg-white md:grid-cols-2"
                 >
-                  <div className="h-56 w-full md:h-full" style={{ background: '#102E4C' }}>
+                  <div className="h-56 w-full md:h-full" style={{ background: '#1B3A5F' }}>
                     {lead.cover_url && (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={lead.cover_url} alt="" className="h-full w-full object-cover" />
@@ -103,7 +103,7 @@ export default async function InsightsPage() {
                         href={`/insights/${a.slug}`}
                         className="group flex h-full flex-col overflow-hidden rounded-[2px] border border-[color:var(--pmbc-border-warm)] bg-white transition hover:-translate-y-0.5 hover:shadow-[0_12px_36px_rgba(15,37,64,0.08)]"
                       >
-                        <div className="h-40 w-full" style={{ background: '#102E4C' }}>
+                        <div className="h-40 w-full" style={{ background: '#1B3A5F' }}>
                           {a.cover_url && (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img src={a.cover_url} alt="" className="h-full w-full object-cover" />

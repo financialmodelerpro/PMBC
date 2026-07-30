@@ -12,7 +12,10 @@ const navItemSchema = z.object({
 });
 
 const configSchema = z.object({
-  nav_items: z.array(navItemSchema),
+  // Optional since migration 027: nav items are `site_pages` rows edited at
+  // /admin/pages. Still accepted so an older client (or a manual call) can
+  // write the legacy fallback row, but the admin UI no longer sends it.
+  nav_items: z.array(navItemSchema).optional(),
   cta_label: z.string(),
   cta_href: z.string(),
   show_cta: z.boolean(),
@@ -47,12 +50,6 @@ async function handleMutation(req: Request) {
   const upserts: TablesInsert<'cms_content'>[] = [
     {
       section: 'header_settings',
-      key: 'nav_items',
-      value: JSON.stringify(parsed.data.nav_items),
-      updated_at: now,
-    },
-    {
-      section: 'header_settings',
       key: 'cta_label',
       value: parsed.data.cta_label,
       updated_at: now,
@@ -77,6 +74,15 @@ async function handleMutation(req: Request) {
     },
   ];
 
+  if (parsed.data.nav_items) {
+    upserts.push({
+      section: 'header_settings',
+      key: 'nav_items',
+      value: JSON.stringify(parsed.data.nav_items),
+      updated_at: now,
+    });
+  }
+
   const { error } = await supabase
     .from('cms_content')
     .upsert(upserts, { onConflict: 'section,key' });
@@ -91,7 +97,7 @@ async function handleMutation(req: Request) {
     entityType: 'header_settings',
     entityId: 'all',
     metadata: {
-      nav_count: parsed.data.nav_items.length,
+      nav_count: parsed.data.nav_items?.length ?? null,
       keys: upserts.map((u) => u.key),
     },
   });

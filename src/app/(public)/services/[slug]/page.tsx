@@ -75,18 +75,18 @@ export default async function ServiceDetailPage(props: {
         className="px-6 py-24 text-white sm:py-28 lg:py-32"
         style={{
           background:
-            'radial-gradient(ellipse at 50% 40%, #173E63 0%, #102E4C 55%, #0C2741 100%)',
+            'radial-gradient(ellipse at 50% 40%, #1F4269 0%, #1B3A5F 55%, #14304F 100%)',
         }}
       >
         <div className="mx-auto flex max-w-[860px] flex-col items-center text-center">
           <div
             aria-hidden
             className="h-px w-[60px]"
-            style={{ background: '#D4A93A' }}
+            style={{ background: '#C69C3E' }}
           />
           <p
             className="mt-5 text-[11px] font-semibold uppercase"
-            style={{ letterSpacing: '0.18em', color: '#D4A93A' }}
+            style={{ letterSpacing: '0.18em', color: '#C69C3E' }}
           >
             Engage PMBC
           </p>
@@ -103,7 +103,7 @@ export default async function ServiceDetailPage(props: {
           <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
             <Link
               href={`/contact?service=${service.slug}`}
-              className="inline-flex items-center gap-2 border border-[#D4A93A] px-8 py-3.5 text-[12px] font-semibold uppercase text-[#E8DDC4] transition-all duration-200 hover:bg-[#D4A93A] hover:text-[#0F2F4F]"
+              className="inline-flex items-center gap-2 border border-[#C69C3E] px-8 py-3.5 text-[12px] font-semibold uppercase text-[#E8DDC4] transition-all duration-200 hover:bg-[#C69C3E] hover:text-[#14304F]"
               style={{ letterSpacing: '0.12em' }}
             >
               Start a conversation
