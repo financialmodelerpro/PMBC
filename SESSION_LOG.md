@@ -649,3 +649,28 @@ PMBC drove the navbar from a single `cms_content` row edited at `/admin/header-s
 **Environment note:** a second checkout at `D:\PMBC - Cursor\PMBC-site` was running a dev server on port 3000 that hung mid-session; verification ran on a separate server on port 3100 from `D:\PMBC\PMBC-site`. The hung process was killed at end of session. Both checkouts were at the same commit.
 
 **Still open (unchanged by this session):** production env vars on Vercel, rotate `Admin@2026`, DNS + SSL, counsel review of `/privacy` + `/terms`, submit sitemap to Search Console, refresh the Supabase Security Advisor, real assets (logo, founder photo, network image, partner logos), and content for the four empty Phase 10 collections. Two inquiries are still sitting unread in `/admin/contact-submissions`, one of which looks genuine (dated 2026-06-21).
+
+### 2026-07-30 — Checkpoint: closing for the day
+
+Phase 11 shipped and pushed (`e6105ab`), then a documentation sweep to clear staleness the refactor exposed.
+
+**Docs corrected this pass**
+- `CLAUDE.md` §6 admin route table: `/admin/pages` was still documented as "List all CMS pages with edit links", which was the bug Phase 11 fixed. Now lists `/admin/page-builder` as the pages list and `/admin/pages` as Pages & Nav.
+- `CLAUDE.md` admin-styling section: still claimed gold `#D4A93A`. Corrected to `#C69C3E`, with a note that the admin/public isolation rule is about structural colors, not the shared brand accent.
+- `CLAUDE.md` `branding_config` DDL block: added a note that the `#D4A93A` column default is the original 003 value and migration 028 retunes the live row, so a fresh 003-then-028 run lands on the current palette. The default itself is left alone because applied migrations are never edited.
+- `CLAUDE.md` Phase 9.5 status row: marked its palette values superseded by Phase 11 while noting the structure it introduced still stands. History kept, not rewritten.
+- `CLAUDE.md` launch checklist: re-dated to 2026-07-30 and added the unread-inquiries item.
+- `PROJECT_HANDOFF.md`: the status paragraph was badly stale, claiming "Phases 1 through 8 complete; Phase 9 in progress" as of 2026-05-06, listing the old palette, and listing work as remaining that has since shipped (all page content, the contact inbox). Rewritten to cover Phases 1 to 11 and the real remaining list.
+- `SESSION_LOG.md`: historical colour references in the Phase 9.5 and earlier entries were deliberately **left as-is**. They are an accurate record of what those sessions did; only forward-looking documents were updated.
+
+**State at close**
+- `main` clean and pushed, local and remote HEAD equal.
+- Typecheck and build clean; 20 admin routes and 14 public routes verified 200 earlier in the session.
+- Migrations 027 and 028 applied to Supabase by the user and re-verified: `site_pages` at exactly 6 rows with no duplicates, anon key blocked by RLS, `branding_config` on the new palette.
+- The hung dev server on port 3000 (the `D:\PMBC - Cursor` checkout) was killed; both 3000 and 3100 are free.
+
+**Two Phase 11 choices left open for review** (both shipped, both a small revert if unwanted):
+1. The **Collections sidebar group** (Services, Case Studies, Team & Advisors) was kept even though the brief's sidebar order omitted it, because deleting it would orphan three working Phase 10 pages that have no FMP counterpart.
+2. The **hero gradient re-anchor** (`#1F4269` / `#1B3A5F` / `#14304F`) exceeded the four named tokens. It was the actual cause of the "renders too dark" complaint, since the old stops bottomed out at `#0C2741`, but it is a judgement call best confirmed by eye on the deployed site.
+
+**Next session pickup:** the launch checklist in `CLAUDE.md`, in order. Nothing in the codebase is blocking. First code-touching item is likely removing the "Subject to legal review" badge once counsel signs off, or wiring real assets once provided.
