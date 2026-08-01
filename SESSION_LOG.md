@@ -4,6 +4,46 @@ Chronological build history for the PMBC website. Split out of `CLAUDE.md` to ke
 
 ---
 
+### 2026-08-01 - FMP Admin Parity, Phase 4: create and delete pages with templates
+
+PMBC had no way to create or delete a CMS page from the admin: pages existed only via SQL migrations. FMP's Page Builder list has a New Page modal with template seeds and a per-row delete guarded by `is_system` (`CMS_REFERENCE.md` section 2.2).
+
+**ACTION REQUIRED: migration 031 must be run by hand.** It is the first migration in this run that needs DDL (`ALTER TABLE cms_pages ADD COLUMN is_system`). supabase-js cannot execute DDL, the Supabase CLI is not installed, and no direct Postgres connection string exists in `.env.local`, so it could not be applied from here. Run `supabase/migrations/031_cms_pages_is_system.sql` in the Supabase SQL editor.
+
+**Two findings that changed the design**
+
+1. **`cms_pages` had no `is_system` column at all.** PMBC's migration 002 never defined one; the brief assumed it existed. Migration 031 adds it.
+
+2. **All 17 pages are system pages, not the 8 in the brief.** The 8 firm pages obviously back bespoke routes. The 9 `service-*` rows look like inert metadata, but `src/app/(public)/services/[slug]/page.tsx` calls `fetchPage('service-' + slug)` inside `generateMetadata` and passes it to `buildPageMetadata`, so each one supplies the meta title, description and OG image for a live public service page. Deleting one would not break the page (it falls back to config defaults) but would silently downgrade its SEO. Marking only 8 would have left a delete button that quietly degrades live pages, so all 17 are locked. New pages default to `is_system = false` and are freely deletable, which is the point of the feature.
+
+**Built**
+- `supabase/migrations/031_cms_pages_is_system.sql`. Additive, idempotent, `UPDATE` scoped by `created_at` so a re-run cannot re-lock a page created later and deliberately left unlocked.
+- `src/lib/cms/pageTemplates.ts`. Five templates (blank / landing / about / services / contact). Sections compose `defaultContentFor`, the same source the Add-section picker uses, so a templated section and a hand-added one start identical. `display_order` in 10s. The contact template overrides the generic `text_image` default so the block reads as contact details on first render. Also exports `SLUG_RX` and `slugFromTitle`, shared by the form and the API so the two cannot disagree on what a valid slug is.
+- `POST /api/admin/page-sections` gains `action: 'create_page'`, and a new `DELETE` handler takes `action: 'delete_page'`. FMP puts both on the same endpoint behind an action discriminator rather than sub-routes (sections 2.2 and 5.3), so PMBC matches.
+- `src/app/admin/page-builder/PageListClient.tsx`. New Page button (green, Phase 2 `SaveButton`), modal with title, live-derived slug, and five radio-style template cards. Per-row trash for deletable pages, lock icon for system pages. Delete goes through the shared `ConfirmDialog` and names the section count.
+- `is_system` hand-added to `src/types/database.ts` (Row / Insert / Update).
+
+**Correctness details worth recording**
+- Slug auto-fills from the title until the admin edits it, then stops overwriting.
+- Uniqueness is pre-checked for a friendly error, but the UNIQUE index is still the real guard: two simultaneous creates would race past the check, so the insert also maps Postgres `23505` to a 409.
+- If seeding template sections fails, the just-created `cms_pages` row is deleted again. A page with a half-applied template is worse than no page, because the admin cannot tell which sections are missing.
+- Delete removes `page_sections` first. `page_sections.page_slug` is a slug reference, not a real foreign key, so nothing cascades on its own and the sections would otherwise be orphaned.
+- The system-page check is enforced **server-side** (403), not only by hiding the button. The UI is not the security boundary.
+- **Everything fails closed while 031 is pending:** the list retries its query without `is_system` and treats every page as system, so the worst case is "nothing is deletable" rather than "everything is". The DELETE endpoint returns 409 with a message naming the migration. A warning banner on the list says the same. Create still works, because the insert omits `is_system` and relies on the column default.
+
+**Verified**
+- Typecheck and build clean (34/34).
+- List renders 17 rows, 17 lock icons, 0 trash buttons, 1 green New Page button, and the migration-pending banner.
+- Validation: invalid slug `Test Page!` 422 with the regex message; duplicate `home` 409; unknown template 422; empty title 422.
+- Created "Test Page" with the landing template: 201, 4 sections at display_order 10/20/30/40, all visible, content populated from the type defaults, page status `draft`, and an audit row carrying `page_slug`, `template`, `section_count` and `status`.
+- Builder route loaded 200 for the new page.
+- Delete refused with 409 pre-migration (fails closed) and 401 unauthenticated.
+- Test page removed afterwards; database back to 17 pages / 36 sections. Public routes including `/services/financial-modeling` all 200.
+
+**Not yet verified, because it needs migration 031:** the delete happy path (cascade then page, list refresh), the 403 on a system page, and the trash-versus-lock split once real flags exist. After running 031, create a throwaway page and delete it to close those out.
+
+---
+
 ### 2026-08-01 - FMP Admin Parity, Phase 3: Page Builder per-section save
 
 The Page Builder had one global Save that POSTed every section at once, and a visibility toggle that persisted immediately. FMP gives each section its own Save and keeps visibility pending until that section is saved (`CMS_REFERENCE.md` section 2.3).

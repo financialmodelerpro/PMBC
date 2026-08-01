@@ -5,6 +5,12 @@ import { getAdminSession } from '@/lib/auth/requireAdmin';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { writeAudit } from '@/lib/audit';
 import { isSectionType } from '@/lib/cms/sectionTypes';
+import {
+  SLUG_RX,
+  buildTemplateSections,
+  isTemplateId,
+  type TemplateId,
+} from '@/lib/cms/pageTemplates';
 
 const sectionSchema = z.object({
   id: z.string().uuid(),
@@ -19,6 +25,29 @@ const sectionSchema = z.object({
 const bodySchema = z.object({
   page_slug: z.string().min(1),
   sections: z.array(sectionSchema),
+});
+
+/**
+ * Create a page from a starter template. FMP puts this on the same endpoint
+ * behind an `action` discriminator rather than a sub-route
+ * (CMS_REFERENCE.md sections 2.2 and 5.3), so PMBC does the same.
+ */
+const createPageSchema = z.object({
+  action: z.literal('create_page'),
+  title: z.string().trim().min(1, 'Title is required').max(200),
+  slug: z
+    .string()
+    .trim()
+    .min(1, 'Slug is required')
+    .max(80)
+    .regex(SLUG_RX, 'Slug may contain only lowercase letters, numbers and hyphens'),
+  template: z.string().refine(isTemplateId, { message: 'unknown template' }),
+  status: z.enum(['draft', 'published']).default('draft'),
+});
+
+const deletePageSchema = z.object({
+  action: z.literal('delete_page'),
+  slug: z.string().trim().min(1),
 });
 
 // Lightweight structural PATCH: persists ONLY order/visibility so an auto-save
@@ -118,6 +147,16 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
   }
 
+  // Route on the discriminator first, so the batch-save shape (which carries no
+  // `action`) stays exactly as it was.
+  if (
+    json &&
+    typeof json === 'object' &&
+    (json as { action?: unknown }).action === 'create_page'
+  ) {
+    return handleCreatePage(json, session.user.id);
+  }
+
   const parsed = bodySchema.safeParse(json);
   if (!parsed.success) {
     return NextResponse.json(
@@ -170,4 +209,191 @@ export async function POST(req: Request) {
   });
 
   return NextResponse.json({ ok: true, updated: sections.length });
+}
+
+async function handleCreatePage(json: unknown, adminId: string) {
+  const parsed = createPageSchema.safeParse(json);
+  if (!parsed.success) {
+    return NextResponse.json(
+      {
+        error: parsed.error.issues[0]?.message ?? 'Validation failed',
+        issues: parsed.error.issues,
+      },
+      { status: 422 },
+    );
+  }
+
+  const { title, slug, template, status } = parsed.data;
+  const supabase = createSupabaseServerClient();
+
+  // Explicit pre-check so the admin gets "that slug is taken" rather than a raw
+  // unique-constraint violation. The UNIQUE index is still the real guard: two
+  // simultaneous creates would race past this, and the insert below is what
+  // actually rejects the loser.
+  const { data: existing } = await supabase
+    .from('cms_pages')
+    .select('slug')
+    .eq('slug', slug)
+    .maybeSingle();
+  if (existing) {
+    return NextResponse.json(
+      { error: `A page with the slug "${slug}" already exists` },
+      { status: 409 },
+    );
+  }
+
+  const nowIso = new Date().toISOString();
+  const { data: page, error: pageError } = await supabase
+    .from('cms_pages')
+    .insert({
+      slug,
+      title,
+      status,
+      // `is_system` is deliberately NOT set here. The column defaults to false
+      // (migration 031), so admin-created pages are deletable, and omitting it
+      // means this insert also succeeds on a database where 031 has not been
+      // applied yet rather than failing on an unknown column.
+      created_at: nowIso,
+      updated_at: nowIso,
+    })
+    .select('*')
+    .single();
+
+  if (pageError || !page) {
+    // 23505 is Postgres unique_violation: the race described above.
+    const isDuplicate = (pageError as { code?: string } | null)?.code === '23505';
+    return NextResponse.json(
+      {
+        error: isDuplicate
+          ? `A page with the slug "${slug}" already exists`
+          : (pageError?.message ?? 'Could not create page'),
+      },
+      { status: isDuplicate ? 409 : 500 },
+    );
+  }
+
+  const rows = buildTemplateSections(template as TemplateId, slug);
+  if (rows.length > 0) {
+    const { error: sectionsError } = await supabase
+      .from('page_sections')
+      .insert(rows as never);
+    if (sectionsError) {
+      // Roll the page back by hand: Postgres cannot undo the insert above from
+      // here, and leaving a page with a half-applied template is worse than
+      // leaving nothing, because the admin cannot tell which sections are
+      // missing.
+      await supabase.from('cms_pages').delete().eq('slug', slug);
+      return NextResponse.json(
+        { error: `Could not seed template sections: ${sectionsError.message}` },
+        { status: 500 },
+      );
+    }
+  }
+
+  await writeAudit(supabase, {
+    adminId,
+    action: 'create',
+    entityType: 'cms_pages',
+    entityId: slug,
+    metadata: { page_slug: slug, title, template, section_count: rows.length, status },
+  });
+
+  return NextResponse.json({ page, section_count: rows.length }, { status: 201 });
+}
+
+/**
+ * Delete a page and its sections. Child rows go first: `page_sections.page_slug`
+ * is a slug reference rather than a real foreign key, so nothing would cascade
+ * on its own and the sections would be orphaned.
+ */
+export async function DELETE(req: Request) {
+  const session = await getAdminSession();
+  if (!session) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  let json: unknown;
+  try {
+    json = await req.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+  }
+
+  const parsed = deletePageSchema.safeParse(json);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: 'Validation failed', issues: parsed.error.issues },
+      { status: 422 },
+    );
+  }
+
+  const { slug } = parsed.data;
+  const supabase = createSupabaseServerClient();
+
+  const { data: page, error: readError } = await supabase
+    .from('cms_pages')
+    .select('slug, title, is_system')
+    .eq('slug', slug)
+    .maybeSingle();
+
+  if (readError) {
+    // Before migration 031 the column does not exist and this select fails.
+    // Refuse the delete rather than guessing: without the flag there is no way
+    // to tell a system page from an admin-created one, and deleting a page that
+    // backs a live public route is not a mistake worth risking.
+    return NextResponse.json(
+      {
+        error:
+          'Page deletion is unavailable until migration 031 (cms_pages.is_system) has been applied.',
+      },
+      { status: 409 },
+    );
+  }
+  if (!page) {
+    return NextResponse.json({ error: `No page with slug "${slug}"` }, { status: 404 });
+  }
+
+  // Server-side guard. The list hides the delete control for system pages, but
+  // the UI is not the security boundary: a hand-rolled request must be refused
+  // too, or the flag is decoration.
+  if (page.is_system) {
+    return NextResponse.json(
+      { error: `"${page.title}" is a system page and cannot be deleted` },
+      { status: 403 },
+    );
+  }
+
+  const { data: removedSections, error: sectionsError } = await supabase
+    .from('page_sections')
+    .delete()
+    .eq('page_slug', slug)
+    .select('id');
+  if (sectionsError) {
+    return NextResponse.json(
+      { error: `Could not delete sections: ${sectionsError.message}` },
+      { status: 500 },
+    );
+  }
+
+  const { error: pageError } = await supabase.from('cms_pages').delete().eq('slug', slug);
+  if (pageError) {
+    return NextResponse.json({ error: pageError.message }, { status: 500 });
+  }
+
+  await writeAudit(supabase, {
+    adminId: session.user.id,
+    action: 'delete',
+    entityType: 'cms_pages',
+    entityId: slug,
+    metadata: {
+      page_slug: slug,
+      title: page.title,
+      section_count: removedSections?.length ?? 0,
+    },
+  });
+
+  return NextResponse.json({
+    ok: true,
+    deleted_sections: removedSections?.length ?? 0,
+  });
 }

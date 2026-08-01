@@ -158,6 +158,7 @@ export type Database = {
           meta_description: string | null
           meta_title: string | null
           og_image_url: string | null
+          is_system: boolean
           slug: string
           status: string
           title: string
@@ -169,6 +170,7 @@ export type Database = {
           meta_description?: string | null
           meta_title?: string | null
           og_image_url?: string | null
+          is_system?: boolean
           slug: string
           status?: string
           title: string
@@ -180,6 +182,7 @@ export type Database = {
           meta_description?: string | null
           meta_title?: string | null
           og_image_url?: string | null
+          is_system?: boolean
           slug?: string
           status?: string
           title?: string
