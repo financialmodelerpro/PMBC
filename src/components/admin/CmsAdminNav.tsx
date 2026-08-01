@@ -29,7 +29,6 @@ import {
   Menu,
   MessageSquareQuote,
   Newspaper,
-  Palette,
   PanelTop,
   Settings,
   Share2,
@@ -65,13 +64,15 @@ const NAV: NavEntry[] = [
     href: '/admin/page-builder',
     icon: LayoutTemplate,
   },
-  { kind: 'item', label: 'Header Settings', href: '/admin/header-settings', icon: PanelTop },
+  // Branding was merged into Header Settings in Phase 1 of the FMP parity
+  // work. FMP has one entry here with exactly this matchPath, so /admin/branding
+  // (now a redirect) still highlights the right item on the way through.
   {
     kind: 'item',
-    label: 'Header & Branding',
-    href: '/admin/branding',
-    icon: Palette,
-    matchPaths: ['/admin/brand'],
+    label: 'Header Settings',
+    href: '/admin/header-settings',
+    icon: PanelTop,
+    matchPaths: ['/admin/branding'],
   },
   { kind: 'item', label: 'Page Content', href: '/admin/content', icon: Type },
   { kind: 'item', label: 'Pages & Nav', href: '/admin/pages', icon: FileText },

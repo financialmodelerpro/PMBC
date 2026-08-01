@@ -2,12 +2,45 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
 
 export type NavItem = { label: string; href: string };
 
+/**
+ * The 17 discrete `header_settings` keys, matching FMP's Header Settings page
+ * (verified against the real FMP source in "PMBC from FMP/", not only against
+ * CMS_REFERENCE.md).
+ *
+ * Brand identity fields (logo_url, brand_name, tagline, colours) are absent on
+ * purpose: PMBC keeps those in the `branding_config` table, which the public
+ * Navbar, Footer, /api/og and buildPageMetadata already read. See migration 029
+ * for the reasoning.
+ */
 export type HeaderConfig = {
   nav_items: NavItem[];
+
+  // Call to action + mobile (pre-existing).
   cta_label: string;
   cta_href: string;
   show_cta: boolean;
   mobile_menu_enabled: boolean;
+
+  // Logo presentation.
+  logo_enabled: boolean;
+  logo_width_px: string;
+  logo_height_px: string;
+  logo_position: 'left' | 'center' | 'right';
+
+  // Branding text toggles.
+  show_brand_name: boolean;
+  show_tagline: boolean;
+
+  // Header icon.
+  icon_url: string;
+  icon_as_favicon: boolean;
+  icon_in_header: boolean;
+  icon_size_px: string;
+
+  // Header layout.
+  header_height_px: string;
+  header_padding_top_px: string;
+  header_padding_bottom_px: string;
 };
 
 export const DEFAULT_HEADER_CONFIG: HeaderConfig = {
@@ -23,6 +56,23 @@ export const DEFAULT_HEADER_CONFIG: HeaderConfig = {
   cta_href: '/contact',
   show_cta: true,
   mobile_menu_enabled: true,
+
+  logo_enabled: true,
+  logo_width_px: '',
+  logo_height_px: '40',
+  logo_position: 'left',
+
+  show_brand_name: true,
+  show_tagline: false,
+
+  icon_url: '',
+  icon_as_favicon: false,
+  icon_in_header: false,
+  icon_size_px: '20',
+
+  header_height_px: '',
+  header_padding_top_px: '',
+  header_padding_bottom_px: '',
 };
 
 function parseBool(v: string | null | undefined, fallback: boolean): boolean {
@@ -82,7 +132,7 @@ async function fetchSitePagesNav(): Promise<NavItem[] | null> {
  * come from discrete cms_content rows under section 'header_settings':
  *   - cta_label, cta_href (text)
  *   - show_cta, mobile_menu_enabled (text 'true'|'false')
- *   - nav_items (JSON array) — legacy fallback only, no longer written
+ *   - nav_items (JSON array), legacy fallback only, no longer written
  *
  * Falls back to DEFAULT_HEADER_CONFIG for any missing/malformed key.
  */
@@ -112,6 +162,15 @@ export async function fetchHeaderConfig(): Promise<HeaderConfig> {
   }
 
   const nav = parseNavItems(rows.get('nav_items') ?? null);
+
+  // Every key falls back to DEFAULT_HEADER_CONFIG, so a database that has not
+  // run migration 029 still renders the consolidated form with sane values
+  // rather than blank inputs.
+  const str = (key: keyof HeaderConfig): string => {
+    const v = rows.get(key);
+    return typeof v === 'string' ? v : (DEFAULT_HEADER_CONFIG[key] as string);
+  };
+
   return {
     nav_items:
       sitePagesNav ??
@@ -131,5 +190,36 @@ export async function fetchHeaderConfig(): Promise<HeaderConfig> {
       rows.get('mobile_menu_enabled'),
       legacy?.mobile_menu_enabled ?? DEFAULT_HEADER_CONFIG.mobile_menu_enabled,
     ),
+
+    logo_enabled: parseBool(rows.get('logo_enabled'), DEFAULT_HEADER_CONFIG.logo_enabled),
+    logo_width_px: str('logo_width_px'),
+    logo_height_px: str('logo_height_px'),
+    logo_position: parsePosition(rows.get('logo_position')),
+
+    show_brand_name: parseBool(
+      rows.get('show_brand_name'),
+      DEFAULT_HEADER_CONFIG.show_brand_name,
+    ),
+    show_tagline: parseBool(rows.get('show_tagline'), DEFAULT_HEADER_CONFIG.show_tagline),
+
+    icon_url: str('icon_url'),
+    icon_as_favicon: parseBool(
+      rows.get('icon_as_favicon'),
+      DEFAULT_HEADER_CONFIG.icon_as_favicon,
+    ),
+    icon_in_header: parseBool(
+      rows.get('icon_in_header'),
+      DEFAULT_HEADER_CONFIG.icon_in_header,
+    ),
+    icon_size_px: str('icon_size_px'),
+
+    header_height_px: str('header_height_px'),
+    header_padding_top_px: str('header_padding_top_px'),
+    header_padding_bottom_px: str('header_padding_bottom_px'),
   };
+}
+
+function parsePosition(v: string | null | undefined): 'left' | 'center' | 'right' {
+  if (v === 'left' || v === 'center' || v === 'right') return v;
+  return DEFAULT_HEADER_CONFIG.logo_position;
 }

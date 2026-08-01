@@ -323,9 +323,11 @@ const QUICK_ACTIONS: Array<{
     Icon: FileText,
   },
   {
-    label: 'Branding',
+    // Points straight at the merged page rather than through the
+    // /admin/branding redirect kept for older bookmarks.
+    label: 'Header Settings',
     desc: 'Logo, colours, tagline',
-    href: '/admin/branding',
+    href: '/admin/header-settings',
     Icon: Palette,
   },
   {

@@ -4,6 +4,54 @@ Chronological build history for the PMBC website. Split out of `CLAUDE.md` to ke
 
 ---
 
+### 2026-08-01 - FMP Admin Parity, Phase 1: Header Settings consolidation
+
+Context: `ADMIN_PARITY_GAP.md` scored `/admin/header-settings` as the worst gap in the console (LAYOUT and DATA MODEL both MISSING). FMP has one page owning brand colours, logo, branding text, header icon and header layout; PMBC had split branding onto a separate `/admin/branding` and left header-settings with four fields. This phase merges them.
+
+Decisions in force: **Palette B** (keep PMBC navy + gold, adopt green only for Save semantics, deferred to Phase 2) and **Behavior B** (match FMP structure, keep PMBC's shared components, zod validation, audit coverage, RLS).
+
+**Verified against FMP source, not the doc**
+`CMS_REFERENCE.md` is a 2026-05-02 snapshot marked "no behavioral contract", so its "17 keys" claim was checked against the real FMP page carried in `PMBC from FMP/app/admin/header-settings/page.tsx`. The doc was accurate: 17 keys, five cards, `Promise.all` Save All, hex guard `/^#[0-9A-Fa-f]{0,6}$/` while typing.
+
+**Built**
+- `supabase/migrations/029_header_settings_keys.sql` - seeds the 13 header presentation keys. Additive, idempotent (`ON CONFLICT DO NOTHING`), rollback SQL in the file footer.
+- `scripts/seed-header-settings-keys.mjs` - JS equivalent for dev, `--dry-run` default reporting, fails closed if either Supabase env var is absent.
+- `src/app/admin/header-settings/HeaderSettingsForm.tsx` - rewritten. Seven cards: Brand colours, Logo, Branding text, Header icon, Header layout, Call to action, Mobile. Sticky **Save All at the top**, matching FMP.
+- `src/app/admin/header-settings/page.tsx` - now loads `fetchHeaderConfig()` and `fetchBranding()` in parallel, mirroring FMP's paired fetch. Max-width 760 (FMP uses 680; PMBC's colour row is three columns because it has an accent token FMP lacks).
+- `src/app/admin/branding/page.tsx` - replaced with a `redirect()` to `/admin/header-settings`. `BrandingForm.tsx` deleted.
+- `src/lib/cms/headerSettings.ts` - `HeaderConfig` extended to all 17 keys, each with a `DEFAULT_HEADER_CONFIG` fallback so an un-migrated database still renders sane values.
+- `src/app/api/admin/header-settings/route.ts` - zod schema extended. New keys are **optional** so an older client sending only the four CTA fields still validates. `putIf` skips undefined fields, so a partial PATCH cannot blank a key it did not send. Pixel fields validate as `/^\d*$/` (TEXT, because blank means auto).
+- `src/components/admin/CmsAdminNav.tsx` - "Header & Branding" removed; "Header Settings" gains `matchPaths: ['/admin/branding']`, exactly as FMP's own sidebar does. Unused `Palette` import dropped from the nav.
+- `src/app/admin/page.tsx` - dashboard quick-action retargeted to `/admin/header-settings`.
+- `tsconfig.json` - excludes `PMBC from FMP`. See below.
+
+**Two deliberate deviations from FMP**
+1. **Tagline stays a plain text input.** FMP uses a `RichTextEditor` here. PMBC cannot: `branding_config.tagline` is consumed by `/api/og` (satori, which takes text nodes, not HTML) and by `Footer.tsx` as a text node, so stored markup would render as escaped tags on the OG share card and in the footer. A hint on the field says so.
+2. **Identity fields stay in `branding_config`, not `cms_content`.** FMP keeps `logo_url` / `brand_name` / `tagline` as `cms_content` rows. PMBC's public Navbar, Footer, `/api/og` and `buildPageMetadata` already read them from the `branding_config` table; duplicating them would recreate the dual-source-of-truth problem migration 027 fixed for nav items. The page still presents them as one form, so the admin UX matches; only the storage differs.
+
+Also not ported: FMP's `achievement_card_logo_height`, which sizes the logo on a training achievement share card. PMBC has no such card, so the key would be dead config.
+
+**One efficiency change vs FMP**: FMP's Save All fires 17 separate `PATCH /api/admin/content` calls. PMBC sends one request to `/api/admin/header-settings`, which already upserts the batch and writes a single audit row. Seventeen round trips would produce seventeen audit entries per click. Verified: one Save All produced exactly one `audit_log` row.
+
+**Verified**
+- `npm run typecheck` clean, `npm run build` clean (34/34 static pages).
+- Migration applied to Supabase. Dry-run first (13 missing), applied, re-run reported "nothing to do", confirming idempotency. Discovered en route that `mobile_menu_enabled` had never existed as a row and was running on the code fallback; it now exists.
+- `header_settings` holds exactly **17 rows**.
+- Unauthenticated: `/admin/header-settings`, `/admin/branding`, `/admin/pages` all 307. `PATCH /api/admin/header-settings` 401.
+- Authenticated: all three 200. `/admin/branding` 307 to `/admin/header-settings`.
+- All seven card headings render, with live brand values (`#1B3A5F` / `#3FA663` / `#C69C3E`) read from the database.
+- Full 17-key write round trip persisted correctly, then restored to defaults.
+- zod rejects `header_height_px: "72px"` and `logo_position: "diagonal"` with 422.
+- Public routes `/`, `/about`, `/services`, `/contact` all 200, unchanged.
+
+**Incidental fix (blocking the verification gate)**
+The untracked `PMBC from FMP/` tree was contributing **107 TypeScript errors** to the root `tsc --noEmit`, because the root `tsconfig.json` globbed `**/*.ts(x)`. Zero came from this phase's changes. This is the hazard already logged as S4/R14 in `MIGRATION_PLAN.md`. Rather than delete the tree (that is Phase A of the separate migration plan, and the tree is untracked and unarchived), `tsconfig.json` now excludes it. Reversible in one line, and it makes the typecheck gate meaningful again.
+
+**Deferred, not done**
+The 13 new presentation keys are **stored but not yet read by the public site**. `Navbar.tsx` still hardcodes `height={40}` and does not consult logo sizing, position, the header icon, or header layout. That is public-renderer work, and this brief scoped the phase to admin only. Setting header height today changes the stored value and nothing visible. Wiring it is a follow-up.
+
+---
+
 ### 2026-05-02 — Phase 2: Auth + Admin Shell
 
 **Built**

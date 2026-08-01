@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 
 import { AdminPageHeader } from '@/components/admin/AdminPageHeader';
+import { fetchBranding } from '@/lib/cms/branding';
 import { fetchHeaderConfig } from '@/lib/cms/headerSettings';
 import { adminPageMain } from '@/lib/admin/styles';
 
@@ -14,17 +15,33 @@ export const metadata: Metadata = {
 };
 
 export default async function HeaderSettingsPage() {
-  const config = await fetchHeaderConfig();
+  // Both sources load in parallel, mirroring FMP, which fetches
+  // /api/admin/content and /api/branding together on mount.
+  const [header, branding] = await Promise.all([
+    fetchHeaderConfig(),
+    safeFetchBranding(),
+  ]);
+
   return (
     <div style={adminPageMain}>
-      <div style={{ maxWidth: 720, margin: '0 auto' }}>
+      {/* FMP caps this form at 680px. PMBC uses 760 because the colour row is
+          three columns wide (primary/secondary/accent) where FMP has two. */}
+      <div style={{ maxWidth: 760, margin: '0 auto' }}>
         <AdminPageHeader
-          eyebrow="Admin"
+          eyebrow="Content"
           title="Header Settings"
-          description="Public navigation items, call-to-action button, and mobile menu behaviour. Drag to reorder."
+          description="Brand colours, logo, branding text, header icon, and header layout. Applies across every public page."
         />
-        <HeaderSettingsForm initial={config} />
+        <HeaderSettingsForm initialHeader={header} initialBranding={branding} />
       </div>
     </div>
   );
+}
+
+async function safeFetchBranding() {
+  try {
+    return await fetchBranding();
+  } catch {
+    return null;
+  }
 }
