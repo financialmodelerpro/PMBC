@@ -5,10 +5,9 @@ import { useForm } from 'react-hook-form';
 import { Check, AlertCircle } from 'lucide-react';
 
 import { AdminPageHeader } from '@/components/admin/AdminPageHeader';
+import { SaveButton } from '@/components/admin/SaveButton';
 import {
   ADMIN_COLORS,
-  adminButtonPrimary,
-  adminButtonPrimaryDisabled,
   adminCard,
   adminInput,
   adminLabel,
@@ -88,13 +87,9 @@ export function SettingsForm({ initial }: { initial: SiteSettings }) {
         title="Site Settings"
         description="Contact details, social links, default OG image, and analytics. Stored as a single site_settings JSONB blob."
         actions={
-          <button
-            type="submit"
-            disabled={saving}
-            style={saving ? adminButtonPrimaryDisabled : adminButtonPrimary}
-          >
+          <SaveButton type="submit" saving={saving}>
             {saving ? 'Saving…' : 'Save all settings'}
-          </button>
+          </SaveButton>
         }
       />
 
@@ -158,7 +153,7 @@ function Toast({ state, message }: { state: SaveState; message?: string }) {
         gap: 8,
         padding: '12px 24px',
         borderRadius: 8,
-        background: success ? '#1A7A30' : '#DC2626',
+        background: success ? ADMIN_COLORS.toastSuccessBg : ADMIN_COLORS.danger,
         color: '#FFFFFF',
         fontSize: 13,
         fontWeight: 600,

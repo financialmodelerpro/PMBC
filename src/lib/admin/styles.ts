@@ -15,6 +15,19 @@ export const ADMIN_COLORS = {
   primaryDeep: '#0F2540', // deep navy — body headings, sidebar bg
   sidebar: '#0F2540', // sidebar background
   accent: '#C69C3E', // gold — active border, premium signal
+
+  /**
+   * Save semantics, adopted from FMP CMS_REFERENCE.md section 7.3 in parity
+   * Phase 2. These are the ONLY green values in the admin palette and they mean
+   * exactly one thing: "this control commits your work". Green is deliberately
+   * not used for identity anywhere, so PMBC keeps its navy + gold. Do not reuse
+   * `save` for a generic primary button; FMP's whole point is that a green
+   * button is recognisable as the commit action across both consoles.
+   */
+  save: '#2EAA4A', // save button background (FMP accent green)
+  saveHover: '#24913E', // save button hover, one step darker
+  toastSuccessBg: '#1A7A30', // "Saved" toast background (FMP toast green)
+
   success: '#1B6B3F', // saved toast text
   successBg: '#E5F1EA', // saved toast bg
   danger: '#DC2626',
@@ -130,6 +143,24 @@ export const adminButtonPrimary: CSSProperties = {
 export const adminButtonPrimaryDisabled: CSSProperties = {
   ...adminButtonPrimary,
   opacity: 0.55,
+  cursor: 'not-allowed',
+};
+
+/**
+ * The save/commit button. Green per FMP section 7.3. Prefer the `SaveButton`
+ * component over these raw presets: it also handles the hover state, which an
+ * inline style cannot express.
+ */
+export const adminButtonSave: CSSProperties = {
+  ...adminButtonPrimary,
+  background: ADMIN_COLORS.save,
+};
+
+/** Disabled save: grey, never green, so "nothing to save" reads at a glance. */
+export const adminButtonSaveDisabled: CSSProperties = {
+  ...adminButtonPrimary,
+  background: '#D1D5DB',
+  color: '#6B7280',
   cursor: 'not-allowed',
 };
 

@@ -32,11 +32,10 @@ import {
 
 import { SaveStatus, type SaveState } from '@/components/admin/SaveStatus';
 import { ConfirmDialog } from '@/components/admin/ConfirmDialog';
+import { SaveButton } from '@/components/admin/SaveButton';
 import {
   ADMIN_COLORS,
   adminButtonGhost,
-  adminButtonPrimary,
-  adminButtonPrimaryDisabled,
 } from '@/lib/admin/styles';
 import { getSectionMeta } from '@/lib/cms/sectionTypes';
 import { sectionFromRow, type LocalSection } from '@/lib/cms/serializers';
@@ -333,18 +332,14 @@ export function PageBuilder({
             Open preview
             <ArrowUpRight size={13} />
           </Link>
-          <button
+          <SaveButton
             type="button"
             onClick={handleSave}
-            disabled={!dirty || saveState === 'saving'}
-            style={
-              !dirty || saveState === 'saving'
-                ? adminButtonPrimaryDisabled
-                : adminButtonPrimary
-            }
+            saving={saveState === 'saving'}
+            disabled={!dirty}
           >
             {saveState === 'saving' ? 'Saving…' : 'Save'}
-          </button>
+          </SaveButton>
         </div>
       </div>
 

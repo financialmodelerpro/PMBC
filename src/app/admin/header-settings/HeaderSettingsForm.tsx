@@ -5,10 +5,9 @@ import { useState, type CSSProperties } from 'react';
 
 import { SaveStatus, type SaveState } from '@/components/admin/SaveStatus';
 import { MediaPickerButton } from '@/components/admin/MediaPicker';
+import { SaveButton } from '@/components/admin/SaveButton';
 import {
   ADMIN_COLORS,
-  adminButtonPrimary,
-  adminButtonPrimaryDisabled,
   adminCard,
   adminInput,
   adminLabel,
@@ -155,14 +154,9 @@ export function HeaderSettingsForm({
         }}
       >
         <SaveStatus state={state} message={errMsg} />
-        <button
-          type="button"
-          onClick={saveAll}
-          disabled={saving}
-          style={saving ? adminButtonPrimaryDisabled : adminButtonPrimary}
-        >
+        <SaveButton type="button" onClick={saveAll} saving={saving}>
           {saving ? 'Saving…' : 'Save All'}
-        </button>
+        </SaveButton>
       </div>
 
       {!brand && (

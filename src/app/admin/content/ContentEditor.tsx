@@ -5,12 +5,11 @@ import { ChevronDown, Plus, Trash2 } from 'lucide-react';
 
 import { SaveStatus, type SaveState } from '@/components/admin/SaveStatus';
 import { ConfirmDialog } from '@/components/admin/ConfirmDialog';
+import { SaveButton } from '@/components/admin/SaveButton';
 import {
   ADMIN_COLORS,
   adminButtonGhost,
   adminButtonIcon,
-  adminButtonPrimary,
-  adminButtonPrimaryDisabled,
   adminInput,
   adminTextarea,
 } from '@/lib/admin/styles';
@@ -296,18 +295,13 @@ export function ContentEditor({ initial }: { initial: ContentRow[] }) {
                     </button>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                       <SaveStatus state={sec.state} message={sec.errMsg} />
-                      <button
+                      <SaveButton
                         type="button"
                         onClick={() => saveSection(sectionName)}
-                        disabled={sec.state === 'saving'}
-                        style={
-                          sec.state === 'saving'
-                            ? adminButtonPrimaryDisabled
-                            : adminButtonPrimary
-                        }
+                        saving={sec.state === 'saving'}
                       >
                         {sec.state === 'saving' ? 'Saving…' : 'Save section'}
-                      </button>
+                      </SaveButton>
                     </div>
                   </div>
                 </div>

@@ -4,10 +4,9 @@ import { useState, type CSSProperties } from 'react';
 
 import { SaveStatus, type SaveState } from '@/components/admin/SaveStatus';
 import { RichTextEditor } from '@/components/admin/RichTextEditor';
+import { SaveButton } from '@/components/admin/SaveButton';
 import {
   ADMIN_COLORS,
-  adminButtonPrimary,
-  adminButtonPrimaryDisabled,
   adminCard,
   adminInput,
   adminLabel,
@@ -213,14 +212,9 @@ export function EmailTemplatesEditor({ initial }: { initial: EmailTemplate[] }) 
             }}
           >
             <SaveStatus state={state} message={errMsg} />
-            <button
-              type="button"
-              onClick={onSave}
-              disabled={state === 'saving'}
-              style={state === 'saving' ? adminButtonPrimaryDisabled : adminButtonPrimary}
-            >
+            <SaveButton type="button" onClick={onSave} saving={state === 'saving'}>
               {state === 'saving' ? 'Saving…' : 'Save all templates'}
-            </button>
+            </SaveButton>
           </div>
         </div>
       ) : (

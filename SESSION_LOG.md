@@ -4,6 +4,42 @@ Chronological build history for the PMBC website. Split out of `CLAUDE.md` to ke
 
 ---
 
+### 2026-08-01 - FMP Admin Parity, Phase 2: semantic green save buttons
+
+Decision 1 (Palette B) in effect: PMBC keeps navy and gold for identity, and adopts FMP's green for save semantics only. The muscle memory that matters when switching consoles is "the green button commits my work", not the shade of the sidebar.
+
+**Tokens** (`lib/admin/styles.ts`), the only green in the admin palette:
+- `save: '#2EAA4A'` (FMP accent green), `saveHover: '#24913E'`, `toastSuccessBg: '#1A7A30'` (FMP toast green).
+- `adminButtonSave` and `adminButtonSaveDisabled` presets. Disabled is grey `#D1D5DB` on `#6B7280`, never a faded green, so "nothing to save" reads at a glance.
+
+**`SaveButton` component (new).** Built as a component rather than a bare preset because the admin is inline-styled by design and an inline style cannot express `:hover`. Without it, all nine call sites would have repeated their own `onMouseEnter`/`onMouseLeave` pair. Carries `saving` and `disabled` separately, plus `aria-busy`, and a `style` escape hatch for the one call site that needs compact padding.
+
+**`SaveStatus` upgraded.** "Saved" was green *text* on the page background; it is now a solid green pill (`#1A7A30`, white text, checkmark) so success reads from across the screen the way FMP's does. Error keeps `#DC2626`, which already matched. Added `role="status"` and `role="alert"`.
+
+**Nine call sites converted:** Page Content (Save section), Email Branding, Email Templates, Header Settings (Save All), Site Settings, OG Previews, Page Builder, Contact Submissions, and the CollectionManager drawer (which powers Testimonials, Services, Team, Case Studies, Insights, and Pages and Nav).
+
+**Four buttons deliberately NOT greened**, because they do not commit work:
+- `LoginForm` "Sign in" (authentication)
+- `media/page.tsx` "Upload files" and `MediaPicker` "Upload" (upload is not a save; also outside the stated scope)
+- `CollectionManager` "New entry" (opens the drawer; only the drawer's own button commits)
+- `ConfirmDialog` (generic confirm, frequently destructive)
+
+One judgment call: the CollectionManager drawer button is green in **both** states, whether it reads "Create" or "Save changes". It is the single control that commits the drawer, and splitting it by colour would break the exact recognition this phase exists to build.
+
+**Cleanup.** `adminButtonPrimary` / `adminButtonPrimaryDisabled` imports left orphaned by the conversion were removed from all eight affected files. `SettingsForm`'s local floating `Toast` already used `#1A7A30` and `#DC2626` correctly from an earlier phase; it now reads the tokens instead of hardcoding them, so the values live in one place.
+
+**Verified**
+- Typecheck and build clean (34/34).
+- Green save button present on Header Settings, Page Content (13, one per section), Site Settings, Email Branding, Email Templates, OG Previews (17, one per page row).
+- Drawer and detail-pane saves do not appear in SSR HTML because they render on interaction; `#2EAA4A` confirmed present in the client chunk for `/admin/testimonials`, and both call sites confirmed at source.
+- Save path 200, validation error 422, so both toast states are reachable.
+- **No bleed:** sidebar active border still gold `3px solid #C69C3E` with zero green, sidebar background still `#0F2540`, and `/`, `/about`, `/services`, `/contact` return zero hits for `2eaa4a` or `1a7a30`.
+- `git diff --name-only` touches only `src/app/admin/**`, `src/components/admin/**`, and `src/lib/admin/styles.ts`.
+
+**Note for Phase 3.** Page Builder's Save is currently one global button, so it is one green button for the whole page. Phase 3 converts it to per-section save, which is where FMP's green save button actually lives (`CMS_REFERENCE.md` section 7.3 cites the Page Builder per-section save as the canonical use). Expect the count on that page to go from 1 to N.
+
+---
+
 ### 2026-08-01 - Wire header presentation fields to the public Navbar, archive and delete the FMP scaffold
 
 Two tasks between parity Phase 1 and Phase 2. Task A closes the "stored but inert" gap Phase 1 left open. Task B executes `MIGRATION_PLAN.md` Phase A / milestone M1.

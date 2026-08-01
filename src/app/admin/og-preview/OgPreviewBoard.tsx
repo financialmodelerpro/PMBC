@@ -3,11 +3,10 @@
 import { useMemo, useState, type CSSProperties } from 'react';
 import { ExternalLink, RefreshCw, Save, X } from 'lucide-react';
 
+import { SaveButton } from '@/components/admin/SaveButton';
 import {
   ADMIN_COLORS,
   adminButtonGhost,
-  adminButtonPrimary,
-  adminButtonPrimaryDisabled,
   adminInput,
   adminLabel,
 } from '@/lib/admin/styles';
@@ -329,19 +328,15 @@ function Row({
                 <X size={12} /> Clear override
               </button>
             )}
-            <button
+            <SaveButton
               type="button"
               onClick={onSave}
-              disabled={state.saveState === 'saving'}
-              style={
-                state.saveState === 'saving'
-                  ? { ...adminButtonPrimaryDisabled, padding: '7px 16px' }
-                  : { ...adminButtonPrimary, padding: '7px 16px' }
-              }
+              saving={state.saveState === 'saving'}
+              style={{ padding: '7px 16px' }}
             >
               <Save size={12} />
               {state.saveState === 'saving' ? 'Saving…' : 'Save'}
-            </button>
+            </SaveButton>
           </div>
         </div>
       </div>

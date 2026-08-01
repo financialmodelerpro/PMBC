@@ -10,6 +10,7 @@ import {
   X,
 } from 'lucide-react';
 
+import { SaveButton } from '@/components/admin/SaveButton';
 import {
   ADMIN_COLORS,
   adminBadge,
@@ -434,10 +435,13 @@ function EditorDrawer({
             <button type="button" onClick={onClose} style={adminButtonGhost}>
               Cancel
             </button>
-            <button type="button" onClick={save} disabled={saving} style={adminButtonPrimary}>
+            {/* Green in both states: this is the control that commits the
+                drawer, whether the row is new or existing. The "New item"
+                button above stays navy, because it only opens the drawer. */}
+            <SaveButton type="button" onClick={save} saving={saving}>
               {saving ? <Loader2 size={14} className="animate-spin" /> : null}
               {saving ? 'Saving…' : isNew ? 'Create' : 'Save changes'}
-            </button>
+            </SaveButton>
           </div>
         </div>
       </aside>

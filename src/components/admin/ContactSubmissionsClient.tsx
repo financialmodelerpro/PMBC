@@ -3,12 +3,11 @@
 import { useMemo, useState, type CSSProperties } from 'react';
 import { Mail, RefreshCw, Inbox } from 'lucide-react';
 
+import { SaveButton } from '@/components/admin/SaveButton';
 import {
   ADMIN_COLORS,
   adminBadge,
   adminButtonGhost,
-  adminButtonPrimary,
-  adminButtonPrimaryDisabled,
   adminInput,
   adminLabel,
   adminTextarea,
@@ -491,14 +490,9 @@ export function ContactSubmissionsClient({
                 </div>
 
                 <div style={{ marginTop: 18, display: 'flex', gap: 10, alignItems: 'center' }}>
-                  <button
-                    type="button"
-                    onClick={save}
-                    disabled={!dirty || saving}
-                    style={!dirty || saving ? adminButtonPrimaryDisabled : adminButtonPrimary}
-                  >
+                  <SaveButton type="button" onClick={save} saving={saving} disabled={!dirty}>
                     {saving ? 'Saving...' : 'Save changes'}
-                  </button>
+                  </SaveButton>
                   {dirty && !saving && (
                     <span style={{ fontSize: 12, color: ADMIN_COLORS.textMuted }}>
                       Unsaved changes
