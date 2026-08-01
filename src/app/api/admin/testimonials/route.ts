@@ -19,6 +19,11 @@ const base = {
 export const { GET, POST, PATCH, DELETE } = createCollectionApi({
   table: 'testimonials',
   orderBy: { column: 'display_order', ascending: true },
+  // The testimonials table (migration 025) has no updated_at column; its time
+  // columns are created_at and approved_at. The factory stamps updated_at by
+  // default, which made every create and update fail with
+  // "Could not find the 'updated_at' column". Found while verifying Phase 7.
+  touchUpdatedAt: false,
   createSchema: z.object(base),
   updateSchema: z.object({
     ...base,

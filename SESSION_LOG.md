@@ -32,7 +32,25 @@ Closes the last PARTIAL row in the gap report for the audit page. PMBC had a fla
 - `/admin/audit` renders 200, and the viewer strings (empty state, "Showing", "All admins", "Clear filters", the migration banner, pagination) are all present in the client bundle.
 - **The write fallback works:** a settings PATCH returned 200 and still produced an audit row (88 total), proving a pre-032 database keeps auditing rather than failing the mutation.
 
-**Not yet verified, because it needs migration 032:** actual before/after values being stored, the diff dialog rendering real content, and the `reason` column. After running 032, edit any collection row and open its diff to close those out.
+**Migration 032 applied by the user the same day. The three outstanding items are closed, and the verification found a separate pre-existing bug.**
+
+**Diff semantics confirmed against a real create, update and delete cycle** on a throwaway testimonial:
+
+| Operation | before_value | after_value |
+|---|---|---|
+| create | null | the new row |
+| update | the old row | the new row |
+| delete | the last state | null |
+
+The update correctly chains from the create (its before-value equals the create's after-value), `updated_at` is stripped from every diff by `forDiff`, and `reason` is null as designed since no caller supplies one yet.
+
+API now reports `diffColumnsAvailable: true` across 92 rows, the `admin_users` join renders `{"name":"Ahmad Din","email":"..."}` rather than a UUID, action filters pick up the new rows (create 8, update 38, delete 7), and the migration banner is gone from `/admin/audit`. Historical rows correctly keep null in all three columns and render as "none" rather than an empty object.
+
+**Pre-existing bug found and fixed: the Testimonials admin section could never create or update a row.** `testimonials` (migration 025) is the only collection table with no `updated_at` column; its time columns are `created_at` and `approved_at`. `createCollectionApi` defaults `touchUpdatedAt = true`, so every create and update returned 400 with "Could not find the 'updated_at' column of 'testimonials' in the schema cache". This predates the parity work and dates to the Phase 10 collections build in June. Fixed with `touchUpdatedAt: false` on that one route, no migration needed. Checked the other five collection tables: `services`, `case_studies`, `team_members`, `articles` and `site_pages` all have `updated_at`, so testimonials was the only one affected.
+
+That bug is also why Testimonials was still empty. It was not only that nobody had written any, it is that the form could not save one.
+
+Test data cleaned up: 0 testimonials remain. The 92 audit rows are kept deliberately, since the log is append-only and deleting entries to tidy a test would defeat its purpose.
 
 Em dashes 0, en dashes 0.
 
