@@ -1,6 +1,7 @@
 import Link from 'next/link';
 
 import { SectionContainer, SectionIntro } from '../SectionContainer';
+import { RichText } from '@/components/public/RichText';
 import { variantStyles, type PmbcVariant } from '@/lib/public/tokens';
 
 type Card = { number: string; title: string; description: string; link: string };
@@ -99,7 +100,7 @@ export function ServiceCards({
                     className="mt-4 text-[15px] leading-[1.7]"
                     style={{ color: v.textMuted }}
                   >
-                    {card.description}
+                    <RichText html={card.description} as="span" />
                   </p>
                 )}
               </>

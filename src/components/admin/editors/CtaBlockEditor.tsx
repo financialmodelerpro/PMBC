@@ -6,6 +6,7 @@ import {
   adminLabel,
   adminTextarea,
 } from '@/lib/admin/styles';
+import { RichTextarea } from '@/components/admin/RichTextarea';
 
 import type { SectionEditorProps } from './types';
 
@@ -59,11 +60,10 @@ export function CtaBlockEditor({ content, onChange }: SectionEditorProps) {
       </Field>
 
       <Field label="Subhead">
-        <textarea
+        <RichTextarea
           value={subhead}
-          onChange={(e) => update({ subhead: e.target.value })}
-          rows={2}
-          style={adminTextarea}
+          onChange={(html) => update({ subhead: html })}
+          minHeight={48}
         />
       </Field>
 

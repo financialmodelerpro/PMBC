@@ -6,6 +6,7 @@ import {
   adminLabel,
   adminTextarea,
 } from '@/lib/admin/styles';
+import { RichTextarea } from '@/components/admin/RichTextarea';
 
 import type { SectionEditorProps } from './types';
 
@@ -61,11 +62,10 @@ export function HeroEditor({ content, onChange }: SectionEditorProps) {
       </Field>
 
       <Field label="Subtitle">
-        <textarea
+        <RichTextarea
           value={subtitle}
-          onChange={(e) => update({ subtitle: e.target.value })}
-          rows={3}
-          style={adminTextarea}
+          onChange={(html) => update({ subtitle: html })}
+          minHeight={56}
         />
       </Field>
 

@@ -6,6 +6,7 @@ import {
   adminLabel,
   adminTextarea,
 } from '@/lib/admin/styles';
+import { RichTextarea } from '@/components/admin/RichTextarea';
 
 import type { SectionEditorProps } from './types';
 
@@ -38,11 +39,10 @@ export function QuoteEditor({ content, onChange }: SectionEditorProps) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
       <Field label="Quote text">
-        <textarea
+        <RichTextarea
           value={quote_text}
-          onChange={(e) => update({ quote_text: e.target.value })}
-          rows={4}
-          style={adminTextarea}
+          onChange={(html) => update({ quote_text: html })}
+          minHeight={72}
         />
       </Field>
 

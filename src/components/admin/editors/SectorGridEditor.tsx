@@ -28,6 +28,7 @@ import {
   adminLabel,
   adminTextarea,
 } from '@/lib/admin/styles';
+import { RichTextarea } from '@/components/admin/RichTextarea';
 import { SECTOR_ICONS, resolveSectorIcon } from '@/lib/cms/sectorIcons';
 
 import type { SectionEditorProps } from './types';
@@ -288,12 +289,11 @@ function SortableSector({
               placeholder="Sector name"
               style={adminInput}
             />
-            <textarea
+            <RichTextarea
               value={sector.description}
-              onChange={(e) => onUpdate({ description: e.target.value })}
-              rows={2}
+              onChange={(html) => onUpdate({ description: html })}
               placeholder="Two-line description"
-              style={adminTextarea}
+              minHeight={44}
             />
           </div>
         </div>

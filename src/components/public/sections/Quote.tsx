@@ -1,6 +1,7 @@
 import Image from 'next/image';
 
 import { SectionContainer } from '../SectionContainer';
+import { RichText } from '@/components/public/RichText';
 import { variantStyles, type PmbcVariant } from '@/lib/public/tokens';
 
 function s(v: unknown): string {
@@ -71,7 +72,7 @@ export function Quote({
             letterSpacing: '-0.005em',
           }}
         >
-          {c.quote_text}
+          <RichText html={c.quote_text} as="span" />
         </blockquote>
         {(c.attribution_name || c.attribution_role || c.attribution_photo_url) && (
           <figcaption

@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { ChevronDown } from 'lucide-react';
 
+import { RichText } from '@/components/public/RichText';
 import { variantStyles, type PmbcVariant } from '@/lib/public/tokens';
 import {
   parseSectionStyles,
@@ -69,7 +70,7 @@ export function Hero({
       className={`relative flex min-h-[88vh] items-center px-6 py-28 sm:py-32 ${overrides.className}`.trim()}
       style={{ background: bg, color: v.text, ...overrides.style }}
     >
-      {/* Faint diagonal pattern overlay — kept extremely subtle. */}
+      {/* Faint diagonal pattern overlay, kept extremely subtle. */}
       {dark && (
         <div
           aria-hidden
@@ -116,7 +117,7 @@ export function Hero({
               fontWeight: 400,
             }}
           >
-            {c.subtitle}
+            <RichText html={c.subtitle} as="span" />
           </p>
         )}
 

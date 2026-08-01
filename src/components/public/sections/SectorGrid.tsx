@@ -1,3 +1,4 @@
+import { RichText } from '@/components/public/RichText';
 import { resolveSectorIcon } from '@/lib/cms/sectorIcons';
 
 import { SectionContainer, SectionIntro } from '../SectionContainer';
@@ -95,7 +96,7 @@ export function SectorGrid({
                     className="mt-3 text-[15px] leading-[1.7]"
                     style={{ color: dark ? v.textMuted : '#52606B' }}
                   >
-                    {sector.description}
+                    <RichText html={sector.description} as="span" />
                   </p>
                 )}
               </div>

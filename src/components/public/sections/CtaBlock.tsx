@@ -1,6 +1,7 @@
 import Link from 'next/link';
 
 import { SectionContainer } from '../SectionContainer';
+import { RichText } from '@/components/public/RichText';
 import { variantStyles, type PmbcVariant } from '@/lib/public/tokens';
 
 function s(v: unknown): string {
@@ -86,7 +87,7 @@ export function CtaBlock({
             className="mx-auto mt-5 max-w-[640px] text-[17px] leading-[1.7] sm:text-[18px]"
             style={{ color: dark ? v.textMuted : '#52606B' }}
           >
-            {c.subhead}
+            <RichText html={c.subhead} as="span" />
           </p>
         )}
         {(c.cta_primary_label || c.cta_secondary_label) && (

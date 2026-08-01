@@ -28,6 +28,7 @@ import {
   adminLabel,
   adminTextarea,
 } from '@/lib/admin/styles';
+import { RichTextarea } from '@/components/admin/RichTextarea';
 
 import type { SectionEditorProps } from './types';
 
@@ -254,12 +255,11 @@ function SortableStep({
             style={adminInput}
           />
           <div />
-          <textarea
+          <RichTextarea
             value={step.description}
-            onChange={(e) => onUpdate({ description: e.target.value })}
-            rows={2}
+            onChange={(html) => onUpdate({ description: html })}
             placeholder="Step description"
-            style={adminTextarea}
+            minHeight={44}
           />
         </div>
         <button

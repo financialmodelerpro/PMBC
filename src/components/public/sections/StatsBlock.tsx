@@ -1,4 +1,5 @@
 import { SectionContainer } from '../SectionContainer';
+import { RichText } from '@/components/public/RichText';
 import { variantStyles, type PmbcVariant } from '@/lib/public/tokens';
 
 type Stat = { value: string; label: string };
@@ -41,7 +42,7 @@ export function StatsBlock({
           className="mx-auto max-w-2xl text-center text-[17px] leading-[1.7]"
           style={{ color: v.textMuted }}
         >
-          {intro}
+          <RichText html={intro} as="span" />
         </p>
       )}
       {stats.length > 0 && (

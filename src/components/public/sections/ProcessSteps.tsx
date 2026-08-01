@@ -1,6 +1,7 @@
 import Link from 'next/link';
 
 import { SectionContainer, SectionIntro } from '../SectionContainer';
+import { RichText } from '@/components/public/RichText';
 import { variantStyles, type PmbcVariant } from '@/lib/public/tokens';
 
 type Step = { number: string; title: string; description: string };
@@ -109,7 +110,7 @@ export function ProcessSteps({
                     className="mt-4 text-[15px] leading-[1.7]"
                     style={{ color: dark ? v.textMuted : '#52606B' }}
                   >
-                    {step.description}
+                    <RichText html={step.description} as="span" />
                   </p>
                 )}
               </div>

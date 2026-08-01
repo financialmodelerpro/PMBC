@@ -10,6 +10,7 @@ import {
   adminLabel,
   adminTextarea,
 } from '@/lib/admin/styles';
+import { RichTextarea } from '@/components/admin/RichTextarea';
 
 import type { SectionEditorProps } from './types';
 
@@ -45,11 +46,10 @@ export function StatsBlockEditor({ content, onChange }: SectionEditorProps) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
       <label style={{ display: 'block' }}>
         <span style={adminLabel}>Intro (optional)</span>
-        <textarea
+        <RichTextarea
           value={intro}
-          onChange={(e) => setIntro(e.target.value)}
-          rows={2}
-          style={adminTextarea}
+          onChange={(html) => setIntro(html)}
+          minHeight={48}
         />
       </label>
 

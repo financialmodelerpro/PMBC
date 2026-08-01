@@ -28,6 +28,7 @@ import {
   adminLabel,
   adminTextarea,
 } from '@/lib/admin/styles';
+import { RichTextarea } from '@/components/admin/RichTextarea';
 
 import type { SectionEditorProps } from './types';
 
@@ -247,12 +248,11 @@ function SortableCard({
             style={adminInput}
           />
           <div />
-          <textarea
+          <RichTextarea
             value={card.description}
-            onChange={(e) => onUpdate({ description: e.target.value })}
-            rows={2}
+            onChange={(html) => onUpdate({ description: html })}
             placeholder="Description"
-            style={adminTextarea}
+            minHeight={44}
           />
           <div />
           <input

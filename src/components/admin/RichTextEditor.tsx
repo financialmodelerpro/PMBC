@@ -2,19 +2,31 @@
 
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
-import { useEffect, type CSSProperties } from 'react';
+import ImageExt from '@tiptap/extension-image';
+import TextAlign from '@tiptap/extension-text-align';
+import { Color, FontSize, TextStyle } from '@tiptap/extension-text-style';
+import { useEffect, useState, type CSSProperties } from 'react';
 import {
+  AlignCenter,
+  AlignLeft,
+  AlignRight,
   Bold,
+  Heading1,
+  Heading2,
+  Heading3,
+  ImagePlus,
   Italic,
+  Link2,
+  Link2Off,
   List,
   ListOrdered,
-  Heading2,
   Pilcrow,
-  Undo2,
   Redo2,
+  Undo2,
 } from 'lucide-react';
 
 import { ADMIN_COLORS } from '@/lib/admin/styles';
+import { MediaModal } from '@/components/admin/MediaPicker';
 
 type Props = {
   value: string;
@@ -22,6 +34,9 @@ type Props = {
   minHeight?: number;
   ariaLabel?: string;
 };
+
+/** Sizes offered in the font-size dropdown. Blank means "inherit". */
+const FONT_SIZES = ['12px', '14px', '16px', '18px', '20px', '24px', '28px', '32px'];
 
 function ToolbarButton({
   active,
@@ -71,9 +86,47 @@ function ToolbarButton({
   );
 }
 
+function Divider() {
+  return (
+    <span
+      style={{ width: 1, height: 18, background: ADMIN_COLORS.border, margin: '0 4px' }}
+    />
+  );
+}
+
+/**
+ * Full rich text editor for long-form HTML: article bodies, founder bio,
+ * service write-ups, paragraph sections.
+ *
+ * Parity Phase 6 added colour, font size, link, image, alignment and H1/H3 to
+ * match FMP's editor. Link and underline come from StarterKit in Tiptap 3, so
+ * they are configured there rather than added as separate extensions, which
+ * would register a duplicate and throw.
+ *
+ * For short single-line fields use RichTextarea instead. This one is
+ * deliberately heavy.
+ */
 export function RichTextEditor({ value, onChange, minHeight = 180, ariaLabel }: Props) {
+  const [mediaOpen, setMediaOpen] = useState(false);
+
   const editor = useEditor({
-    extensions: [StarterKit],
+    extensions: [
+      StarterKit.configure({
+        link: {
+          openOnClick: false,
+          autolink: true,
+          // Operator-supplied hrefs. Restricting the scheme set here stops a
+          // "javascript:" link ever reaching the stored HTML.
+          protocols: ['http', 'https', 'mailto'],
+          HTMLAttributes: { rel: 'noopener noreferrer', target: '_blank' },
+        },
+      }),
+      TextStyle,
+      Color,
+      FontSize,
+      TextAlign.configure({ types: ['heading', 'paragraph'] }),
+      ImageExt.configure({ inline: false, allowBase64: false }),
+    ],
     content: value,
     immediatelyRender: false,
     editorProps: {
@@ -108,6 +161,28 @@ export function RichTextEditor({ value, onChange, minHeight = 180, ariaLabel }: 
     );
   }
 
+  const currentColor =
+    (editor.getAttributes('textStyle').color as string | undefined) ?? '#0F1B2D';
+  const currentSize =
+    (editor.getAttributes('textStyle').fontSize as string | undefined) ?? '';
+
+  const setLink = () => {
+    const existing = (editor.getAttributes('link').href as string | undefined) ?? '';
+    const input = window.prompt('Link URL', existing || 'https://');
+    if (input === null) return;
+    const url = input.trim();
+    if (!url) {
+      editor.chain().focus().extendMarkRange('link').unsetLink().run();
+      return;
+    }
+    // Belt and braces alongside the protocol allowlist above.
+    if (!/^(https?:\/\/|mailto:|\/)/i.test(url)) {
+      window.alert('Use a link starting with http://, https://, mailto: or /');
+      return;
+    }
+    editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
+  };
+
   return (
     <div
       style={{
@@ -136,13 +211,29 @@ export function RichTextEditor({ value, onChange, minHeight = 180, ariaLabel }: 
           <Pilcrow size={15} />
         </ToolbarButton>
         <ToolbarButton
-          title="Heading"
+          title="Heading 1"
+          active={editor.isActive('heading', { level: 1 })}
+          onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
+        >
+          <Heading1 size={15} />
+        </ToolbarButton>
+        <ToolbarButton
+          title="Heading 2"
           active={editor.isActive('heading', { level: 2 })}
           onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
         >
           <Heading2 size={15} />
         </ToolbarButton>
-        <span style={{ width: 1, height: 18, background: ADMIN_COLORS.border, margin: '0 4px' }} />
+        <ToolbarButton
+          title="Heading 3"
+          active={editor.isActive('heading', { level: 3 })}
+          onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
+        >
+          <Heading3 size={15} />
+        </ToolbarButton>
+
+        <Divider />
+
         <ToolbarButton
           title="Bold"
           active={editor.isActive('bold')}
@@ -157,7 +248,33 @@ export function RichTextEditor({ value, onChange, minHeight = 180, ariaLabel }: 
         >
           <Italic size={15} />
         </ToolbarButton>
-        <span style={{ width: 1, height: 18, background: ADMIN_COLORS.border, margin: '0 4px' }} />
+
+        <Divider />
+
+        <ToolbarButton
+          title="Align left"
+          active={editor.isActive({ textAlign: 'left' })}
+          onClick={() => editor.chain().focus().setTextAlign('left').run()}
+        >
+          <AlignLeft size={15} />
+        </ToolbarButton>
+        <ToolbarButton
+          title="Align center"
+          active={editor.isActive({ textAlign: 'center' })}
+          onClick={() => editor.chain().focus().setTextAlign('center').run()}
+        >
+          <AlignCenter size={15} />
+        </ToolbarButton>
+        <ToolbarButton
+          title="Align right"
+          active={editor.isActive({ textAlign: 'right' })}
+          onClick={() => editor.chain().focus().setTextAlign('right').run()}
+        >
+          <AlignRight size={15} />
+        </ToolbarButton>
+
+        <Divider />
+
         <ToolbarButton
           title="Bullet list"
           active={editor.isActive('bulletList')}
@@ -172,7 +289,96 @@ export function RichTextEditor({ value, onChange, minHeight = 180, ariaLabel }: 
         >
           <ListOrdered size={15} />
         </ToolbarButton>
-        <span style={{ width: 1, height: 18, background: ADMIN_COLORS.border, margin: '0 4px' }} />
+
+        <Divider />
+
+        <ToolbarButton
+          title={editor.isActive('link') ? 'Edit link' : 'Add link'}
+          active={editor.isActive('link')}
+          onClick={setLink}
+        >
+          <Link2 size={15} />
+        </ToolbarButton>
+        <ToolbarButton
+          title="Remove link"
+          disabled={!editor.isActive('link')}
+          onClick={() => editor.chain().focus().unsetLink().run()}
+        >
+          <Link2Off size={15} />
+        </ToolbarButton>
+        <ToolbarButton title="Insert image" onClick={() => setMediaOpen(true)}>
+          <ImagePlus size={15} />
+        </ToolbarButton>
+
+        <Divider />
+
+        <input
+          type="color"
+          value={/^#[0-9a-fA-F]{6}$/.test(currentColor) ? currentColor : '#0F1B2D'}
+          onChange={(e) => editor.chain().focus().setColor(e.target.value).run()}
+          title="Text colour"
+          aria-label="Text colour"
+          style={{
+            width: 28,
+            height: 26,
+            padding: 1,
+            border: `1px solid ${ADMIN_COLORS.borderInput}`,
+            borderRadius: 5,
+            background: '#FFFFFF',
+            cursor: 'pointer',
+          }}
+        />
+        <button
+          type="button"
+          title="Clear text colour"
+          aria-label="Clear text colour"
+          onClick={() => editor.chain().focus().unsetColor().run()}
+          style={{
+            height: 26,
+            padding: '0 8px',
+            border: `1px solid ${ADMIN_COLORS.borderInput}`,
+            borderRadius: 5,
+            background: '#FFFFFF',
+            color: ADMIN_COLORS.textMuted,
+            fontSize: 11,
+            cursor: 'pointer',
+            fontFamily: 'inherit',
+          }}
+        >
+          Reset
+        </button>
+
+        <select
+          value={currentSize}
+          onChange={(e) => {
+            const v = e.target.value;
+            if (!v) editor.chain().focus().unsetFontSize().run();
+            else editor.chain().focus().setFontSize(v).run();
+          }}
+          title="Font size"
+          aria-label="Font size"
+          style={{
+            height: 26,
+            border: `1px solid ${ADMIN_COLORS.borderInput}`,
+            borderRadius: 5,
+            background: '#FFFFFF',
+            color: ADMIN_COLORS.textBody,
+            fontSize: 11,
+            padding: '0 4px',
+            cursor: 'pointer',
+            fontFamily: 'inherit',
+          }}
+        >
+          <option value="">Size</option>
+          {FONT_SIZES.map((s) => (
+            <option key={s} value={s}>
+              {s.replace('px', '')}
+            </option>
+          ))}
+        </select>
+
+        <Divider />
+
         <ToolbarButton
           title="Undo"
           disabled={!editor.can().undo()}
@@ -188,9 +394,21 @@ export function RichTextEditor({ value, onChange, minHeight = 180, ariaLabel }: 
           <Redo2 size={15} />
         </ToolbarButton>
       </div>
+
       <div style={{ padding: '12px 14px' }}>
         <EditorContent editor={editor} />
       </div>
+
+      {mediaOpen && (
+        <MediaModal
+          bucket="cms-assets"
+          onClose={() => setMediaOpen(false)}
+          onSelect={(url) => {
+            editor.chain().focus().setImage({ src: url }).run();
+            setMediaOpen(false);
+          }}
+        />
+      )}
     </div>
   );
 }
