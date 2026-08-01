@@ -3,7 +3,8 @@ import { z } from 'zod';
 
 import { getAdminSession } from '@/lib/auth/requireAdmin';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
-import { writeAudit } from '@/lib/audit';
+import { forDiff, snapshotRow, writeAudit } from '@/lib/audit';
+import type { Json } from '@/types/database';
 
 const HEX = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
 
@@ -58,6 +59,7 @@ async function handleMutation(req: Request) {
   }
 
   const supabase = createSupabaseServerClient();
+  const before = await snapshotRow(supabase, 'branding_config', 'id', '1');
   const { data, error } = await supabase
     .from('branding_config')
     .update({ ...parsed.data, updated_at: new Date().toISOString() })
@@ -75,6 +77,8 @@ async function handleMutation(req: Request) {
     entityType: 'branding_config',
     entityId: '1',
     metadata: { fields: Object.keys(parsed.data) },
+    beforeValue: forDiff(before),
+    afterValue: forDiff(data as unknown as Json),
   });
 
   return NextResponse.json({ row: data });

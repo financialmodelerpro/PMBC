@@ -3,7 +3,8 @@ import { z } from 'zod';
 
 import { getAdminSession } from '@/lib/auth/requireAdmin';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
-import { writeAudit } from '@/lib/audit';
+import { forDiff, writeAudit } from '@/lib/audit';
+import type { Json } from '@/types/database';
 
 const idSchema = z.string().uuid();
 
@@ -27,7 +28,7 @@ export async function DELETE(
   // Read first so we can audit page_slug + type.
   const { data: row } = await supabase
     .from('page_sections')
-    .select('id, page_slug, section_type')
+    .select('*')
     .eq('id', parsed.data)
     .maybeSingle();
 
@@ -46,6 +47,10 @@ export async function DELETE(
     entityType: 'page_sections',
     entityId: row.id,
     metadata: { page_slug: row.page_slug, section_type: row.section_type },
+    // Deleting a section is where the diff matters most: this becomes the only
+    // remaining copy of what the section contained.
+    beforeValue: forDiff(row as unknown as Json),
+    afterValue: null,
   });
 
   return NextResponse.json({ ok: true });

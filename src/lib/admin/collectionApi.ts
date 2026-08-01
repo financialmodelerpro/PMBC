@@ -4,8 +4,8 @@ import type { z } from 'zod';
 
 import { getAdminSession } from '@/lib/auth/requireAdmin';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
-import type { Database } from '@/types/database';
-import { writeAudit } from '@/lib/audit';
+import type { Database, Json } from '@/types/database';
+import { forDiff, snapshotRow, writeAudit } from '@/lib/audit';
 import { slugify } from '@/lib/admin/slugify';
 
 type AnyRow = Record<string, unknown>;
@@ -128,6 +128,10 @@ export function createCollectionApi(config: CollectionConfig) {
       entityId: (data as unknown as AnyRow | null)?.id
         ? String((data as unknown as AnyRow).id)
         : null,
+      // A create has nothing before it, so the null is meaningful rather than
+      // a gap in the record.
+      beforeValue: null,
+      afterValue: forDiff(data as unknown as Json),
     });
 
     return NextResponse.json({ row: data });
@@ -162,6 +166,11 @@ export function createCollectionApi(config: CollectionConfig) {
     if (touchUpdatedAt) patch.updated_at = new Date().toISOString();
 
     const supabase = looseDb();
+    // Snapshot first: after the update the old values are gone. snapshotRow
+    // returns null on any failure, so a missed snapshot costs the diff and
+    // never the mutation.
+    const before = await snapshotRow(typed(supabase), table, 'id', String(id));
+
     const { data, error } = await supabase
       .from(table)
       .update(patch as never)
@@ -175,6 +184,8 @@ export function createCollectionApi(config: CollectionConfig) {
       action: 'update',
       entityType: table,
       entityId: String(id),
+      beforeValue: forDiff(before),
+      afterValue: forDiff(data as unknown as Json),
     });
 
     return NextResponse.json({ row: data });
@@ -188,6 +199,9 @@ export function createCollectionApi(config: CollectionConfig) {
     if (!id) return NextResponse.json({ error: 'id is required' }, { status: 400 });
 
     const supabase = looseDb();
+    // The whole point of auditing a delete is keeping what was removed.
+    const before = await snapshotRow(typed(supabase), table, 'id', id);
+
     const { error } = await supabase.from(table).delete().eq('id', id);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
@@ -196,6 +210,8 @@ export function createCollectionApi(config: CollectionConfig) {
       action: 'delete',
       entityType: table,
       entityId: id,
+      beforeValue: forDiff(before),
+      afterValue: null,
     });
 
     return NextResponse.json({ ok: true });

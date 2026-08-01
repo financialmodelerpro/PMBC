@@ -3,7 +3,8 @@ import { z } from 'zod';
 
 import { getAdminSession } from '@/lib/auth/requireAdmin';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
-import { writeAudit } from '@/lib/audit';
+import { forDiff, writeAudit } from '@/lib/audit';
+import type { Json } from '@/types/database';
 import { isSectionType } from '@/lib/cms/sectionTypes';
 import {
   SLUG_RX,
@@ -296,6 +297,8 @@ async function handleCreatePage(json: unknown, adminId: string) {
     entityType: 'cms_pages',
     entityId: slug,
     metadata: { page_slug: slug, title, template, section_count: rows.length, status },
+    beforeValue: null,
+    afterValue: forDiff(page as unknown as Json),
   });
 
   return NextResponse.json({ page, section_count: rows.length }, { status: 201 });
@@ -390,6 +393,8 @@ export async function DELETE(req: Request) {
       title: page.title,
       section_count: removedSections?.length ?? 0,
     },
+    beforeValue: forDiff(page as unknown as Json),
+    afterValue: null,
   });
 
   return NextResponse.json({

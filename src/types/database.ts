@@ -47,30 +47,39 @@ export type Database = {
       audit_log: {
         Row: {
           action: string
+          after_value: Json | null
+          before_value: Json | null
           admin_id: string | null
           created_at: string | null
           entity_id: string | null
           entity_type: string
           id: string
           metadata: Json | null
+          reason: string | null
         }
         Insert: {
           action: string
+          after_value?: Json | null
+          before_value?: Json | null
           admin_id?: string | null
           created_at?: string | null
           entity_id?: string | null
           entity_type: string
           id?: string
           metadata?: Json | null
+          reason?: string | null
         }
         Update: {
           action?: string
+          after_value?: Json | null
+          before_value?: Json | null
           admin_id?: string | null
           created_at?: string | null
           entity_id?: string | null
           entity_type?: string
           id?: string
           metadata?: Json | null
+          reason?: string | null
         }
         Relationships: [
           {

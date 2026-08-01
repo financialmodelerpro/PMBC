@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { getAdminSession } from '@/lib/auth/requireAdmin';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { writeAudit } from '@/lib/audit';
+import type { Json } from '@/types/database';
 
 const settingsSchema = z.object({
   contact_email: z.string().email().or(z.literal('')).optional(),
@@ -68,6 +69,10 @@ async function handleMutation(req: Request) {
     entityType: 'site_settings',
     entityId: '1',
     metadata: { keys: Object.keys(parsed.data) },
+    // The existing blob was already read above to build the merge, so the
+    // before-value costs no extra query here.
+    beforeValue: existing as Json,
+    afterValue: merged as Json,
   });
 
   return NextResponse.json({ ok: true });

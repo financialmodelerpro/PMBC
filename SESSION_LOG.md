@@ -4,6 +4,42 @@ Chronological build history for the PMBC website. Split out of `CLAUDE.md` to ke
 
 ---
 
+### 2026-08-01 - FMP Admin Parity, Phase 7: AuditLogViewer
+
+Closes the last PARTIAL row in the gap report for the audit page. PMBC had a flat inlined table with a hard 200-row limit, no filters, no pagination and no diff.
+
+**ACTION REQUIRED: migration 032 must be run by hand,** like 031. It is DDL (`ALTER TABLE audit_log ADD COLUMN`), and supabase-js cannot execute DDL, the CLI is not installed, and there is no direct Postgres connection string in `.env.local`. Run `supabase/migrations/032_audit_log_diff_columns.sql` in the Supabase SQL editor.
+
+**Built**
+- `supabase/migrations/032_audit_log_diff_columns.sql`. Adds `before_value` and `after_value` as JSONB and `reason` as text, all nullable. JSONB rather than text so a future query can filter on a field inside a diff. Also adds two composite indexes, `(action, created_at DESC)` and `(admin_id, created_at DESC)`, so the filtered views do not degrade to a sequential scan as the table grows. Additive and idempotent, with rollback in the footer.
+- `lib/audit.ts` extended: `AuditEntry` gains `beforeValue`, `afterValue` and `reason`. Two new helpers, `snapshotRow` (reads a row for use as a before-value, returns null on any failure so it can be inlined without a try/catch) and `forDiff` (strips `updated_at`, which changes on every write and would otherwise make every diff show a difference and train the reader to ignore them).
+- `GET /api/admin/audit-log` with `limit` (default 100, clamped to 500), `offset`, `admin_id`, repeatable `action`, `from_date` and `to_date`. Returns `{ entries, total, limit, offset, diffColumnsAvailable }`, joining `admin_users` so the viewer shows a name rather than a UUID. `POST` on the same route returns filter options (admins, distinct actions) and mutates nothing.
+- `components/admin/AuditLogViewer.tsx`. Filters row, 100-row pages with Previous and Next, "Showing X to Y of Z", and a side-by-side before/after JSON dialog per row. Rows with no diff recorded show "none" rather than an empty object, since those are different facts.
+- `/admin/audit` reduced to a shell that renders the viewer.
+
+**Write paths now capturing diffs.** `collectionApi.ts` was the highest-leverage target: one factory serves Services, Case Studies, Team, Insights, Testimonials and Pages & Nav, so wiring create, update and delete there covers six admin sections at once. Update and delete snapshot the row first, because after the mutation the old values are gone. Also wired: branding, site settings (where the existing blob was already read to build the merge, so the before-value is free), page section delete (the case where the diff matters most, since the audit row becomes the only remaining copy), and page create and delete.
+
+**Two deliberate design choices**
+1. **The audit API is read-only.** There is no PATCH or DELETE. An audit log the admin console can edit is not an audit log. Rows are written only by `lib/audit.ts`, server side, as a side effect of a real mutation.
+2. **Audit failures never block a mutation.** `writeAudit` swallows errors and, if the insert is rejected because the diff columns do not exist, retries without them. An audit row records work that already happened, so failing the request because the record could not be written would turn a logging problem into a data problem.
+
+**Verified, all with migration 032 still unapplied, which also proves the degradation paths**
+- Typecheck and build clean (35 routes, up from 34 with the new endpoint).
+- API returns 87 entries with `diffColumnsAvailable: false` via the legacy column fallback, rather than erroring.
+- Filters: unfiltered 87, `action=update` 36, `action=create` 7, multi-select create plus delete 13 (7 + 6, so the `in` clause is correct), real admin id 87, nonexistent admin 0, today 41, far-past range 0.
+- Pagination at limit 10: offsets 0, 10 and 80 return 10, 10 and 7 rows with correctly descending timestamps and a stable total of 87.
+- `limit=99999` clamps to 500. Unauthenticated GET and POST both 401.
+- `/admin/audit` renders 200, and the viewer strings (empty state, "Showing", "All admins", "Clear filters", the migration banner, pagination) are all present in the client bundle.
+- **The write fallback works:** a settings PATCH returned 200 and still produced an audit row (88 total), proving a pre-032 database keeps auditing rather than failing the mutation.
+
+**Not yet verified, because it needs migration 032:** actual before/after values being stored, the diff dialog rendering real content, and the `reason` column. After running 032, edit any collection row and open its diff to close those out.
+
+Em dashes 0, en dashes 0.
+
+One incidental note: the dev server threw a transient Turbopack error resolving the next/font module right after a `.next` clear. It is a bundler cache fault, not code, and cleared on restart. The production build passed throughout.
+
+---
+
 ### 2026-08-01 - Phase 6.5: sanitise the remaining 10 rich-text render sites
 
 Closes S1, the highest-severity finding in `ADMIN_PARITY_GAP.md` and Phase B of `MIGRATION_PLAN.md`. Phase 6 built the sanitiser and used it for the 7 newly rich fields. This routes everything else through it, so no operator HTML reaches a browser unsanitised.
