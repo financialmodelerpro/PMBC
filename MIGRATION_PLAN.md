@@ -1,9 +1,16 @@
 # PMBC Consolidation and Migration Plan
 
-**Status:** Proposed, not executed. Nothing in this document has been applied to the codebase or the database.
+**Status:** Phases A and B executed 2026-08-01 (see the status update below). Phases C to F remain proposed.
 **Author:** Prepared for Ahmad Din, PaceMakers Business Consultants LLP.
 **Date:** 2026-08-01
 **Scope:** Consolidate the untracked `PMBC from FMP/` tree into the main PMBC application, remove redundancy, close feature parity gaps, retune branding, and establish governance.
+
+> **STATUS UPDATE 2026-08-01.** Two phases of this plan are done, delivered alongside the FMP admin-parity work rather than as a separate programme:
+>
+> - **Phase A (decommission): COMPLETE.** `PMBC from FMP/` was extracted (29 files staged outside the repo with sha256 manifests), archived as parentless commit `5926e49` under tag `fmp-cms-archive-2026-08-01` (59 files), then deleted. The `tsconfig` exclude added as a stopgap was removed. `tsc --noEmit` went from **107 errors to 0** from a clean tree with no exclusions. The allowlist in Appendix A was extended first: as written it would have discarded the reference source for parity phases 3 to 8, including the two rich-text components parity 6 exists to port.
+> - **Phase B (security baseline): COMPLETE.** `sanitize-html` installed and `src/lib/cms/sanitize.ts` shipped with three allowlists (inline, rich, email). All 10 `dangerouslySetInnerHTML` sites route through it. The render diff described in risk R3 was run and came back **14 of 14 public routes byte-identical**, so the risk did not materialise. A hostile payload test confirmed 0 markers reach the DOM. The `normalizeExternalUrl` port (P7) was **not** done; link safety is instead enforced by the sanitiser's scheme allowlist and by Tiptap's protocol config.
+>
+> Phases C to F (the Articles schema and editor work, P2 to P6 and P8) remain outstanding and are still accurately described below.
 
 ---
 

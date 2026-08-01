@@ -1,9 +1,25 @@
 # PMBC vs FMP Admin: Parity Gap Report
 
 **Purpose:** Establish what would have to change for PMBC's admin console to match FMP's, so switching between the two projects requires no re-learning.
-**Status:** Gap analysis only. Nothing fixed, nothing changed.
+**Status:** Original audit, retained as written. Phases 1 to 7 have since been implemented (see the status update below).
 **Date:** 2026-08-01
 **Scope:** Admin only. Public content and public routes are out of scope and untouched.
+
+> **STATUS UPDATE 2026-08-01: phases 1 to 7 are implemented and shipped.** This document is kept as the original audit, so the findings below describe the state *before* the work, not the state now. What changed:
+>
+> | Item | Then | Now |
+> |---|---|---|
+> | Header Settings | LAYOUT and DATA MODEL both MISSING | Consolidated, seven cards, one Save All |
+> | Page Builder list | No create, no delete | New Page modal with 5 templates, delete guarded by `is_system` |
+> | Page Builder save | One global Save | Per-section Save with per-section dirty tracking |
+> | StyleEditor | MISSING | Shipped, layered over the variant system |
+> | RichTextEditor | Half the toolbar | Colour, size, link, image, alignment, H1 to H3 |
+> | RichTextarea | MISSING | Shipped, wired into 7 short fields |
+> | AuditLogViewer | MISSING | Shipped with filters, paging and before/after diffs |
+> | Save button colour | Navy | Green `#2EAA4A`, semantics only (palette option C) |
+> | Unsanitised HTML (S1) | 8 sites | 0. All 10 sites routed through `lib/cms/sanitize.ts` |
+>
+> **Still outstanding:** parity 8 (Testimonials approval workflow, Pages & Nav inline edit), and the two items in section 6 deliberately left alone (per-field `VF`/`ItemVF` wrappers, and section-type parity, both judged wrong for PMBC). See `SESSION_LOG.md` for the per-phase record.
 
 ---
 

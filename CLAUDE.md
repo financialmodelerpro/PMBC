@@ -1,4 +1,4 @@
-# PaceMakers Business Consultants — Technical Handoff
+# PaceMakers Business Consultants: Technical Handoff
 
 This document is the source of truth for building the PMBC website. It is written for Claude Code to use as project context. Drop this file at the root of the repository as `CLAUDE.md` and Claude Code will read it on every session.
 
@@ -29,19 +29,41 @@ PMBC is the parent entity. Financial Modeler Pro is its flagship platform. The w
 
 ## Content Style Rules
 
-These rules apply to **all** PMBC content: public copy, admin-facing strings, fallback text, error messages, email templates, migrations seeding `cms_content` or `page_sections`, button labels, hero subtitles, every JSONB blob. Anything a human reader could see, in either the public site or the admin console.
+**Scope is universal, strengthened 2026-08-01.** These rules apply to everything written in a PMBC session, with no carve-outs:
 
-1. **No em dashes (—).** Do not use the em dash anywhere. Replace with a comma, parenthesis, period, or colon depending on the relationship being expressed:
-   - **Pause / aside** (where you'd reach for an em dash): use a comma or parentheses. *"Senior-led, analytically grounded."* not *"Senior-led — analytically grounded."*
-   - **Strong break / new clause:** start a new sentence. *"We model. We advise."* not *"We model — we advise."*
-   - **List intro / explanation:** use a colon. *"Three things matter: clarity, rigor, judgment."* not *"Three things matter — clarity, rigor, judgment."*
-   - **Range** (where en dashes are sometimes used): write out the range words. *"4 to 6 weeks"* not *"4–6 weeks"* — and never *"4 — 6 weeks"*.
+- public site copy, admin UI strings, fallback text, badge and button labels, alt text
+- **source code comments and JSDoc**
+- **git commit messages and PR bodies**
+- **SQL migration files, including their comment headers**
+- **this file, SESSION_LOG.md, and every other repo markdown doc**
+- **replies to the user in chat**
+- seeded JSONB, placeholder and hint text, validation and error messages, test fixtures
 
-   This applies to drafts you write yourself, content you generate during admin/page-builder workflows, fallback copy in route files, error pages (`not-found.tsx`, `error.tsx`), email subject and body templates, admin UI labels, badge text, captions, and alt text. Every string you author. When you find an em dash in *existing* content while doing other work, fix it as part of that work; don't carve out separate em-dash-only PRs.
+An earlier version of this section exempted technical docs, code comments and commit messages. That exemption is revoked.
 
-2. **No en dashes (–) in prose.** Same fix as em dash. Acceptable only inside numeric date ranges where the format requires it (rare in PMBC content), or inside copy the user explicitly hands over verbatim.
+1. **No em dashes (U+2014).** Replace with a comma, parentheses, a period, or a colon depending on the relationship being expressed:
+   - **Pause or aside:** comma or parentheses. *"Senior-led, analytically grounded."*
+   - **Strong break:** start a new sentence. *"We model. We advise."*
+   - **List intro or explanation:** colon. *"Three things matter: clarity, rigor, judgment."*
+   - **Range:** write the words. *"4 to 6 weeks"*.
 
-Why this matters: PMBC is intentionally institutional, considered, calm. The em dash reads as energetic and digital-marketing-flavored, which is exactly the tone we are NOT going for. The substitutions above produce copy that scans as deliberate and senior. If a sentence feels like it *needs* an em dash, the sentence is usually doing too much; split it.
+2. **No en dashes (U+2013) in prose.** Same fix. Acceptable only inside a numeric range where the format genuinely requires it, or inside copy the user hands over verbatim.
+
+**Enforcement.** Before finishing any phase, grep every touched file for the em dash character. It must return zero. Treat this as a release gate, not an afterthought. On Windows Git Bash a bare `grep -r` on the literal character can misbehave depending on shell encoding, so prefer the escape form:
+
+```sh
+for f in $(git status --porcelain | awk '{print $NF}'); do
+  n=$(grep -oP '\x{2014}' "$f" 2>/dev/null | wc -l)
+  [ "$n" -gt 0 ] && echo "VIOLATION $f : $n"
+done
+```
+
+When you find an em dash in *existing* content while doing other work, fix it as part of that work. Do not raise em-dash-only PRs.
+
+**Why this matters:** PMBC is intentionally institutional, considered, calm. The em dash reads as energetic and digital-marketing-flavored, which is exactly the tone we are not going for. The substitutions above scan as deliberate and senior. If a sentence feels like it needs an em dash, the sentence is usually doing too much. Split it.
+
+**Known pre-rule content that still contains em dashes.** Fix when next touching, not proactively, since a bulk rewrite would bury real diffs:
+`CMS_REFERENCE.md` (65) and `PACEMAKERS_ADMIN_CMS_SPEC.md` (30) are both inherited reference documents and are exempt. Live content: migrations 005, 008, 010, 011, 014 to 020 (all applied, so never edit them; fix the rendered content instead), `(public)/privacy` and `terms` (fix at counsel review), the three `not-found`/`error` files, and the email templates seeded in migration 008.
 
 ---
 
@@ -49,31 +71,45 @@ Why this matters: PMBC is intentionally institutional, considered, calm. The em 
 
 | Phase | Status | Notes |
 |-------|--------|-------|
-| Phase 1 — Scaffold + DB | ✅ Complete (2026-04-30) | Next.js 15 + Supabase migrations 001-008 applied. |
-| Phase 2 — Auth + Admin Shell | ✅ Complete (2026-05-02) | NextAuth credentials provider, middleware, login page, admin layout + sidebar, empty dashboard. Login verified end-to-end. |
-| Phase 3 — CMS Foundations | ✅ Complete (2026-05-02) | Six admin editors (branding, content, header settings, site settings, email branding, email templates), six API routes (all session-gated, all audit-logged). |
-| Phase 4 — Page Builder | ✅ Complete (2026-05-02) | `/admin/pages`, three-pane `/admin/page-builder/[slug]` with dnd reorder + visibility + delete, four section editors (hero, paragraphs, stats_block, service_cards), public `/[slug]` route + home wired up. |
-| Phase 4.5 — Admin Refactor (FMP alignment) | ✅ Complete (2026-05-02) | New `CmsAdminNav` (240/64 collapse, off-canvas, gold-accent active border, matchPaths, external links to live site + FMP). Tailwind→inline styles across all admin pages with shared tokens at `src/lib/admin/styles.ts`. API routes accept both `PATCH` and `POST`; `cms_content` GET added; branding mutations return `{ row }`. `(header_settings, config)` JSON blob split into discrete keys via migration 009. |
-| Phase 5 — Public Pages (core) | ✅ Complete (2026-05-03) | Public root layout with CMS-driven Navbar + Footer, fonts (Inter + Source Serif 4) wired via `next/font`, services overview with config-driven 9-card grid, contact page + form + `/api/contact` route, Resend wrapper with graceful fallback, branded email shell, hardcoded Privacy + Terms. |
-| Phase 6 — Remaining Section Types | ✅ Complete (2026-05-03) | Public renderers + admin editors for the 9 outstanding types: sector_grid, process_steps, network_partners, founder_block, text_image, cta_block, quote, fmp_intro, service_detail. Curated 21-icon lucide registry shared between sector editor + renderer. `SECTION_TYPES` now has `implemented: true` for all 13 types. |
-| Phase 7 — Remaining Pages | ✅ Complete (2026-05-03) | Bespoke routes for /about, /sectors, /approach, /network, /financial-modeler-pro replace the catch-all `[slug]`. New `/services/[slug]` route renders all 9 service details from `cms_content` namespace `service_<slug>`. Migration 010 seeds 36 rows (4 fields × 9 services). `/admin/content` groups the service-prefixed sections into a "Service detail content" block. `sitemap.ts` lists all 19 public URLs; `robots.ts` blocks /admin and /api. `title: { absolute }` fix removes doubled brand suffix from `<title>` across bespoke pages. `/contact?service=<slug>` pre-selects the service dropdown at SSR. |
-| Phase 8 — SEO & Polish | ✅ Complete (2026-05-03) | Dynamic OG image route at `/api/og` (navy/gold satori card with branding-driven logo + tagline). Shared `buildPageMetadata` helper drives unique `<title>` / canonical / OG / twitter meta on every public page, auto-routing OG images to `/api/og?title=…&subtitle=…` when no override is set. Schema.org `@graph` with FinancialService + Organization + WebSite mounted in the public layout; per-service `Service` JSON-LD on `/services/[slug]` with `provider: { @id: '#organization' }`. Branded 404 (both `(public)` and root) and `error.tsx` boundary. Privacy + Terms fleshed out with named processors and "Subject to legal review" badge. `next.config.ts` adds Supabase + Cloudinary `remotePatterns` and `poweredByHeader: false`. `/admin/og-preview` admin tool shows live previews for every page with per-page override-URL save. |
-| Phase 9 — Content Population & Launch | 🟡 In progress | Page content COMPLETE + `/admin/contact-submissions` inbox COMPLETE (2026-06-01). Home (2026-05-03) + about, sectors, approach, network, financial-modeler-pro, services overview, contact all seeded via migrations 014-020 (+ companion `scripts/seed-<page>-page.mjs`); 9 service-detail pages kept their migration-010 copy (verified). Contact inbox: session-gated GET/PATCH API + master-detail admin UI (status, notes, audit, first-touch timestamps). All buildable work is now done; everything remaining is ops/review. See the "Remaining Before Launch" checklist below and the SESSION_LOG.md 2026-06-01 entries. |
-| Phase 9.5 — Visual Polish (boutique private bank aesthetic) | ✅ Complete (2026-05-06) | **Palette values in this row were superseded by Phase 11; the structure it introduced (tokens layer, three background variants, shared primitives) still stands.** Refined design tokens (#153D64 primary navy, #0F2F4F deep navy, #FAF7F2 cream surface, #D4A93A gold, #B89530 muted gold, #E8DDC4 cream-on-navy text). New `src/lib/public/tokens.ts` + `SectionContainer` / `SectionIntro` primitives. All 13 section renderers redesigned around three background variants (`navy_deep` / `cream` / `white`); SectionRenderer extended with sequence-aware variant resolution so home page rhythm is automatic without DB changes. Hero is 88vh navy_deep with radial gradient, gold hairline, 80px serif headline, gold-bordered CTAs, scroll chevron. FounderBlock has gold-framed photo + navy accent corner + monogram fallback. StatsBlock uses 72px serif numbers with gold dividers. Process steps render in deep navy with gold connectors. Quote is editorial italic serif with 80px gold quote mark. Navbar refined with gold underline-on-hover and PM monogram fallback; Footer reframed at #0F2F4F with small-caps gold column headlines and italic-serif tagline. No content schema changes; all 11 public routes verified 200 in dev, build + typecheck clean. |
-| Phase 10 — Advisory Collections CMS (per `PACEMAKERS_ADMIN_CMS_SPEC.md`) | ✅ Complete (2026-06-10) | Five new managed collections as first-class admin sections + DB tables: **Services**, **Case Studies**, **Team & Advisors**, **Insights/Articles**, **Testimonials**. Migrations 021-026 (each table RLS-enabled default-deny per the 013 pattern; 021 seeds the 9 service lines published; 026 adds four public-read storage buckets `cms-assets` / `article-covers` / `case-study-images` / `team-photos` + a public-read storage policy). New table types hand-added to `src/types/database.ts`. Shared infra: `lib/admin/collectionApi.ts` (session-gated, zod-validated, audit-logged CRUD route factory with auto-slugify; operates through a loosely-typed client since the table name is dynamic), `lib/admin/slugify.ts`, `components/admin/CollectionManager.tsx` (one field-driven list + drag-reorder + drawer editor powering all five; field types text/textarea/richtext/media/select/number/checkbox/stringList/kvList), `components/admin/MediaPicker.tsx` (image field + library modal). Reuses the existing TipTap `RichTextEditor`. Thin API routes at `/api/admin/{services,case-studies,team,articles,testimonials}` + `/api/admin/media` (multipart upload/list/delete via service role). Admin pages at `/admin/{services,case-studies,team,articles,testimonials,media,audit}` (audit = read-only `audit_log` viewer). **Dashboard fully rebuilt** (spec §5.1): live KPI grid (leads new/month/total, services, pages, sections) + Recent Inquiries table + Quick Actions + Collections counts row, all resilient to missing tables. `CmsAdminNav` regrouped: Leads / Collections / Content / Email / System. Public: new `/case-studies`(+`[slug]`), `/team`, `/insights`(+`[slug]`); `/services` grid now reads the `services` table (config fallback); `/about` renders team grid + approved testimonials; `TestimonialsBlock` component; footer + dynamic `sitemap.xml` include the new routes. All public collection fetchers (`lib/cms/collections.ts`) degrade to empty on error. Existing `/services/[slug]` detail pages kept their richer migration-010 `cms_content` copy (table drives admin + grid only). Migrations applied to Supabase 2026-06-10; verified live: public routes 200, `/services` renders seeded rows, admin APIs 401 unauth, admin pages 307→login, build + typecheck clean. Also fixed a pre-existing `next build` blocker (non-route `STATUSES` export in the contact-submissions API route). |
-| Phase 11 — FMP-parity admin structure + palette retune | ✅ Complete (2026-07-30) | **Route fix:** `/admin/page-builder` was a 404 (the folder only held `[slug]/`) while the pages list sat at `/admin/pages`, so the sidebar's own "Page Builder" link was broken. The list moved to `/admin/page-builder/page.tsx`; `/admin/pages` was rebuilt as **Pages & Nav**, a navbar-menu editor over the new `site_pages` table (migration 027, RLS default-deny, seeded from `(header_settings, nav_items)`). New `/api/admin/site-pages` via the existing `createCollectionApi` factory; `/admin/leads` added as a redirect alias to the inquiries inbox. **Single source of truth for the navbar:** `fetchHeaderConfig()` now reads `site_pages`, falling back to the legacy `cms_content` JSON row and then `DEFAULT_HEADER_CONFIG`, so a partial migration can never render an empty navbar. The nav-item editor was **removed from `/admin/header-settings`** (which now owns only the header CTA + mobile toggle, matching FMP per `CMS_REFERENCE.md` §1); `nav_items` is optional in that API rather than deleted. **Sidebar regrouped** to FMP order: Dashboard, Content (Page Builder, Header Settings, Header & Branding, Page Content, Pages & Nav, Insights, Testimonials, Media Library, OG Previews), Collections (Services, Case Studies, Team & Advisors), Leads, Email, System. **Palette retuned** (see §9) across `globals.css`, `tokens.ts`, all 13 renderers, layout chrome, public pages, `/api/og`, and `branding_config` (migration 028). Verified: typecheck + build clean, all 20 sidebar destinations 200 authenticated with zero 404s, all 14 public routes 200, navbar renders the same 6 items from `site_pages`, full CRUD round-trip on a throwaway nav row (create to public-navbar to delete) with audit rows written and data restored, zero old colour values and zero em dashes in rendered HTML. |
+| Phase 1 : Scaffold + DB | ✅ Complete (2026-04-30) | Next.js 15 + Supabase migrations 001-008 applied. |
+| Phase 2 : Auth + Admin Shell | ✅ Complete (2026-05-02) | NextAuth credentials provider, middleware, login page, admin layout + sidebar, empty dashboard. Login verified end-to-end. |
+| Phase 3 : CMS Foundations | ✅ Complete (2026-05-02) | Six admin editors (branding, content, header settings, site settings, email branding, email templates), six API routes (all session-gated, all audit-logged). |
+| Phase 4 : Page Builder | ✅ Complete (2026-05-02) | `/admin/pages`, three-pane `/admin/page-builder/[slug]` with dnd reorder + visibility + delete, four section editors (hero, paragraphs, stats_block, service_cards), public `/[slug]` route + home wired up. |
+| Phase 4.5 : Admin Refactor (FMP alignment) | ✅ Complete (2026-05-02) | New `CmsAdminNav` (240/64 collapse, off-canvas, gold-accent active border, matchPaths, external links to live site + FMP). Tailwind→inline styles across all admin pages with shared tokens at `src/lib/admin/styles.ts`. API routes accept both `PATCH` and `POST`; `cms_content` GET added; branding mutations return `{ row }`. `(header_settings, config)` JSON blob split into discrete keys via migration 009. |
+| Phase 5 : Public Pages (core) | ✅ Complete (2026-05-03) | Public root layout with CMS-driven Navbar + Footer, fonts (Inter + Source Serif 4) wired via `next/font`, services overview with config-driven 9-card grid, contact page + form + `/api/contact` route, Resend wrapper with graceful fallback, branded email shell, hardcoded Privacy + Terms. |
+| Phase 6 : Remaining Section Types | ✅ Complete (2026-05-03) | Public renderers + admin editors for the 9 outstanding types: sector_grid, process_steps, network_partners, founder_block, text_image, cta_block, quote, fmp_intro, service_detail. Curated 21-icon lucide registry shared between sector editor + renderer. `SECTION_TYPES` now has `implemented: true` for all 13 types. |
+| Phase 7 : Remaining Pages | ✅ Complete (2026-05-03) | Bespoke routes for /about, /sectors, /approach, /network, /financial-modeler-pro replace the catch-all `[slug]`. New `/services/[slug]` route renders all 9 service details from `cms_content` namespace `service_<slug>`. Migration 010 seeds 36 rows (4 fields × 9 services). `/admin/content` groups the service-prefixed sections into a "Service detail content" block. `sitemap.ts` lists all 19 public URLs; `robots.ts` blocks /admin and /api. `title: { absolute }` fix removes doubled brand suffix from `<title>` across bespoke pages. `/contact?service=<slug>` pre-selects the service dropdown at SSR. |
+| Phase 8 : SEO & Polish | ✅ Complete (2026-05-03) | Dynamic OG image route at `/api/og` (navy/gold satori card with branding-driven logo + tagline). Shared `buildPageMetadata` helper drives unique `<title>` / canonical / OG / twitter meta on every public page, auto-routing OG images to `/api/og?title=…&subtitle=…` when no override is set. Schema.org `@graph` with FinancialService + Organization + WebSite mounted in the public layout; per-service `Service` JSON-LD on `/services/[slug]` with `provider: { @id: '#organization' }`. Branded 404 (both `(public)` and root) and `error.tsx` boundary. Privacy + Terms fleshed out with named processors and "Subject to legal review" badge. `next.config.ts` adds Supabase + Cloudinary `remotePatterns` and `poweredByHeader: false`. `/admin/og-preview` admin tool shows live previews for every page with per-page override-URL save. |
+| Phase 9 : Content Population & Launch | 🟡 In progress | Page content COMPLETE + `/admin/contact-submissions` inbox COMPLETE (2026-06-01). Home (2026-05-03) + about, sectors, approach, network, financial-modeler-pro, services overview, contact all seeded via migrations 014-020 (+ companion `scripts/seed-<page>-page.mjs`); 9 service-detail pages kept their migration-010 copy (verified). Contact inbox: session-gated GET/PATCH API + master-detail admin UI (status, notes, audit, first-touch timestamps). All buildable work is now done; everything remaining is ops/review. See the "Remaining Before Launch" checklist below and the SESSION_LOG.md 2026-06-01 entries. |
+| Phase 9.5 : Visual Polish (boutique private bank aesthetic) | ✅ Complete (2026-05-06) | **Palette values in this row were superseded by Phase 11; the structure it introduced (tokens layer, three background variants, shared primitives) still stands.** Refined design tokens (#153D64 primary navy, #0F2F4F deep navy, #FAF7F2 cream surface, #D4A93A gold, #B89530 muted gold, #E8DDC4 cream-on-navy text). New `src/lib/public/tokens.ts` + `SectionContainer` / `SectionIntro` primitives. All 13 section renderers redesigned around three background variants (`navy_deep` / `cream` / `white`); SectionRenderer extended with sequence-aware variant resolution so home page rhythm is automatic without DB changes. Hero is 88vh navy_deep with radial gradient, gold hairline, 80px serif headline, gold-bordered CTAs, scroll chevron. FounderBlock has gold-framed photo + navy accent corner + monogram fallback. StatsBlock uses 72px serif numbers with gold dividers. Process steps render in deep navy with gold connectors. Quote is editorial italic serif with 80px gold quote mark. Navbar refined with gold underline-on-hover and PM monogram fallback; Footer reframed at #0F2F4F with small-caps gold column headlines and italic-serif tagline. No content schema changes; all 11 public routes verified 200 in dev, build + typecheck clean. |
+| Phase 10 : Advisory Collections CMS (per `PACEMAKERS_ADMIN_CMS_SPEC.md`) | ✅ Complete (2026-06-10) | Five new managed collections as first-class admin sections + DB tables: **Services**, **Case Studies**, **Team & Advisors**, **Insights/Articles**, **Testimonials**. Migrations 021-026 (each table RLS-enabled default-deny per the 013 pattern; 021 seeds the 9 service lines published; 026 adds four public-read storage buckets `cms-assets` / `article-covers` / `case-study-images` / `team-photos` + a public-read storage policy). New table types hand-added to `src/types/database.ts`. Shared infra: `lib/admin/collectionApi.ts` (session-gated, zod-validated, audit-logged CRUD route factory with auto-slugify; operates through a loosely-typed client since the table name is dynamic), `lib/admin/slugify.ts`, `components/admin/CollectionManager.tsx` (one field-driven list + drag-reorder + drawer editor powering all five; field types text/textarea/richtext/media/select/number/checkbox/stringList/kvList), `components/admin/MediaPicker.tsx` (image field + library modal). Reuses the existing TipTap `RichTextEditor`. Thin API routes at `/api/admin/{services,case-studies,team,articles,testimonials}` + `/api/admin/media` (multipart upload/list/delete via service role). Admin pages at `/admin/{services,case-studies,team,articles,testimonials,media,audit}` (audit = read-only `audit_log` viewer). **Dashboard fully rebuilt** (spec §5.1): live KPI grid (leads new/month/total, services, pages, sections) + Recent Inquiries table + Quick Actions + Collections counts row, all resilient to missing tables. `CmsAdminNav` regrouped: Leads / Collections / Content / Email / System. Public: new `/case-studies`(+`[slug]`), `/team`, `/insights`(+`[slug]`); `/services` grid now reads the `services` table (config fallback); `/about` renders team grid + approved testimonials; `TestimonialsBlock` component; footer + dynamic `sitemap.xml` include the new routes. All public collection fetchers (`lib/cms/collections.ts`) degrade to empty on error. Existing `/services/[slug]` detail pages kept their richer migration-010 `cms_content` copy (table drives admin + grid only). Migrations applied to Supabase 2026-06-10; verified live: public routes 200, `/services` renders seeded rows, admin APIs 401 unauth, admin pages 307→login, build + typecheck clean. Also fixed a pre-existing `next build` blocker (non-route `STATUSES` export in the contact-submissions API route). |
+| Phase 11 : FMP-parity admin structure + palette retune | ✅ Complete (2026-07-30) | **Route fix:** `/admin/page-builder` was a 404 (the folder only held `[slug]/`) while the pages list sat at `/admin/pages`, so the sidebar's own "Page Builder" link was broken. The list moved to `/admin/page-builder/page.tsx`; `/admin/pages` was rebuilt as **Pages & Nav**, a navbar-menu editor over the new `site_pages` table (migration 027, RLS default-deny, seeded from `(header_settings, nav_items)`). New `/api/admin/site-pages` via the existing `createCollectionApi` factory; `/admin/leads` added as a redirect alias to the inquiries inbox. **Single source of truth for the navbar:** `fetchHeaderConfig()` now reads `site_pages`, falling back to the legacy `cms_content` JSON row and then `DEFAULT_HEADER_CONFIG`, so a partial migration can never render an empty navbar. The nav-item editor was **removed from `/admin/header-settings`** (which now owns only the header CTA + mobile toggle, matching FMP per `CMS_REFERENCE.md` §1); `nav_items` is optional in that API rather than deleted. **Sidebar regrouped** to FMP order: Dashboard, Content (Page Builder, Header Settings, Header & Branding, Page Content, Pages & Nav, Insights, Testimonials, Media Library, OG Previews), Collections (Services, Case Studies, Team & Advisors), Leads, Email, System. **Palette retuned** (see §9) across `globals.css`, `tokens.ts`, all 13 renderers, layout chrome, public pages, `/api/og`, and `branding_config` (migration 028). Verified: typecheck + build clean, all 20 sidebar destinations 200 authenticated with zero 404s, all 14 public routes 200, navbar renders the same 6 items from `site_pages`, full CRUD round-trip on a throwaway nav row (create to public-navbar to delete) with audit rows written and data restored, zero old colour values and zero em dashes in rendered HTML. |
+| Phase 12 (parity 1) : Header Settings consolidation | Complete (2026-08-01) | Branding merged into `/admin/header-settings` as seven cards with a sticky **Save All** at the top, matching FMP. `/admin/branding` is now a redirect; `BrandingForm` deleted; sidebar has one entry with `matchPaths: ['/admin/branding']`. Migration 029 seeds 13 header presentation keys (17 total under `header_settings`). Two deliberate deviations from FMP: tagline stays plain text (it feeds `/api/og` via satori and the footer as text nodes, so markup would render as escaped tags), and brand identity fields stay in the `branding_config` table rather than moving to `cms_content`, because the public Navbar, Footer, `/api/og` and `buildPageMetadata` already read them there. Save All sends one batched request, so one click writes one audit row instead of seventeen. |
+| Phase 12 (parity 1b) : Navbar wiring + FMP scaffold removed | Complete (2026-08-01) | The 13 presentation keys are now read by the public Navbar: header height and padding, logo height/width/position, the optional header icon, brand-name and tagline toggles, and nav alignment (migration 030 adds `header_layout`). Settings merge over shipped defaults per field with `??`, so a cleared field can never render a zero-height header. Separately, the untracked `PMBC from FMP/` tree was archived (orphan commit `5926e49`, tag `fmp-cms-archive-2026-08-01`, 59 files) and deleted; 29 reference files were staged outside the repo first. That tree had been contributing **107 TypeScript errors** to the root typecheck. |
+| Phase 13 (parity 2) : Semantic green save buttons | Complete (2026-08-01) | Palette decision B: PMBC keeps navy and gold for identity and adopts FMP's green for save semantics only. Tokens `save #2EAA4A`, `saveHover #24913E`, `toastSuccessBg #1A7A30`. New shared `SaveButton` (a component rather than a preset, because inline styles cannot express `:hover`). `SaveStatus` "Saved" became a solid green pill with a checkmark. Nine save surfaces converted. Sign in, Upload, "New entry" and ConfirmDialog stay navy, because they do not commit work. |
+| Phase 14 (parity 3) : Page Builder per-section save | Complete (2026-08-01) | Global Save removed. Each section owns its Save, dirty state is tracked per section id (a page-level flag would let one section's Save flush another's pending edit), and the visibility toggle is now local until that section is saved. Reorder, add and delete still persist immediately. Left rail shows an amber dot on sections with pending edits. Verified by isolation test: saving one section leaves its siblings byte-identical. |
+| Phase 15 (parity 4) : Create and delete pages | Complete (2026-08-01) | New Page modal with five templates (blank, landing, about, services, contact) seeding canonical section lists via `defaultContentFor`. Per-row delete for non-system pages, lock icon for system pages, enforced **server side** with a 403. Migration 031 adds `cms_pages.is_system`. All 17 existing pages are marked system, not the 8 first assumed: the 9 `service-*` rows supply meta title, description and OG image to live `/services/[slug]` pages via `generateMetadata`, so deleting one would silently downgrade real SEO. |
+| Phase 16 (parity 5) : StyleEditor | Complete (2026-08-01) | Per-section presentation control over `page_sections.styles`: background colour and image with overlay, text colour, four paddings, max width, radius, animation, custom class. Collapsed by default. Composes with the Phase 9.5 variant system rather than replacing it: variant first, overrides per CSS property on top, so `styles = {}` renders byte-identically to before. `lib/public/sectionStyles.ts` re-validates every field at render, so a hostile stored value is rejected rather than trusted. |
+| Phase 17 (parity 6) : RichTextEditor upgrades + RichTextarea | Complete (2026-08-01) | Editor gains colour, font size, link, image insert, alignment and H1/H3. New compact `RichTextarea` (bold, italic, link) wired into 7 short fields. All `@tiptap/*` deps pinned exactly, since `^3.22.5` resolves to 3.29 and breaks the peer graph. Blocked on a hidden dependency: those fields rendered as plain text nodes, so making them rich required converting the renderers to HTML, which would have widened the unsanitised surface. The sanitiser was pulled forward rather than doing that. |
+| Phase 17.5 (parity 6.5) : Sanitise all rich-text output | Complete (2026-08-01) | **Closes S1**, the highest-severity finding in `ADMIN_PARITY_GAP.md` and Phase B of `MIGRATION_PLAN.md`. All 10 remaining `dangerouslySetInnerHTML` sites routed through `lib/cms/sanitize.ts` (8 public plus the 2 email previews). The two JSON-LD blocks are deliberately excluded, since they serialise objects we build ourselves. Email previews got their own wider allowlist so the preview does not lie about what the real email sends. Render diff: **14 of 14 public routes byte-identical**. Hostile payload test: 0 markers reach the DOM. |
+| Phase 18 (parity 7) : AuditLogViewer | Complete (2026-08-01) | Shared `AuditLogViewer` with filters (admin, action multi-select, date range), 100-row paging capped at 500 per fetch, and a side-by-side before/after JSON dialog. New read-only `GET/POST /api/admin/audit-log`. Migration 032 adds `before_value`, `after_value`, `reason` plus two composite indexes. `writeAudit` gains diff support and never blocks a mutation, falling back if the columns are absent. Diff capture wired into `collectionApi` (six sections at once), branding, settings, and page/section deletes. Verified against a real create/update/delete cycle. |
+| Parity 8 : Testimonials + Pages & Nav polish | Not started | The two remaining PARTIAL rows in `ADMIN_PARITY_GAP.md`. |
 
-**Working admin login (local dev):** `meetahmadch@gmail.com` / `Admin@2026`. This is a debug-only password — must be rotated to a strong production credential before launch. Use `npm run seed-admin` (after editing `ADMIN_PASSWORD` in `scripts/seed-admin.mjs`) to rotate.
+**Working admin login (local dev):** `meetahmadch@gmail.com` / `Admin@2026`. This is a debug-only password: must be rotated to a strong production credential before launch. Use `npm run seed-admin` (after editing `ADMIN_PASSWORD` in `scripts/seed-admin.mjs`) to rotate.
 
 ---
 
 ## Remaining Before Launch (next to do)
 
-All buildable features are done as of 2026-07-30 (Phase 10 added the advisory collections CMS; Phase 11 fixed the admin route structure to match FMP and retuned the palette). Page content is seeded, the public site renders, and the admin console (CMS, page builder, nav editor, contact inbox, plus Services / Case Studies / Team / Insights / Testimonials / Media Library / Audit Log) is complete. What is left is operational, content-population, and review work, most of which lives outside the codebase. Pick up here next session.
+All buildable features are done as of 2026-08-01. The FMP admin-parity programme (phases 1 to 7 of `ADMIN_PARITY_GAP.md`) is complete apart from parity 8, a small polish item. Page content is seeded, the public site renders, and the admin console is complete. What is left is operational, content-population, and review work, most of which lives outside the codebase. Pick up here next session.
 
-**Waiting on a human, not on code:** there are **two unread submissions in `/admin/contact-submissions`**, both `status='new'` with `read_at` never set. The 2026-07-02 one is spam; the **2026-06-21 one (Leslie Merricroft, Al-Mashrea Law Firm) looks genuine and has gone unanswered for weeks.** The inbox works correctly; nobody has opened it. Worth clearing before launch day.
+**Two DDL migrations were applied by hand on 2026-08-01** (031 `cms_pages.is_system`, 032 `audit_log` diff columns). Both are verified live. If you rebuild this database from scratch, run every migration in order and remember that 031 and 032 need the SQL editor.
 
-**Content population for the Phase 10 collections (not blockers; pages degrade gracefully to empty/"coming soon"):** the 9 Services are seeded and published; **Case Studies, Insights, Testimonials, and Team are empty** and need real entries via their admin sections before they render publicly. Upload imagery through `/admin/media` first, then reference it in each collection editor. If you want Case Studies / Insights / Team in the public top nav, add them via **Pages & Nav** (they are already in the footer).
+**Waiting on a human, not on code:** there are **two unread submissions in `/admin/contact-submissions`**, both `status='new'` with `read_at` never set. The 2026-07-02 one is spam; the **2026-06-21 one (Leslie Merricroft, Al-Mashrea Law Firm) looks genuine and has now gone unanswered for six weeks.** The inbox works correctly; nobody has opened it. This is the single most overdue item on the list.
+
+**Content population for the Phase 10 collections (not blockers; pages degrade gracefully to empty):** the 9 Services are seeded and published; **Case Studies, Insights, Testimonials, and Team are empty** and need real entries via their admin sections before they render publicly. Upload imagery through `/admin/media` first, then reference it in each collection editor. If you want Case Studies / Insights / Team in the public top nav, add them via **Pages & Nav** (they are already in the footer).
+
+> **Correction to a long-standing assumption.** Testimonials was not empty only because nobody had written any. **The form could not save one.** `testimonials` is the only collection table without an `updated_at` column, while `createCollectionApi` stamps one by default, so every create and update returned a 400. That dates to the Phase 10 collections build in June and was found and fixed on 2026-08-01 (parity 7 verification). Testimonials is genuinely writable now. The other four collections were never blocked, so those really are just unwritten.
 
 **Blockers (site is not launch-ready until these are done):**
 1. **Production env vars on Vercel.** Set `RESEND_API_KEY`, `EMAIL_FROM_DEFAULT`, `EMAIL_FROM_CONTACT`, `EMAIL_TO_ADMIN`, `HCAPTCHA_SECRET_KEY`, `NEXT_PUBLIC_HCAPTCHA_SITE_KEY`, `NEXTAUTH_SECRET`, `NEXTAUTH_URL`, `NEXT_PUBLIC_SITE_URL`, and the Supabase keys. Until Resend is configured the contact form still saves to the inbox but sends no notification or acknowledgement email (the send wrapper degrades gracefully). [user, Vercel dashboard]
@@ -109,7 +145,7 @@ Single Next.js application, single domain (pacemakersglobal.com), no subdomain r
 | Email | Resend | ^6 | Contact form notifications |
 | Image | sharp | ^0.34 | OG image logo conversion |
 | OG Images | next/og (satori ImageResponse) | built-in | Dynamic OG cards |
-| Icons | lucide-react | ^1 | Lucide moved to a 1.x major in 2024. v1.x is current and correct — do **not** "downgrade" to 0.x. |
+| Icons | lucide-react | ^1 | Lucide moved to a 1.x major in 2024. v1.x is current and correct : do **not** "downgrade" to 0.x. |
 | Forms | react-hook-form + zod | latest | Contact form validation |
 | Rich Text | @tiptap/react | latest | Admin content editing |
 | Captcha | @hcaptcha/react-hcaptcha | ^2 | Contact form spam protection |
@@ -347,19 +383,19 @@ CREATE INDEX idx_page_sections_visible ON page_sections(page_slug, visible, disp
 The page builder. One row per section on a page. `section_type` determines which renderer is used. `content` holds the section data as JSONB. `styles` holds optional layout overrides.
 
 **Section types for v1:**
-- `hero` — main page hero with badge, headline, subtitle, CTA
-- `stats_block` — large number callouts (100+, SAR 20B+, etc.)
-- `service_cards` — grid of service cards with number, title, description, link
-- `service_detail` — full detail block for a single service (used on /services/[slug])
-- `sector_grid` — sector coverage grid
-- `process_steps` — numbered methodology steps
-- `network_partners` — Sky Gulf and Lynkers blocks
-- `founder_block` — founder photo, name, credentials, bio
-- `text_image` — alternating text-image rows
-- `paragraphs` — rich text paragraphs (Tiptap-rendered HTML)
-- `cta_block` — single call-to-action panel
-- `quote` — pull quote with attribution
-- `fmp_intro` — Financial Modeler Pro introduction block (one specific section type for the FMP page)
+- `hero`: main page hero with badge, headline, subtitle, CTA
+- `stats_block`: large number callouts (100+, SAR 20B+, etc.)
+- `service_cards`: grid of service cards with number, title, description, link
+- `service_detail`: full detail block for a single service (used on /services/[slug])
+- `sector_grid`: sector coverage grid
+- `process_steps`: numbered methodology steps
+- `network_partners`: Sky Gulf and Lynkers blocks
+- `founder_block`: founder photo, name, credentials, bio
+- `text_image`: alternating text-image rows
+- `paragraphs`: rich text paragraphs (Tiptap-rendered HTML)
+- `cta_block`: single call-to-action panel
+- `quote`: pull quote with attribution
+- `fmp_intro`: Financial Modeler Pro introduction block (one specific section type for the FMP page)
 
 #### Branding and Settings
 
@@ -479,9 +515,21 @@ For v1, only two template_key rows are needed: `contact_notification` (sent to a
                                   --   truth for the navbar; edited at /admin/pages.
 028_retune_brand_colors.sql       -- branding_config + email_branding colour retune
                                   --   (accent_color -> #C69C3E). Idempotent.
+029_header_settings_keys.sql      -- 13 header presentation keys under
+                                  --   (header_settings, *). Seeds only, additive.
+030_header_layout_key.sql         -- header_layout (default|centered|spread). PMBC
+                                  --   addition, not one of FMP's 17 keys.
+031_cms_pages_is_system.sql       -- cms_pages.is_system. DDL. Marks all 17 existing
+                                  --   pages as system so the admin delete button
+                                  --   cannot remove a page backing a live route.
+032_audit_log_diff_columns.sql    -- audit_log before_value / after_value / reason
+                                  --   (JSONB, JSONB, TEXT) + two composite indexes
+                                  --   for the viewer's filter paths. DDL.
 ```
 
 After running migrations, manually insert one admin_users row via SQL with a bcrypt hash for the password.
+
+**DDL migrations must be run by hand.** 031 and 032 use `ALTER TABLE`, which supabase-js cannot execute. The Supabase CLI is not installed and `.env.local` carries no direct Postgres connection string, so the seed-script pattern used for 029 does not work for them. Paste them into the Supabase SQL editor. Every consumer of those columns degrades safely if the migration has not run: the page list treats a missing `is_system` as "system" so nothing is deletable, and `writeAudit` retries without the diff columns rather than failing the mutation.
 
 ---
 
@@ -491,11 +539,11 @@ After running migrations, manually insert one admin_users row via SQL with a bcr
 
 PMBC uses the same two-layer CMS pattern as FMP:
 
-**Layer 1: cms_content (key-value)** — for content that doesn't belong to a specific page or section. Logo URLs, brand name, contact email, footer copyright, default SEO description, social URLs. Section + key + value structure. Read once, cached for the request.
+**Layer 1: cms_content (key-value)**: for content that doesn't belong to a specific page or section. Logo URLs, brand name, contact email, footer copyright, default SEO description, social URLs. Section + key + value structure. Read once, cached for the request.
 
-**Namespace convention:** one row per atomic key. JSON-array values (e.g. `(header_settings, nav_items)`) are allowed when the value is naturally a list, but discrete keys are preferred over bundled JSON blobs — `(header_settings, cta_label)`, `(header_settings, show_cta)`, etc., not a single `config` row that contains all of them. Migration 009 splits the legacy `config` blob accordingly.
+**Namespace convention:** one row per atomic key. JSON-array values (e.g. `(header_settings, nav_items)`) are allowed when the value is naturally a list, but discrete keys are preferred over bundled JSON blobs: `(header_settings, cta_label)`, `(header_settings, show_cta)`, etc., not a single `config` row that contains all of them. Migration 009 splits the legacy `config` blob accordingly.
 
-**Layer 2: page_sections (block-based)** — for the main body content of each page. One row per content block, ordered by `display_order`, rendered through a section-type registry. Editable via drag-and-drop page builder.
+**Layer 2: page_sections (block-based)**: for the main body content of each page. One row per content block, ordered by `display_order`, rendered through a section-type registry. Editable via drag-and-drop page builder.
 
 ### Section Renderer Pattern
 
@@ -659,20 +707,21 @@ export default async function middleware(req) {
 | Route | Purpose |
 |-------|---------|
 | `/admin` | Dashboard: recent contact submissions, page count, last updated timestamps |
-| `/admin/page-builder` | List all CMS pages with a Builder button per row (the pages list; was `/admin/pages` before Phase 11) |
-| `/admin/page-builder/[slug]` | Drag-and-drop section editor for one page |
+| `/admin/page-builder` | Pages list, with a Builder button per row, a **New Page** modal (five templates) and per-row delete for non-system pages |
+| `/admin/page-builder/[slug]` | Three-pane section editor. **Per-section Save** since parity 3, plus a StyleEditor per section since parity 5 |
 | `/admin/pages` | Pages & Nav: the navigation menu that drives the public navbar (`site_pages` rows). Nav links only, not page content |
 | `/admin/content` | Key-value editor for cms_content (grouped by section) |
-| `/admin/branding` | Logo, brand name, tagline, color tokens |
-| `/admin/header-settings` | Header-specific settings |
+| `/admin/branding` | **Redirect to `/admin/header-settings`** since parity 1. Kept for older bookmarks |
+| `/admin/header-settings` | Brand colours, logo, branding text, header icon, header layout, CTA and mobile. Seven cards, one Save All. Owns the 17 `header_settings` keys plus the `branding_config` row |
 | `/admin/contact-submissions` | List and view contact form submissions, change status, add notes |
-| `/admin/email-branding` | Email logo, signature, footer |
+| `/admin/email-branding` | Email logo, signature, footer. Previews are sanitised through `sanitizeEmailHtml` |
 | `/admin/email-templates` | Edit email subject and body for the two templates |
+| `/admin/audit` | Audit log viewer: filters (admin, action, date range), 100-row paging, before/after JSON diff |
 | `/admin/settings` | Misc site settings (analytics IDs, social URLs, etc.) |
 
 ### Sidebar (`src/components/admin/CmsAdminNav.tsx`)
 
-Single component handling both desktop and mobile chrome (no separate `AdminSidebar` / `AdminMobileNav` / `LogoutButton` components — those were collapsed into this one in Phase 4.5).
+Single component handling both desktop and mobile chrome (no separate `AdminSidebar` / `AdminMobileNav` / `LogoutButton` components: those were collapsed into this one in Phase 4.5).
 
 - 240px expanded · 64px collapsed (icons only)
 - Collapse persisted to `localStorage['pmbcAdminSidebarCollapsed']`
@@ -685,7 +734,7 @@ Single component handling both desktop and mobile chrome (no separate `AdminSide
 
 ### Admin styling
 
-All admin pages use **inline styles**, not Tailwind utility classes. Shared design tokens live in `src/lib/admin/styles.ts` — colors, layout constants, and ready-made `CSSProperties` presets (`adminCard`, `adminInput`, `adminButtonPrimary`, etc.). This intentionally isolates the admin console from the public-site theme so future public-site work can't accidentally restyle the dashboard. The PMBC palette (deep navy `#0F2540` sidebar, navy `#1B3A5F` primary, gold `#C69C3E` accent, page bg `#F4F7FC`) is anchored here. Note the isolation is about structure, not the brand accent: Phase 11 moved the admin gold in step with the public gold (`#D4A93A` to `#C69C3E`) so the console does not visibly diverge from the site, while the structural colors (sidebar `#0F2540`, primary `#1B4F8A`) stay independent.
+All admin pages use **inline styles**, not Tailwind utility classes. Shared design tokens live in `src/lib/admin/styles.ts`: colors, layout constants, and ready-made `CSSProperties` presets (`adminCard`, `adminInput`, `adminButtonPrimary`, etc.). This intentionally isolates the admin console from the public-site theme so future public-site work can't accidentally restyle the dashboard. The PMBC palette (deep navy `#0F2540` sidebar, navy `#1B3A5F` primary, gold `#C69C3E` accent, page bg `#F4F7FC`) is anchored here. Note the isolation is about structure, not the brand accent: Phase 11 moved the admin gold in step with the public gold (`#D4A93A` to `#C69C3E`) so the console does not visibly diverge from the site, while the structural colors (sidebar `#0F2540`, primary `#1B4F8A`) stay independent.
 
 ### Admin API conventions
 
@@ -699,10 +748,20 @@ All admin pages use **inline styles**, not Tailwind utility classes. Shared desi
 
 Three-pane layout matching FMP's pattern:
 - **Left pane**: list of sections on the current page with drag handles, visibility toggle, delete button, and "Add Section" button at bottom
-- **Center pane**: editor for the currently selected section (the appropriate editor component from `editors/`)
-- **Right pane**: live preview iframe pointed at the page (with `?preview=1` query to bypass cache). PMBC kept the iframe rather than FMP's "open in new tab" — preview re-keys after every Save / Add / Delete.
+- **Center pane**: editor for the currently selected section (the appropriate editor component from `editors/`), with that section's own Save header above it and a collapsible **StyleEditor** below it
+- **Right pane**: live preview iframe pointed at the page (with `?preview=1` query to bypass cache). PMBC kept the iframe rather than FMP's "open in new tab": preview re-keys after every Save / Add / Delete.
 
-Save button at the top right. **Explicit-save** model for v1 (no auto-save).
+**Save model (parity 3, matching FMP).** Each section owns its own Save. There is no global Save button. Dirty state is tracked per section id, never per page, so saving one section cannot flush another section's half-finished edit.
+
+| Operation | Persists |
+|---|---|
+| Reorder (drag) | Immediately on drop |
+| Add section | Immediately, server side, so the row has a stable id to edit against |
+| Delete section | Immediately, behind the confirm dialog |
+| Content edit | Pending until that section's Save |
+| Visibility toggle | Pending until that section's Save |
+
+Sections with pending edits show an amber dot in the left rail, and the top bar shows a count. A `beforeunload` guard fires while anything is unsaved.
 
 ---
 
@@ -872,7 +931,7 @@ Critical positioning point: PMBC's design language should feel **distinct from F
 | Body | Inter | 16-18px | 400 |
 | Caption / label | Inter | 12-14px | 500 (uppercase, tracked) |
 
-Decision pending on serif choice — present both during build phase. Both load via Google Fonts with `next/font`.
+Decision pending on serif choice: present both during build phase. Both load via Google Fonts with `next/font`.
 
 ### Layout Tokens
 
@@ -918,7 +977,7 @@ NEXT_PUBLIC_GA_ID=
 
 Follow this order. Don't skip ahead. Each phase is testable on its own.
 
-### Phase 1: Scaffold and Database (Day 1) — ✅ Complete (2026-04-30)
+### Phase 1: Scaffold and Database (Day 1): ✅ Complete (2026-04-30)
 1. `npx create-next-app@latest` with TypeScript, Tailwind, App Router, src/ directory, Turbopack
 2. Install dependencies (see Section 2)
 3. Set up Supabase project, get keys, populate `.env.local`
@@ -926,40 +985,40 @@ Follow this order. Don't skip ahead. Each phase is testable on its own.
 5. Insert one admin user via SQL with bcrypt hash
 6. Verify Supabase connection from a server component
 
-### Phase 2: Auth and Admin Shell (Day 1-2) — ✅ Complete (2026-05-02)
+### Phase 2: Auth and Admin Shell (Day 1-2): ✅ Complete (2026-05-02)
 1. NextAuth config with credentials provider hitting admin_users
 2. Middleware protecting `/admin/*`
 3. Admin login page
 4. Admin layout (sidebar nav, header with logout)
 5. Empty admin dashboard
 
-### Phase 3: CMS Foundations (Day 2-3) — ✅ Complete (2026-05-02)
+### Phase 3: CMS Foundations (Day 2-3): ✅ Complete (2026-05-02)
 1. cms_content key-value editor at `/admin/content`
 2. Branding admin at `/admin/branding`
 3. Site settings at `/admin/settings`
 4. Email branding and templates admin
 
-### Phase 4: Page Builder (Day 3-5) — ✅ Complete (2026-05-02)
+### Phase 4: Page Builder (Day 3-5): ✅ Complete (2026-05-02)
 1. `/admin/pages` listing
 2. `/admin/page-builder/[slug]` three-pane layout
 3. Section editors for: hero, paragraphs, stats_block, service_cards (start with these four)
 4. Drag-and-drop reorder
 5. Save and visibility toggle
 
-### Phase 5: Public Pages — Core (Day 5-7)
+### Phase 5: Public Pages: Core (Day 5-7)
 1. Root layout with Navbar + Footer (CMS-driven)
 2. Section renderer with the four section types built so far
 3. Home page rendering from page_sections
 4. Services overview page
 5. Contact page with form, contact API route, email templates wired up
 
-### Phase 6: Remaining Section Types (Day 7-9) — ✅ Complete (2026-05-03)
+### Phase 6: Remaining Section Types (Day 7-9): ✅ Complete (2026-05-03)
 Editors + public renderers shipped for the 9 outstanding types: `sector_grid`, `process_steps`, `network_partners`, `founder_block`, `text_image`, `cta_block`, `quote`, `fmp_intro`, `service_detail`. All marked `implemented: true` in `SECTION_TYPES`; `SectionRenderer` and `SectionEditorPanel` registries cover all 13 types. Shared 21-icon lucide registry at `src/lib/cms/sectorIcons.tsx` powers both the sector-grid editor dropdown and the public renderer.
 
-### Phase 7: Remaining Pages (Day 9-11) — ✅ Complete (2026-05-03)
-Bespoke routes shipped at `src/app/(public)/{about,sectors,approach,network,financial-modeler-pro}/page.tsx`, plus `src/app/(public)/services/[slug]/page.tsx` for the 9 service detail pages. The catch-all `(public)/[slug]/page.tsx` was deleted — all CMS-managed pages now have explicit routes; missing pages 404 explicitly rather than silently rendering an unconfigured slug. Service-detail content lives in `cms_content` under namespace `service_<slug>` (migration 010); the route renderer parses `deliverables` robustly (JSON first, newline-split fallback). `src/app/sitemap.ts` and `src/app/robots.ts` shipped alongside.
+### Phase 7: Remaining Pages (Day 9-11): ✅ Complete (2026-05-03)
+Bespoke routes shipped at `src/app/(public)/{about,sectors,approach,network,financial-modeler-pro}/page.tsx`, plus `src/app/(public)/services/[slug]/page.tsx` for the 9 service detail pages. The catch-all `(public)/[slug]/page.tsx` was deleted: all CMS-managed pages now have explicit routes; missing pages 404 explicitly rather than silently rendering an unconfigured slug. Service-detail content lives in `cms_content` under namespace `service_<slug>` (migration 010); the route renderer parses `deliverables` robustly (JSON first, newline-split fallback). `src/app/sitemap.ts` and `src/app/robots.ts` shipped alongside.
 
-### Phase 8: SEO and Polish (Day 11-13) — ✅ Complete (2026-05-03)
+### Phase 8: SEO and Polish (Day 11-13): ✅ Complete (2026-05-03)
 Dynamic OG image route at `/api/og` (`next/og` ImageResponse, 1200×630, navy + gold, branding-driven). Shared `src/lib/seo/metadata.ts` `buildPageMetadata()` helper drives unique title / canonical / OG / twitter on every public page, auto-routing OG images to `/api/og?…` when no override is set. Schema.org `@graph` (FinancialService + Organization + WebSite) mounted in the public layout via `OrganizationJsonLd`; per-service `Service` schema on `/services/[slug]` linked back via `@id`. Branded 404 in both `(public)/not-found.tsx` (in-group `notFound()`) and root `not-found.tsx` (unmatched URLs); root `error.tsx` client boundary logs digest and offers retry. Privacy + Terms fleshed out with named processors (Vercel, Supabase, Resend, hCaptcha, Google Fonts) and "Subject to legal review" badge. `next.config.ts` adds Supabase + Cloudinary `remotePatterns` and `poweredByHeader: false`. `/admin/og-preview` admin tool with live previews + per-page override-URL save (writes to `cms_pages.og_image_url`). Sitemap and robots already shipped in Phase 7.
 
 ### Phase 9: Content Population and Launch (Day 13-15)

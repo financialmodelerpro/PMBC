@@ -1,25 +1,41 @@
-# PMBC Project — Build Handoff Summary
+# PMBC Project: Build Handoff Summary
 
 **Project:** PaceMakers Business Consultants website
 **Repo:** github.com/financialmodelerpro/PMBC
 **Domain:** pacemakersglobal.com
 **Vercel project:** pmbc (already created, domain attached)
 **Build path:** Self-built using Claude Code
-**Status (as of 2026-07-30):** Phases 1 through 11 complete. **All buildable work is done; everything outstanding is operational, content-population, or review work.**
+**Status (as of 2026-08-01):** Phases 1 through 11 complete, plus FMP admin-parity phases 1 to 7. **All buildable work is done; everything outstanding is operational, content-population, or review work.**
 
 The public site renders 19 routes from the CMS: all 13 section types have editors and renderers, every public page has a bespoke route, and production content is seeded for home, about, sectors, approach, network, financial-modeler-pro, the services overview, contact, and all 9 service-detail pages (migrations 010 to 020). SEO is complete: dynamic OG images, Schema.org JSON-LD, sitemap, robots, branded 404 and error boundaries. Privacy and Terms are drafted with named processors and still carry a "Subject to legal review" badge.
 
 The admin console covers the key-value CMS, page builder, contact inbox, five managed collections (Services, Case Studies, Team & Advisors, Insights, Testimonials), media library, audit log, OG previews, email branding and templates, and site settings. Supabase RLS is default-deny on every public table (migrations 013, 021 to 027), with all server access via the service role.
 
-Two design-language notes: Phase 9.5 established the token layer (`src/lib/public/tokens.ts`, `SectionContainer`, three background variants with sequence-aware resolution). Phase 11 retuned the values to primary navy `#1B3A5F`, deep navy `#14304F`, cream `#FAF7F2`, gold `#C69C3E`, muted gold `#A88530`, cream-on-navy `#E8DDC4`, and re-anchored the hero gradient. Phase 11 also fixed the admin structure to match FMP: `/admin/page-builder` is the pages list, `/admin/pages` is the navbar menu editor over the new `site_pages` table, and nav editing was removed from `/admin/header-settings` so the navbar has one source of truth.
+## FMP admin parity (2026-08-01)
 
-**Remaining before launch:** production env vars on Vercel (without `RESEND_API_KEY` the contact form saves to the inbox but sends no email); rotate the `Admin@2026` dev password; DNS and SSL for `pacemakersglobal.com`; counsel review of Privacy and Terms, then remove the badge; submit the sitemap to Search Console; refresh the Supabase Security Advisor; real asset uploads (logo, founder photo, network image, partner logos); and content for the four empty collections (Case Studies, Insights, Testimonials, Team), which degrade gracefully to empty until then. See the "Remaining Before Launch" checklist in `CLAUDE.md` for owners per item.
+The admin console was audited against FMP's (`ADMIN_PARITY_GAP.md`) and brought into line over seven phases. Headlines:
+
+- **Header Settings consolidated.** Branding merged back in as seven cards with one Save All. `/admin/branding` is now a redirect.
+- **The public navbar is CMS-driven.** Header height, logo sizing and position, an optional header icon, and nav alignment all read from `header_settings`.
+- **Green Save buttons.** PMBC keeps navy and gold for identity and adopts FMP's green purely for save semantics, so "the green button commits my work" transfers between the two consoles.
+- **Per-section save in the page builder**, replacing one global Save, with per-section dirty tracking.
+- **Pages can be created and deleted** from the admin, with five starter templates and a server-enforced guard on system pages.
+- **StyleEditor** gives per-section control of background, spacing, width, radius and animation, layered on top of the existing variant system rather than replacing it.
+- **Rich text upgraded**, with a full editor for long-form copy and a compact one for short fields.
+- **All rich-text output is sanitised.** This closed S1, the highest-severity finding in the audit. A 14-route render diff confirmed zero visual change to existing content.
+- **Audit log viewer** with filters, pagination and before/after diffs.
+
+Two bugs were found and fixed along the way that predate the parity work: the untracked `PMBC from FMP/` scaffold was contributing 107 TypeScript errors to the root typecheck (archived and deleted), and **the Testimonials admin section could never save a row** because the table has no `updated_at` column while the collection factory stamps one by default.
+
+Two design-language notes: Phase 9.5 established the token layer (`src/lib/public/tokens.ts`, `SectionContainer`, three background variants with sequence-aware resolution). Phase 11 retuned the values to primary navy `#1B3A5F`, deep navy `#14304F`, cream `#FAF7F2`, gold `#C69C3E`, muted gold `#A88530`, cream-on-navy `#E8DDC4`, and re-anchored the hero gradient. Phase 11 also fixed the admin structure to match FMP: `/admin/page-builder` is the pages list, `/admin/pages` is the navbar menu editor over the `site_pages` table, and nav editing was removed from `/admin/header-settings` so the navbar has one source of truth.
+
+**Remaining before launch:** production env vars on Vercel (without `RESEND_API_KEY` the contact form saves to the inbox but sends no email); rotate the `Admin@2026` dev password; DNS and SSL for `pacemakersglobal.com`; counsel review of Privacy and Terms, then remove the badge; submit the sitemap to Search Console; refresh the Supabase Security Advisor; real asset uploads (logo, founder photo, network image, partner logos); and content for the four empty collections (Case Studies, Insights, Testimonials, Team), which degrade gracefully to empty until then. **There is also a genuine client enquiry from 2026-06-21 sitting unread in the inbox.** See the "Remaining Before Launch" checklist in `CLAUDE.md` for owners per item.
 
 ---
 
 ## What This Project Is
 
-A standalone marketing website for PaceMakers Business Consultants LLP — the parent firm under which Financial Modeler Pro operates. The website's job is to convert referred prospects into conversations. It is a credibility document for KSA and GCC family offices, investment offices, real estate investors, developers, and corporates running M&A, valuation, or modeling mandates.
+A standalone marketing website for PaceMakers Business Consultants LLP: the parent firm under which Financial Modeler Pro operates. The website's job is to convert referred prospects into conversations. It is a credibility document for KSA and GCC family offices, investment offices, real estate investors, developers, and corporates running M&A, valuation, or modeling mandates.
 
 It is **not** an inbound SEO engine, **not** a lead-magnet funnel, and **not** a self-service portal. It is a small, high-quality site that needs to feel institutional and trustworthy to a sophisticated buyer.
 
@@ -107,7 +123,7 @@ FMP is a learning and modeling platform with student auth, course content, quizz
 
 **Positioning:** Senior-led, analytically grounded, commercially focused. Founder Ahmad Din leads every mandate directly. Network of partners (Sky Gulf in Al Khobar, Lynkers in Manama as equity shareholder) extends GCC reach.
 
-**Visual language:** Distinct from FMP. Where FMP is approachable, modern, and educational, PMBC is institutional, considered, and senior. Same base color family (navy, green, gold accent from logo) but used differently — heavier navy, sparing green, gold thread for premium signaling. Serif headlines paired with Inter body. Less rounded corners. More whitespace. Larger type.
+**Visual language:** Distinct from FMP. Where FMP is approachable, modern, and educational, PMBC is institutional, considered, and senior. Same base color family (navy, green, gold accent from logo) but used differently: heavier navy, sparing green, gold thread for premium signaling. Serif headlines paired with Inter body. Less rounded corners. More whitespace. Larger type.
 
 ## Build Sequence
 
@@ -151,7 +167,7 @@ Two single-purpose work streams have also landed since Phase 8:
 |----------------|-------|
 | Headline serif font | Source Serif Pro vs Playfair Display. Decide during Phase 5 polish. |
 | Resend account | Reuse FMP's account with new sender, or create new account for PMBC. Recommendation: separate account. |
-| Color tokens — exact hex values | Starting palette in CLAUDE.md is a draft. Refine against logo and brand once first pages render. |
+| Color tokens, exact hex values | Starting palette in CLAUDE.md is a draft. Refine against logo and brand once first pages render. |
 | Founder photo on About page | Use the existing FMP profile photo, or shoot new institutional photography. |
 | Direct booking link | Microsoft Bookings (already used by FMP) vs Calendly vs WhatsApp-only. |
 
@@ -182,8 +198,8 @@ The FMP founder page (`financialmodelerpro.com/about/ahmad-din`) is the canonica
 
 ## How to Use These Files
 
-- **CLAUDE.md** — drop this at the root of the repo. Claude Code reads it on every session and uses it as project context. It contains all the patterns, schema, and conventions needed to build the site without re-explaining context.
-- **PROJECT_HANDOFF.md** — drop this at the root or in a `/docs` folder. It is the human-readable summary of the project for orientation. Claude Code can read it but doesn't need to as often as CLAUDE.md.
+- **CLAUDE.md**: drop this at the root of the repo. Claude Code reads it on every session and uses it as project context. It contains all the patterns, schema, and conventions needed to build the site without re-explaining context.
+- **PROJECT_HANDOFF.md**: drop this at the root or in a `/docs` folder. It is the human-readable summary of the project for orientation. Claude Code can read it but doesn't need to as often as CLAUDE.md.
 
 When you start the next development session with Claude Code, the first prompt should be: *"Read CLAUDE.md, then begin Phase 1 of the build sequence."*
 
