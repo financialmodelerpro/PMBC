@@ -40,7 +40,16 @@ PMBC had no way to create or delete a CMS page from the admin: pages existed onl
 - Delete refused with 409 pre-migration (fails closed) and 401 unauthenticated.
 - Test page removed afterwards; database back to 17 pages / 36 sections. Public routes including `/services/financial-modeling` all 200.
 
-**Not yet verified, because it needs migration 031:** the delete happy path (cascade then page, list refresh), the 403 on a system page, and the trash-versus-lock split once real flags exist. After running 031, create a throwaway page and delete it to close those out.
+**Migration 031 applied by the user later the same day, and the three outstanding flows were closed out:**
+- Column present, 17/17 rows flagged system, 0 unflagged. Migration-pending banner gone.
+- `DELETE` on `home` returned **403** with `"Home" is a system page and cannot be deleted`, proving the guard is server-side rather than just a hidden button.
+- Created a throwaway page on the `about` template: 201, `is_system: false` returned (the column default applied), 5 sections at 10/20/30/40/50 (hero, founder_block, text_image, quote, cta_block).
+- List then showed **18 rows, 17 locks, 1 trash**, and the single trash was labelled `Delete Phase 4 Smoke Test`. The trash-versus-lock split is driven by real data, not a guess.
+- Deleted it: 200 with `deleted_sections: 5`. The `cms_pages` row is gone, **zero orphaned `page_sections`** (the manual cascade works, which matters because `page_slug` is not a foreign key), and totals returned to the pre-test baseline of 17 pages / 36 sections exactly.
+- Audit trail carries both halves: `create` with `template` and `section_count`, `delete` with `section_count`.
+- List refreshed to 17 rows / 17 locks / 0 trash. The deleted page now 404s in the builder. All public routes including `/services/financial-modeling` still 200.
+
+Phase 4 is fully verified. Nothing outstanding.
 
 ---
 
