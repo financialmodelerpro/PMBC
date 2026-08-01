@@ -14,6 +14,8 @@ import { QuoteEditor } from '@/components/admin/editors/QuoteEditor';
 import { FmpIntroEditor } from '@/components/admin/editors/FmpIntroEditor';
 import { ServiceDetailEditor } from '@/components/admin/editors/ServiceDetailEditor';
 import type { SectionEditorProps } from '@/components/admin/editors/types';
+import { SaveButton } from '@/components/admin/SaveButton';
+import { SaveStatus, type SaveState } from '@/components/admin/SaveStatus';
 import { ADMIN_COLORS } from '@/lib/admin/styles';
 import { getSectionMeta } from '@/lib/cms/sectionTypes';
 
@@ -33,17 +35,147 @@ const EDITORS: Record<string, (props: SectionEditorProps) => React.ReactElement>
   service_detail: ServiceDetailEditor,
 };
 
+/**
+ * The centre pane: one section's editor, with its own Save header.
+ *
+ * Parity Phase 3 (FMP CMS_REFERENCE.md section 3): FMP gives every section its
+ * own Save rather than one global button for the page, so the editing surface
+ * owns the control that commits it. The Save button is green via the Phase 2
+ * SaveButton, and is disabled (grey) until this section actually has changes.
+ */
 export function SectionEditorPanel({
   sectionType,
   content,
   onChange,
+  sectionLabel,
+  visible,
+  dirty,
+  saveState,
+  saveError,
+  onSave,
 }: {
   sectionType: string;
   content: Record<string, unknown>;
   onChange: (next: Record<string, unknown>) => void;
+  sectionLabel: string;
+  visible: boolean;
+  dirty: boolean;
+  saveState: SaveState;
+  saveError?: string;
+  onSave: () => void;
+}) {
+  const Editor = EDITORS[sectionType];
+
+  return (
+    <>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: 12,
+          marginBottom: 14,
+        }}
+      >
+        <div style={{ minWidth: 0 }}>
+          <p
+            style={{
+              margin: 0,
+              fontSize: 10,
+              fontWeight: 700,
+              letterSpacing: '0.16em',
+              textTransform: 'uppercase',
+              color: ADMIN_COLORS.textMuted,
+            }}
+          >
+            Editing
+          </p>
+          <p
+            style={{
+              margin: '2px 0 0',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              fontSize: 13,
+              fontWeight: 700,
+              color: ADMIN_COLORS.textHeading,
+            }}
+          >
+            {sectionLabel}
+            {!visible && (
+              <span
+                style={{
+                  padding: '2px 8px',
+                  borderRadius: 999,
+                  background: '#F3F4F6',
+                  color: ADMIN_COLORS.textMuted,
+                  fontSize: 10,
+                  fontWeight: 700,
+                  letterSpacing: '0.06em',
+                  textTransform: 'uppercase',
+                }}
+              >
+                Hidden
+              </span>
+            )}
+          </p>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {dirty && saveState !== 'saving' && (
+            <span
+              style={{
+                fontSize: 11,
+                fontWeight: 600,
+                color: ADMIN_COLORS.warning,
+              }}
+            >
+              Unsaved
+            </span>
+          )}
+          <SaveStatus state={saveState} message={saveError} />
+          <SaveButton
+            type="button"
+            onClick={onSave}
+            saving={saveState === 'saving'}
+            disabled={!dirty}
+          >
+            {saveState === 'saving' ? 'Saving…' : 'Save section'}
+          </SaveButton>
+        </div>
+      </div>
+
+      <div
+        style={{
+          background: '#FFFFFF',
+          border: `1px solid ${ADMIN_COLORS.border}`,
+          borderRadius: 12,
+          padding: 20,
+        }}
+      >
+        <SectionEditorBody
+          sectionType={sectionType}
+          content={content}
+          onChange={onChange}
+          Editor={Editor}
+        />
+      </div>
+    </>
+  );
+}
+
+function SectionEditorBody({
+  sectionType,
+  content,
+  onChange,
+  Editor,
+}: {
+  sectionType: string;
+  content: Record<string, unknown>;
+  onChange: (next: Record<string, unknown>) => void;
+  Editor?: (props: SectionEditorProps) => React.ReactElement;
 }) {
   const meta = getSectionMeta(sectionType);
-  const Editor = EDITORS[sectionType];
 
   if (!Editor) {
     return (

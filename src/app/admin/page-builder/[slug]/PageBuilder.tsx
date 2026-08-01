@@ -32,11 +32,7 @@ import {
 
 import { SaveStatus, type SaveState } from '@/components/admin/SaveStatus';
 import { ConfirmDialog } from '@/components/admin/ConfirmDialog';
-import { SaveButton } from '@/components/admin/SaveButton';
-import {
-  ADMIN_COLORS,
-  adminButtonGhost,
-} from '@/lib/admin/styles';
+import { ADMIN_COLORS, adminButtonGhost } from '@/lib/admin/styles';
 import { getSectionMeta } from '@/lib/cms/sectionTypes';
 import { sectionFromRow, type LocalSection } from '@/lib/cms/serializers';
 import type { Tables } from '@/types/database';
@@ -51,6 +47,24 @@ type Props = {
   initialSections: LocalSection[];
 };
 
+/**
+ * Page Builder, per-section save (FMP CMS_REFERENCE.md section 3, parity Phase 3).
+ *
+ * Which operations persist immediately and which wait for a Save, matching FMP:
+ *
+ *   Reorder (drag)     auto-saves on drop. Structural and low-risk, and leaving
+ *                      it pending would make the left rail disagree with the
+ *                      preview.
+ *   Add section        creates on the server immediately, so the new row has a
+ *                      stable database id to edit against.
+ *   Delete section     deletes immediately, behind a confirm dialog.
+ *   Content edits      pending until that section's own Save.
+ *   Visibility toggle  pending until that section's own Save. This CHANGED in
+ *                      Phase 3: it used to persist immediately.
+ *
+ * Dirty state is tracked per section id, never per page, so saving one section
+ * cannot flush another section's half-finished edit.
+ */
 export function PageBuilder({
   pageSlug,
   pageTitle,
@@ -62,22 +76,33 @@ export function PageBuilder({
   const [selectedId, setSelectedId] = useState<string | null>(
     initialSections[0]?.id ?? null,
   );
-  const [dirty, setDirty] = useState(false);
-  const [saveState, setSaveState] = useState<SaveState>('idle');
-  const [errMsg, setErrMsg] = useState<string | undefined>();
+
+  // Per-section state. A page-level `dirty` flag would let one section's Save
+  // clear another section's pending edits.
+  const [dirtyIds, setDirtyIds] = useState<Set<string>>(() => new Set());
+  const [saveStates, setSaveStates] = useState<Record<string, SaveState>>({});
+  const [saveErrs, setSaveErrs] = useState<Record<string, string | undefined>>({});
+
+  // Structural operations (reorder / add / delete) report separately in the top
+  // bar, because they are not tied to the section currently being edited.
+  const [structuralState, setStructuralState] = useState<SaveState>('idle');
+  const [structuralErr, setStructuralErr] = useState<string | undefined>();
+
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
   const [previewKey, setPreviewKey] = useState(0);
 
+  const anyDirty = dirtyIds.size > 0;
+
   useEffect(() => {
-    if (!dirty) return;
+    if (!anyDirty) return;
     const handler = (e: BeforeUnloadEvent) => {
       e.preventDefault();
       e.returnValue = '';
     };
     window.addEventListener('beforeunload', handler);
     return () => window.removeEventListener('beforeunload', handler);
-  }, [dirty]);
+  }, [anyDirty]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
@@ -93,62 +118,88 @@ export function PageBuilder({
   const previewHref =
     pageSlug === 'home' ? '/?preview=1' : `/${pageSlug}?preview=1`;
 
+  const markDirty = useCallback((id: string) => {
+    setDirtyIds((prev) => {
+      if (prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+    // A fresh edit clears any lingering "Saved" pill for that section.
+    setSaveStates((prev) => (prev[id] ? { ...prev, [id]: 'idle' } : prev));
+  }, []);
+
+  const clearDirty = useCallback((id: string) => {
+    setDirtyIds((prev) => {
+      if (!prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+  }, []);
+
   const updateSection = useCallback(
     (id: string, patch: Partial<LocalSection>) => {
       setSections((arr) => arr.map((s) => (s.id === id ? { ...s, ...patch } : s)));
-      setDirty(true);
+      markDirty(id);
     },
-    [],
+    [markDirty],
   );
 
-  // Persist a given set of sections to the server. Used by the explicit Save
-  // button and by the auto-save paths (reorder + visibility toggle), which
-  // mirror FMP where structural changes save immediately.
-  const persist = useCallback(
-    async (list: LocalSection[]) => {
-      setSaveState('saving');
-      setErrMsg(undefined);
+  /** Persist exactly one section. The POST route updates by id and never deletes
+   *  rows missing from the payload, so a single-section body is safe. */
+  const saveSection = useCallback(
+    async (id: string) => {
+      const section = sections.find((s) => s.id === id);
+      if (!section) return;
+
+      setSaveStates((p) => ({ ...p, [id]: 'saving' }));
+      setSaveErrs((p) => ({ ...p, [id]: undefined }));
       try {
         const res = await fetch('/api/admin/page-sections', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({
             page_slug: pageSlug,
-            sections: list.map((s) => ({
-              id: s.id,
-              page_slug: s.page_slug,
-              section_type: s.section_type,
-              content: s.content,
-              styles: s.styles,
-              display_order: s.display_order,
-              visible: s.visible,
-            })),
+            sections: [
+              {
+                id: section.id,
+                page_slug: section.page_slug,
+                section_type: section.section_type,
+                content: section.content,
+                styles: section.styles,
+                display_order: section.display_order,
+                visible: section.visible,
+              },
+            ],
           }),
         });
         if (!res.ok) {
           const body = await res.json().catch(() => ({}));
           throw new Error(body.error ?? 'Save failed');
         }
-        setDirty(false);
-        setSaveState('saved');
+        clearDirty(id);
+        setSaveStates((p) => ({ ...p, [id]: 'saved' }));
         setPreviewKey((k) => k + 1);
-        setTimeout(() => setSaveState('idle'), 2500);
+        setTimeout(
+          () => setSaveStates((p) => (p[id] === 'saved' ? { ...p, [id]: 'idle' } : p)),
+          2500,
+        );
         router.refresh();
       } catch (e) {
-        setSaveState('error');
-        setErrMsg((e as Error).message);
+        setSaveStates((p) => ({ ...p, [id]: 'error' }));
+        setSaveErrs((p) => ({ ...p, [id]: (e as Error).message }));
       }
     },
-    [pageSlug, router],
+    [sections, pageSlug, clearDirty, router],
   );
 
-  // Lightweight structural auto-save (order / visibility only). Crucially it
-  // does NOT clear `dirty`, so any in-progress content edit stays pending and
-  // is never flushed by a reorder or a visibility toggle.
+  /** Structural auto-save: order only. Never touches `content`, so it cannot
+   *  flush a pending content edit. */
   const autosaveStructural = useCallback(
     async (body: Record<string, unknown>) => {
-      setSaveState('saving');
-      setErrMsg(undefined);
+      setStructuralState('saving');
+      setStructuralErr(undefined);
       try {
         const res = await fetch('/api/admin/page-sections', {
           method: 'PATCH',
@@ -159,13 +210,13 @@ export function PageBuilder({
           const b = await res.json().catch(() => ({}));
           throw new Error(b.error ?? 'Save failed');
         }
-        setSaveState('saved');
+        setStructuralState('saved');
         setPreviewKey((k) => k + 1);
-        setTimeout(() => setSaveState('idle'), 2500);
+        setTimeout(() => setStructuralState('idle'), 2500);
         router.refresh();
       } catch (e) {
-        setSaveState('error');
-        setErrMsg((e as Error).message);
+        setStructuralState('error');
+        setStructuralErr((e as Error).message);
       }
     },
     [pageSlug, router],
@@ -182,30 +233,37 @@ export function PageBuilder({
       display_order: i * 10,
     }));
     setSections(reordered);
-    // FMP parity: reorder auto-saves as soon as the drag is released, persisting
-    // order only (content edits stay pending).
+    // Reorder auto-saves on drop and does NOT mark anything dirty: the new order
+    // is already on the server by the time the drag animation settles.
     void autosaveStructural({
       action: 'reorder',
       items: reordered.map((s) => ({ id: s.id, display_order: s.display_order })),
     });
   };
 
+  /**
+   * Visibility is now LOCAL until that section is saved (FMP parity, Phase 3).
+   * Previously this persisted immediately.
+   *
+   * Deliberately does NOT select the section. FMP requires the admin to open the
+   * row and click its own Save, and auto-selecting here would yank the centre
+   * pane away from whatever they were editing. The unsaved dot on the row plus
+   * the count in the top bar are what make the pending change discoverable.
+   */
   const handleToggleVisible = useCallback(
     (id: string) => {
-      const target = sections.find((s) => s.id === id);
-      if (!target) return;
-      const nextVisible = !target.visible;
       setSections((arr) =>
-        arr.map((s) => (s.id === id ? { ...s, visible: nextVisible } : s)),
+        arr.map((s) => (s.id === id ? { ...s, visible: !s.visible } : s)),
       );
-      // Persist visibility immediately, content edits untouched.
-      void autosaveStructural({ action: 'set_visibility', id, visible: nextVisible });
+      markDirty(id);
     },
-    [sections, autosaveStructural],
+    [markDirty],
   );
 
   const handleAddSection = async (sectionType: string) => {
     setPickerOpen(false);
+    setStructuralState('saving');
+    setStructuralErr(undefined);
     try {
       const res = await fetch('/api/admin/page-sections/create', {
         method: 'POST',
@@ -218,16 +276,21 @@ export function PageBuilder({
       }
       const { section } = (await res.json()) as { section: Tables<'page_sections'> };
       const local = sectionFromRow(section);
+      // Created server-side, so it starts clean: no dot, nothing pending.
       setSections((arr) => [...arr, local]);
       setSelectedId(local.id);
       setPreviewKey((k) => k + 1);
+      setStructuralState('saved');
+      setTimeout(() => setStructuralState('idle'), 2500);
     } catch (e) {
-      setSaveState('error');
-      setErrMsg('Could not add section: ' + (e as Error).message);
+      setStructuralState('error');
+      setStructuralErr('Could not add section: ' + (e as Error).message);
     }
   };
 
   const handleDelete = async (id: string) => {
+    setStructuralState('saving');
+    setStructuralErr(undefined);
     try {
       const res = await fetch(`/api/admin/page-sections/${id}`, { method: 'DELETE' });
       if (!res.ok) {
@@ -235,20 +298,28 @@ export function PageBuilder({
         throw new Error(body.error ?? 'Delete failed');
       }
       setSections((arr) => arr.filter((s) => s.id !== id));
+      // Drop any pending state for the row that no longer exists, otherwise the
+      // beforeunload guard would warn about edits to a deleted section.
+      clearDirty(id);
+      setSaveStates((p) => {
+        const next = { ...p };
+        delete next[id];
+        return next;
+      });
       setSelectedId((cur) => {
         if (cur !== id) return cur;
         const remaining = ordered.filter((s) => s.id !== id);
         return remaining[0]?.id ?? null;
       });
       setPreviewKey((k) => k + 1);
+      setStructuralState('saved');
+      setTimeout(() => setStructuralState('idle'), 2500);
     } catch (e) {
-      setSaveState('error');
-      setErrMsg('Could not delete: ' + (e as Error).message);
+      setStructuralState('error');
+      setStructuralErr('Could not delete: ' + (e as Error).message);
     }
     setPendingDelete(null);
   };
-
-  const handleSave = () => persist(ordered);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
@@ -303,7 +374,7 @@ export function PageBuilder({
           </h1>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-          {dirty && (
+          {anyDirty && (
             <span
               style={{
                 display: 'inline-flex',
@@ -316,30 +387,21 @@ export function PageBuilder({
                 fontWeight: 600,
               }}
             >
-              Unsaved changes
+              {dirtyIds.size} section{dirtyIds.size === 1 ? '' : 's'} unsaved
             </span>
           )}
-          <SaveStatus state={saveState} message={errMsg} />
+          {/* Structural feedback only. There is deliberately no global Save
+              button here in Phase 3: each section saves itself. */}
+          <SaveStatus state={structuralState} message={structuralErr} />
           <Link
             href={previewHref}
             target="_blank"
             rel="noreferrer"
-            style={{
-              ...adminButtonGhost,
-              textDecoration: 'none',
-            }}
+            style={{ ...adminButtonGhost, textDecoration: 'none' }}
           >
             Open preview
             <ArrowUpRight size={13} />
           </Link>
-          <SaveButton
-            type="button"
-            onClick={handleSave}
-            saving={saveState === 'saving'}
-            disabled={!dirty}
-          >
-            {saveState === 'saving' ? 'Saving…' : 'Save'}
-          </SaveButton>
         </div>
       </div>
 
@@ -401,6 +463,7 @@ export function PageBuilder({
                       key={s.id}
                       section={s}
                       active={s.id === selectedId}
+                      dirty={dirtyIds.has(s.id)}
                       onSelect={() => setSelectedId(s.id)}
                       onToggleVisible={() => handleToggleVisible(s.id)}
                       onRequestDelete={() => setPendingDelete(s.id)}
@@ -446,46 +509,19 @@ export function PageBuilder({
           }}
         >
           {selected ? (
-            <>
-              <div style={{ marginBottom: 14 }}>
-                <p
-                  style={{
-                    margin: 0,
-                    fontSize: 10,
-                    fontWeight: 700,
-                    letterSpacing: '0.16em',
-                    textTransform: 'uppercase',
-                    color: ADMIN_COLORS.textMuted,
-                  }}
-                >
-                  Editing
-                </p>
-                <p
-                  style={{
-                    margin: '2px 0 0',
-                    fontSize: 13,
-                    fontWeight: 700,
-                    color: ADMIN_COLORS.textHeading,
-                  }}
-                >
-                  {getSectionMeta(selected.section_type)?.label ?? selected.section_type}
-                </p>
-              </div>
-              <div
-                style={{
-                  background: '#FFFFFF',
-                  border: `1px solid ${ADMIN_COLORS.border}`,
-                  borderRadius: 12,
-                  padding: 20,
-                }}
-              >
-                <SectionEditorPanel
-                  sectionType={selected.section_type}
-                  content={selected.content}
-                  onChange={(next) => updateSection(selected.id, { content: next })}
-                />
-              </div>
-            </>
+            <SectionEditorPanel
+              sectionType={selected.section_type}
+              content={selected.content}
+              onChange={(next) => updateSection(selected.id, { content: next })}
+              sectionLabel={
+                getSectionMeta(selected.section_type)?.label ?? selected.section_type
+              }
+              visible={selected.visible}
+              dirty={dirtyIds.has(selected.id)}
+              saveState={saveStates[selected.id] ?? 'idle'}
+              saveError={saveErrs[selected.id]}
+              onSave={() => saveSection(selected.id)}
+            />
           ) : (
             <p style={{ fontSize: 13, color: ADMIN_COLORS.textMuted }}>
               Select a section to edit.
@@ -526,11 +562,7 @@ export function PageBuilder({
             <button
               type="button"
               onClick={() => setPreviewKey((k) => k + 1)}
-              style={{
-                ...adminButtonGhost,
-                padding: '4px 10px',
-                fontSize: 11,
-              }}
+              style={{ ...adminButtonGhost, padding: '4px 10px', fontSize: 11 }}
               aria-label="Refresh preview"
               title="Refresh preview"
             >
@@ -549,7 +581,7 @@ export function PageBuilder({
               border: 'none',
             }}
           />
-          {dirty && (
+          {anyDirty && (
             <p
               style={{
                 margin: 0,
@@ -560,7 +592,8 @@ export function PageBuilder({
                 borderTop: `1px solid ${ADMIN_COLORS.border}`,
               }}
             >
-              Preview reflects the last <strong>saved</strong> state. Unsaved edits will appear after Save.
+              Preview reflects the last <strong>saved</strong> state. Save a section to see
+              its edits here.
             </p>
           )}
         </div>
@@ -588,12 +621,14 @@ export function PageBuilder({
 function SortableSectionItem({
   section,
   active,
+  dirty,
   onSelect,
   onToggleVisible,
   onRequestDelete,
 }: {
   section: LocalSection;
   active: boolean;
+  dirty: boolean;
   onSelect: () => void;
   onToggleVisible: () => void;
   onRequestDelete: () => void;
@@ -657,6 +692,9 @@ function SortableSectionItem({
         <p
           style={{
             margin: 0,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 5,
             fontSize: 13,
             fontWeight: 600,
             color: active ? ADMIN_COLORS.primary : ADMIN_COLORS.textHeading,
@@ -665,7 +703,27 @@ function SortableSectionItem({
             textOverflow: 'ellipsis',
           }}
         >
-          {meta?.label ?? section.section_type}
+          {/* Unsaved marker. Amber rather than the save green, because it means
+              "not yet committed", the opposite of a successful save. */}
+          {dirty && (
+            <span
+              aria-hidden
+              title="Unsaved changes"
+              style={{
+                width: 7,
+                height: 7,
+                flexShrink: 0,
+                borderRadius: '50%',
+                background: '#D97706',
+              }}
+            />
+          )}
+          <span
+            style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}
+          >
+            {meta?.label ?? section.section_type}
+          </span>
+          {dirty && <span style={visuallyHidden}>Unsaved changes</span>}
         </p>
         <p
           style={{
@@ -702,3 +760,15 @@ function SortableSectionItem({
     </li>
   );
 }
+
+const visuallyHidden: CSSProperties = {
+  position: 'absolute',
+  width: 1,
+  height: 1,
+  padding: 0,
+  margin: -1,
+  overflow: 'hidden',
+  clip: 'rect(0 0 0 0)',
+  whiteSpace: 'nowrap',
+  border: 0,
+};

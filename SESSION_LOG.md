@@ -4,6 +4,47 @@ Chronological build history for the PMBC website. Split out of `CLAUDE.md` to ke
 
 ---
 
+### 2026-08-01 - FMP Admin Parity, Phase 3: Page Builder per-section save
+
+The Page Builder had one global Save that POSTed every section at once, and a visibility toggle that persisted immediately. FMP gives each section its own Save and keeps visibility pending until that section is saved (`CMS_REFERENCE.md` section 2.3).
+
+**Checked first, because it would have been destructive:** `POST /api/admin/page-sections` updates by id and never deletes rows missing from the payload, so sending a single-section body is safe. Had it been a replace-style endpoint, per-section save would have silently deleted the other eight sections on every click. Confirmed by test, not by reading alone (see below).
+
+**Persistence model now, matching FMP**
+
+| Operation | When it persists |
+|---|---|
+| Reorder (drag) | Immediately on drop. Unchanged |
+| Add section | Immediately, server-side, so the row has a stable id to edit against. Unchanged |
+| Delete section | Immediately, behind the confirm dialog. Unchanged |
+| Content edit | Pending until that section's Save |
+| Visibility toggle | Pending until that section's Save. **Changed**, was immediate |
+
+**Built**
+- `PageBuilder.tsx` rewritten around per-section state: `dirtyIds: Set<string>`, `saveStates: Record<id, SaveState>`, `saveErrs`. A page-level dirty flag would have let one section's Save flush another's half-finished edit, which is the whole reason FMP works this way.
+- `saveSection(id)` POSTs exactly one section.
+- Structural operations (reorder, add, delete) report through a separate `structuralState` in the top bar, because they are not tied to whichever section is open.
+- Global Save button **removed** from the top bar. The top bar now shows only the unsaved count, structural status, and Open preview.
+- Left rail: amber dot (`#D97706`) plus a visually-hidden "Unsaved changes" label on any section with pending edits. Amber, not the Phase 2 green, because it means "not yet committed", the opposite of a successful save.
+- Top bar shows "N sections unsaved" rather than a single flag.
+- `SectionEditorPanel.tsx` now owns the section's Save header: label, a "Hidden" pill when `visible` is false, `SaveStatus`, and a green `SaveButton` reading "Save section", disabled and grey until that section is dirty. The editor-registry switch moved into an inner `SectionEditorBody` so the panel keeps one job per component.
+- `beforeunload` now fires on `dirtyIds.size > 0` rather than a single page flag.
+- Delete clears that id's dirty and save state, otherwise the unload guard would warn about edits to a row that no longer exists.
+
+**One deviation corrected mid-implementation.** The visibility toggle initially also selected the section, so its Save button would be immediately to hand. Removed: FMP requires the admin to open the row themselves, and auto-selecting would yank the centre pane away from whatever they were editing. The dot plus the top-bar count are what make the pending change discoverable.
+
+**Verified**
+- Typecheck and build clean (34/34).
+- **Isolation test, the important one:** captured hero and stats content, POSTed a changed hero **alone**, then confirmed hero updated, `stats.content` byte-identical, and all 9 rows still present. A single-section save does not touch its siblings.
+- Visibility through the save path: hid the quote section via POST, confirmed `visible=false` in the database and zero quote markers in the rendered public home page, then restored.
+- Reorder PATCH still 200 both directions; display_order returned to 10..90.
+- Rendered page builder: zero occurrences of the old global `>Save<`, exactly one "Save section" button, and it renders disabled with the grey `#D1D5DB` background on load (nothing dirty yet).
+- Public routes `/`, `/about`, `/services` all 200.
+
+**Not machine-verified.** The Chrome extension was not connected this session, so the click-through transitions (dot appears on edit, button grey to green, dot clears after save, iframe re-key) were verified by reading the state transitions rather than by driving the browser. Every handler was audited for which ones call `markDirty` / `clearDirty`: content edit and visibility mark dirty; reorder, add and delete do not; save clears. Worth a visual pass on staging.
+
+---
+
 ### 2026-08-01 - FMP Admin Parity, Phase 2: semantic green save buttons
 
 Decision 1 (Palette B) in effect: PMBC keeps navy and gold for identity, and adopts FMP's green for save semantics only. The muscle memory that matters when switching consoles is "the green button commits my work", not the shade of the sidebar.
