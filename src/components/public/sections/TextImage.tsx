@@ -37,6 +37,7 @@ function pick(c: Record<string, unknown>): TextImageContent {
 
 export function TextImage({
   content,
+  styles,
   variant = 'cream',
 }: {
   content: Record<string, unknown>;
@@ -50,7 +51,7 @@ export function TextImage({
   const dark = variant === 'navy_deep';
 
   return (
-    <SectionContainer variant={variant}>
+    <SectionContainer variant={variant} styles={styles}>
       <div
         className={
           'grid items-center gap-12 lg:grid-cols-2 lg:gap-20 ' +

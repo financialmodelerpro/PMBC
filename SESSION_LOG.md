@@ -4,6 +4,33 @@ Chronological build history for the PMBC website. Split out of `CLAUDE.md` to ke
 
 ---
 
+### 2026-08-01 - FMP Admin Parity, Phase 5: StyleEditor
+
+Per-section presentation control (`CMS_REFERENCE.md` section 2.3a), the largest item in the gap report at **L effort**, because it needed both an admin editor and every public renderer taught to honour it.
+
+**How it composes with the Phase 9.5 variant system.** The variant still decides each section's default background, text and eyebrow colours, and the sequence-aware rhythm in `SectionRenderer` is untouched. The StyleEditor sits **on top**: the variant is applied first and overrides second, per CSS property. Any field left blank falls through, so a section with `styles = {}` renders byte-identically to before. `background_variant` and the legacy `background_style` are deliberately not editable in this panel and every write preserves unknown keys.
+
+**Built**
+- `src/lib/public/sectionStyles.ts`. Parser and style builders, shared by the container and Hero so the two cannot drift. Every field is validated on the way out rather than trusted: hex regex for colours, numeric ranges (padding 0 to 200, radius 0 to 24, max width 320 to 2400, overlay 0 to 100), an animation enum, a conservative `[A-Za-z0-9_ -]` class rule, and image URLs restricted to `http(s)` or root-relative with quote/paren/backslash characters refused so nothing can break out of `url("...")`.
+- `src/components/admin/StyleEditor.tsx`. Collapsed by default, since these are overrides and the common case should need no intervention. Grouped Background / Text / Spacing / Layout / Advanced, a "customised" badge when anything is set, per-field range validation, and a Reset that clears only the presentation keys and leaves `background_variant` alone.
+- `SectionContainer` takes an optional `styles` prop and applies outer style, inner max-width and extra classes.
+- `styles` threaded into the 12 renderers that use `SectionContainer`. **Hero is the exception**: it owns an 88vh layout and a radial gradient rather than using the container, so it applies the overrides itself through the same helpers.
+- Animation keyframes in `globals.css`. They run once on load rather than on scroll, because the public site is server-rendered with no client observer and a scroll-triggered version would mean shipping JS to every page for a decorative effect. Fully disabled under `prefers-reduced-motion`, and the reduced-motion rule resets opacity and transform so the section stays visible rather than being stuck at its start frame.
+- Wired through `updateSection`, so a style change marks that section dirty and is committed by its own Save (Phase 3 model). No new save path.
+
+**Verified**
+- Typecheck and build clean (34/34).
+- StyleEditor renders on all 8 CMS pages, and is available for every section type including ones whose content editor is a placeholder, because styles live on the row rather than in the type-specific content shape.
+- **Every field applied**, confirmed in rendered HTML on the home quote section: `background:#FF0000`, `color:#00FF00`, `padding-top:137px` / `right:19px` / `bottom:41px` / `left:23px`, `border-radius:12px`, class list gained `pmbc-anim-fade-in pmbc-style-probe`, and the inner wrapper got `max-width:640px` over the 1200px default.
+- Background image with a 60% overlay produced `linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.6)), url("...")` plus cover / center / no-repeat and the fallback colour beneath.
+- **Hostile input test.** Sent `padding_top: 9999`, `bg_color: 'red; background:url(javascript:alert(1))'`, `css_class: 'evil" onload="alert(1)'`, `bg_image_url: 'javascript:alert(1)'`, `border_radius: -5`, `animation: 'explode'`, `max_width: 10`. The rendered section came back as `style="background:#FAF7F2;color:#0F1B2D"`, variant defaults only: every value rejected. The strings do appear in the RSC flight payload as JSON-escaped data (the serialized row), where they are inert and cannot break out of the script context, and they are operator-authored public CMS content rather than anything private.
+- Restoring `styles` to `{}` returned the section to `background:#FFFFFF`, confirming the empty case still falls through to the variant.
+- Variant rhythm on home still spans navy `#14304F` / `#1B3A5F`, cream `#FAF7F2` and white `#FFFFFF`. All 13 public routes 200.
+
+Also fixed a cosmetic double space in the section class list that the first pass introduced.
+
+---
+
 ### 2026-08-01 - FMP Admin Parity, Phase 4: create and delete pages with templates
 
 PMBC had no way to create or delete a CMS page from the admin: pages existed only via SQL migrations. FMP's Page Builder list has a New Page modal with template seeds and a per-row delete guarded by `is_system` (`CMS_REFERENCE.md` section 2.2).

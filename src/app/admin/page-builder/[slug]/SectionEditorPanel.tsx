@@ -16,6 +16,7 @@ import { ServiceDetailEditor } from '@/components/admin/editors/ServiceDetailEdi
 import type { SectionEditorProps } from '@/components/admin/editors/types';
 import { SaveButton } from '@/components/admin/SaveButton';
 import { SaveStatus, type SaveState } from '@/components/admin/SaveStatus';
+import { StyleEditor } from '@/components/admin/StyleEditor';
 import { ADMIN_COLORS } from '@/lib/admin/styles';
 import { getSectionMeta } from '@/lib/cms/sectionTypes';
 
@@ -47,6 +48,8 @@ export function SectionEditorPanel({
   sectionType,
   content,
   onChange,
+  styles,
+  onStylesChange,
   sectionLabel,
   visible,
   dirty,
@@ -57,6 +60,8 @@ export function SectionEditorPanel({
   sectionType: string;
   content: Record<string, unknown>;
   onChange: (next: Record<string, unknown>) => void;
+  styles: Record<string, unknown>;
+  onStylesChange: (next: Record<string, unknown>) => void;
   sectionLabel: string;
   visible: boolean;
   dirty: boolean;
@@ -160,6 +165,11 @@ export function SectionEditorPanel({
           Editor={Editor}
         />
       </div>
+
+      {/* Available for every section type, including ones whose content editor
+          has not been built, because styles live on the row rather than in the
+          type-specific content shape. */}
+      <StyleEditor styles={styles} onChange={onStylesChange} />
     </>
   );
 }

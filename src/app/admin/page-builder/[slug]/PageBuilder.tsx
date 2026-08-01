@@ -513,6 +513,11 @@ export function PageBuilder({
               sectionType={selected.section_type}
               content={selected.content}
               onChange={(next) => updateSection(selected.id, { content: next })}
+              styles={selected.styles}
+              // Styles go through the same updateSection path as content, so a
+              // style change marks the section dirty and is committed by that
+              // section's own Save (Phase 3 model).
+              onStylesChange={(next) => updateSection(selected.id, { styles: next })}
               sectionLabel={
                 getSectionMeta(selected.section_type)?.label ?? selected.section_type
               }

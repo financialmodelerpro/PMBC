@@ -55,6 +55,7 @@ function getInitials(name: string): string {
 
 export function FounderBlock({
   content,
+  styles,
   variant = 'cream',
 }: {
   content: Record<string, unknown>;
@@ -67,7 +68,7 @@ export function FounderBlock({
   const v = variantStyles(variant);
 
   return (
-    <SectionContainer variant={variant}>
+    <SectionContainer variant={variant} styles={styles}>
       <SectionIntro
         eyebrow={c.eyebrow}
         headline={c.section_headline}

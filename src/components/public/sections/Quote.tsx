@@ -27,6 +27,7 @@ function pick(c: Record<string, unknown>): QuoteContent {
 
 export function Quote({
   content,
+  styles,
   variant = 'white',
 }: {
   content: Record<string, unknown>;
@@ -40,7 +41,7 @@ export function Quote({
   const dark = variant === 'navy_deep';
 
   return (
-    <SectionContainer variant={variant}>
+    <SectionContainer variant={variant} styles={styles}>
       <figure
         className={'mx-auto max-w-[800px] ' + (left ? 'text-left' : 'text-center')}
       >

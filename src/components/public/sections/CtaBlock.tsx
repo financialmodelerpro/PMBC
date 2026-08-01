@@ -41,6 +41,7 @@ function pick(c: Record<string, unknown>): CtaContent {
 
 export function CtaBlock({
   content,
+  styles,
   variant = 'navy_deep',
 }: {
   content: Record<string, unknown>;
@@ -54,7 +55,7 @@ export function CtaBlock({
   const dark = variant === 'navy_deep';
 
   return (
-    <SectionContainer variant={variant}>
+    <SectionContainer variant={variant} styles={styles}>
       <div className="mx-auto max-w-[860px] text-center">
         <div
           aria-hidden

@@ -81,3 +81,43 @@ body {
 .pmbc-link-underline[data-active="true"]::after {
   transform: scaleX(1);
 }
+
+/* ------------------------------------------------------------------
+   Section entrance animations (admin StyleEditor, parity Phase 5).
+   Applied by sectionOuterClassName() when the operator picks an
+   animation other than "none" for a section.
+
+   These run once on load rather than on scroll: the public site is
+   server-rendered with no client-side observer, and a scroll-triggered
+   variant would mean shipping JS to every page for a decorative effect.
+
+   Fully disabled under prefers-reduced-motion. The section must still be
+   visible in that case, so the reduced-motion rule resets opacity and
+   transform rather than simply dropping the animation.
+   ------------------------------------------------------------------ */
+@keyframes pmbc-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes pmbc-slide-up {
+  from { opacity: 0; transform: translateY(18px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.pmbc-anim-fade-in {
+  animation: pmbc-fade-in 600ms ease-out both;
+}
+
+.pmbc-anim-slide-up {
+  animation: pmbc-slide-up 600ms ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pmbc-anim-fade-in,
+  .pmbc-anim-slide-up {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+}

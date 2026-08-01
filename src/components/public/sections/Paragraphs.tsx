@@ -3,6 +3,7 @@ import { variantStyles, type PmbcVariant } from '@/lib/public/tokens';
 
 export function Paragraphs({
   content,
+  styles,
   variant = 'white',
 }: {
   content: Record<string, unknown>;
@@ -14,7 +15,7 @@ export function Paragraphs({
   const v = variantStyles(variant);
   const dark = variant === 'navy_deep';
   return (
-    <SectionContainer variant={variant} size="compact">
+    <SectionContainer variant={variant} styles={styles} size="compact">
       <div
         className={
           'prose mx-auto max-w-[780px] ' + (dark ? 'prose-invert' : 'prose-neutral')

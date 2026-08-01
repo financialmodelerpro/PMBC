@@ -2,6 +2,12 @@ import Link from 'next/link';
 import { ChevronDown } from 'lucide-react';
 
 import { variantStyles, type PmbcVariant } from '@/lib/public/tokens';
+import {
+  parseSectionStyles,
+  sectionInnerStyle,
+  sectionOuterClassName,
+  sectionOuterStyle,
+} from '@/lib/public/sectionStyles';
 
 type HeroContent = {
   badge_text?: string;
@@ -31,6 +37,7 @@ function pick(c: Record<string, unknown>): HeroContent {
 
 export function Hero({
   content,
+  styles,
   variant = 'navy_deep',
 }: {
   content: Record<string, unknown>;
@@ -41,6 +48,16 @@ export function Hero({
   const dark = variant === 'navy_deep';
   const v = variantStyles(variant);
 
+  // Hero is the one section that does not use SectionContainer (it owns an
+  // 88vh layout and a radial gradient), so it applies the StyleEditor overrides
+  // itself. Same precedence: variant first, operator overrides on top.
+  const parsed = parseSectionStyles(styles);
+  const overrides = {
+    style: { ...sectionOuterStyle(parsed) },
+    inner: sectionInnerStyle(parsed),
+    className: sectionOuterClassName(parsed),
+  };
+
   // Subtle radial gradient for the navy variant: lighter primary at center,
   // deeper navy at edges. On non-navy variants the section is a flat surface.
   const bg = dark
@@ -49,8 +66,8 @@ export function Hero({
 
   return (
     <section
-      className="relative flex min-h-[88vh] items-center px-6 py-28 sm:py-32"
-      style={{ background: bg, color: v.text }}
+      className={`relative flex min-h-[88vh] items-center px-6 py-28 sm:py-32 ${overrides.className}`.trim()}
+      style={{ background: bg, color: v.text, ...overrides.style }}
     >
       {/* Faint diagonal pattern overlay — kept extremely subtle. */}
       {dark && (
@@ -64,7 +81,10 @@ export function Hero({
         />
       )}
 
-      <div className="relative mx-auto w-full max-w-[1100px] text-center">
+      <div
+        className="relative mx-auto w-full max-w-[1100px] text-center"
+        style={overrides.inner}
+      >
         <div
           aria-hidden
           className="mx-auto h-px w-[80px]"

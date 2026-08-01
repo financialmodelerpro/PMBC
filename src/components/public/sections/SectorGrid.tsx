@@ -38,6 +38,7 @@ function pickSectors(c: Record<string, unknown>): {
 
 export function SectorGrid({
   content,
+  styles,
   variant = 'white',
 }: {
   content: Record<string, unknown>;
@@ -51,7 +52,7 @@ export function SectorGrid({
   const dark = variant === 'navy_deep';
 
   return (
-    <SectionContainer variant={variant}>
+    <SectionContainer variant={variant} styles={styles}>
       <SectionIntro
         eyebrow={eyebrow}
         headline={heading}

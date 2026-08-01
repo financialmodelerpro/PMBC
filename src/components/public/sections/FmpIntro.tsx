@@ -37,6 +37,7 @@ function pick(c: Record<string, unknown>): FmpContent {
 
 export function FmpIntro({
   content,
+  styles,
   variant = 'navy_deep',
 }: {
   content: Record<string, unknown>;
@@ -50,7 +51,7 @@ export function FmpIntro({
   const dark = variant === 'navy_deep';
 
   return (
-    <SectionContainer variant={variant}>
+    <SectionContainer variant={variant} styles={styles}>
       <div
         className="relative mx-auto max-w-[1000px] p-10 sm:p-14 lg:p-16"
         style={{

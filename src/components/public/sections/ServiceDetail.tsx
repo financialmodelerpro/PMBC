@@ -34,6 +34,7 @@ function pick(c: Record<string, unknown>): ServiceDetailContent {
 
 export function ServiceDetail({
   content,
+  styles,
   variant = 'white',
 }: {
   content: Record<string, unknown>;
@@ -55,7 +56,7 @@ export function ServiceDetail({
   const v = variantStyles(variant);
 
   return (
-    <SectionContainer variant={variant}>
+    <SectionContainer variant={variant} styles={styles}>
       <div className="mx-auto max-w-[1000px]">
         <div
           aria-hidden

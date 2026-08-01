@@ -1,33 +1,63 @@
 import { variantStyles, type PmbcVariant } from '@/lib/public/tokens';
+import {
+  parseSectionStyles,
+  sectionInnerStyle,
+  sectionOuterClassName,
+  sectionOuterStyle,
+} from '@/lib/public/sectionStyles';
 
 /**
  * Shared wrapper for every public section. Owns the section padding rhythm
  * (96-120px desktop / 64-80px tablet / 56-64px mobile) and the navy/cream/
  * white background variants. Children should not set their own outer
- * background or vertical padding — only inner spacing.
+ * background or vertical padding, only inner spacing.
+ *
+ * Pass the section's raw `styles` JSONB to honour the admin StyleEditor
+ * (parity Phase 5). Anything the operator leaves blank falls through to the
+ * variant, so an empty `styles` renders exactly as it did before.
  */
 export function SectionContainer({
   variant = 'white',
   size = 'default',
   children,
   className = '',
+  styles,
 }: {
   variant?: PmbcVariant;
   size?: 'default' | 'compact';
   children: React.ReactNode;
   className?: string;
+  /** Raw `page_sections.styles`. Omit for sections rendered outside the CMS. */
+  styles?: unknown;
 }) {
   const v = variantStyles(variant);
   const padding =
     size === 'compact'
       ? 'px-6 py-16 sm:py-20 lg:py-24'
       : 'px-6 py-20 sm:py-24 lg:py-32';
+
+  const overrides = parseSectionStyles(styles);
+  const extraClass = sectionOuterClassName(overrides);
+
   return (
     <section
-      className={`relative ${padding} ${className}`}
-      style={{ background: v.bg, color: v.text }}
+      className={['relative', padding, className, extraClass]
+        .filter(Boolean)
+        .join(' ')}
+      style={{
+        // Variant first, overrides second: an inline override of the same key
+        // wins, and keys the operator left blank keep the variant value.
+        background: v.bg,
+        color: v.text,
+        ...sectionOuterStyle(overrides),
+      }}
     >
-      <div className="mx-auto w-full max-w-[1200px]">{children}</div>
+      <div
+        className="mx-auto w-full max-w-[1200px]"
+        style={sectionInnerStyle(overrides)}
+      >
+        {children}
+      </div>
     </section>
   );
 }

@@ -21,6 +21,7 @@ function pickStats(content: Record<string, unknown>): { intro: string; stats: St
 
 export function StatsBlock({
   content,
+  styles,
   variant = 'white',
 }: {
   content: Record<string, unknown>;
@@ -34,7 +35,7 @@ export function StatsBlock({
   const dark = variant === 'navy_deep';
 
   return (
-    <SectionContainer variant={variant} size="compact">
+    <SectionContainer variant={variant} styles={styles} size="compact">
       {intro && (
         <p
           className="mx-auto max-w-2xl text-center text-[17px] leading-[1.7]"

@@ -39,6 +39,7 @@ function pickSteps(c: Record<string, unknown>): {
 
 export function ProcessSteps({
   content,
+  styles,
   variant = 'navy_deep',
 }: {
   content: Record<string, unknown>;
@@ -54,7 +55,7 @@ export function ProcessSteps({
   const dark = variant === 'navy_deep';
 
   return (
-    <SectionContainer variant={variant}>
+    <SectionContainer variant={variant} styles={styles}>
       <SectionIntro
         eyebrow={eyebrow}
         headline={heading}

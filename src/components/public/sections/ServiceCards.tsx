@@ -43,6 +43,7 @@ function pickCards(content: Record<string, unknown>): {
 
 export function ServiceCards({
   content,
+  styles,
   variant = 'cream',
 }: {
   content: Record<string, unknown>;
@@ -58,7 +59,7 @@ export function ServiceCards({
   const dark = variant === 'navy_deep';
 
   return (
-    <SectionContainer variant={variant}>
+    <SectionContainer variant={variant} styles={styles}>
       <SectionIntro
         eyebrow={eyebrow}
         headline={headline}

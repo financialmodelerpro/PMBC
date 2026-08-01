@@ -50,6 +50,7 @@ function pickPartners(c: Record<string, unknown>): {
 
 export function NetworkPartners({
   content,
+  styles,
   variant = 'cream',
 }: {
   content: Record<string, unknown>;
@@ -63,7 +64,7 @@ export function NetworkPartners({
   const dark = variant === 'navy_deep';
 
   return (
-    <SectionContainer variant={variant}>
+    <SectionContainer variant={variant} styles={styles}>
       <SectionIntro
         eyebrow={eyebrow}
         headline={heading}
