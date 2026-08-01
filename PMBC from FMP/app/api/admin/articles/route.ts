@@ -1,0 +1,259 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from '@/src/shared/auth/session';
+import { authOptions } from '@/src/shared/auth/session';
+import { getServerClient } from '@/src/core/db/supabase';
+import { resolveSchedule } from '@/src/shared/cms/scheduling';
+
+const MAIN_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000';
+
+// Additive columns from migrations 187+ (scheduled_at = 198). Writes stay
+// schema-tolerant: if the column does not exist yet (migration not applied), we
+// retry without these keys.
+const ADDITIVE_KEYS = ['mid_image_url', 'mid_image_caption', 'og_image_url', 'tags', 'writer_id', 'writer_name', 'writer_title', 'hero_before_content', 'writer_avatar_url', 'author_bio', 'author_profile_url', 'scheduled_at', 'series_id', 'series_order'] as const;
+
+/** Next append position for an article joining a series: max(series_order)+1 (0 when empty). */
+async function nextSeriesOrder(sb: ReturnType<typeof getServerClient>, seriesId: string): Promise<number> {
+  try {
+    const { data } = await sb.from('articles').select('series_order').eq('series_id', seriesId).order('series_order', { ascending: false }).limit(1);
+    const top = Array.isArray(data) && data[0] ? (data[0] as { series_order?: number | null }).series_order : null;
+    return (typeof top === 'number' ? top : -1) + 1;
+  } catch { return 0; }
+}
+
+/** The linked instructor's photo + bio, snapshotted onto the article byline +
+ *  author block (migs 194 + 195). Resolved server-side from writer_id so it
+ *  cannot be spoofed and stays in sync with the instructor record at save time.
+ *  Returns null when unavailable. */
+async function resolveWriterInstructor(sb: ReturnType<typeof getServerClient>, writerId: unknown): Promise<{ photo_url: string | null; bio: string | null; profile_url: string | null } | null> {
+  if (!writerId || typeof writerId !== 'string') return null;
+  // profile_url (mig 196) is requested but tolerated absent (pre-apply): retry
+  // without it so saves still work before the column exists.
+  const sel = async (cols: string) => sb.from('instructors').select(cols).eq('id', writerId).single();
+  try {
+    let { data, error } = await sel('photo_url, bio, profile_url');
+    if (error && (error.code === '42703' || /column/i.test(error.message ?? ''))) ({ data } = await sel('photo_url, bio'));
+    const row = data as { photo_url?: string | null; bio?: string | null; profile_url?: string | null } | null;
+    return row ? { photo_url: row.photo_url ?? null, bio: row.bio ?? null, profile_url: row.profile_url ?? null } : null;
+  } catch { return null; }
+}
+
+/** Publish-ish statuses that require a writer (draft stays free). */
+function requiresWriter(status: unknown): boolean {
+  return status === 'published' || status === 'scheduled';
+}
+const WRITER_REQUIRED_MSG = 'A writer is required to publish';
+
+function isMissingColumnError(error: { message?: string; code?: string } | null): boolean {
+  if (!error) return false;
+  const m = (error.message ?? '').toLowerCase();
+  return error.code === 'PGRST204' || m.includes('column') || m.includes('schema cache');
+}
+
+function stripAdditive(obj: Record<string, unknown>): Record<string, unknown> {
+  const clone = { ...obj };
+  for (const k of ADDITIVE_KEYS) delete clone[k];
+  return clone;
+}
+
+/** Names for the given category ids, in the given order (for the deprecated primary text column). */
+async function resolveCategoryNames(sb: ReturnType<typeof getServerClient>, ids: string[]): Promise<string[]> {
+  if (!ids.length) return [];
+  const { data } = await sb.from('categories').select('id,name').in('id', ids);
+  const byId = new Map((data ?? []).map((c: { id: string; name: string }) => [c.id, c.name]));
+  return ids.map((id) => byId.get(id)).filter((n): n is string => !!n);
+}
+
+/** Replace an article's junction rows with the given category ids. Best-effort (never breaks the save). */
+async function syncArticleCategories(sb: ReturnType<typeof getServerClient>, articleId: string, ids: string[]): Promise<void> {
+  try {
+    await sb.from('article_categories').delete().eq('article_id', articleId);
+    if (ids.length) {
+      await sb.from('article_categories').insert(ids.map((cid) => ({ article_id: articleId, category_id: cid })));
+    }
+  } catch { /* junction is additive; a failure must not break the article save */ }
+}
+
+async function checkAdmin() {
+  const session = await getServerSession(authOptions);
+  if (!session?.user || (session.user as any).role !== 'admin') return false;
+  return true;
+}
+
+export async function GET(req: NextRequest) {
+  if (!await checkAdmin()) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const id = req.nextUrl.searchParams.get('id');
+  const sb = getServerClient();
+  if (id) {
+    let { data, error } = await sb.from('articles').select('*, article_categories(category_id)').eq('id', id).single();
+    if (error) ({ data } = await sb.from('articles').select('*').eq('id', id).single()); // fallback pre-junction
+    let article = data as (Record<string, unknown> & { article_categories?: Array<{ category_id: string }> }) | null;
+    if (article) {
+      const { article_categories, ...rest } = article;
+      article = { ...rest, category_ids: Array.isArray(article_categories) ? article_categories.map((r) => r.category_id) : [] } as any;
+    }
+    return NextResponse.json({ article });
+  }
+  const { data } = await sb.from('articles').select('*').order('created_at', { ascending: false });
+  return NextResponse.json({ articles: data ?? [] });
+}
+
+export async function POST(req: NextRequest) {
+  if (!await checkAdmin()) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  try {
+    const body = await req.json();
+    const { title, slug, body: articleBody, cover_url, category, status, featured, seo_title, seo_description, mid_image_url, mid_image_caption, og_image_url, tags, category_ids, writer_id, writer_name, writer_title, hero_before_content, author_bio, author_profile_url, scheduled_at, series_id } = body;
+    if (!title || !slug) return NextResponse.json({ error: 'title and slug required' }, { status: 400 });
+    if (requiresWriter(status) && !writer_id) return NextResponse.json({ error: WRITER_REQUIRED_MSG }, { status: 400 });
+    // Scheduling (mig 198): a due/past time resolves to a straight publish. See
+    // src/shared/cms/scheduling.ts for why that collapse is the safe rule.
+    const sched = resolveSchedule(status, scheduled_at);
+    if (sched?.error) return NextResponse.json({ error: sched.error }, { status: 400 });
+    const effectiveStatus = sched?.status ?? 'draft';
+    const sb = getServerClient();
+    const session = await getServerSession(authOptions);
+    // Dual-write: keep the deprecated primary `category` text = first selected category.
+    const ids: string[] = Array.isArray(category_ids) ? category_ids : [];
+    const primaryName = ids.length ? (await resolveCategoryNames(sb, ids))[0] : undefined;
+    const insert: Record<string, unknown> = { title, slug, body: articleBody ?? '', category: primaryName ?? category ?? 'General', status: effectiveStatus, scheduled_at: sched?.scheduledAt ?? null, featured: featured ?? false, seo_title: seo_title ?? null, seo_description: seo_description ?? null, author_id: (session?.user as any)?.id ?? null };
+    if (cover_url) insert.cover_url = cover_url;
+    if (mid_image_url !== undefined) insert.mid_image_url = mid_image_url || null;
+    if (mid_image_caption !== undefined) insert.mid_image_caption = mid_image_caption || null;
+    if (og_image_url !== undefined) insert.og_image_url = og_image_url || null;
+    if (tags !== undefined) insert.tags = Array.isArray(tags) ? tags : [];
+    if (writer_id !== undefined) insert.writer_id = writer_id || null;
+    if (writer_name !== undefined) insert.writer_name = writer_name || null;
+    if (writer_title !== undefined) insert.writer_title = writer_title || null;
+    // Snapshot the writer photo + bio from the linked instructor (byline avatar +
+    // author block). author_bio falls back to the instructor bio when left blank.
+    const inst = writer_id ? await resolveWriterInstructor(sb, writer_id) : null;
+    if (writer_id) insert.writer_avatar_url = inst?.photo_url ?? null;
+    else if (writer_id !== undefined) insert.writer_avatar_url = null;
+    if (author_bio !== undefined || writer_id) {
+      const providedBio = typeof author_bio === 'string' ? author_bio.trim() : '';
+      insert.author_bio = providedBio || (writer_id ? (inst?.bio ?? null) : null);
+    }
+    // Profile link auto-derives from the writer's on-site profile when the manual
+    // override is blank, so it never has to be typed for a known author.
+    if (author_profile_url !== undefined || writer_id) {
+      const providedUrl = typeof author_profile_url === 'string' ? author_profile_url.trim() : '';
+      insert.author_profile_url = providedUrl || (writer_id ? (inst?.profile_url ?? null) : null);
+    }
+    if (hero_before_content !== undefined) insert.hero_before_content = !!hero_before_content;
+    // Series membership: assigning appends to the end of the series (drag-reorder in
+    // the series manager owns the exact order); no series -> standalone at order 0.
+    if (series_id !== undefined) {
+      insert.series_id = series_id || null;
+      insert.series_order = series_id ? await nextSeriesOrder(sb, series_id) : 0;
+    }
+    if (effectiveStatus === 'published') insert.published_at = new Date().toISOString();
+    let { data, error } = await sb.from('articles').insert(insert).select().single();
+    if (error && isMissingColumnError(error)) {
+      ({ data, error } = await sb.from('articles').insert(stripAdditive(insert)).select().single());
+    }
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (data && category_ids !== undefined) await syncArticleCategories(sb, data.id, ids);
+    // Newsletter on publish removed: this site has no subscriber list.
+    return NextResponse.json({ article: data });
+  } catch (e) {
+    return NextResponse.json({ error: 'Failed to create article' }, { status: 500 });
+  }
+}
+
+export async function PATCH(req: NextRequest) {
+  if (!await checkAdmin()) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  try {
+    const body = await req.json();
+    const { id, ...fields } = body;
+    if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 });
+    const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
+    const allowed = ['title', 'slug', 'body', 'cover_url', 'category', 'status', 'featured', 'seo_title', 'seo_description', ...ADDITIVE_KEYS];
+    for (const k of allowed) { if (fields[k] !== undefined) update[k] = fields[k]; }
+    // Scheduling (mig 198): run the requested status + time through the shared rule,
+    // which collapses a due/past schedule into a straight publish. That is what keeps
+    // the editor's 60s auto-save from PATCHing 'scheduled' back over an article the
+    // cron has just published, which would silently un-publish it. A PATCH carrying
+    // no status leaves both status and the timer untouched.
+    const sched = resolveSchedule(fields.status, fields.scheduled_at);
+    if (sched?.error) return NextResponse.json({ error: sched.error }, { status: 400 });
+    if (sched) { update.status = sched.status; update.scheduled_at = sched.scheduledAt; }
+    else delete update.scheduled_at;
+    const sb = getServerClient();
+    // Re-snapshot writer photo + author bio whenever the writer/bio changes.
+    const inst = fields.writer_id ? await resolveWriterInstructor(sb, fields.writer_id) : null;
+    if (fields.writer_id !== undefined) update.writer_avatar_url = fields.writer_id ? (inst?.photo_url ?? null) : null;
+    if ('author_bio' in update || fields.author_bio !== undefined) {
+      const b = typeof update.author_bio === 'string' ? update.author_bio.trim() : '';
+      update.author_bio = b || (fields.writer_id ? (inst?.bio ?? null) : null);
+    }
+    if ('author_profile_url' in update || fields.author_profile_url !== undefined) {
+      const u = typeof update.author_profile_url === 'string' ? update.author_profile_url.trim() : '';
+      update.author_profile_url = u || (fields.writer_id ? (inst?.profile_url ?? null) : null);
+    }
+    // Publish gate: a writer is required to publish/schedule. Resolve from the payload
+    // when provided, otherwise from the existing row (a status-only PATCH).
+    if (requiresWriter(fields.status)) {
+      let writerId = fields.writer_id;
+      if (writerId === undefined) {
+        const { data: cur } = await sb.from('articles').select('writer_id').eq('id', id).single();
+        writerId = (cur as { writer_id?: string | null } | null)?.writer_id ?? null;
+      }
+      if (!writerId) return NextResponse.json({ error: WRITER_REQUIRED_MSG }, { status: 400 });
+    }
+    // Series membership: recompute the append position ONLY when the series actually
+    // changes, so the editor's 60s auto-save (which re-sends the same series_id) never
+    // walks the article to the end of the list every minute. Drag-reorder (PUT
+    // /api/admin/series) owns the precise order and is left untouched here.
+    if (fields.series_id !== undefined) {
+      const { data: cur } = await sb.from('articles').select('series_id').eq('id', id).single();
+      const curSeries = (cur as { series_id?: string | null } | null)?.series_id ?? null;
+      const newSeries = fields.series_id || null;
+      if (newSeries !== curSeries) {
+        update.series_id = newSeries;
+        update.series_order = newSeries ? await nextSeriesOrder(sb, newSeries) : 0;
+      } else {
+        delete update.series_id;
+        delete update.series_order;
+      }
+    }
+    // Dual-write: junction is the source of truth; keep primary `category` text in sync.
+    const hasCategoryIds = Array.isArray(fields.category_ids);
+    const ids: string[] = hasCategoryIds ? fields.category_ids : [];
+    if (hasCategoryIds && ids.length) update.category = (await resolveCategoryNames(sb, ids))[0] ?? update.category;
+    // Stamp published_at only on the FIRST publish, so re-saving keeps the original
+    // date. Previously this re-stamped on every publish PATCH (the `fields.published_at`
+    // guard could never fire, since published_at is not allowlisted above), which the
+    // 60s auto-save turns into visible drift: an open editor would walk a published
+    // article's date forward every minute, and a scheduled article would lose the
+    // publish time the cron set for it.
+    if (sched?.status === 'published') {
+      const { data: cur } = await sb.from('articles').select('published_at').eq('id', id).single();
+      if (!(cur as { published_at?: string | null } | null)?.published_at) {
+        update.published_at = new Date().toISOString();
+      }
+    }
+    let { error } = await sb.from('articles').update(update).eq('id', id);
+    if (error && isMissingColumnError(error)) {
+      ({ error } = await sb.from('articles').update(stripAdditive(update)).eq('id', id));
+    }
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (hasCategoryIds) await syncArticleCategories(sb, id, ids);
+    // Newsletter on publish removed: this site has no subscriber list. The
+    // original re-read the article here purely to build that email.
+    // Echo the resolved state so the editor can re-sync: when a schedule fires while
+    // the tab is open, its Status select flips to Published on the next save instead
+    // of showing a stale "Scheduled" for an article that is already live.
+    return NextResponse.json({ ok: true, status: sched?.status, scheduled_at: sched?.scheduledAt ?? null });
+  } catch (e) {
+    return NextResponse.json({ error: 'Failed to update article' }, { status: 500 });
+  }
+}
+
+export async function DELETE(req: NextRequest) {
+  if (!await checkAdmin()) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const id = req.nextUrl.searchParams.get('id');
+  if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 });
+  const sb = getServerClient();
+  const { error } = await sb.from('articles').delete().eq('id', id);
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ ok: true });
+}
