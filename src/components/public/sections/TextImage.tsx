@@ -2,6 +2,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 
 import { SectionContainer } from '../SectionContainer';
+import { sanitizeRichHtml } from '@/lib/cms/sanitize';
 import { variantStyles, type PmbcVariant } from '@/lib/public/tokens';
 
 function s(v: unknown): string {
@@ -136,7 +137,7 @@ export function TextImage({
                 fontSize: 17,
                 lineHeight: 1.75,
               }}
-              dangerouslySetInnerHTML={{ __html: c.body_html }}
+              dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(c.body_html) }}
             />
           )}
           {c.cta_label && c.cta_href && (

@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { CheckCircle2, ArrowRight } from 'lucide-react';
 
+import { sanitizeRichHtml } from '@/lib/cms/sanitize';
 import { SERVICES } from '@/config/services';
 import { SectionContainer } from '../SectionContainer';
 import { variantStyles, type PmbcVariant } from '@/lib/public/tokens';
@@ -92,7 +93,7 @@ export function ServiceDetail({
           <div
             className="prose prose-neutral mt-12 max-w-[780px]"
             style={{ color: v.text, fontSize: 17, lineHeight: 1.75 }}
-            dangerouslySetInnerHTML={{ __html: c.full_description_html }}
+            dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(c.full_description_html) }}
           />
         )}
 

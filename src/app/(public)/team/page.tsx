@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { ExternalLink, Mail } from 'lucide-react';
 
+import { sanitizeRichHtml } from '@/lib/cms/sanitize';
 import { fetchVisibleTeam } from '@/lib/cms/collections';
 import { buildPageMetadata } from '@/lib/seo/metadata';
 
@@ -91,7 +92,7 @@ export default async function TeamPage() {
                   {m.bio && (
                     <div
                       className="pmbc-prose mt-4 text-[14px] leading-[1.7] text-[color:var(--pmbc-muted)]"
-                      dangerouslySetInnerHTML={{ __html: m.bio }}
+                      dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(m.bio) }}
                     />
                   )}
                   <div className="mt-5 flex gap-3">

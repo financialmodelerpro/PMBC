@@ -2,6 +2,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 
 import { SectionContainer, SectionIntro } from '../SectionContainer';
+import { sanitizeRichHtml } from '@/lib/cms/sanitize';
 import { variantStyles, type PmbcVariant } from '@/lib/public/tokens';
 
 function s(v: unknown): string {
@@ -89,7 +90,7 @@ export function FounderBlock({
                 aria-hidden
                 className="absolute -inset-2 border border-[#C69C3E]"
               />
-              {/* Navy accent corner — bottom-right */}
+              {/* Navy accent corner, bottom-right */}
               <div
                 aria-hidden
                 className="absolute -right-2 -bottom-2 h-8 w-8"
@@ -152,7 +153,7 @@ export function FounderBlock({
             <div
               className="prose prose-neutral mt-7 max-w-none"
               style={{ color: v.text, fontSize: 17, lineHeight: 1.7 }}
-              dangerouslySetInnerHTML={{ __html: c.bio_html }}
+              dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(c.bio_html) }}
             />
           )}
           {(c.cta_primary_label || c.cta_secondary_label) && (

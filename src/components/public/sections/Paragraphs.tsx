@@ -1,4 +1,5 @@
 import { SectionContainer } from '../SectionContainer';
+import { sanitizeRichHtml } from '@/lib/cms/sanitize';
 import { variantStyles, type PmbcVariant } from '@/lib/public/tokens';
 
 export function Paragraphs({
@@ -25,7 +26,7 @@ export function Paragraphs({
           fontSize: 17,
           lineHeight: 1.75,
         }}
-        dangerouslySetInnerHTML={{ __html: html }}
+        dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(html) }}
       />
     </SectionContainer>
   );

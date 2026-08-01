@@ -2,6 +2,7 @@ import Image from 'next/image';
 import { ArrowUpRight, CheckCircle2 } from 'lucide-react';
 
 import { SectionContainer } from '../SectionContainer';
+import { sanitizeRichHtml } from '@/lib/cms/sanitize';
 import { variantStyles, type PmbcVariant } from '@/lib/public/tokens';
 
 function s(v: unknown): string {
@@ -105,7 +106,7 @@ export function FmpIntro({
               fontSize: 17,
               lineHeight: 1.7,
             }}
-            dangerouslySetInnerHTML={{ __html: c.description_html }}
+            dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(c.description_html) }}
           />
         )}
         {c.feature_points.length > 0 && (

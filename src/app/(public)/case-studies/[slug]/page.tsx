@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 
+import { sanitizeRichHtml } from '@/lib/cms/sanitize';
 import { fetchCaseStudyBySlug } from '@/lib/cms/collections';
 import { buildPageMetadata } from '@/lib/seo/metadata';
 
@@ -110,7 +111,7 @@ export default async function CaseStudyDetailPage(props: { params: Promise<Param
           {study.body ? (
             <div
               className="pmbc-prose text-[17px] leading-[1.8] text-[color:var(--pmbc-text)]"
-              dangerouslySetInnerHTML={{ __html: study.body }}
+              dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(study.body) }}
             />
           ) : (
             <p className="text-[16px] text-[color:var(--pmbc-muted)]">Full write-up coming soon.</p>

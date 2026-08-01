@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 
+import { sanitizeEmailHtml } from '@/lib/cms/sanitize';
 import { SaveStatus, type SaveState } from '@/components/admin/SaveStatus';
 import { RichTextEditor } from '@/components/admin/RichTextEditor';
 import { SaveButton } from '@/components/admin/SaveButton';
@@ -270,7 +271,7 @@ function EmailPreview({
                 borderTop: `1px solid ${ADMIN_COLORS.border}`,
                 fontSize: 13,
               }}
-              dangerouslySetInnerHTML={{ __html: signatureHtml }}
+              dangerouslySetInnerHTML={{ __html: sanitizeEmailHtml(signatureHtml) }}
             />
           )}
         </div>
@@ -283,7 +284,7 @@ function EmailPreview({
               fontSize: 12,
               color: ADMIN_COLORS.textMuted,
             }}
-            dangerouslySetInnerHTML={{ __html: footerHtml }}
+            dangerouslySetInnerHTML={{ __html: sanitizeEmailHtml(footerHtml) }}
           />
         )}
       </div>

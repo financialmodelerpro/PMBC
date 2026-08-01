@@ -8,15 +8,19 @@ import sanitizeHtml from 'sanitize-html';
  * text nodes, so turning them into HTML would have grown the unsanitised
  * surface. Everything Phase 6 converts goes through here.
  *
- * This is the helper described in MIGRATION_PLAN.md Phase B. That phase also
- * covers the 8 pre-existing dangerouslySetInnerHTML sites (article body, case
- * study body, team bio, founder bio, paragraphs, text_image, service detail,
- * fmp_intro), which are NOT routed through here yet: converting them needs the
- * before-and-after render diff described in risk R3, and doing it inside this
- * phase would bury that check in an unrelated diff.
+ * This is the helper described in MIGRATION_PLAN.md Phase B. Phase 6.5 completed
+ * that work: every remaining site now routes through here, so no operator HTML
+ * reaches a browser unsanitised.
  *
- * Tag sets are deliberately narrow. `richInline` is what RichTextarea can
- * produce; `richBlock` adds the block structure RichTextEditor can produce.
+ * Deliberately NOT sanitised, and correctly so: the two JSON-LD blocks in
+ * components/seo/. Those interpolate `JSON.stringify(...)` of an object we build
+ * ourselves, never operator HTML, and running them through an HTML sanitiser
+ * would corrupt the structured data.
+ *
+ * Three allowlists, narrowest first:
+ *   sanitizeInlineHtml  short fields (RichTextarea): inline marks only
+ *   sanitizeRichHtml    long-form body copy (RichTextEditor): adds block tags
+ *   sanitizeEmailHtml   email signature and footer previews: adds table markup
  */
 
 const INLINE_TAGS = ['b', 'strong', 'i', 'em', 'u', 's', 'a', 'br', 'span'];
@@ -98,6 +102,52 @@ export function sanitizeRichHtml(html: string | null | undefined): string {
       h4: ['style'],
     },
     allowedStyles: ALLOWED_STYLES as unknown as sanitizeHtml.IOptions['allowedStyles'],
+  });
+}
+
+/**
+ * For the email signature and footer previews in the admin.
+ *
+ * Wider than `sanitizeRichHtml` on purpose. Transactional email HTML relies on
+ * table layout and inline styles for client compatibility, so applying the
+ * strict body allowlist would strip markup that the real email keeps, and the
+ * preview would then be lying about what actually gets sent. This permits the
+ * markup email needs while still removing scripts, event handlers and unsafe
+ * URL schemes, which is what protects the admin viewing the preview.
+ *
+ * Note this sanitises the PREVIEW only. The stored value is sent as authored by
+ * lib/email, which is the correct split: the sanitiser exists to protect a
+ * browser rendering the HTML, and an email client is not this codebase's
+ * browser.
+ */
+export function sanitizeEmailHtml(html: string | null | undefined): string {
+  if (!html) return '';
+  return sanitizeHtml(html, {
+    ...BASE,
+    allowedTags: [
+      ...BLOCK_TAGS,
+      'table',
+      'thead',
+      'tbody',
+      'tfoot',
+      'tr',
+      'td',
+      'th',
+      'small',
+      'strike',
+      'sub',
+      'sup',
+    ],
+    allowedAttributes: {
+      '*': ['style', 'class', 'align', 'valign', 'width', 'height', 'colspan', 'rowspan'],
+      a: ['href', 'target', 'rel', 'style'],
+      img: ['src', 'alt', 'title', 'width', 'height', 'style'],
+      table: ['cellpadding', 'cellspacing', 'border', 'role', 'style', 'width'],
+    },
+    // Email styling is broad by nature, so styles are allowed rather than
+    // pattern-matched. `style` cannot execute script in any current browser,
+    // and the tag and scheme allowlists above are what stop the real attacks.
+    allowedStyles: undefined,
   });
 }
 

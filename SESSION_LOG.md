@@ -4,6 +4,34 @@ Chronological build history for the PMBC website. Split out of `CLAUDE.md` to ke
 
 ---
 
+### 2026-08-01 - Phase 6.5: sanitise the remaining 10 rich-text render sites
+
+Closes S1, the highest-severity finding in `ADMIN_PARITY_GAP.md` and Phase B of `MIGRATION_PLAN.md`. Phase 6 built the sanitiser and used it for the 7 newly rich fields. This routes everything else through it, so no operator HTML reaches a browser unsanitised.
+
+**Converted (10)**
+- Public (8), all via `sanitizeRichHtml`: case study body, article body, team bio, `fmp_intro.description_html`, `founder_block.bio_html`, `paragraphs.html`, `service_detail.full_description_html`, `text_image.body_html`.
+- Admin (2): the email signature and footer previews in `EmailBrandingForm`.
+
+**Deliberately NOT converted:** the two JSON-LD blocks in `components/seo/`. They interpolate `JSON.stringify` of an object we build ourselves, never operator HTML, and running structured data through an HTML sanitiser would corrupt it.
+
+**A new allowlist was needed for the email previews.** Transactional email HTML relies on table layout and inline styles for client compatibility. Applying the strict body allowlist would have stripped markup the real email keeps, so the preview would have been lying about what actually gets sent. `sanitizeEmailHtml` permits table markup and broad inline styles while still removing scripts, event handlers and unsafe URL schemes, which is what protects the admin viewing the preview. Note it sanitises the preview only: the stored value is still sent as authored, which is the right split, since the sanitiser exists to protect a browser and an email client is not this codebase's browser.
+
+**Render diff, the gate this phase existed to pass (risk R3).** Captured all 14 public routes before and after, with every route warmed first so nothing was caught mid-compile. Result: **14 of 14 byte-identical** once script tags are excluded. The sanitiser strips nothing from existing safe content.
+
+Two false alarms worth recording, both capture artefacts rather than content changes:
+- A first attempt showed `/services/financial-modeling` differing. The capture had caught it at 560 bytes during a cold dev compile; the settled page is about 164 KB. Fixed by warming every route before capturing.
+- After restoring the hostile-test data, the same route differed again by exactly `<template id="B:1"></template>`, a React streaming boundary marker. The first 10,167 characters of `<main>` are byte-identical.
+
+**Hostile payload test.** Injected `<script>`, `<img onerror onload>`, a `javascript:` href, `<iframe>`, `<object>`, `<embed>` and an `onclick` div into all 8 public fields, inserting throwaway `case_studies`, `articles` and `team_members` rows since those tables are empty. Result across 6 affected routes: **0 hostile markers reach the DOM**, safe content preserved everywhere.
+
+The raw strings do still appear inside `<script>` tags, in the RSC flight payload that serialises the row. That is JSON-escaped, inert, and is operator-authored public CMS content rather than anything private, but it is worth knowing that the stored value is visible in view-source even though nothing reaches the DOM. The same was true of the StyleEditor values in Phase 5.
+
+All test data restored afterwards: throwaway rows deleted, sections and `cms_content` returned to their prior values, counts verified back at 36 sections and 17 pages with zero rows still holding the test marker.
+
+**Em dash gate: 0.** One pre-existing em dash in a `FounderBlock` comment was caught by the gate and fixed, which is the gate doing its job on a file this phase touched. En dashes: 0. Typecheck and build clean (34/34).
+
+---
+
 ### 2026-08-01 - FMP Admin Parity, Phase 6: RichTextEditor upgrades and new RichTextarea
 
 **Content style rule strengthened.** The no-em-dash rule is now universal: code, comments, commit messages, migrations, docs, UI strings, and replies to the user. The previous carve-out for technical docs and code comments is revoked. Persisted to project memory. A phase is not complete if the character appears anywhere in its changes.

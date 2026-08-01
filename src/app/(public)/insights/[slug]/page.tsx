@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 
+import { sanitizeRichHtml } from '@/lib/cms/sanitize';
 import { fetchArticleBySlug } from '@/lib/cms/collections';
 import { buildPageMetadata } from '@/lib/seo/metadata';
 
@@ -80,7 +81,7 @@ export default async function InsightDetailPage(props: { params: Promise<Params>
           {article.body ? (
             <div
               className="pmbc-prose text-[17px] leading-[1.85] text-[color:var(--pmbc-text)]"
-              dangerouslySetInnerHTML={{ __html: article.body }}
+              dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(article.body) }}
             />
           ) : (
             <p className="text-[16px] text-[color:var(--pmbc-muted)]">{article.excerpt}</p>
