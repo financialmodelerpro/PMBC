@@ -4,6 +4,65 @@ Chronological build history for the PMBC website. Split out of `CLAUDE.md` to ke
 
 ---
 
+### 2026-08-01 - Wire header presentation fields to the public Navbar, archive and delete the FMP scaffold
+
+Two tasks between parity Phase 1 and Phase 2. Task A closes the "stored but inert" gap Phase 1 left open. Task B executes `MIGRATION_PLAN.md` Phase A / milestone M1.
+
+#### Task A: Navbar wiring
+
+**Field-name reconciliation.** The request named five fields, three of which did not match what Phase 1 created. Mapped rather than duplicated, because a second row per concept is the dual-source problem migration 027 exists to prevent:
+
+| Requested | Actual key | Resolution |
+|---|---|---|
+| `header_height_px` | `header_height_px` | already existed |
+| `logo_height_px` | `logo_height_px` | already existed |
+| `logo_max_width_px` | `logo_width_px` | mapped to the existing key |
+| `logo_position` | `logo_position` | already existed |
+| `header_icon_url` | `icon_url` | mapped to the existing key |
+| `header_layout` | none | genuinely new, migration 030 |
+
+Also corrected: the brief said the navbar height was "hardcoded 40". It was `h-[80px]` on the header row; 40 was the logo height (`h-10`). Both are now driven, separately.
+
+**Built**
+- `supabase/migrations/030_header_layout_key.sql` - the one new key, `header_layout` in `default` / `centered` / `spread`. Additive, idempotent, rollback in the footer. Explicitly noted as a PMBC addition, not one of FMP's 17.
+- `src/lib/cms/headerSettings.ts` - `HeaderLayout` type, `parseLayout` falling back to `default` on any unrecognised value.
+- `src/app/api/admin/header-settings/route.ts` - `header_layout` added as an optional enum.
+- `src/app/admin/header-settings/HeaderSettingsForm.tsx` - "Nav alignment" select in the Header layout card, with a hint that it is desktop only.
+- `src/components/layout/NavbarServer.tsx` - passes a `presentation` object. A local `px()` helper treats blank, non-numeric and zero as "unset", so a cleared admin field can never render a zero-height header. `icon_in_header` gates `icon_url`, matching the admin toggle.
+- `src/components/layout/Navbar.tsx` - `NavbarPresentation` type plus `PRESENTATION_DEFAULTS` holding the values the navbar shipped with. Settings merge **per field with `??`**, not a plain spread, because a spread would let an explicit `null` win over the default. Drives header min-height and padding, logo height and max-width, the monogram fallback (which now scales with `logo_height_px`), an optional icon slot, brand-name and tagline toggles, brand placement via flex `order` plus auto margins, and nav distribution via `flex`/`justify-content`.
+
+Wired 13 keys, not just the 5 requested. The neighbours (`logo_enabled`, `icon_in_header`, `icon_size_px`, `show_brand_name`, `show_tagline`, the two padding keys) share the same component, and leaving half the card inert would have reproduced the exact problem this task was raised to fix.
+
+**Verified live, each field changed then observed in rendered HTML**
+- `header_height_px` 80 to 120 to 140: `min-height` tracked each change.
+- `logo_height_px` 40 to 64: logo `height:64px;object-fit:contain`.
+- `logo_position` right: `order:3` on brand. Center: `order:2;margin-left:auto;margin-right:auto`.
+- `icon_url` with `icon_in_header` **false**: 0 occurrences in HTML. Set **true**: renders at `height:28px` with `alt="" aria-hidden`.
+- `header_layout`: `default` gives bare `order:2`; `centered` adds `flex:1;justify-content:center`; `spread` adds `justify-content:space-around`. `"diagonal"` rejected 422.
+- **Fallback**: every field cleared to blank returned the navbar to `min-height:80px` and `height:40px`, not zero.
+
+#### Task B: archive and delete `PMBC from FMP/`
+
+**Extraction.** `scripts/extract-fmp-ports.mjs` written per `MIGRATION_PLAN.md` Appendix A: explicit allowlist (never a recursive copy), sha256 manifest, and a printed list of everything NOT copied so the delete decision is informed.
+
+**The allowlist was extended before deleting.** Appendix A was written for the Articles migration and lists 12 files. The not-copied report showed it would have discarded the reference source for parity Phases 3 to 8, including `RichTextarea.tsx` and `RichTextEditor.tsx`, which parity Phase 6 exists to port. 17 reference files were added, marked REFERENCE rather than "port verbatim" (they are Next 16 / TipTap 2 and cannot be copied directly). 29/29 copied to `D:/PMBC/_fmp-ports-2026-08-01`.
+
+**Archive.** Built with git plumbing (`write-tree` + `commit-tree` against a temp `GIT_INDEX_FILE`) rather than `git checkout --orphan`, because the working tree held uncommitted Task A changes that an orphan checkout would have carried onto the archive branch. Verified afterwards that main's HEAD and all Task A edits were untouched.
+
+- Commit `5926e49`, parentless (`rev-list --count` = 1), 59 files, zero `node_modules` (the nested `.gitignore` did the filtering; the 2-file gap versus the 61 on disk is `tsbuildinfo` and `next-env.d.ts`, correctly ignored).
+- Branch `fmp-cms-archive` and tag `fmp-cms-archive-2026-08-01` both point at it. **Do not merge.**
+- Retrieval verified: `git show "fmp-cms-archive-2026-08-01:PMBC from FMP/src/components/admin/RichTextarea.tsx"` returns the file.
+
+**Deleted**, then the `tsconfig.json` exclude added in Phase 1 was removed, since it no longer has anything to exclude.
+
+**Result:** `tsc --noEmit` reports **0 errors from a clean tree with no exclusions**, down from 107. One `package.json`, one lockfile, one `node_modules` at the root.
+
+**One false alarm worth recording.** After deletion, four routes returned 500 with `Could not find the module ... next-devtools/userspace/app/segment-explorer-node.js#SegmentViewNode in the React Client Manifest`. That is a stale `.next` dev cache, not a code fault: the production build passed 34/34 throughout. Clearing `.next` fixed it. A second confusion followed: `pkill -f "next dev"` does not reliably kill Next on Windows, so the old server kept port 3000 with the corrupt cache while the new one silently moved to 3003, making it look as though every route had broken. Killed by PID. On Windows, verify the port in the dev log before trusting a smoke test.
+
+**Verified after deletion:** typecheck 0 errors, build clean (34/34), all 13 public routes 200, and the wired fields still take effect live.
+
+---
+
 ### 2026-08-01 - FMP Admin Parity, Phase 1: Header Settings consolidation
 
 Context: `ADMIN_PARITY_GAP.md` scored `/admin/header-settings` as the worst gap in the console (LAYOUT and DATA MODEL both MISSING). FMP has one page owning brand colours, logo, branding text, header icon and header layout; PMBC had split branding onto a separate `/admin/branding` and left header-settings with four fields. This phase merges them.

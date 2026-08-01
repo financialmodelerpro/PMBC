@@ -48,6 +48,7 @@ const configSchema = z.object({
   header_height_px: pxField.optional(),
   header_padding_top_px: pxField.optional(),
   header_padding_bottom_px: pxField.optional(),
+  header_layout: z.enum(['default', 'centered', 'spread']).optional(),
 });
 
 async function handleMutation(req: Request) {
@@ -111,6 +112,7 @@ async function handleMutation(req: Request) {
   putIf('header_height_px', d.header_height_px);
   putIf('header_padding_top_px', d.header_padding_top_px);
   putIf('header_padding_bottom_px', d.header_padding_bottom_px);
+  putIf('header_layout', d.header_layout);
 
   if (d.nav_items) {
     put('nav_items', JSON.stringify(d.nav_items));

@@ -2,6 +2,17 @@ import { fetchBranding } from '@/lib/cms/branding';
 import { fetchHeaderConfig, DEFAULT_HEADER_CONFIG } from '@/lib/cms/headerSettings';
 import { Navbar } from './Navbar';
 
+/**
+ * Parses a cms_content pixel string. Blank, non-numeric, or zero means "unset",
+ * so the Navbar falls back to its own shipped default rather than collapsing to
+ * a zero-height header.
+ */
+function px(value: string | null | undefined): number | null {
+  if (!value) return null;
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
 export async function NavbarServer() {
   const [brandingRow, header] = await Promise.all([
     safeFetchBranding(),
@@ -13,6 +24,7 @@ export async function NavbarServer() {
       brand={{
         name: brandingRow?.brand_name ?? 'PaceMakers Business Consultants',
         shortName: brandingRow?.short_name ?? 'PaceMakers',
+        tagline: brandingRow?.tagline ?? null,
         logoUrl: brandingRow?.logo_url ?? null,
         logoDarkUrl: brandingRow?.logo_dark_url ?? null,
       }}
@@ -23,6 +35,28 @@ export async function NavbarServer() {
           : null
       }
       mobileMenuEnabled={header.mobile_menu_enabled}
+      /*
+       * Presentation settings from cms_content section='header_settings'
+       * (migrations 029 + 030), edited at /admin/header-settings. Every numeric
+       * value is nullable so the Navbar keeps its shipped default when a key is
+       * blank, missing, or the migration has not been applied yet.
+       */
+      presentation={{
+        headerHeightPx: px(header.header_height_px),
+        headerPaddingTopPx: px(header.header_padding_top_px),
+        headerPaddingBottomPx: px(header.header_padding_bottom_px),
+        headerLayout: header.header_layout,
+        logoEnabled: header.logo_enabled,
+        logoHeightPx: px(header.logo_height_px),
+        logoWidthPx: px(header.logo_width_px),
+        logoPosition: header.logo_position,
+        showBrandName: header.show_brand_name,
+        showTagline: header.show_tagline,
+        // icon_in_header gates the icon, matching the admin toggle: an icon URL
+        // with the toggle off must not render.
+        iconUrl: header.icon_in_header && header.icon_url ? header.icon_url : null,
+        iconSizePx: px(header.icon_size_px),
+      }}
     />
   );
 }

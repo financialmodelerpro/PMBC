@@ -41,7 +41,12 @@ export type HeaderConfig = {
   header_height_px: string;
   header_padding_top_px: string;
   header_padding_bottom_px: string;
+  /** PMBC addition (migration 030), not one of FMP's 17 keys. */
+  header_layout: HeaderLayout;
 };
+
+/** How nav items distribute across the header. See migration 030. */
+export type HeaderLayout = 'default' | 'centered' | 'spread';
 
 export const DEFAULT_HEADER_CONFIG: HeaderConfig = {
   nav_items: [
@@ -73,6 +78,7 @@ export const DEFAULT_HEADER_CONFIG: HeaderConfig = {
   header_height_px: '',
   header_padding_top_px: '',
   header_padding_bottom_px: '',
+  header_layout: 'default',
 };
 
 function parseBool(v: string | null | undefined, fallback: boolean): boolean {
@@ -216,10 +222,16 @@ export async function fetchHeaderConfig(): Promise<HeaderConfig> {
     header_height_px: str('header_height_px'),
     header_padding_top_px: str('header_padding_top_px'),
     header_padding_bottom_px: str('header_padding_bottom_px'),
+    header_layout: parseLayout(rows.get('header_layout')),
   };
 }
 
 function parsePosition(v: string | null | undefined): 'left' | 'center' | 'right' {
   if (v === 'left' || v === 'center' || v === 'right') return v;
   return DEFAULT_HEADER_CONFIG.logo_position;
+}
+
+function parseLayout(v: string | null | undefined): HeaderLayout {
+  if (v === 'default' || v === 'centered' || v === 'spread') return v;
+  return DEFAULT_HEADER_CONFIG.header_layout;
 }

@@ -101,6 +101,7 @@ export function HeaderSettingsForm({
             header_height_px: header.header_height_px,
             header_padding_top_px: header.header_padding_top_px,
             header_padding_bottom_px: header.header_padding_bottom_px,
+            header_layout: header.header_layout,
           }),
         }),
       ];
@@ -424,7 +425,7 @@ export function HeaderSettingsForm({
             label="Header height (px)"
             value={header.header_height_px}
             onChange={(v) => h('header_height_px', v)}
-            placeholder="auto"
+            placeholder="80"
           />
           <PxField
             label="Padding top (px)"
@@ -439,6 +440,24 @@ export function HeaderSettingsForm({
             placeholder="0"
           />
         </div>
+        <label style={{ display: 'block', marginTop: 16, maxWidth: 260 }}>
+          <span style={adminLabel}>Nav alignment</span>
+          <select
+            value={header.header_layout}
+            onChange={(e) =>
+              h('header_layout', e.target.value as HeaderConfig['header_layout'])
+            }
+            style={adminInput}
+          >
+            <option value="default">Default (spaced apart)</option>
+            <option value="centered">Centered</option>
+            <option value="spread">Spread evenly</option>
+          </select>
+          <p style={hint}>
+            How the navigation links distribute between the logo and the CTA.
+            Desktop only; the mobile menu is always a stacked list.
+          </p>
+        </label>
       </Card>
 
       {/* ---- Call to action (PMBC, pre-existing) ---- */}

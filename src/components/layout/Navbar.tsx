@@ -9,22 +9,62 @@ import { Menu, X } from 'lucide-react';
 export type NavbarBrand = {
   name: string;
   shortName: string;
+  tagline: string | null;
   logoUrl: string | null;
   logoDarkUrl: string | null;
 };
 
 export type NavbarItem = { label: string; href: string };
 
+/**
+ * Header presentation, driven by cms_content section='header_settings' and
+ * edited at /admin/header-settings. Numeric fields are null when unset so the
+ * defaults below stay authoritative: a blank admin field must never render a
+ * zero-height header or a zero-height logo.
+ */
+export type NavbarPresentation = {
+  headerHeightPx: number | null;
+  headerPaddingTopPx: number | null;
+  headerPaddingBottomPx: number | null;
+  headerLayout: 'default' | 'centered' | 'spread';
+  logoEnabled: boolean;
+  logoHeightPx: number | null;
+  logoWidthPx: number | null;
+  logoPosition: 'left' | 'center' | 'right';
+  showBrandName: boolean;
+  showTagline: boolean;
+  iconUrl: string | null;
+  iconSizePx: number | null;
+};
+
+/** The values the navbar shipped with before these fields were wired up. */
+const PRESENTATION_DEFAULTS: NavbarPresentation = {
+  headerHeightPx: 80,
+  headerPaddingTopPx: null,
+  headerPaddingBottomPx: null,
+  headerLayout: 'default',
+  logoEnabled: true,
+  logoHeightPx: 40,
+  logoWidthPx: null,
+  logoPosition: 'left',
+  showBrandName: true,
+  showTagline: false,
+  iconUrl: null,
+  iconSizePx: 20,
+};
+
 export function Navbar({
   brand,
   navItems,
   cta,
   mobileMenuEnabled,
+  presentation,
 }: {
   brand: NavbarBrand;
   navItems: NavbarItem[];
   cta: { label: string; href: string } | null;
   mobileMenuEnabled: boolean;
+  presentation?: Partial<NavbarPresentation>;
 }) {
   const pathname = usePathname();
   const [scrolled, setScrolled] = useState(false);
@@ -56,6 +96,40 @@ export function Navbar({
     return pathname === href || pathname.startsWith(href + '/');
   };
 
+  // Merge admin settings over the shipped defaults. A null inside `presentation`
+  // means "not set", so it must not win over the default: `??` per field rather
+  // than a plain spread, which would let null through.
+  const p: NavbarPresentation = {
+    ...PRESENTATION_DEFAULTS,
+    ...presentation,
+    headerHeightPx:
+      presentation?.headerHeightPx ?? PRESENTATION_DEFAULTS.headerHeightPx,
+    logoHeightPx: presentation?.logoHeightPx ?? PRESENTATION_DEFAULTS.logoHeightPx,
+    iconSizePx: presentation?.iconSizePx ?? PRESENTATION_DEFAULTS.iconSizePx,
+  };
+
+  const logoHeight = p.logoHeightPx ?? 40;
+  const iconSize = p.iconSizePx ?? 20;
+
+  // Brand placement inside the header row, driven by logo_position:
+  //   left   brand, nav, actions   (default)
+  //   center nav, brand, actions   brand centred by auto side margins
+  //   right  nav, actions, brand
+  const brandOrder = p.logoPosition === 'left' ? 1 : p.logoPosition === 'center' ? 2 : 3;
+  const navOrder = p.logoPosition === 'left' ? 2 : 1;
+  const actionsOrder = p.logoPosition === 'right' ? 2 : 3;
+
+  // header_layout controls how nav links distribute. Desktop only: the mobile
+  // menu is always a stacked list.
+  const navFlex =
+    p.headerLayout === 'centered'
+      ? { flex: 1, justifyContent: 'center' as const }
+      : p.headerLayout === 'spread'
+        ? { flex: 1, justifyContent: 'space-around' as const }
+        : {};
+
+  const showWordmark = !p.logoEnabled || !brand.logoUrl;
+
   return (
     <header
       className={
@@ -70,49 +144,92 @@ export function Navbar({
           : '1px solid transparent',
       }}
     >
-      <div className="mx-auto flex h-[80px] w-full max-w-[1280px] items-center justify-between px-6 lg:px-8">
+      <div
+        className="mx-auto flex w-full max-w-[1280px] items-center justify-between px-6 lg:px-8"
+        style={{
+          minHeight: p.headerHeightPx ?? 80,
+          paddingTop: p.headerPaddingTopPx ?? undefined,
+          paddingBottom: p.headerPaddingBottomPx ?? undefined,
+        }}
+      >
         {/* Brand */}
         <Link
           href="/"
           className="flex items-center gap-3 transition-opacity duration-200 hover:opacity-80"
+          style={{
+            order: brandOrder,
+            marginLeft: p.logoPosition === 'center' ? 'auto' : undefined,
+            marginRight: p.logoPosition === 'center' ? 'auto' : undefined,
+          }}
         >
-          {brand.logoUrl ? (
+          {p.iconUrl && (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img
+              src={p.iconUrl}
+              alt=""
+              aria-hidden
+              style={{ height: iconSize, width: 'auto', objectFit: 'contain' }}
+            />
+          )}
+          {!showWordmark ? (
             <Image
-              src={brand.logoUrl}
+              src={brand.logoUrl as string}
               alt={brand.name}
-              width={160}
-              height={40}
-              className="h-10 w-auto"
+              width={p.logoWidthPx ?? 160}
+              height={logoHeight}
+              className="w-auto"
+              style={{
+                height: logoHeight,
+                maxWidth: p.logoWidthPx ?? undefined,
+                objectFit: 'contain',
+              }}
               priority
               unoptimized
             />
           ) : (
             <div className="flex items-center gap-3">
               <div
-                className="flex h-10 w-10 items-center justify-center"
+                className="flex items-center justify-center"
                 style={{
+                  height: logoHeight,
+                  width: logoHeight,
                   background: '#1B3A5F',
                   color: '#C69C3E',
                   fontFamily: 'var(--font-source-serif), serif',
                   fontWeight: 600,
-                  fontSize: 18,
+                  fontSize: Math.max(12, Math.round(logoHeight * 0.45)),
                   letterSpacing: '-0.02em',
                 }}
               >
                 PM
               </div>
-              <span
-                className="font-serif text-[18px] font-semibold tracking-tight text-[color:var(--pmbc-primary-deep)]"
-                style={{ letterSpacing: '-0.01em' }}
-              >
-                {brand.shortName}
-              </span>
+              {p.showBrandName && (
+                <div className="flex flex-col">
+                  <span
+                    className="font-serif text-[18px] font-semibold tracking-tight text-[color:var(--pmbc-primary-deep)]"
+                    style={{ letterSpacing: '-0.01em' }}
+                  >
+                    {brand.shortName}
+                  </span>
+                  {p.showTagline && brand.tagline && (
+                    <span
+                      className="text-[11px] text-[color:var(--pmbc-muted)]"
+                      style={{ letterSpacing: '0.04em', lineHeight: 1.3 }}
+                    >
+                      {brand.tagline}
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </Link>
 
         {/* Desktop nav */}
-        <nav className="hidden items-center gap-9 md:flex">
+        <nav
+          className="hidden items-center gap-9 md:flex"
+          style={{ order: navOrder, ...navFlex }}
+        >
           {navItems.map((item) => {
             const active = isActive(item.href);
             return (
@@ -135,7 +252,7 @@ export function Navbar({
         </nav>
 
         {/* CTA + mobile toggle */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3" style={{ order: actionsOrder }}>
           {cta && (
             <Link
               href={cta.href}
