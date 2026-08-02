@@ -93,7 +93,7 @@ When you find an em dash in *existing* content while doing other work, fix it as
 | Phase 17 (parity 6) : RichTextEditor upgrades + RichTextarea | Complete (2026-08-01) | Editor gains colour, font size, link, image insert, alignment and H1/H3. New compact `RichTextarea` (bold, italic, link) wired into 7 short fields. All `@tiptap/*` deps pinned exactly, since `^3.22.5` resolves to 3.29 and breaks the peer graph. Blocked on a hidden dependency: those fields rendered as plain text nodes, so making them rich required converting the renderers to HTML, which would have widened the unsanitised surface. The sanitiser was pulled forward rather than doing that. |
 | Phase 17.5 (parity 6.5) : Sanitise all rich-text output | Complete (2026-08-01) | **Closes S1**, the highest-severity finding in `ADMIN_PARITY_GAP.md` and Phase B of `MIGRATION_PLAN.md`. All 10 remaining `dangerouslySetInnerHTML` sites routed through `lib/cms/sanitize.ts` (8 public plus the 2 email previews). The two JSON-LD blocks are deliberately excluded, since they serialise objects we build ourselves. Email previews got their own wider allowlist so the preview does not lie about what the real email sends. Render diff: **14 of 14 public routes byte-identical**. Hostile payload test: 0 markers reach the DOM. |
 | Phase 18 (parity 7) : AuditLogViewer | Complete (2026-08-01) | Shared `AuditLogViewer` with filters (admin, action multi-select, date range), 100-row paging capped at 500 per fetch, and a side-by-side before/after JSON dialog. New read-only `GET/POST /api/admin/audit-log`. Migration 032 adds `before_value`, `after_value`, `reason` plus two composite indexes. `writeAudit` gains diff support and never blocks a mutation, falling back if the columns are absent. Diff capture wired into `collectionApi` (six sections at once), branding, settings, and page/section deletes. Verified against a real create/update/delete cycle. |
-| Parity 8 : Testimonials + Pages & Nav polish | Not started | The two remaining PARTIAL rows in `ADMIN_PARITY_GAP.md`. |
+| Phase 19 (parity 8) : Testimonials approval workflow + Pages & Nav inline edit | Complete (2026-08-02) | **Closes the FMP admin-parity programme.** Testimonials is now a moderation queue, not a generic list: status filter tabs with counts, per-row Approve and Reject, Revoke and Reconsider, inline Featured and Show-on-homepage switches, and checkbox bulk approve/reject. `approved_at` is server-owned (absent from the route's zod schemas) and only moves on a real status change, so editing an approved quote's wording does not reset its approval date. Pages & Nav dropped the drawer for an inline table: label and href pend until that row's Save, while visibility, pinning and reorder save immediately, with a new-item row at the bottom. `createCollectionApi` gained `transformWrite`, `guardWrite` and `guardDelete`; the PATCH handler now snapshots the pre-write row before shaping the patch, since both hooks need it. Migration 033 adds `site_pages.can_toggle` (**DDL, run by hand**), enforced server side for both hide and delete. Everything degrades on a pre-033 database: the UI hides the Pinned control when no row carries the column, and the route replays a write with `can_toggle` stripped if Postgres rejects it, narrowly enough that a 403 guard and a 422 zod failure still pass through. Verified by `scripts/verify-parity8.mjs`: 36 assertions, 0 failures, run with 033 deliberately unapplied. |
 
 **Working admin login (local dev):** `meetahmadch@gmail.com` / `Admin@2026`. This is a debug-only password: must be rotated to a strong production credential before launch. Use `npm run seed-admin` (after editing `ADMIN_PASSWORD` in `scripts/seed-admin.mjs`) to rotate.
 
@@ -101,9 +101,9 @@ When you find an em dash in *existing* content while doing other work, fix it as
 
 ## Remaining Before Launch (next to do)
 
-All buildable features are done as of 2026-08-01. The FMP admin-parity programme (phases 1 to 7 of `ADMIN_PARITY_GAP.md`) is complete apart from parity 8, a small polish item. Page content is seeded, the public site renders, and the admin console is complete. What is left is operational, content-population, and review work, most of which lives outside the codebase. Pick up here next session.
+All buildable features are done as of 2026-08-02. **The FMP admin-parity programme is complete**: all eight phases of `ADMIN_PARITY_GAP.md` are closed. Page content is seeded, the public site renders, and the admin console is complete. What is left is operational, content-population, and review work, most of which lives outside the codebase. Pick up here next session.
 
-**Two DDL migrations were applied by hand on 2026-08-01** (031 `cms_pages.is_system`, 032 `audit_log` diff columns). Both are verified live. If you rebuild this database from scratch, run every migration in order and remember that 031 and 032 need the SQL editor.
+**Two DDL migrations were applied by hand on 2026-08-01** (031 `cms_pages.is_system`, 032 `audit_log` diff columns). Both are verified live. **Migration 033 (`site_pages.can_toggle`) is written but NOT yet applied**: paste `supabase/migrations/033_site_pages_can_toggle.sql` into the Supabase SQL editor. Nothing is broken until you do; Pages & Nav simply does not show the Pinned column. If you rebuild this database from scratch, run every migration in order and remember that 031, 032 and 033 need the SQL editor.
 
 **Waiting on a human, not on code:** there are **two unread submissions in `/admin/contact-submissions`**, both `status='new'` with `read_at` never set. The 2026-07-02 one is spam; the **2026-06-21 one (Leslie Merricroft, Al-Mashrea Law Firm) looks genuine and has now gone unanswered for six weeks.** The inbox works correctly; nobody has opened it. This is the single most overdue item on the list.
 
@@ -525,11 +525,15 @@ For v1, only two template_key rows are needed: `contact_notification` (sent to a
 032_audit_log_diff_columns.sql    -- audit_log before_value / after_value / reason
                                   --   (JSONB, JSONB, TEXT) + two composite indexes
                                   --   for the viewer's filter paths. DDL.
+033_site_pages_can_toggle.sql     -- site_pages.can_toggle. DDL. False pins a nav
+                                  --   item: /api/admin/site-pages refuses to hide
+                                  --   or delete it, and the admin locks its
+                                  --   Visible switch. Pins /contact by default.
 ```
 
 After running migrations, manually insert one admin_users row via SQL with a bcrypt hash for the password.
 
-**DDL migrations must be run by hand.** 031 and 032 use `ALTER TABLE`, which supabase-js cannot execute. The Supabase CLI is not installed and `.env.local` carries no direct Postgres connection string, so the seed-script pattern used for 029 does not work for them. Paste them into the Supabase SQL editor. Every consumer of those columns degrades safely if the migration has not run: the page list treats a missing `is_system` as "system" so nothing is deletable, and `writeAudit` retries without the diff columns rather than failing the mutation.
+**DDL migrations must be run by hand.** 031, 032 and 033 use `ALTER TABLE`, which supabase-js cannot execute. The Supabase CLI is not installed and `.env.local` carries no direct Postgres connection string, so the seed-script pattern used for 029 does not work for them. Paste them into the Supabase SQL editor. Every consumer of those columns degrades safely if the migration has not run: the page list treats a missing `is_system` as "system" so nothing is deletable, `writeAudit` retries without the diff columns rather than failing the mutation, and `/api/admin/site-pages` replays a write with `can_toggle` stripped when Postgres rejects the column (so Pages & Nav keeps working, minus pinning).
 
 ---
 
@@ -709,7 +713,8 @@ export default async function middleware(req) {
 | `/admin` | Dashboard: recent contact submissions, page count, last updated timestamps |
 | `/admin/page-builder` | Pages list, with a Builder button per row, a **New Page** modal (five templates) and per-row delete for non-system pages |
 | `/admin/page-builder/[slug]` | Three-pane section editor. **Per-section Save** since parity 3, plus a StyleEditor per section since parity 5 |
-| `/admin/pages` | Pages & Nav: the navigation menu that drives the public navbar (`site_pages` rows). Nav links only, not page content |
+| `/admin/pages` | Pages & Nav: the navigation menu that drives the public navbar (`site_pages` rows). Nav links only, not page content. **Inline-edit table** since parity 8: label and href pend until that row's Save; visibility, pinning and reorder save immediately |
+| `/admin/testimonials` | Testimonials moderation queue: status filter tabs, per-row Approve and Reject, Revoke and Reconsider, inline Featured and Show-on-homepage switches, checkbox bulk actions. Drawer editor for the wording |
 | `/admin/content` | Key-value editor for cms_content (grouped by section) |
 | `/admin/branding` | **Redirect to `/admin/header-settings`** since parity 1. Kept for older bookmarks |
 | `/admin/header-settings` | Brand colours, logo, branding text, header icon, header layout, CTA and mobile. Seven cards, one Save All. Owns the 17 `header_settings` keys plus the `branding_config` row |

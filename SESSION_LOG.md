@@ -4,6 +4,32 @@ Chronological build history for the PMBC website. Split out of `CLAUDE.md` to ke
 
 ---
 
+### 2026-08-02 - FMP Admin Parity, Phase 8: Testimonials approval workflow and Pages and Nav inline edit
+
+The last two PARTIAL rows in `ADMIN_PARITY_GAP.md` (sections 6 and 8). This closes the parity programme.
+
+**ACTION REQUIRED: migration 033 must be run by hand,** like 031 and 032. It is DDL (`ALTER TABLE site_pages ADD COLUMN can_toggle`), and supabase-js cannot execute DDL. Probed for a SQL-exec RPC (`exec_sql`, `execute_sql`, `exec`, `sql`) before concluding that; none exists. Run `supabase/migrations/033_site_pages_can_toggle.sql` in the Supabase SQL editor. **Everything ships working without it**, minus pinning: verified, see below.
+
+**Task 1: testimonials approval workflow.** New `TestimonialsManager`, a moderation queue rather than a generic collection list. Status filter tabs (All, Pending, Approved, Rejected) with live counts; per-row Approve (green) and Reject (red) on pending items; Revoke on approved and Reconsider on rejected, both returning the row to pending; Featured and Show on homepage as inline switches; a checkbox column with Approve selected and Reject selected in a bar that only appears once something is selected. `CollectionManager`'s drawer was exported as `CollectionEditorDrawer` and reused for editing the wording, so there is one editor implementation rather than two.
+
+**`approved_at` is server-owned.** It is deliberately absent from the route's zod schemas, so an admin cannot post an arbitrary approval date. Two new optional hooks on `createCollectionApi` carry this: `transformWrite(row, {mode, before})` for last-mile shaping, and `guardWrite` / `guardDelete` for refusing a write with a 403. The PATCH handler now snapshots the pre-write row *before* shaping the patch, because both hooks need it.
+
+That `before` is what makes the stamp correct rather than merely present. A naive version stamps `approved_at = now()` whenever status is approved, so editing an approved quote's wording silently resets its approval date. The transform only moves the stamp when the status actually changes, which is the whole point of recording it.
+
+**Task 2: Pages and Nav inline edit.** `/admin/pages` was a `CollectionManager` list plus a slide-in drawer. A nav item is two short strings and two booleans, so the drawer was more ceremony than the data deserved. Now an inline table, splitting saves the way the rest of the console already does: label and href are pending until that row's Save (text needs a commit point), while visibility, pinning and reorder save on the spot (a switch that needs confirming is a lie). Dirty state is per row, never per table, for the same reason the page builder tracks it per section in parity 3. New item is a form row at the bottom of the list, not a modal.
+
+**`can_toggle` (migration 033) is enforced server side, not just in the UI.** Same reasoning as the `is_system` page-delete guard in parity 5: the client is not the authority, and anyone can PATCH the route directly. Delete is guarded alongside hide, because a pin that only blocks one of the two doors is not a pin.
+
+**Graceful degradation on a pre-033 database.** The admin table detects the column from the row shape (the GET already returns every column) and hides the Pinned control when no row carries it. The route goes further: a write rejected *because* of the missing column is replayed with the field stripped. That retry is deliberately narrow, only a 500 whose error names the column, so a 403 from `guardWrite` and a 422 from zod both pass straight through untouched. The net effect is that an un-migrated database loses pinning, not the ability to edit the navbar.
+
+**Verification.** New `scripts/verify-parity8.mjs` drives the real admin APIs through a real NextAuth session, asserts database state, checks the public pages, and deletes everything it created. **36 assertions, 0 failures**, run against the working database with migration 033 *not* applied, which is what exercised the degradation path. Covered: approve stamps `approved_at`; re-saving an approved row keeps the original date; revoke and reject both clear it; both toggles persist; bulk approve and reject land every row on the requested status; an approved testimonial reaches `/about` and a non-approved one does not, so the public `status='approved'` filter is intact; inline label and href edits save; the visible toggle persists immediately and the public navbar follows within the same request; reorder persists; a write carrying `can_toggle` degrades rather than failing. Separately checked that both admin pages render with no error boundary in the SSR output and that the pre-render markup carries the filter tabs. Typecheck and build clean, em dash gate zero.
+
+**One pre-existing em dash fixed in passing,** the empty-value placeholder in `CollectionManager`'s badge cell, which was a bare em-dash character and is now the word `'none'`. Per the Content Style Rules, fixed as part of touching the file rather than as its own change.
+
+**Not done, and why.** `ADMIN_PARITY_GAP.md` section 8 also suggests adding `linkedin_url` and `profile_photo_url` to testimonials. That is a schema change plus a public-renderer change, not approval-workflow UX, and no testimonial content exists yet to need it. Left for whenever real testimonials arrive. Renaming `text` to `quote` stays rejected for the reason already recorded there: a migration plus a renderer change for zero user-visible benefit.
+
+---
+
 ### 2026-08-01 - FMP Admin Parity, Phase 7: AuditLogViewer
 
 Closes the last PARTIAL row in the gap report for the audit page. PMBC had a flat inlined table with a hard 200-row limit, no filters, no pagination and no diff.

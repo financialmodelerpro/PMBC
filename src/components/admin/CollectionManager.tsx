@@ -23,7 +23,9 @@ import {
 import { RichTextEditor } from '@/components/admin/RichTextEditor';
 import { MediaPickerButton, type MediaBucket } from '@/components/admin/MediaPicker';
 
-type Row = Record<string, unknown> & { id: string };
+export type CollectionRow = Record<string, unknown> & { id: string };
+
+type Row = CollectionRow;
 
 export type FieldType =
   | 'text'
@@ -233,7 +235,7 @@ export function CollectionManager({
                     return (
                       <td key={c.key} style={tdStyle}>
                         {c.badge && statusTone ? (
-                          <span style={adminBadge(statusTone(row))}>{text || '—'}</span>
+                          <span style={adminBadge(statusTone(row))}>{text || 'none'}</span>
                         ) : c.key === listColumns[0].key ? (
                           <button
                             type="button"
@@ -274,7 +276,7 @@ export function CollectionManager({
       </div>
 
       {editing && (
-        <EditorDrawer
+        <CollectionEditorDrawer
           apiBase={apiBase}
           fields={fields}
           row={editing}
@@ -291,7 +293,12 @@ export function CollectionManager({
   );
 }
 
-function EditorDrawer({
+/**
+ * The slide-in create/edit form. Exported so a bespoke list (the testimonials
+ * approval board, parity 8) can keep the same editor without reimplementing the
+ * field rendering, the save contract, or the delete confirmation.
+ */
+export function CollectionEditorDrawer({
   apiBase,
   fields,
   row,

@@ -19,6 +19,17 @@ function typed(db: SupabaseClient): SupabaseClient<Database> {
   return db as unknown as SupabaseClient<Database>;
 }
 
+/**
+ * Context handed to `transformWrite`. `before` is the row as it existed prior
+ * to the write, and is always null on create. It lets a transform tell an
+ * actual state change from a no-op re-save, which matters for anything that
+ * stamps a timestamp on transition.
+ */
+export type WriteContext = {
+  mode: 'create' | 'update';
+  before: AnyRow | null;
+};
+
 type CollectionConfig = {
   /** Postgres table name. */
   table: string;
@@ -35,6 +46,26 @@ type CollectionConfig = {
   titleField?: string;
   /** Stamp updated_at on write. Defaults true. */
   touchUpdatedAt?: boolean;
+  /**
+   * Last-mile shaping of the row about to be written, applied after zod
+   * validation. Use it for values the server owns and the client must not be
+   * able to set directly, such as a transition timestamp. Runs for both create
+   * and update; the mode and the pre-write row are in the context.
+   */
+  transformWrite?: (row: AnyRow, ctx: WriteContext) => AnyRow;
+  /**
+   * Rejects a write before it reaches Postgres. Return an error string to fail
+   * with a 403, or null to allow. Runs after `transformWrite`, so it sees the
+   * row exactly as it would be written. Only called on update, where a
+   * pre-existing row can carry a constraint the client should not override.
+   */
+  guardWrite?: (row: AnyRow, ctx: WriteContext) => string | null;
+  /**
+   * Rejects a delete before it reaches Postgres. Return an error string to fail
+   * with a 403, or null to allow. Pairs with `guardWrite`: a row the admin is
+   * forbidden to hide should not be removable by the other door either.
+   */
+  guardDelete?: (before: AnyRow | null) => string | null;
 };
 
 /**
@@ -56,6 +87,9 @@ export function createCollectionApi(config: CollectionConfig) {
     slugField,
     titleField,
     touchUpdatedAt = true,
+    transformWrite,
+    guardWrite,
+    guardDelete,
   } = config;
 
   async function GET(req: Request) {
@@ -102,7 +136,8 @@ export function createCollectionApi(config: CollectionConfig) {
       );
     }
 
-    const row = { ...(parsed.data as AnyRow) };
+    let row = { ...(parsed.data as AnyRow) };
+    if (transformWrite) row = transformWrite(row, { mode: 'create', before: null });
     if (slugField && titleField) {
       const slug = row[slugField];
       if (!slug || (typeof slug === 'string' && slug.trim() === '')) {
@@ -159,17 +194,26 @@ export function createCollectionApi(config: CollectionConfig) {
     const { id, ...rest } = parsed.data as AnyRow & { id: string };
     if (!id) return NextResponse.json({ error: 'id is required' }, { status: 400 });
 
-    const patch = { ...rest } as AnyRow;
+    const supabase = looseDb();
+    // Snapshot first: after the update the old values are gone. snapshotRow
+    // returns null on any failure, so a missed snapshot costs the diff and
+    // never the mutation. It is read before the patch is shaped because
+    // transformWrite and guardWrite both need the pre-write state.
+    const before = await snapshotRow(typed(supabase), table, 'id', String(id));
+    const beforeRow = (before as unknown as AnyRow | null) ?? null;
+
+    let patch = { ...rest } as AnyRow;
+    if (transformWrite) {
+      patch = transformWrite(patch, { mode: 'update', before: beforeRow });
+    }
+    if (guardWrite) {
+      const refusal = guardWrite(patch, { mode: 'update', before: beforeRow });
+      if (refusal) return NextResponse.json({ error: refusal }, { status: 403 });
+    }
     if (slugField && typeof patch[slugField] === 'string' && patch[slugField]) {
       patch[slugField] = slugify(String(patch[slugField]));
     }
     if (touchUpdatedAt) patch.updated_at = new Date().toISOString();
-
-    const supabase = looseDb();
-    // Snapshot first: after the update the old values are gone. snapshotRow
-    // returns null on any failure, so a missed snapshot costs the diff and
-    // never the mutation.
-    const before = await snapshotRow(typed(supabase), table, 'id', String(id));
 
     const { data, error } = await supabase
       .from(table)
@@ -201,6 +245,11 @@ export function createCollectionApi(config: CollectionConfig) {
     const supabase = looseDb();
     // The whole point of auditing a delete is keeping what was removed.
     const before = await snapshotRow(typed(supabase), table, 'id', id);
+
+    if (guardDelete) {
+      const refusal = guardDelete((before as unknown as AnyRow | null) ?? null);
+      if (refusal) return NextResponse.json({ error: refusal }, { status: 403 });
+    }
 
     const { error } = await supabase.from(table).delete().eq('id', id);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });

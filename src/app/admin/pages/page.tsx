@@ -3,43 +3,8 @@
 import Link from 'next/link';
 
 import { AdminPageHeader } from '@/components/admin/AdminPageHeader';
-import {
-  CollectionManager,
-  type FieldDef,
-  type ListColumn,
-} from '@/components/admin/CollectionManager';
+import { SitePagesManager } from '@/components/admin/SitePagesManager';
 import { ADMIN_COLORS, adminPageMain } from '@/lib/admin/styles';
-
-const FIELDS: FieldDef[] = [
-  {
-    key: 'label',
-    label: 'Menu label',
-    type: 'text',
-    hint: 'Shown in the navbar',
-    placeholder: 'Services',
-  },
-  {
-    key: 'href',
-    label: 'Link target',
-    type: 'text',
-    hint: 'Relative path such as /services, or a full external URL',
-    placeholder: '/services',
-  },
-  { key: 'display_order', label: 'Display order', type: 'number' },
-  { key: 'visible', label: 'Visible in navbar', type: 'checkbox' },
-];
-
-const COLUMNS: ListColumn[] = [
-  { key: 'label', label: 'Label' },
-  { key: 'href', label: 'Link' },
-  {
-    key: 'visible',
-    label: 'Visible',
-    badge: true,
-    width: 110,
-    render: (r) => (r.visible === false ? 'hidden' : 'visible'),
-  },
-];
 
 export default function AdminPagesNavPage() {
   return (
@@ -48,7 +13,7 @@ export default function AdminPagesNavPage() {
         <AdminPageHeader
           eyebrow="Content"
           title="Pages and Nav"
-          description="The navigation menu that drives the public navbar. Reorder items, hide them, or point them somewhere else. Editing page content happens in Page Builder."
+          description="The navigation menu that drives the public navbar. Edit a label or link in the row and press Save. Order, visibility and pinning save as soon as you change them. Editing page content happens in Page Builder."
         />
 
         <div
@@ -77,19 +42,11 @@ export default function AdminPagesNavPage() {
           >
             Header Settings
           </Link>
-          .
+          . A pinned item stays in the navbar: its Visible switch locks and it
+          cannot be deleted until it is unpinned.
         </div>
 
-        <CollectionManager
-          apiBase="/api/admin/site-pages"
-          fields={FIELDS}
-          listColumns={COLUMNS}
-          enableReorder
-          newDefaults={{ label: '', href: '/', display_order: 0, visible: true }}
-          itemLabel={(r) => (r.label as string) || 'Menu item'}
-          statusTone={(r) => (r.visible === false ? 'neutral' : 'success')}
-          emptyHint="No navigation items. Add the first navbar link."
-        />
+        <SitePagesManager />
       </div>
     </div>
   );

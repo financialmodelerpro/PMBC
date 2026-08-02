@@ -635,6 +635,8 @@ export type Database = {
           href: string
           display_order: number
           visible: boolean
+          /** Migration 033. False pins the item visible in the navbar. */
+          can_toggle: boolean
           created_at: string | null
           updated_at: string | null
         }
@@ -644,6 +646,7 @@ export type Database = {
           href: string
           display_order?: number
           visible?: boolean
+          can_toggle?: boolean
           created_at?: string | null
           updated_at?: string | null
         }
@@ -653,6 +656,7 @@ export type Database = {
           href?: string
           display_order?: number
           visible?: boolean
+          can_toggle?: boolean
           created_at?: string | null
           updated_at?: string | null
         }

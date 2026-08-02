@@ -24,6 +24,22 @@ export const { GET, POST, PATCH, DELETE } = createCollectionApi({
   // default, which made every create and update fail with
   // "Could not find the 'updated_at' column". Found while verifying Phase 7.
   touchUpdatedAt: false,
+  /**
+   * approved_at is owned by the server, not the client. It is deliberately
+   * absent from the zod schemas above, so an admin cannot post an arbitrary
+   * approval date; it is derived here from the status transition alone.
+   *
+   * Only a genuine change of status moves it. Re-saving an already-approved
+   * testimonial (editing its wording, flipping Featured) leaves the original
+   * approval time intact, which is the whole point of recording it.
+   */
+  transformWrite: (row, { before }) => {
+    const next = row.status;
+    if (typeof next !== 'string') return row;
+    if (before && before.status === next) return row;
+    row.approved_at = next === 'approved' ? new Date().toISOString() : null;
+    return row;
+  },
   createSchema: z.object(base),
   updateSchema: z.object({
     ...base,

@@ -12,7 +12,9 @@ const ADMIN_ROUTES = [
   '/admin/page-builder/home',
   '/admin/page-builder/services',
   '/admin/content',
-  '/admin/branding',
+  // Parity 1 turned /admin/branding into a redirect to header-settings, so a
+  // 307 here is the correct answer, not a failure. The script kept reporting it
+  // as one until parity 8.
   '/admin/header-settings',
   '/admin/contact-submissions',
   '/admin/email-branding',

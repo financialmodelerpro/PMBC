@@ -1,7 +1,7 @@
 # PMBC vs FMP Admin: Parity Gap Report
 
 **Purpose:** Establish what would have to change for PMBC's admin console to match FMP's, so switching between the two projects requires no re-learning.
-**Status:** Original audit, retained as written. Phases 1 to 7 have since been implemented (see the status update below).
+**Status:** Original audit, retained as written. All eight phases have since been implemented (see the status updates below). The parity programme is closed.
 **Date:** 2026-08-01
 **Scope:** Admin only. Public content and public routes are out of scope and untouched.
 
@@ -19,7 +19,21 @@
 > | Save button colour | Navy | Green `#2EAA4A`, semantics only (palette option C) |
 > | Unsanitised HTML (S1) | 8 sites | 0. All 10 sites routed through `lib/cms/sanitize.ts` |
 >
-> **Still outstanding:** parity 8 (Testimonials approval workflow, Pages & Nav inline edit), and the two items in section 6 deliberately left alone (per-field `VF`/`ItemVF` wrappers, and section-type parity, both judged wrong for PMBC). See `SESSION_LOG.md` for the per-phase record.
+> **Still outstanding as of that date:** parity 8, plus the two items in section 6 deliberately left alone (per-field `VF`/`ItemVF` wrappers, and section-type parity, both judged wrong for PMBC). See `SESSION_LOG.md` for the per-phase record.
+
+> **STATUS UPDATE 2026-08-02: parity 8 is implemented and shipped. The programme is closed.** The two remaining PARTIAL rows, section 6 (Pages & Nav) and section 8 (Testimonials), are resolved:
+>
+> | Item | Then | Now |
+> |---|---|---|
+> | Testimonials layout | List plus drawer, no approval flow | Moderation queue: status filter tabs with counts, per-row Approve and Reject, Revoke and Reconsider |
+> | Testimonials row controls | Featured and homepage flags only reachable in the drawer | Inline switches on the row, each its own audited PATCH |
+> | Testimonials bulk actions | MISSING | Checkbox column, Approve selected and Reject selected |
+> | `approved_at` | Never written | Server-owned, stamped on a real status transition only, cleared on revoke or reject |
+> | Pages & Nav layout | List plus drawer | Inline-edit table, new-item row at the bottom |
+> | Pages & Nav save | Drawer Save for everything | Label and href pend until that row's Save; visibility, pinning and reorder save immediately |
+> | `site_pages.can_toggle` | MISSING | Migration 033, enforced server side for both hide and delete, degrades on a pre-033 database |
+>
+> Two suggestions in section 8 were **not** taken. `linkedin_url` and `profile_photo_url` are a schema plus public-renderer change rather than approval UX, and no testimonial content exists yet to need them; deferred until real testimonials arrive. Renaming `text` to `quote` stays rejected for the reason recorded in that section.
 
 ---
 
