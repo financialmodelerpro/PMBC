@@ -4,7 +4,7 @@ import type { NextConfig } from 'next';
  * Allowed remote hosts for `next/image`. The Supabase project domain is
  * pulled from `SUPABASE_URL` (or its public mirror) so admin-uploaded
  * assets stored in Supabase Storage render without a config change. Other
- * hosts are added explicitly — only add a host here once you've confirmed
+ * hosts are added explicitly. Only add a host here once you have confirmed
  * its content is trusted (next/image fetches and re-encodes whatever it
  * loads, and a mistake here is a vector for hot-linking abuse).
  */
@@ -38,7 +38,7 @@ remotePatterns.push({
   pathname: '/storage/v1/object/public/**',
 });
 
-// Cloudinary — common admin choice for hosted images. Safe to keep
+// Cloudinary, a common admin choice for hosted images. Safe to keep
 // permanently; remove if not used.
 remotePatterns.push({
   protocol: 'https',

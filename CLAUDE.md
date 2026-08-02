@@ -403,7 +403,7 @@ The page builder. One row per section on a page. `section_type` determines which
 - `cta_block`: single call-to-action panel
 - `quote`: pull quote with attribution
 - `fmp_intro`: Financial Modeler Pro introduction block (one specific section type for the FMP page)
-- `founder_hero`: page-leading founder identity (portrait, name, two-line title, credentials, CTAs). Added 2026-08-02 for `/about/ahmad-din`. Distinct from `founder_block`, which is the mid-page summary card on home and about
+- `founder_hero`: page-leading founder identity (portrait, name, two-line title, credentials, CTAs). Added 2026-08-02 for `/about/ahmad-din`. Distinct from `founder_block`, which is the mid-page summary card on home and about. **Each stores its own `photo_url`**, and there is no shared founder-photo source in `branding_config`, `site_settings` or `team_members`. That is by design (a section owns its content, and a card may want a different crop), but it means uploading a portrait in the page builder sets it on one section only. `npm run sync-founder-photo` copies it onto any card still empty without touching one deliberately given a different image
 - `founder_credentials`: heading plus a list of short strings, rendered as `numbered`, `pills`, or `cards` per a `display` key. One type rather than three, because the three founder-profile list blocks differ only in presentation
 
 #### Branding and Settings
@@ -558,6 +558,13 @@ For v1, only two template_key rows are needed: `contact_notification` (sent to a
                                   --   (supports --dry-run). Rendering already
                                   --   strips them, so this is about making the
                                   --   stored value match. Idempotent.
+037_sync_founder_photo.sql        -- Copies the portrait from the founder_hero on
+                                  --   /about/ahmad-din onto every founder_block
+                                  --   card whose photo_url is empty. Reads the URL
+                                  --   from the DB rather than hardcoding it, so a
+                                  --   rebuild on another Supabase project is safe.
+                                  --   DML only, `npm run sync-founder-photo`
+                                  --   (supports --dry-run). Idempotent.
 ```
 
 After running migrations, manually insert one admin_users row via SQL with a bcrypt hash for the password.

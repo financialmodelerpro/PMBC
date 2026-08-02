@@ -4,6 +4,20 @@ Chronological build history for the PMBC website. Split out of `CLAUDE.md` to ke
 
 ---
 
+### 2026-08-02 - Founder photo synced across the profile hero and both founder cards
+
+**Cause 1, confirmed from the data rather than assumed.** `founder_hero` (on /about/ahmad-din) and `founder_block` (on / and /about) each store their own `photo_url` in `page_sections.content`. Checked for a shared source that a card might have been meant to read instead: `branding_config` has no photo or founder column, `site_settings` has no such key, `team_members` is empty. So there is no broken data flow, only two sections that were never given the same value. The architecture stays as it is, per the brief.
+
+**The brief covered /, but /about had the identical defect.** Its `founder_block` also had an empty `photo_url` and was also rendering the monogram. Fixing only the page named would have left a known-identical fault one click away, so both were filled. Say the word if /about was meant to stay on the monogram.
+
+**The URL is read from the database, never hardcoded.** Migration 037 and its script take the portrait from whichever `founder_hero` carries one, which matters for two reasons: a rebuild against a different Supabase project picks up that project's own storage URL instead of this one's, which would 404, and a fresh database with no portrait uploaded yet is a no-op rather than writing a broken path. Only cards whose `photo_url` is empty are filled, so a card deliberately given a different image is never overwritten. The script reports the difference between "already set to the same photo" and "set to a different image, left alone" rather than lumping both under "skipped".
+
+**Verified beyond "the string appears in the HTML".** The portrait renders on all three surfaces with the monogram fallback gone and alt text present, checked against the rendered DOM with the RSC flight payload stripped, since that data island has produced two false results already this session. Also confirmed the two things that fail independently of the markup: the storage object is publicly fetchable and served as `image/png`, and Next's own image optimiser accepts the remote host, which is a separate failure mode from the object existing. 15 assertions, 0 failures, plus all 15 public routes at 200. Script run twice for idempotency, with a read-back over every founder card.
+
+One pre-existing em dash fixed in `next.config.ts` while reading it to confirm the storage host was allowlisted.
+
+---
+
 ### 2026-08-02 - Post-migration verification, and two problems it surfaced
 
 The user applied all outstanding migrations by hand and asked for confirmation. Verification found the state correct, and two things worth fixing.
