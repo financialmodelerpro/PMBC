@@ -4,6 +4,27 @@ Chronological build history for the PMBC website. Split out of `CLAUDE.md` to ke
 
 ---
 
+### 2026-08-02 - Admin credential rotated, launch blocker 2 closed
+
+`Admin@2026` is dead. Rotated via the new `npm run rotate-admin-password`, bcrypt cost 12.
+
+**The new password is not written down in this repository, and that is the point.** The credential it replaces was worthless precisely because it was recorded in `CLAUDE.md`, in three verification scripts, and across a dozen `SESSION_LOG.md` entries, all of which are in public git history. Recording the replacement would reproduce the failure exactly. No lockout risk: `rotate-admin-password.mjs` uses the service-role key from `.env.local`, so a forgotten password is one command from being reset.
+
+**Verified independently of the rotation script's own report,** because a script confirming its own success is not much of a check:
+
+- Stored hash no longer matches `Admin@2026`, and is `$2b$12$`.
+- Stored hash matches the intended literal, which rules out shell mangling. This mattered: the password contained `$%` and `!`, and an inline shell variable could have hashed a string nobody could reproduce later. It was passed through a quoted heredoc so bash performed no expansion at all.
+- End-to-end: the new password logs in and reaches `/admin` with HTTP 200.
+- End-to-end: the old password is refused, no session cookie issued.
+- `npm run seed-admin` now refuses to run, proving the anti-clobber guard works on a genuinely rotated row rather than only in theory.
+- `smoke-admin.mjs` passes 10 of 10 with `ADMIN_PASSWORD` exported, and fails at login without it, which is the intended behaviour after rotation.
+
+**Known weakness, recorded rather than glossed.** The replacement was typed into a chat transcript, so it is not fully private, and it is name-based, which is guessable in a targeted attack on a firm whose founder is named Ahmad. It is still a large improvement on a password published to GitHub. Rotating once more to a value that has never been transcribed is worth doing before launch and now costs one command with a hidden prompt.
+
+The `Admin@2026` references in this file's older entries and in `MIGRATION_PLAN.md` / `PROJECT_HANDOFF.md` are **left intact**. Rewriting history would not un-publish the string, and the string no longer opens anything.
+
+---
+
 ### 2026-08-02 - FMP Admin Parity, Phase 8: Testimonials approval workflow and Pages and Nav inline edit
 
 The last two PARTIAL rows in `ADMIN_PARITY_GAP.md` (sections 6 and 8). This closes the parity programme.
