@@ -100,7 +100,7 @@ export function FmpIntro({
         )}
         {c.description_html && (
           <div
-            className="prose prose-invert mt-6 max-w-none"
+            className="pmbc-prose pmbc-prose-invert mt-6 max-w-none"
             style={{
               color: dark ? '#E8DDC4' : v.text,
               fontSize: 17,

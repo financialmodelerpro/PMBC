@@ -4,6 +4,34 @@ Chronological build history for the PMBC website. Split out of `CLAUDE.md` to ke
 
 ---
 
+### 2026-08-02 - Founder profile readability, and the site-wide rich-text bug it exposed
+
+Three reported issues on `/about/ahmad-din`. Investigating them found one root cause that was much larger than the report, and disproved the stated cause of another.
+
+**The real finding: rich text had no paragraph spacing anywhere on the site, and never had.** Tailwind's preflight resets every element to `margin: 0`, and this project does **not** install `@tailwindcss/typography`. So every `prose`, `prose-neutral` and `prose-invert` class in the codebase was a no-op class name matching nothing. Separately, three files already referenced `pmbc-prose`, which had **never been defined in any stylesheet**. Confirmed by pulling the compiled stylesheet and searching it: `.prose`, `.prose-neutral`, `.prose-invert` and `.pmbc-prose` were all absent, while `*,:after,:before { margin: 0 }` was present. No rule anywhere gave `<p>` a margin.
+
+Net effect: the six-paragraph Background bio rendered as one unbroken slab. That also explains the "too wide" report, see below. Affected far more than the founder page: privacy, terms, service details, FMP intro, text+image, founder blocks, case studies, insights, team bios, and the admin rich-text editor itself, which showed no spacing while editing either.
+
+The fix is a hand-written `.pmbc-prose` layer in `globals.css` rather than adding the typography plugin. The site needs about twenty rules, all of which want PMBC's own scale and gold accent, and the plugin would have to be fought back to that. Everything is scoped under `.pmbc-prose` so it can only touch CMS body copy. All eight dead `prose` usages were switched over, which also makes the three pre-existing `pmbc-prose` references real for the first time. `p:empty` now keeps one line of height, so a deliberate blank line from the editor survives the round trip instead of collapsing.
+
+**Issue 1 as reported was not what was happening.** The claim was that prose sections render at the full 1200px container width. They do not: `Paragraphs` was already capped at 780px, verified by walking the div nesting in the served HTML and confirming the prose element sits inside the `max-w-[780px]` wrapper at depth 1. An earlier, sloppier count of the same markup said "outside", which is worth recording because it nearly sent this in the wrong direction. What made the column *look* wrong was the missing paragraph spacing above. The measure is now an explicit shared constant (`PROSE_MEASURE` in `lib/public/prose.ts`) with a comment on why 780px, rather than a magic number repeated in JSX.
+
+**Issue 2, alignment.** Option B as requested: a `left | center | right | justify` dropdown in the paragraphs editor, defaulting to `left` so every previously authored section is untouched. `text-align` inherits, so setting it on the container reaches every paragraph and list item, while an inline alignment the operator set on a single paragraph from the toolbar still wins. That is the right precedence. Justified copy also gets `hyphens: auto`, because justification at a 780px measure without hyphenation opens rivers of whitespace.
+
+Migration 035 sets `justify` on the two long-form blocks only. Market Focus and Personal are a single short paragraph each, where justification has nothing to even out and would just stretch one line. 034 was left untouched, since applied migrations are never edited; a rebuild runs 034 then 035 and lands in the same place.
+
+**A seed script that lied, and the fix.** The first alignment run reported all four sections updated, but a read-back showed section 30 had no `align` key at all. Re-running the same update standalone worked. Root cause not conclusively identified, so the script was hardened rather than hand-waved: it now uses `.select()` on each update to confirm what was actually stored, fails loudly on a mismatch, and does an independent read-back query at the end. Run twice, clean both times. A seed that reports success without confirming the write is how that ambiguity arose in the first place.
+
+**Sanitiser: unchanged, and verified unchanged.** The report suggested the sanitiser might be stripping `text-align` or margins. It is not stripping `text-align`, which has been allowlisted since Phase 6. Inline `margin` deliberately stays blocked: paragraph rhythm is now a stylesheet concern, and allowing arbitrary inline margins would let one operator edit break a section's vertical rhythm site-wide. No allowlist change was needed, so the security posture is byte-identical.
+
+The hostile payload test was re-run end to end, inserting a real malicious section into the founder page and rendering it: script tags, `onclick`, `onerror`, `javascript:` URLs, `iframe`, `object`, `embed`, `<style>` and `url(javascript:)` are all stripped from the rendered DOM, while allowlisted `text-align` and `color` survive and `target="_blank"` still gains `rel="noopener noreferrer"`. **15 assertions, 0 failures**, probe row cleaned up.
+
+One note for whoever writes the next security test. A first version of that test searched the whole document and appeared to fail six assertions. It was wrong: the raw section row also travels to the client inside the RSC flight payload as JSON, with `<` escaped to `<`. That data is inert and never rendered, but a naive substring search over the full response finds it and reads as a breach. **Scope security assertions to the rendered DOM region**, and assert separately that the flight copy is escaped. Both checks are in the final test.
+
+**Verification totals.** 9 layout and alignment assertions, 15 hostile-payload assertions, and 36 route and backwards-compatibility assertions across all 16 public routes, confirming every route still 200 and that exactly two blocks on one page are justified with zero elsewhere. Typecheck and build clean, em dash gate zero, including three pre-existing em dashes fixed in `globals.css` while touching it.
+
+---
+
 ### 2026-08-02 - Founder profile page at /about/ahmad-din
 
 Mirrors FMP's page of the same path. **Read from the real FMP source** at `D:/FMP/financial-modeler-pro/app/about/ahmad-din/page.tsx` and its home founder card in `app/(portal)/page.tsx`, rather than working from the task description alone. Worth doing: the description said "four paragraphs" for Background and then listed six, and the FMP source settled the section order and the exact list contents.

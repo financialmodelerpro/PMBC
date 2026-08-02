@@ -131,7 +131,7 @@ export function TextImage({
           )}
           {c.body_html && (
             <div
-              className="prose prose-neutral mt-6 max-w-none"
+              className="pmbc-prose mt-6 max-w-none"
               style={{
                 color: dark ? '#E8DDC4' : v.text,
                 fontSize: 17,

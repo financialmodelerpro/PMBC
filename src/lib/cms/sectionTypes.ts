@@ -47,9 +47,11 @@ export const SECTION_TYPES: SectionTypeMeta[] = [
   {
     type: 'paragraphs',
     label: 'Paragraphs',
-    description: 'Rich-text body content.',
+    description: 'Rich-text body content, with an optional heading and alignment.',
     implemented: true,
-    defaultContent: { html: '<p></p>' },
+    // `align` defaults to 'left', matching how every section authored before
+    // the field existed already renders.
+    defaultContent: { heading: '', html: '<p></p>', align: 'left' },
   },
   {
     type: 'stats_block',

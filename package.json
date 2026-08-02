@@ -12,7 +12,8 @@
     "rotate-admin-password": "node scripts/rotate-admin-password.mjs",
     "seed-phase6": "node scripts/seed-phase6-sections.mjs",
     "seed-service-content": "node scripts/seed-service-content.mjs",
-    "seed-founder-profile": "node scripts/seed-founder-profile.mjs"
+    "seed-founder-profile": "node scripts/seed-founder-profile.mjs",
+    "seed-founder-alignment": "node scripts/seed-founder-alignment.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

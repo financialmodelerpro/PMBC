@@ -131,7 +131,7 @@ export function RichTextEditor({ value, onChange, minHeight = 180, ariaLabel }: 
     immediatelyRender: false,
     editorProps: {
       attributes: {
-        class: 'prose prose-sm max-w-none focus:outline-none',
+        class: 'pmbc-prose max-w-none focus:outline-none',
         'aria-label': ariaLabel ?? 'Rich text editor',
         style: `min-height: ${minHeight}px`,
       },

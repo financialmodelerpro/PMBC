@@ -1,11 +1,11 @@
 @import "tailwindcss";
 
 :root {
-  /* PMBC brand tokens — see CLAUDE.md §9 */
+  /* PMBC brand tokens, see CLAUDE.md section 9 */
   --pmbc-primary: #1B3A5F;        /* primary navy (logo navy) */
   --pmbc-primary-deep: #14304F;   /* deeper navy for footers/dark sections */
   --pmbc-secondary: #3FA663;      /* used sparingly (small accents, checkmarks) */
-  --pmbc-accent: #C69C3E;         /* gold — hairlines, dividers */
+  --pmbc-accent: #C69C3E;         /* gold, for hairlines and dividers */
   --pmbc-accent-muted: #A88530;   /* muted gold for eyebrow text, secondary accents */
   --pmbc-text-primary: #0F1B2D;   /* body text on light */
   --pmbc-text-on-dark: #E8DDC4;   /* warm cream on navy */
@@ -61,7 +61,7 @@ body {
   font-feature-settings: "kern", "liga", "calt", "ss01";
 }
 
-/* Subtle gold underline on hover — used for nav items and inline links */
+/* Subtle gold underline on hover, used for nav items and inline links */
 .pmbc-link-underline {
   position: relative;
 }
@@ -120,4 +120,114 @@ body {
     opacity: 1;
     transform: none;
   }
+}
+
+/* ---------------------------------------------------------------------------
+   Rich text (.pmbc-prose)
+
+   Tailwind's preflight resets every element to `margin: 0`, and this project
+   does NOT install @tailwindcss/typography. Every `prose` / `prose-neutral` /
+   `prose-invert` class in the codebase was therefore a no-op, and three files
+   already referenced `pmbc-prose`, which had never been defined anywhere. Net
+   effect: operator-authored rich text rendered with zero spacing between
+   paragraphs, so a six-paragraph bio came out as one unbroken slab of text.
+
+   This is the missing layer. It is written by hand rather than pulling in the
+   typography plugin because the site needs perhaps twenty rules, all of which
+   want PMBC's own scale and gold accent, and the plugin would have to be
+   fought back to that anyway.
+
+   Scoped entirely under .pmbc-prose so it can only ever affect CMS body copy.
+--------------------------------------------------------------------------- */
+
+.pmbc-prose > :first-child { margin-top: 0; }
+.pmbc-prose > :last-child { margin-bottom: 0; }
+
+.pmbc-prose p {
+  margin-block: 0 1.15em;
+}
+
+/* TipTap serialises a blank line as an empty <p>. With margin collapsed to
+   zero and no content, it vanished entirely, which is the "paragraph breaks do
+   not persist" report. Give it the height of one line so a deliberate blank
+   line survives the round trip. */
+.pmbc-prose p:empty::before {
+  content: "";
+  display: inline-block;
+  height: 1em;
+}
+
+.pmbc-prose ul,
+.pmbc-prose ol {
+  margin-block: 0 1.15em;
+  padding-inline-start: 1.4em;
+}
+.pmbc-prose ul { list-style: disc; }
+.pmbc-prose ol { list-style: decimal; }
+.pmbc-prose li { margin-block: 0.35em; padding-inline-start: 0.2em; }
+.pmbc-prose li::marker { color: var(--pmbc-accent-muted); }
+.pmbc-prose ul ul,
+.pmbc-prose ol ol,
+.pmbc-prose ul ol,
+.pmbc-prose ol ul { margin-block: 0.35em; }
+
+.pmbc-prose h1,
+.pmbc-prose h2,
+.pmbc-prose h3,
+.pmbc-prose h4 {
+  font-family: var(--font-source-serif), "Source Serif 4", Georgia, serif;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  line-height: 1.25;
+  margin-block: 1.8em 0.6em;
+}
+.pmbc-prose h1 { font-size: 1.7em; }
+.pmbc-prose h2 { font-size: 1.45em; }
+.pmbc-prose h3 { font-size: 1.2em; }
+.pmbc-prose h4 { font-size: 1.05em; }
+
+.pmbc-prose a {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: var(--pmbc-accent);
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+}
+.pmbc-prose a:hover { text-decoration-thickness: 2px; }
+
+.pmbc-prose strong, .pmbc-prose b { font-weight: 600; }
+.pmbc-prose em, .pmbc-prose i { font-style: italic; }
+
+.pmbc-prose blockquote {
+  margin-block: 1.4em;
+  padding-inline-start: 1.1em;
+  border-inline-start: 2px solid var(--pmbc-accent);
+  font-style: italic;
+}
+
+.pmbc-prose hr {
+  margin-block: 2em;
+  border: 0;
+  border-top: 1px solid var(--pmbc-border-warm);
+}
+
+.pmbc-prose img {
+  max-width: 100%;
+  height: auto;
+  margin-block: 1.4em;
+}
+
+/* On navy sections the gold hairline and marker need the brighter accent, and
+   links need to stay legible against the dark ground. */
+.pmbc-prose-invert li::marker { color: var(--pmbc-accent); }
+.pmbc-prose-invert blockquote { border-inline-start-color: var(--pmbc-accent); }
+.pmbc-prose-invert hr { border-top-color: rgba(232, 221, 196, 0.25); }
+.pmbc-prose-invert a { text-decoration-color: var(--pmbc-accent); }
+
+/* Justified copy needs hyphenation, otherwise the last line of each paragraph
+   opens rivers of whitespace at this measure. */
+.pmbc-prose-justify p,
+.pmbc-prose-justify li {
+  hyphens: auto;
+  -webkit-hyphens: auto;
 }

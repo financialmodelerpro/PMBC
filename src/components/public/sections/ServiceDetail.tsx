@@ -91,7 +91,7 @@ export function ServiceDetail({
 
         {c.full_description_html && (
           <div
-            className="prose prose-neutral mt-12 max-w-[780px]"
+            className="pmbc-prose mt-12 max-w-[780px]"
             style={{ color: v.text, fontSize: 17, lineHeight: 1.75 }}
             dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(c.full_description_html) }}
           />

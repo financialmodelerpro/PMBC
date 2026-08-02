@@ -156,7 +156,7 @@ export function FounderBlock({
           )}
           {c.bio_html && (
             <div
-              className="prose prose-neutral mt-7 max-w-none"
+              className="pmbc-prose mt-7 max-w-none"
               style={{ color: v.text, fontSize: 17, lineHeight: 1.7 }}
               dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(c.bio_html) }}
             />

@@ -543,6 +543,10 @@ For v1, only two template_key rows are needed: `contact_notification` (sent to a
                                   --   CTA repoint and proof points. DML only, so
                                   --   `npm run seed-founder-profile` applies it.
                                   --   Idempotent (deletes this page's sections first).
+035_founder_prose_alignment.sql   -- Sets align='justify' on the two long-form
+                                  --   founder prose blocks (20, 30). DML only,
+                                  --   `npm run seed-founder-alignment`. Short
+                                  --   blocks stay left. Idempotent.
 ```
 
 After running migrations, manually insert one admin_users row via SQL with a bcrypt hash for the password.
@@ -940,6 +944,15 @@ Critical positioning point: PMBC's design language should feel **distinct from F
 - More serif accents (consider Source Serif Pro or similar for headlines, paired with Inter for body)
 - Less green (FMP uses green liberally; PMBC uses it sparingly as a credibility accent)
 - Gold thread used minimally for premium signaling
+
+### Rich text (`.pmbc-prose`)
+
+**This project does not install `@tailwindcss/typography`, and must not start using `prose` classes.** Tailwind's preflight resets everything to `margin: 0`, so before 2026-08-02 every `prose` / `prose-neutral` / `prose-invert` class in the codebase was a no-op and all CMS body copy rendered with zero spacing between paragraphs, site-wide. The replacement is a hand-written `.pmbc-prose` layer at the end of `src/app/globals.css`: paragraph and list spacing, serif headings on PMBC's scale, gold list markers and blockquote rule, gold-underlined links, and a `p:empty` rule so a deliberate blank line from the editor survives.
+
+- Use `pmbc-prose` on any element rendering operator HTML. Add `pmbc-prose-invert` on navy sections.
+- `PROSE_MEASURE` (780px) in `src/lib/public/prose.ts` is the shared column width for long-form copy, roughly 70 characters at the 17px body size. Section backgrounds still span the full 1200px container; only the text column narrows.
+- `paragraphs` sections carry an optional `align` (`left` default, plus `center` / `right` / `justify`). Justified copy also gets `pmbc-prose-justify`, which turns on automatic hyphenation.
+- Inline `margin` is deliberately **not** allowlisted in the sanitiser. Paragraph rhythm is a stylesheet concern; letting one operator edit set arbitrary margins would break the vertical rhythm unpredictably. `text-align`, `color` and `font-size` are allowlisted.
 
 ### Typography
 
