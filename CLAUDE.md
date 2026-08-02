@@ -547,6 +547,12 @@ For v1, only two template_key rows are needed: `contact_notification` (sent to a
                                   --   founder prose blocks (20, 30). DML only,
                                   --   `npm run seed-founder-alignment`. Short
                                   --   blocks stay left. Idempotent.
+036_strip_empty_paragraphs.sql    -- Removes stored empty paragraphs from
+                                  --   page_sections content. DML only,
+                                  --   `npm run strip-empty-paragraphs`
+                                  --   (supports --dry-run). Rendering already
+                                  --   strips them, so this is about making the
+                                  --   stored value match. Idempotent.
 ```
 
 After running migrations, manually insert one admin_users row via SQL with a bcrypt hash for the password.
@@ -953,6 +959,8 @@ Critical positioning point: PMBC's design language should feel **distinct from F
 - `PROSE_MEASURE` (780px) in `src/lib/public/prose.ts` is the shared column width for long-form copy, roughly 70 characters at the 17px body size. Section backgrounds still span the full 1200px container; only the text column narrows.
 - `paragraphs` sections carry an optional `align` (`left` default, plus `center` / `right` / `justify`). Justified copy also gets `pmbc-prose-justify`, which turns on automatic hyphenation.
 - Inline `margin` is deliberately **not** allowlisted in the sanitiser. Paragraph rhythm is a stylesheet concern; letting one operator edit set arbitrary margins would break the vertical rhythm unpredictably. `text-align`, `color` and `font-size` are allowlisted.
+- **Empty paragraphs are removed, not styled.** Word, Google Docs and TipTap all express a blank line between paragraphs as an empty `<p></p>`, which is redundant here because `.pmbc-prose p` already carries a bottom margin. Left in, they double or triple the gap, and since authors are inconsistent about inserting them the column loses its rhythm. `collapseEmptyParagraphs` in `src/lib/cms/richText.ts` drops them, and it runs in three places: inside `sanitizeRichHtml` at render (so existing content is correct with no admin work), on the `page_sections` save path (so stored content matches what renders), and as a one-off backfill in migration 036. A paragraph containing only an image or other void element is **not** treated as empty. **Never give `p:empty` height in CSS**, which was tried once and stacked a full line box on top of both adjoining margins.
+- Normalisation happens at the save boundary, never in the editor's `onChange`: stripping an empty paragraph mid-keystroke would delete the one the author just created by pressing Enter, and fight the cursor.
 
 ### Typography
 

@@ -1,5 +1,7 @@
 import sanitizeHtml from 'sanitize-html';
 
+import { collapseEmptyParagraphs } from './richText';
+
 /**
  * Allowlist sanitiser for operator-authored HTML.
  *
@@ -85,10 +87,22 @@ export function sanitizeInlineHtml(html: string | null | undefined): string {
   });
 }
 
-/** For long-form body copy produced by the full RichTextEditor. */
+/**
+ * For long-form body copy produced by the full RichTextEditor.
+ *
+ * This is the render path for body copy, so it does two things: it sanitises,
+ * and it then normalises paragraph rhythm by dropping paragraphs that render as
+ * nothing (see lib/cms/richText.ts for why). Normalisation runs second so it
+ * only ever sees allowlisted tags, with Word's `<o:p>` and friends already
+ * discarded.
+ *
+ * Combining them here rather than exposing a separate render helper is
+ * deliberate: every long-form site already calls this one function, so the two
+ * behaviours cannot drift apart by someone forgetting the second call.
+ */
 export function sanitizeRichHtml(html: string | null | undefined): string {
   if (!html) return '';
-  return sanitizeHtml(html, {
+  const clean = sanitizeHtml(html, {
     ...BASE,
     allowedTags: BLOCK_TAGS,
     allowedAttributes: {
@@ -103,6 +117,7 @@ export function sanitizeRichHtml(html: string | null | undefined): string {
     },
     allowedStyles: ALLOWED_STYLES as unknown as sanitizeHtml.IOptions['allowedStyles'],
   });
+  return collapseEmptyParagraphs(clean);
 }
 
 /**

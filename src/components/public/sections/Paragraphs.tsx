@@ -1,5 +1,5 @@
 import { SectionContainer, SectionIntro } from '../SectionContainer';
-import { sanitizeRichHtml } from '@/lib/cms/sanitize';
+import { isBlankHtml, sanitizeRichHtml } from '@/lib/cms/sanitize';
 import { PROSE_MEASURE, proseAlignClass, readProseAlign } from '@/lib/public/prose';
 import { variantStyles, type PmbcVariant } from '@/lib/public/tokens';
 
@@ -18,7 +18,11 @@ export function Paragraphs({
   // carry no heading key, so they render exactly as before.
   const heading = typeof content?.heading === 'string' ? content.heading : '';
   const align = readProseAlign(content?.align);
-  if (!html) return null;
+  // `isBlankHtml` rather than a falsy check: an emptied rich text field
+  // serialises to "<p></p>", which is truthy but renders as nothing once the
+  // empty paragraphs are dropped. Without this the section would contribute its
+  // padding and heading to the page for no visible content.
+  if (isBlankHtml(html)) return null;
   const v = variantStyles(variant);
   const dark = variant === 'navy_deep';
 

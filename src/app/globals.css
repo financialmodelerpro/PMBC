@@ -147,15 +147,13 @@ body {
   margin-block: 0 1.15em;
 }
 
-/* TipTap serialises a blank line as an empty <p>. With margin collapsed to
-   zero and no content, it vanished entirely, which is the "paragraph breaks do
-   not persist" report. Give it the height of one line so a deliberate blank
-   line survives the round trip. */
-.pmbc-prose p:empty::before {
-  content: "";
-  display: inline-block;
-  height: 1em;
-}
+/* Word, Google Docs and TipTap all express a blank line between paragraphs as
+   an empty <p>. Those are removed before render (lib/cms/richText.ts), because
+   the margin above already separates paragraphs and an empty one would add a
+   second gap on top of it. An earlier version of this file instead gave
+   p:empty a line of height, which stacked a full line box on both adjoining
+   margins and made the gaps worse. Nothing here should give an empty paragraph
+   height: if one reaches the DOM it should occupy no space. */
 
 .pmbc-prose ul,
 .pmbc-prose ol {

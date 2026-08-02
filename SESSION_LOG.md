@@ -4,6 +4,36 @@ Chronological build history for the PMBC website. Split out of `CLAUDE.md` to ke
 
 ---
 
+### 2026-08-02 - Paragraph rhythm respects WYSIWYG intent
+
+Fixes a defect introduced by the previous commit, and cleans the stored content behind it.
+
+**The bad rule.** The `.pmbc-prose` layer gave `p:empty` a line of height, on the theory that a deliberate blank line should survive the round trip. Wrong on two counts. It stacked a full line box on top of the preceding paragraph's bottom margin **and** its own, so one blank line rendered as roughly three gaps. And it treated an empty paragraph as content worth preserving, when in this stylesheet it is pure redundancy: `.pmbc-prose p` already separates paragraphs.
+
+**What the stored content actually looked like,** checked before theorising rather than after. The founder page had been edited through the admin since it was seeded, and carried 7 empty paragraphs across 2 sections. The distribution is the interesting part:
+
+- Why PaceMakers alternated perfectly: text, empty, text, empty, text, empty, text.
+- Background did not: two adjacent paragraphs with no separator, then an empty, then two more with none, then empties at every remaining boundary.
+
+So gaps alternated between one margin and roughly three, which is exactly the "oversized gaps, inconsistent rhythm" report. The fix is not to render empty paragraphs more carefully, it is to drop them, which makes every boundary identical and gives the 1:1 "six paragraphs in, six paragraphs out" the brief asked for.
+
+**Three layers, deliberately.**
+1. **Render.** `collapseEmptyParagraphs` runs inside `sanitizeRichHtml`, after sanitisation so it only ever sees allowlisted tags with Word's `<o:p>` already discarded. This is what makes existing content correct with **no admin edits**, which the brief required. Folding it into the existing function rather than adding a separate render helper means the two behaviours cannot drift apart by someone forgetting the second call at a new site.
+2. **Save.** `normalizeRichTextDeep` on the `page_sections` save path, so the stored value matches what renders and the editor stops disagreeing with the public site. It walks the JSONB generically instead of naming keys, because content shape varies by section type (`html`, `bio_html`, `body_html`, `description_html`) and a hardcoded list would rot silently as section types are added.
+3. **Backfill.** Migration 036 plus `npm run strip-empty-paragraphs`, so the existing 7 are gone from storage rather than only from output.
+
+**Not done in the editor's `onChange`, on purpose.** The brief suggested normalising on save in `RichTextEditor`. TipTap emits on every keystroke, so stripping empty paragraphs there would delete the one the author just created by pressing Enter twice, and fight the cursor. The save boundary is the only safe moment, and doing it server side also covers every client rather than one component. `RichTextarea` needed nothing: it routes through `sanitizeInlineHtml`, which strips block tags entirely, so an empty `<p>` cannot reach it.
+
+**A paragraph holding only an image is not empty.** The emptiness test checks for void elements first, so `<p><img></p>` survives. Without that guard the normaliser would silently delete images, which is a content-destroying bug rather than a spacing one. Covered by an assertion.
+
+**Sanitiser posture unchanged and re-verified,** since the change alters what `sanitizeRichHtml` returns. Hostile payload re-run: 11 assertions, 0 failures. Scripts, handlers, `javascript:` URLs, `iframe`, `object`, `embed`, `<style>` and `url()` all stripped; allowlisted `text-align` and `color` survive; `target="_blank"` still gains `rel="noopener noreferrer"`.
+
+**Verification.** A six-paragraph Word-style paste, including all five blank-line forms (`&nbsp;`, bare, `<br>`, whitespace, empty `<span>`), pushed through the **real** `/api/admin/page-sections` save endpoint: stored HTML came back with exactly 6 paragraphs, rendered DOM with exactly 6, every paragraph's text intact. Existing founder content renders 7 and 4 paragraphs with no empties. All 16 public routes return 200 with **zero** empty paragraphs in the DOM. Cleanup script run twice for idempotency, with an independent read-back over the whole table. Typecheck and build clean, em dash gate zero.
+
+One test artifact worth recording so it is not mistaken for a regression next time: an assertion on `.pmbc-prose p { ... }` started failing because lightningcss merged `p`, `ul` and `ol` into one selector once their declarations became identical. The margin was present the whole time. Match the declaration, not the exact selector text.
+
+---
+
 ### 2026-08-02 - Founder profile readability, and the site-wide rich-text bug it exposed
 
 Three reported issues on `/about/ahmad-din`. Investigating them found one root cause that was much larger than the report, and disproved the stated cause of another.

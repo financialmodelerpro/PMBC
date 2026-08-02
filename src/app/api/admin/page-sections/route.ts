@@ -6,6 +6,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { forDiff, writeAudit } from '@/lib/audit';
 import type { Json } from '@/types/database';
 import { isSectionType } from '@/lib/cms/sectionTypes';
+import { normalizeRichTextDeep } from '@/lib/cms/richText';
 import {
   SLUG_RX,
   buildTemplateSections,
@@ -180,7 +181,12 @@ export async function POST(req: Request) {
       .from('page_sections')
       .update({
         section_type: s.section_type,
-        content: s.content as never,
+        // Normalised on the way in, so what is stored is what renders. Doing
+        // it here rather than in the editor's onChange is deliberate: stripping
+        // an empty paragraph mid-keystroke would delete the one the author just
+        // created by pressing Enter, and fight the cursor. The save boundary is
+        // the only safe moment.
+        content: normalizeRichTextDeep(s.content) as never,
         styles: (s.styles ?? {}) as never,
         display_order: s.display_order,
         visible: s.visible,
