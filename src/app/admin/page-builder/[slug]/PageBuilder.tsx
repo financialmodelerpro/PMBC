@@ -34,11 +34,19 @@ import { SaveStatus, type SaveState } from '@/components/admin/SaveStatus';
 import { ConfirmDialog } from '@/components/admin/ConfirmDialog';
 import { ADMIN_COLORS, adminButtonGhost } from '@/lib/admin/styles';
 import { getSectionMeta } from '@/lib/cms/sectionTypes';
+import { previewPathForPageSlug } from '@/lib/cms/pageRoutes';
 import { sectionFromRow, type LocalSection } from '@/lib/cms/serializers';
 import type { Tables } from '@/types/database';
 
 import { SectionEditorPanel } from './SectionEditorPanel';
 import { SectionPickerDialog } from './SectionPickerDialog';
+
+/**
+ * Preview pane preference, matching the sidebar-collapse convention
+ * (`pmbcAdminSidebarCollapsed`). Persisted so an operator who works with the
+ * preview open does not have to reopen it on every page.
+ */
+const PREVIEW_VISIBLE_KEY = 'pmbcPageBuilderPreviewVisible';
 
 type Props = {
   pageSlug: string;
@@ -92,6 +100,35 @@ export function PageBuilder({
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
   const [previewKey, setPreviewKey] = useState(0);
 
+  /**
+   * Preview pane visibility, hidden by default so the editor gets the full
+   * centre column. Initialised to false rather than read from localStorage
+   * during render: the server has no localStorage, and seeding state from it
+   * would make the first client render disagree with the server's and trip a
+   * hydration mismatch. The effect below reconciles it immediately after mount.
+   */
+  const [previewVisible, setPreviewVisible] = useState(false);
+
+  useEffect(() => {
+    try {
+      setPreviewVisible(window.localStorage.getItem(PREVIEW_VISIBLE_KEY) === 'true');
+    } catch {
+      // Private mode or a blocked storage partition. Default stands.
+    }
+  }, []);
+
+  const togglePreview = useCallback(() => {
+    setPreviewVisible((prev) => {
+      const next = !prev;
+      try {
+        window.localStorage.setItem(PREVIEW_VISIBLE_KEY, String(next));
+      } catch {
+        // Preference simply does not persist. Not worth failing the toggle.
+      }
+      return next;
+    });
+  }, []);
+
   const anyDirty = dirtyIds.size > 0;
 
   useEffect(() => {
@@ -115,8 +152,8 @@ export function PageBuilder({
   );
   const selected = ordered.find((s) => s.id === selectedId) ?? null;
 
-  const previewHref =
-    pageSlug === 'home' ? '/?preview=1' : `/${pageSlug}?preview=1`;
+  // Slug and public route diverged in Phase 7. See lib/cms/pageRoutes.ts.
+  const previewHref = previewPathForPageSlug(pageSlug);
 
   const markDirty = useCallback((id: string) => {
     setDirtyIds((prev) => {
@@ -393,6 +430,29 @@ export function PageBuilder({
           {/* Structural feedback only. There is deliberately no global Save
               button here in Phase 3: each section saves itself. */}
           <SaveStatus state={structuralState} message={structuralErr} />
+          <button
+            type="button"
+            onClick={togglePreview}
+            aria-pressed={previewVisible}
+            title={
+              previewVisible
+                ? 'Hide the inline preview and give the editor the full width'
+                : 'Show an inline preview beside the editor'
+            }
+            style={{
+              ...adminButtonGhost,
+              ...(previewVisible
+                ? {
+                    background: ADMIN_COLORS.primary,
+                    color: '#FFFFFF',
+                    borderColor: ADMIN_COLORS.primary,
+                  }
+                : null),
+            }}
+          >
+            {previewVisible ? <EyeOff size={13} /> : <Eye size={13} />}
+            Preview
+          </button>
           <Link
             href={previewHref}
             target="_blank"
@@ -408,7 +468,11 @@ export function PageBuilder({
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: '280px minmax(0, 1fr) minmax(380px, 1fr)',
+          // With the preview open the remaining width splits 60/40 in the
+          // editor's favour; with it closed the editor takes the whole column.
+          gridTemplateColumns: previewVisible
+            ? '280px minmax(0, 3fr) minmax(340px, 2fr)'
+            : '280px minmax(0, 1fr)',
           flex: 1,
           minHeight: 0,
         }}
@@ -534,12 +598,18 @@ export function PageBuilder({
           )}
         </div>
 
+        {/* Rendered only when toggled on. Unmounting rather than hiding with
+            CSS matters: a hidden iframe would still load the public route on
+            every page-builder visit, and would keep reloading on each save
+            through the re-key below. */}
+        {previewVisible && (
         <div
           style={{
             display: 'flex',
             flexDirection: 'column',
             background: '#F3F4F6',
             maxHeight: 'calc(100vh - 64px)',
+            borderLeft: `1px solid ${ADMIN_COLORS.border}`,
           }}
         >
           <div
@@ -602,6 +672,7 @@ export function PageBuilder({
             </p>
           )}
         </div>
+        )}
       </div>
 
       <SectionPickerDialog

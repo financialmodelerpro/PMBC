@@ -4,6 +4,29 @@ Chronological build history for the PMBC website. Split out of `CLAUDE.md` to ke
 
 ---
 
+### 2026-08-02 - Page builder preview: nested slug routing, and an on-demand pane
+
+**Issue 1 was broader than the founder page.** The preview URL was built as `` pageSlug === 'home' ? '/?preview=1' : `/${pageSlug}?preview=1` ``, which assumes slug and route are the same string. They stopped being the same in Phase 7, when the catch-all `(public)/[slug]` route was deleted in favour of bespoke routes. So the preview 404d for `about-ahmad-din`, and **also for all 9 service detail pages** (`service-cfo-advisory` was requesting `/service-cfo-advisory`), which had been broken since Phase 7 without anyone noticing. The same hardcoded mapping existed a second time in `/admin/og-preview`.
+
+Fixed with `src/lib/cms/pageRoutes.ts`, one mapping used by both callers. The exceptions are listed rather than derived, because no column records the route; the trade is that a new nested page needs a line in that file, and forgetting it yields a preview 404 rather than a broken public page. Checked against all 18 real `cms_pages` slugs before wiring it in.
+
+Also noticed while there: `/admin/og-preview` never listed the founder page, so it had no OG preview. Added, with the `.filter` on missing rows meaning it is safe on a database predating the page.
+
+**Issue 2, the preview pane, is now opt-in.** Option A as requested: a "Preview" toggle in the top bar with an eye icon, hidden by default, state in `localStorage['pmbcPageBuilderPreviewVisible']`, matching the existing `pmbcAdminSidebarCollapsed` convention. Open, the grid is `280px / 3fr / 2fr`, which is the 60/40 split; closed, `280px / 1fr` and the editor gets the whole column.
+
+Two implementation details worth keeping:
+
+- **The pane unmounts rather than hiding with CSS.** A hidden iframe would still load the public route on every page-builder visit and reload it on every save through the existing re-key, which is the cost the toggle exists to avoid.
+- **`previewVisible` initialises to `false`, not from `localStorage`.** The server has no `localStorage`, so seeding state from it during render would make the first client render disagree with the server's and trip a hydration mismatch. An effect reconciles it immediately after mount.
+
+**Verification, and its limits.** 28 assertions server side: every one of the 11 representative slugs resolves to a real 200 route, the URL actually appears in the built page, and the two paths the old code would have requested are confirmed 404s. Default-hidden state verified directly (no iframe in the markup, two-column grid, `aria-pressed="false"`).
+
+The visible branch cannot be reached over HTTP, since SSR always renders the default. Rather than assert it by reading the code, the initial state was **temporarily flipped to `true`**, giving 15 more assertions (iframe present, correct `src` per slug, 60/40 grid, `aria-pressed="true"`, refresh control), then reverted and confirmed reverted. **What is still unverified by execution is the click itself and the `localStorage` round trip**, because the browser extension was unavailable; both branches render correctly, and the handler between them is six lines. Worth a manual click when convenient.
+
+**One em dash worth explaining.** `stripBrandSuffix` in og-preview matches an em dash on purpose: stored `meta_title` values predating the no-em-dash rule still use one as the brand separator, and that regex is what strips it. Deleting the character would change behaviour on real data. It is now written as a Unicode escape instead, which keeps the source character-free. Proven equivalent with a seven-case comparison against a control regex built via `String.fromCharCode`, after a first attempt at that proof produced a false failure because heredoc escaping had mangled the control's backslashes.
+
+---
+
 ### 2026-08-02 - Paragraph rhythm respects WYSIWYG intent
 
 Fixes a defect introduced by the previous commit, and cleans the stored content behind it.

@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 
 import { AdminPageHeader } from '@/components/admin/AdminPageHeader';
 import { fetchPages } from '@/lib/cms/pages';
+import { publicPathForPageSlug } from '@/lib/cms/pageRoutes';
 import { adminPageMain } from '@/lib/admin/styles';
 import { SERVICES } from '@/config/services';
 
@@ -31,19 +32,24 @@ const FIRM_PAGE_OG_SUBTITLES: Record<string, string> = {
   approach: 'Understand. Analyse. Model. Advise.',
   network: 'Reach extended through partners we trust.',
   about_short: 'About PMBC',
+  'about-ahmad-din': 'Founder, PaceMakers Business Consultants',
   'financial-modeler-pro': 'The platform built by practitioners.',
   contact: 'Tell us about the mandate.',
 };
 
 function stripBrandSuffix(s: string): string {
-  return s.replace(/\s*[—|-]\s*PaceMakers Business Consultants\s*$/i, '');
+  // The em dash below is written as an escape, not the literal character. It
+  // has to stay in the pattern: stored meta_title values predating the
+  // no-em-dash rule still use one as the brand separator, and this is what
+  // strips it. The escape keeps behaviour identical, source character-free.
+  return s.replace(/\s*[\u2014|-]\s*PaceMakers Business Consultants\s*$/i, '');
 }
 
 export default async function OgPreviewAdminPage() {
   const allPages = await fetchPages();
   const byslug = new Map(allPages.map((p) => [p.slug, p] as const));
 
-  // Hardcoded ordering — matches the public sitemap's logical order rather
+  // Hardcoded ordering, matching the public sitemap's logical order rather
   // than the alphabetical cms_pages.slug order.
   const FIRM_ORDER = [
     'home',
@@ -52,6 +58,9 @@ export default async function OgPreviewAdminPage() {
     'approach',
     'network',
     'about',
+    // Added with the founder profile. `.filter` below drops any slug with no
+    // cms_pages row, so listing it is safe on a database predating it.
+    'about-ahmad-din',
     'financial-modeler-pro',
     'contact',
   ];
@@ -62,7 +71,7 @@ export default async function OgPreviewAdminPage() {
     const ogTitle = stripBrandSuffix(titleSource);
     const ogSubtitle =
       FIRM_PAGE_OG_SUBTITLES[slug] ?? row?.meta_description ?? '';
-    const publicUrl = slug === 'home' ? '/' : `/${slug}`;
+    const publicUrl = publicPathForPageSlug(slug);
     return {
       slug: row?.slug ?? slug,
       label: row?.title ?? slug,

@@ -779,7 +779,9 @@ All admin pages use **inline styles**, not Tailwind utility classes. Shared desi
 Three-pane layout matching FMP's pattern:
 - **Left pane**: list of sections on the current page with drag handles, visibility toggle, delete button, and "Add Section" button at bottom
 - **Center pane**: editor for the currently selected section (the appropriate editor component from `editors/`), with that section's own Save header above it and a collapsible **StyleEditor** below it
-- **Right pane**: live preview iframe pointed at the page (with `?preview=1` query to bypass cache). PMBC kept the iframe rather than FMP's "open in new tab": preview re-keys after every Save / Add / Delete.
+- **Right pane**: live preview iframe pointed at the page (with `?preview=1` so hidden sections still render). **Hidden by default since 2026-08-02**, behind a "Preview" toggle in the top bar; the preference persists in `localStorage['pmbcPageBuilderPreviewVisible']`. Open, the centre splits 60/40 editor/preview; closed, the editor takes the full column. The pane unmounts rather than hiding with CSS, so a closed preview costs no page load. It still re-keys after every Save / Add / Delete / reorder. The "Open preview" link (new tab) stays regardless.
+
+**Slug is not the URL.** `cms_pages.slug` and the public route diverged in Phase 7, when the catch-all `(public)/[slug]` was replaced by bespoke routes. Use `publicPathForPageSlug` / `previewPathForPageSlug` from `src/lib/cms/pageRoutes.ts`, never `` `/${slug}` ``. The exceptions are `home` to `/`, `service-<x>` to `/services/<x>` (9 pages), and `about-ahmad-din` to `/about/ahmad-din`. Both the page-builder preview and `/admin/og-preview` had hardcoded `` `/${slug}` `` and were pointing at 404s. A new nested page needs a line in that file.
 
 **Save model (parity 3, matching FMP).** Each section owns its own Save. There is no global Save button. Dirty state is tracked per section id, never per page, so saving one section cannot flush another section's half-finished edit.
 
