@@ -538,7 +538,12 @@ For v1, only two template_key rows are needed: `contact_notification` (sent to a
                                   --   item: /api/admin/site-pages refuses to hide
                                   --   or delete it, and the admin locks its
                                   --   Visible switch. Pins /contact by default.
-034_seed_founder_profile.sql      -- Founder profile /about/ahmad-din: cms_pages row
+034_seed_founder_profile.sql      -- !! DESTRUCTIVE ON RE-RUN, see the file header.
+                                  --   DELETEs every section on /about/ahmad-din
+                                  --   and reinserts the ORIGINAL seed copy, so
+                                  --   re-applying it discards admin edits to that
+                                  --   page. Run only to rebuild from scratch.
+                                  -- Founder profile /about/ahmad-din: cms_pages row
                                   --   + 9 page_sections, plus the home founder_block
                                   --   CTA repoint and proof points. DML only, so
                                   --   `npm run seed-founder-profile` applies it.

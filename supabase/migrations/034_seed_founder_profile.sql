@@ -27,8 +27,20 @@
 -- through supabase-js. This file is the record; the script is the executable.
 -- Same pairing as migrations 014 to 020.
 --
--- Idempotent: the page and each section are keyed on (page_slug, display_order)
--- and re-running replaces content rather than duplicating rows.
+-- !! DESTRUCTIVE ON RE-RUN. DO NOT RE-APPLY ONCE THIS PAGE IS BEING EDITED. !!
+--
+-- "Idempotent" here means it cannot duplicate rows. It does NOT mean it is safe
+-- to re-run: the DELETE below drops every section on this page and the INSERTs
+-- put the ORIGINAL seed copy back, so any wording edited through the admin since
+-- is silently replaced. That happened on 2026-08-02, when re-applying this file
+-- in the SQL editor reverted admin edits to Background. Nothing of substance was
+-- lost that time, and it will not always be so.
+--
+-- Re-run this only to rebuild the page from scratch on a fresh database. To
+-- change live copy, edit it in the page builder.
+--
+-- (This note was added after the fact. The statements below are untouched: an
+-- applied migration's behaviour is never edited, only its documentation.)
 --
 -- Two fields are seeded EMPTY on purpose and need a human:
 --   * founder_hero.photo_url      Ahmad's portrait. Renders a gold-framed

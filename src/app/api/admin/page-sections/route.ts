@@ -170,6 +170,26 @@ export async function POST(req: Request) {
   const { page_slug, sections } = parsed.data;
   const supabase = createSupabaseServerClient();
 
+  /**
+   * Snapshot before writing, so the audit row carries a real before/after diff.
+   *
+   * This was missing until 2026-08-02: page-builder saves wrote an audit row
+   * recording only that an update happened, with null diffs, while the
+   * AuditLogViewer built in parity 7 offers a before/after dialog. So the one
+   * surface most likely to need "what did that edit change" was the one surface
+   * that could not answer it. Found the hard way, when a re-run of a seed
+   * migration replaced authored copy and the audit log had nothing to restore
+   * from.
+   *
+   * Failure here costs the diff, never the save: a null snapshot is recorded as
+   * a gap, matching how `snapshotRow` behaves in the collection API.
+   */
+  const ids = sections.map((s) => s.id);
+  const { data: beforeRows } = await supabase
+    .from('page_sections')
+    .select('id, section_type, display_order, visible, content, styles')
+    .in('id', ids);
+
   for (const s of sections) {
     if (s.page_slug !== page_slug) {
       return NextResponse.json(
@@ -207,12 +227,31 @@ export async function POST(req: Request) {
     .update({ updated_at: new Date().toISOString() })
     .eq('slug', page_slug);
 
+  const { data: afterRows } = await supabase
+    .from('page_sections')
+    .select('id, section_type, display_order, visible, content, styles')
+    .in('id', ids);
+
+  // Ordered by display_order on both sides so the dialog compares like with
+  // like; `.in()` gives no ordering guarantee, and an arbitrary reshuffle would
+  // make an unchanged section look edited.
+  const byOrder = (rows: unknown) =>
+    Array.isArray(rows)
+      ? [...rows].sort(
+          (a, b) =>
+            ((a as { display_order: number }).display_order ?? 0) -
+            ((b as { display_order: number }).display_order ?? 0),
+        )
+      : null;
+
   await writeAudit(supabase, {
     adminId: session.user.id,
     action: 'update',
     entityType: 'page_sections',
     entityId: page_slug,
-    metadata: { count: sections.length, ids: sections.map((s) => s.id) },
+    metadata: { count: sections.length, ids },
+    beforeValue: forDiff(byOrder(beforeRows) as unknown as Json),
+    afterValue: forDiff(byOrder(afterRows) as unknown as Json),
   });
 
   return NextResponse.json({ ok: true, updated: sections.length });

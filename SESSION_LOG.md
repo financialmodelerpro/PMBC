@@ -4,6 +4,32 @@ Chronological build history for the PMBC website. Split out of `CLAUDE.md` to ke
 
 ---
 
+### 2026-08-02 - Post-migration verification, and two problems it surfaced
+
+The user applied all outstanding migrations by hand and asked for confirmation. Verification found the state correct, and two things worth fixing.
+
+**Everything landed.** 031 `is_system` on all 18 pages, 032 audit diff columns readable, 033 `can_toggle` with `/contact` pinned and the other five nav rows free, 034 to 036 giving 9 founder sections with zero stored empty paragraphs and justify on the two long-form blocks. All 15 public routes 200 with zero empty paragraphs in the DOM. The portrait and LinkedIn URL the user set through the admin are live, so the founder page now renders the real photograph rather than the monogram, and the booking CTA correctly stays hidden while its href is empty.
+
+**Problem 1: re-running 034 destroyed admin edits.** Migration 034 opens with `DELETE FROM page_sections WHERE page_slug = 'about-ahmad-din'` and reinserts the original seed. Its header called it "idempotent", which was true in the narrow sense that it cannot duplicate rows and dangerously misleading in the sense that matters.
+
+Established from timestamps rather than assumed: all 9 sections share `created_at` 12:43:42, which only a bulk re-insert produces; sections 20 and 30 were updated 25 seconds later by 035; the hero was updated at 13:02 by the user in the admin, which is why the portrait and LinkedIn survived while the paragraph edits did not.
+
+What was actually lost was one paragraph split, the closing Financial Modeler Pro sentence having been separated out. Nothing of substance. Next time it might be.
+
+The header and the `CLAUDE.md` migration list now carry an explicit destructive-on-re-run warning. Only the comments changed; an applied migration's statements are never edited.
+
+**Problem 2: page-builder saves recorded no diff, which is why nothing was recoverable.** Trying to restore the lost copy from `audit_log` turned up 8 update rows for the founder page with `before_value` and `after_value` both null. The bulk save handler called `writeAudit` with only a count and a list of ids.
+
+So the surface most likely to need "what did that edit change" was the only surface that could not answer it, while the AuditLogViewer built in parity 7 offers a before/after dialog throughout. The collection API had done this properly since parity 7; the page-sections route was simply never wired up.
+
+Fixed: the handler now snapshots the affected rows before writing and reads them back after, storing both on the audit row. Both sides are sorted by `display_order`, because `.in()` gives no ordering guarantee and an arbitrary reshuffle would make an unchanged section look edited. A failed snapshot costs the diff and never the save, matching `snapshotRow` in the collection API.
+
+Verified against a real save through the endpoint: `before_value` holds the prior copy and not the new text, `after_value` holds the new text, and the probe was restored. An overwrite of this kind is now recoverable.
+
+**Two test artifacts, both the RSC data island again.** An assertion that the booking CTA was hidden failed because "Book a Meeting" appears in the flight payload as stored data while the button correctly does not render, and an earlier assertion about `align` on the short blocks failed because migration 035 leaves the key absent where the seed script writes `'left'` explicitly. `readProseAlign` defaults to left, so the two are behaviourally identical. Neither was a defect. The lesson from the previous entry stands: assert against the rendered DOM, not the whole response.
+
+---
+
 ### 2026-08-02 - Page builder preview: nested slug routing, and an on-demand pane
 
 **Issue 1 was broader than the founder page.** The preview URL was built as `` pageSlug === 'home' ? '/?preview=1' : `/${pageSlug}?preview=1` ``, which assumes slug and route are the same string. They stopped being the same in Phase 7, when the catch-all `(public)/[slug]` route was deleted in favour of bespoke routes. So the preview 404d for `about-ahmad-din`, and **also for all 9 service detail pages** (`service-cfo-advisory` was requesting `/service-cfo-advisory`), which had been broken since Phase 7 without anyone noticing. The same hardcoded mapping existed a second time in `/admin/og-preview`.
