@@ -9,6 +9,8 @@ export type SectionType =
   | 'process_steps'
   | 'network_partners'
   | 'founder_block'
+  | 'founder_hero'
+  | 'founder_credentials'
   | 'text_image'
   | 'cta_block'
   | 'quote'
@@ -122,6 +124,39 @@ export const SECTION_TYPES: SectionTypeMeta[] = [
       cta_secondary_label: '',
       cta_secondary_href: '',
       layout: 'image_left',
+    },
+  },
+  {
+    type: 'founder_hero',
+    label: 'Founder hero',
+    description:
+      'Page-leading founder identity: portrait, name, two-line title, credentials, CTAs.',
+    implemented: true,
+    defaultContent: {
+      eyebrow: 'Founder',
+      name: '',
+      title_primary: '',
+      title_accent: '',
+      credentials_line: '',
+      intro: '',
+      photo_url: '',
+      cta_primary_label: '',
+      cta_primary_href: '',
+      cta_secondary_label: '',
+      cta_secondary_href: '',
+    },
+  },
+  {
+    type: 'founder_credentials',
+    label: 'Credential list',
+    description:
+      'Heading plus a list of short strings, shown as a numbered list, pills, or cards.',
+    implemented: true,
+    defaultContent: {
+      heading: '',
+      intro: '',
+      display: 'numbered',
+      items: [],
     },
   },
   {

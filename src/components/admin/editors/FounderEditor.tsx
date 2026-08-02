@@ -23,6 +23,9 @@ export function FounderEditor({ content, onChange }: SectionEditorProps) {
   const cta_secondary_label = s(content.cta_secondary_label);
   const cta_secondary_href = s(content.cta_secondary_href);
   const layout = content.layout === 'image_right' ? 'image_right' : 'image_left';
+  const credentials = Array.isArray(content.credentials)
+    ? content.credentials.map((i) => (typeof i === 'string' ? i : ''))
+    : [];
 
   const update = (patch: Record<string, unknown>) => {
     const { bio: _legacy, title: _legacyTitle, ...rest } = content;
@@ -38,6 +41,7 @@ export function FounderEditor({ content, onChange }: SectionEditorProps) {
       cta_primary_href,
       cta_secondary_label,
       cta_secondary_href,
+      credentials,
       layout,
       ...patch,
     });
@@ -85,6 +89,67 @@ export function FounderEditor({ content, onChange }: SectionEditorProps) {
           minHeight={200}
         />
       </div>
+
+      {/* Proof points under the bio, mirroring FMP's home founder card. The
+          renderer shows at most five; this is a summary, and the full list
+          lives on the founder profile page. */}
+      <Field label={`Proof points (${credentials.length}, first 5 shown)`}>
+        <div style={{ display: 'grid', gap: 6 }}>
+          {credentials.map((item, i) => (
+            <div key={i} style={{ display: 'flex', gap: 6 }}>
+              <input
+                type="text"
+                value={item}
+                onChange={(e) => {
+                  const next = [...credentials];
+                  next[i] = e.target.value;
+                  update({ credentials: next });
+                }}
+                placeholder="12+ years in corporate finance and advisory"
+                style={adminInput}
+              />
+              <button
+                type="button"
+                aria-label={`Remove proof point ${i + 1}`}
+                onClick={() =>
+                  update({ credentials: credentials.filter((_, j) => j !== i) })
+                }
+                style={{
+                  width: 28,
+                  height: 28,
+                  flexShrink: 0,
+                  borderRadius: 6,
+                  border: `1px solid ${ADMIN_COLORS.border}`,
+                  background: '#fff',
+                  color: ADMIN_COLORS.textMuted,
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                }}
+              >
+                x
+              </button>
+            </div>
+          ))}
+          <button
+            type="button"
+            onClick={() => update({ credentials: [...credentials, ''] })}
+            style={{
+              justifySelf: 'start',
+              padding: '6px 14px',
+              borderRadius: 7,
+              fontSize: 12,
+              fontWeight: 600,
+              border: `1px solid ${ADMIN_COLORS.borderInput}`,
+              background: '#FFFFFF',
+              color: ADMIN_COLORS.primaryDeep,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+            }}
+          >
+            Add proof point
+          </button>
+        </div>
+      </Field>
 
       <Fieldset legend="Primary CTA (optional)">
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>

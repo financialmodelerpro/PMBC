@@ -1,6 +1,6 @@
 import Image from 'next/image';
 
-import { SectionContainer } from '../SectionContainer';
+import { SectionContainer, SectionIntro } from '../SectionContainer';
 import { RichText } from '@/components/public/RichText';
 import { variantStyles, type PmbcVariant } from '@/lib/public/tokens';
 
@@ -9,6 +9,7 @@ function s(v: unknown): string {
 }
 
 type QuoteContent = {
+  heading: string;
   quote_text: string;
   attribution_name: string;
   attribution_role: string;
@@ -18,6 +19,7 @@ type QuoteContent = {
 
 function pick(c: Record<string, unknown>): QuoteContent {
   return {
+    heading: s(c.heading),
     quote_text: s(c.quote_text) || s(c.quote),
     attribution_name: s(c.attribution_name),
     attribution_role: s(c.attribution_role),
@@ -43,6 +45,18 @@ export function Quote({
 
   return (
     <SectionContainer variant={variant} styles={styles}>
+      {/* Optional heading, added for the founder profile's "Modeling
+          Philosophy" block. Existing quote sections carry no heading key, so
+          they render exactly as before. */}
+      {c.heading && (
+        <div className={'mx-auto mb-10 max-w-[800px] ' + (left ? '' : 'text-center')}>
+          <SectionIntro
+            headline={c.heading}
+            variant={variant}
+            align={left ? 'left' : 'center'}
+          />
+        </div>
+      )}
       <figure
         className={'mx-auto max-w-[800px] ' + (left ? 'text-left' : 'text-center')}
       >

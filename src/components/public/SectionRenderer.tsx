@@ -9,6 +9,8 @@ import { SectorGrid } from './sections/SectorGrid';
 import { ProcessSteps } from './sections/ProcessSteps';
 import { NetworkPartners } from './sections/NetworkPartners';
 import { FounderBlock } from './sections/FounderBlock';
+import { FounderHero } from './sections/FounderHero';
+import { FounderCredentials } from './sections/FounderCredentials';
 import { TextImage } from './sections/TextImage';
 import { CtaBlock } from './sections/CtaBlock';
 import { Quote } from './sections/Quote';
@@ -48,6 +50,8 @@ const REGISTRY: Record<
   process_steps: ProcessSteps,
   network_partners: NetworkPartners,
   founder_block: FounderBlock,
+  founder_hero: FounderHero,
+  founder_credentials: FounderCredentials,
   text_image: TextImage,
   cta_block: CtaBlock,
   quote: Quote,
@@ -70,6 +74,8 @@ const DEFAULT_VARIANT: Record<string, PmbcVariant> = {
   process_steps: 'navy_deep',
   network_partners: 'cream',
   founder_block: 'cream',
+  founder_hero: 'navy_deep',
+  founder_credentials: 'white',
   text_image: 'cream',
   cta_block: 'navy_deep',
   quote: 'white',

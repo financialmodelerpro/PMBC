@@ -8,6 +8,8 @@ import { SectorGridEditor } from '@/components/admin/editors/SectorGridEditor';
 import { ProcessStepsEditor } from '@/components/admin/editors/ProcessStepsEditor';
 import { NetworkPartnersEditor } from '@/components/admin/editors/NetworkPartnersEditor';
 import { FounderEditor } from '@/components/admin/editors/FounderEditor';
+import { FounderHeroEditor } from '@/components/admin/editors/FounderHeroEditor';
+import { FounderCredentialsEditor } from '@/components/admin/editors/FounderCredentialsEditor';
 import { TextImageEditor } from '@/components/admin/editors/TextImageEditor';
 import { CtaBlockEditor } from '@/components/admin/editors/CtaBlockEditor';
 import { QuoteEditor } from '@/components/admin/editors/QuoteEditor';
@@ -29,6 +31,8 @@ const EDITORS: Record<string, (props: SectionEditorProps) => React.ReactElement>
   process_steps: ProcessStepsEditor,
   network_partners: NetworkPartnersEditor,
   founder_block: FounderEditor,
+  founder_hero: FounderHeroEditor,
+  founder_credentials: FounderCredentialsEditor,
   text_image: TextImageEditor,
   cta_block: CtaBlockEditor,
   quote: QuoteEditor,

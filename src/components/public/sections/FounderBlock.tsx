@@ -20,6 +20,8 @@ type FounderContent = {
   cta_primary_href: string;
   cta_secondary_label: string;
   cta_secondary_href: string;
+  /** Short proof points, shown as a gold-ticked list under the bio. */
+  credentials: string[];
   layout: 'image_left' | 'image_right';
 };
 
@@ -42,6 +44,9 @@ function pick(c: Record<string, unknown>): FounderContent {
     cta_primary_href: s(c.cta_primary_href) || s(primaryObj.href),
     cta_secondary_label: s(c.cta_secondary_label) || s(secondaryObj.label),
     cta_secondary_href: s(c.cta_secondary_href) || s(secondaryObj.href),
+    credentials: Array.isArray(c.credentials)
+      ? c.credentials.map((i) => (typeof i === 'string' ? i : '')).filter(Boolean)
+      : [],
     layout,
   };
 }
@@ -156,6 +161,23 @@ export function FounderBlock({
               dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(c.bio_html) }}
             />
           )}
+          {/* Proof points, mirroring FMP's home founder card. Capped at five:
+              this is a summary card, and the full list lives on the founder
+              profile page. */}
+          {c.credentials.length > 0 && (
+            <ul className="mt-7 flex flex-col gap-3">
+              {c.credentials.slice(0, 5).map((item) => (
+                <li key={item} className="flex items-start gap-3">
+                  <span aria-hidden className="mt-[2px] shrink-0 text-[13px] text-[#C69C3E]">
+                    &#10003;
+                  </span>
+                  <span className="text-[15px] leading-[1.55]" style={{ color: v.textMuted }}>
+                    {item}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
           {(c.cta_primary_label || c.cta_secondary_label) && (
             <div className="mt-9 flex flex-wrap items-center gap-6">
               {c.cta_primary_label && c.cta_primary_href && (
@@ -174,15 +196,29 @@ export function FounderBlock({
                   <span aria-hidden className="text-[#C69C3E]">→</span>
                 </Link>
               )}
-              {c.cta_secondary_label && c.cta_secondary_href && (
-                <Link
-                  href={c.cta_secondary_href}
-                  className="text-[13px] font-medium uppercase text-[#52606B] transition hover:text-[#1B3A5F]"
-                  style={{ letterSpacing: '0.12em' }}
-                >
-                  {c.cta_secondary_label}
-                </Link>
-              )}
+              {/* The secondary CTA is typically an outbound profile link, so
+                  it opens in a new tab when the href leaves the site. */}
+              {c.cta_secondary_label &&
+                c.cta_secondary_href &&
+                (/^https?:\/\//i.test(c.cta_secondary_href) ? (
+                  <a
+                    href={c.cta_secondary_href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[13px] font-medium uppercase text-[#52606B] transition hover:text-[#1B3A5F]"
+                    style={{ letterSpacing: '0.12em' }}
+                  >
+                    {c.cta_secondary_label}
+                  </a>
+                ) : (
+                  <Link
+                    href={c.cta_secondary_href}
+                    className="text-[13px] font-medium uppercase text-[#52606B] transition hover:text-[#1B3A5F]"
+                    style={{ letterSpacing: '0.12em' }}
+                  >
+                    {c.cta_secondary_label}
+                  </Link>
+                ))}
             </div>
           )}
         </div>

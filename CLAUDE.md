@@ -93,6 +93,7 @@ When you find an em dash in *existing* content while doing other work, fix it as
 | Phase 17 (parity 6) : RichTextEditor upgrades + RichTextarea | Complete (2026-08-01) | Editor gains colour, font size, link, image insert, alignment and H1/H3. New compact `RichTextarea` (bold, italic, link) wired into 7 short fields. All `@tiptap/*` deps pinned exactly, since `^3.22.5` resolves to 3.29 and breaks the peer graph. Blocked on a hidden dependency: those fields rendered as plain text nodes, so making them rich required converting the renderers to HTML, which would have widened the unsanitised surface. The sanitiser was pulled forward rather than doing that. |
 | Phase 17.5 (parity 6.5) : Sanitise all rich-text output | Complete (2026-08-01) | **Closes S1**, the highest-severity finding in `ADMIN_PARITY_GAP.md` and Phase B of `MIGRATION_PLAN.md`. All 10 remaining `dangerouslySetInnerHTML` sites routed through `lib/cms/sanitize.ts` (8 public plus the 2 email previews). The two JSON-LD blocks are deliberately excluded, since they serialise objects we build ourselves. Email previews got their own wider allowlist so the preview does not lie about what the real email sends. Render diff: **14 of 14 public routes byte-identical**. Hostile payload test: 0 markers reach the DOM. |
 | Phase 18 (parity 7) : AuditLogViewer | Complete (2026-08-01) | Shared `AuditLogViewer` with filters (admin, action multi-select, date range), 100-row paging capped at 500 per fetch, and a side-by-side before/after JSON dialog. New read-only `GET/POST /api/admin/audit-log`. Migration 032 adds `before_value`, `after_value`, `reason` plus two composite indexes. `writeAudit` gains diff support and never blocks a mutation, falling back if the columns are absent. Diff capture wired into `collectionApi` (six sections at once), branding, settings, and page/section deletes. Verified against a real create/update/delete cycle. |
+| Phase 20 : Founder profile page `/about/ahmad-din` | Complete (2026-08-02) | Mirrors the structure of FMP's page of the same path (read from the real source at `D:/FMP/financial-modeler-pro/app/about/ahmad-din/page.tsx`, not from a description), translated into PMBC's Phase 9.5 visual system. Nine CMS sections, all editable in the page builder: founder hero, Background, Why PaceMakers, Experience & Background (numbered), Expertise Areas (pills), Industry Focus (cards), Market Focus, Modeling Philosophy (quote), Personal. Two new section types, `founder_hero` and `founder_credentials`, plus optional `heading` on the existing `paragraphs` and `quote` (backward compatible: sections without the key render exactly as before). Home `founder_block` gained a proof-point list matching FMP's home card, and its CTA now reads "Read Full Profile" pointing at the new page. Seeded by migration 034 / `npm run seed-founder-profile`. `Person` JSON-LD linked to the existing Organization node. **This reverses Critical Reminder 4** (see the note there). Verified: 44 content and SEO assertions, 0 failures; 16 public routes and 3 admin builder routes 200; zero em dashes in rendered HTML. |
 | Phase 19 (parity 8) : Testimonials approval workflow + Pages & Nav inline edit | Complete (2026-08-02) | **Closes the FMP admin-parity programme.** Testimonials is now a moderation queue, not a generic list: status filter tabs with counts, per-row Approve and Reject, Revoke and Reconsider, inline Featured and Show-on-homepage switches, and checkbox bulk approve/reject. `approved_at` is server-owned (absent from the route's zod schemas) and only moves on a real status change, so editing an approved quote's wording does not reset its approval date. Pages & Nav dropped the drawer for an inline table: label and href pend until that row's Save, while visibility, pinning and reorder save immediately, with a new-item row at the bottom. `createCollectionApi` gained `transformWrite`, `guardWrite` and `guardDelete`; the PATCH handler now snapshots the pre-write row before shaping the patch, since both hooks need it. Migration 033 adds `site_pages.can_toggle` (**DDL, run by hand; applied 2026-08-02**), enforced server side for both hide and delete. Everything degrades on a pre-033 database: the UI hides the Pinned control when no row carries the column, and the route replays a write with `can_toggle` stripped if Postgres rejects it, narrowly enough that a 403 guard and a 422 zod failure still pass through. Verified by `scripts/verify-parity8.mjs` in **both** states: 36 of 36 with 033 unapplied (which is what exercised the degradation path), then 39 of 39 once applied. `/contact` is pinned by the migration's seed. |
 
 **Admin login:** `meetahmadch@gmail.com`. **The password was rotated on 2026-08-02 and is deliberately not recorded here or anywhere else in this repository.** Writing it down is what made the previous one worthless. Ahmad holds it; if it is lost, `npm run rotate-admin-password` sets a new one using the service-role key in `.env.local`, so there is no lockout risk.
@@ -402,6 +403,8 @@ The page builder. One row per section on a page. `section_type` determines which
 - `cta_block`: single call-to-action panel
 - `quote`: pull quote with attribution
 - `fmp_intro`: Financial Modeler Pro introduction block (one specific section type for the FMP page)
+- `founder_hero`: page-leading founder identity (portrait, name, two-line title, credentials, CTAs). Added 2026-08-02 for `/about/ahmad-din`. Distinct from `founder_block`, which is the mid-page summary card on home and about
+- `founder_credentials`: heading plus a list of short strings, rendered as `numbered`, `pills`, or `cards` per a `display` key. One type rather than three, because the three founder-profile list blocks differ only in presentation
 
 #### Branding and Settings
 
@@ -535,6 +538,11 @@ For v1, only two template_key rows are needed: `contact_notification` (sent to a
                                   --   item: /api/admin/site-pages refuses to hide
                                   --   or delete it, and the admin locks its
                                   --   Visible switch. Pins /contact by default.
+034_seed_founder_profile.sql      -- Founder profile /about/ahmad-din: cms_pages row
+                                  --   + 9 page_sections, plus the home founder_block
+                                  --   CTA repoint and proof points. DML only, so
+                                  --   `npm run seed-founder-profile` applies it.
+                                  --   Idempotent (deletes this page's sections first).
 ```
 
 After running migrations, manually insert one admin_users row via SQL with a bcrypt hash for the password.
@@ -653,7 +661,8 @@ Editors should:
 | `/sectors` | sectors | Sector coverage grid with descriptions |
 | `/approach` | approach | Engagement methodology (Understand → Analyse → Model → Advise) |
 | `/network` | network | Sky Gulf and Lynkers detail. Why the network matters. |
-| `/about` | about | The firm. Founder section. Link out to FMP for full Ahmad bio. |
+| `/about` | about | The firm. Founder summary card linking to the full profile. |
+| `/about/ahmad-din` | about-ahmad-din | Founder profile. Nine CMS sections mirroring the structure of FMP's page of the same path. |
 | `/financial-modeler-pro` | financial-modeler-pro | Full page introducing FMP, ending in CTA to visit FMP |
 | `/contact` | contact | Contact form, direct contact info |
 | `/privacy` | privacy | Privacy policy (static, hardcoded for v1) |
@@ -1069,7 +1078,7 @@ PMBC and FMP are fully separate codebases and Supabase projects. They do not sha
 
 - The `/financial-modeler-pro` page on PMBC introduces FMP and ends with a primary CTA "Visit Financial Modeler Pro" → links to `https://financialmodelerpro.com`
 - Footer column "Platform" includes a link to FMP
-- The About / Founder block on PMBC mentions FMP as Ahmad's platform and links to the founder page on FMP for the full bio: `https://financialmodelerpro.com/about/ahmad-din`
+- The About / Founder block on PMBC mentions FMP as Ahmad's platform. **Since 2026-08-02 the full bio lives on PMBC's own `/about/ahmad-din`,** not on FMP. The home founder card links there ("Read Full Profile"). See the reversal note under Critical Reminder 4.
 
 ### From FMP to PMBC
 
@@ -1124,7 +1133,7 @@ Conventional Commits style: `feat:`, `fix:`, `chore:`, `docs:`, `refactor:`. Kee
 1. **PMBC is a credibility document, not a lead engine.** Every decision should be evaluated against this. Heavy SEO content and lead magnets are not v1.
 2. **Design feels institutional, not modern-startup.** No gradient backgrounds, no animated icons, no playful microcopy. Senior, considered, calm.
 3. **Honest credentials only.** PMBC's track record (biofuel, oil & gas, waste management, data center, construction, industrial services). Ahmad's broader career is attributed to him as a professional, with reference to firms where appropriate (per the FMP profile pattern).
-4. **No duplication of FMP's founder content.** Link out to FMP for the deep professional bio.
+4. ~~**No duplication of FMP's founder content.** Link out to FMP for the deep professional bio.~~ **Reversed 2026-08-02 by explicit instruction.** PMBC now hosts its own founder profile at `/about/ahmad-din`, mirroring the structure of FMP's page of the same path. The reasoning for the original rule still deserves a hearing, so it is recorded rather than deleted: two near-identical bios on two domains is duplicate content, and it splits the SEO signal for "Ahmad Din" between them. The counter-argument that won: PMBC is the parent entity and the credibility document for family offices, and sending a prospective client off-site to a training platform to find out who is leading their mandate is worse than the SEO cost. **The two pages are deliberately not identical**: PMBC's carries "Why PaceMakers" (advisory positioning) where FMP's carries "Why Financial Modeler Pro" (platform positioning), and PMBC omits FMP's Notable Projects and booking-led CTAs. If both pages ever converge on identical copy, revisit this, and consider a canonical pointing at PMBC as the parent entity.
 5. **Pakistan is operational headquarters, not the marketing-front geography.** Lead with KSA and GCC. Lahore is mentioned only as where the analytical work happens.
 6. **CMS-first.** Every public page section should be editable from the admin panel. If something is hardcoded, it should be a deliberate exception (privacy/terms only).
 7. **One admin user.** Ahmad. Don't build user management, role hierarchies, or invite flows in v1.

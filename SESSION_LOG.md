@@ -4,6 +4,32 @@ Chronological build history for the PMBC website. Split out of `CLAUDE.md` to ke
 
 ---
 
+### 2026-08-02 - Founder profile page at /about/ahmad-din
+
+Mirrors FMP's page of the same path. **Read from the real FMP source** at `D:/FMP/financial-modeler-pro/app/about/ahmad-din/page.tsx` and its home founder card in `app/(portal)/page.tsx`, rather than working from the task description alone. Worth doing: the description said "four paragraphs" for Background and then listed six, and the FMP source settled the section order and the exact list contents.
+
+**Nine CMS sections, not one hardcoded route.** FMP's page is a single hardcoded file reading a `team` section off its home page, with roughly twenty fields in one JSONB blob. PMBC splits the same material into nine `page_sections` rows so each block is independently editable, reorderable, and hideable in the page builder, which is what the CMS-first rule in `CLAUDE.md` asks for.
+
+**Two new section types, deliberately not five.**
+- `founder_hero`: portrait, name, two-line title (role in light navy, specialism in gold), credentials line, intro, two CTAs.
+- `founder_credentials`: a heading plus a list of short strings, with a `display` key selecting `numbered`, `pills`, or `cards`. Experience and Background, Expertise Areas, and Industry Focus have an identical data shape and differ only in presentation, so three near-identical types would have cluttered the section picker for no gain.
+
+`paragraphs` and `quote` each gained an optional `heading`, rendered through the existing left-aligned `SectionIntro` so the gold hairline treatment is consistent. Backward compatible by construction: every existing section of those types carries no `heading` key, so it renders exactly as before. Verified rather than assumed, see below.
+
+**Three deviations from the brief, each for a reason.**
+
+1. **The portrait lives in section content, not `branding_config.founder_photo_url`.** The brief asked for a new column. That is DDL, which needs a manual SQL-editor step and would have blocked the feature on a human. A founder portrait is also content rather than branding, and the existing home and about `founder_block` sections already store `photo_url` in JSONB. Using the established pattern costs nothing and keeps the field editable in the page builder.
+2. **The LinkedIn and booking URLs are seeded empty.** Both were given as "use placeholder for now", and a founder profile is a credibility document, so a CTA pointing at a guessed URL is worse than no CTA. Both render only when they have a label and an href, so nothing broken is shown. The labels are seeded, so filling in the hrefs in the page builder is all that is needed.
+3. **The `Person` JSON-LD `worksFor` id.** First written as `${base}/#organization`, corrected to `${base}#organization` to match what `OrganizationJsonLd` actually mints. A mismatched id fails silently: valid JSON-LD, two orphan nodes, no link between the founder and the firm.
+
+**Home founder card** gained the proof-point list FMP's card carries (gold ticks, capped at five by the renderer since the full list is on the profile page), its CTA now reads "Read Full Profile" and points at `/about/ahmad-din` instead of `/about`, and the secondary CTA opens in a new tab when the href is external.
+
+**Verification.** A throwaway script asserted all nine sections render with their real copy, not just that the route returns 200: 28 content assertions covering every heading and a distinctive phrase from each block, plus exactly one `h1`, the title tag, `Person` JSON-LD present and joined to the Organization node, the numbered list rendering 01 through 10, the monogram fallback in place of the missing portrait, the home CTA repoint, the sitemap entry, and zero em dashes in the rendered HTML of both pages. **44 assertions, 0 failures.** Separately: 16 public routes 200, `/admin/page-builder/about-ahmad-din` 200 with the new types listed, and `/approach` plus the home quote confirmed still rendering after the shared-renderer edits.
+
+**This reverses Critical Reminder 4** in `CLAUDE.md` ("No duplication of FMP's founder content"). Reversed on explicit instruction, and the original reasoning is recorded rather than deleted, because it was not wrong: two near-identical bios on two domains split the SEO signal for the founder's name. The counter-argument that won is that PMBC is the parent entity and the credibility document, and sending a prospective client off-site to a training platform to learn who leads their mandate costs more than the SEO does. The two pages are kept deliberately non-identical: PMBC carries "Why PaceMakers" where FMP carries "Why Financial Modeler Pro", and PMBC omits FMP's Notable Projects and booking-led CTAs. If they ever converge on identical copy, revisit, and consider a canonical pointing at PMBC.
+
+---
+
 ### 2026-08-02 - Admin credential rotated, launch blocker 2 closed
 
 `Admin@2026` is dead. Rotated via the new `npm run rotate-admin-password`, bcrypt cost 12.
