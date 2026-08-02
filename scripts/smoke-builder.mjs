@@ -4,7 +4,8 @@
 
 const BASE = 'http://localhost:3000';
 const EMAIL = 'meetahmadch@gmail.com';
-const PASSWORD = 'Admin@2026';
+// See the note in smoke-admin.mjs: env first, debug default as a fallback.
+const PASSWORD = process.env.ADMIN_PASSWORD || 'Admin@2026';
 
 const SLUGS = [
   'home',
@@ -90,7 +91,7 @@ async function main() {
     if (!ok) allOk = false;
     console.log(
       `${ok ? '✓' : '✗'} ${slug.padEnd(34)} HTTP ${res.status}` +
-        (ok ? '' : ' — ' + firstChunk),
+        (ok ? '' : ' : ' + firstChunk),
     );
   }
 

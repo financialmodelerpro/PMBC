@@ -12,7 +12,8 @@
 
 const BASE = process.env.SMOKE_BASE || 'http://localhost:3001';
 const EMAIL = 'meetahmadch@gmail.com';
-const PASSWORD = 'Admin@2026';
+// See the note in smoke-admin.mjs: env first, debug default as a fallback.
+const PASSWORD = process.env.ADMIN_PASSWORD || 'Admin@2026';
 
 const TESTIMONIALS = '/api/admin/testimonials';
 const SITE_PAGES = '/api/admin/site-pages';

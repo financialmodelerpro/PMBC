@@ -4,7 +4,11 @@
 
 const BASE = process.env.SMOKE_BASE || 'http://localhost:3001';
 const EMAIL = 'meetahmadch@gmail.com';
-const PASSWORD = 'Admin@2026';
+// Read from the environment so rotating the admin credential does not break the
+// verification tooling. The fallback is the documented pre-rotation debug
+// password; once the launch-blocker rotation happens it stops working, and you
+// export ADMIN_PASSWORD before running this instead.
+const PASSWORD = process.env.ADMIN_PASSWORD || 'Admin@2026';
 
 const ADMIN_ROUTES = [
   '/admin',
@@ -101,7 +105,7 @@ async function main() {
     else fail++;
     console.log(
       `${tag} ${route.padEnd(36)} HTTP ${res.status}` +
-        (firstChunk ? ' — ' + firstChunk : ''),
+        (firstChunk ? ' : ' + firstChunk : ''),
     );
   }
   console.log(`\n${pass} OK · ${info} 404 (placeholder) · ${fail} failed`);

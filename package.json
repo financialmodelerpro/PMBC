@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit",
     "deploy": "vercel --prod",
     "seed-admin": "node scripts/seed-admin.mjs",
+    "rotate-admin-password": "node scripts/rotate-admin-password.mjs",
     "seed-phase6": "node scripts/seed-phase6-sections.mjs",
     "seed-service-content": "node scripts/seed-service-content.mjs"
   },

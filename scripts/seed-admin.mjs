@@ -1,6 +1,16 @@
 // scripts/seed-admin.mjs
-// Sets/resets the admin password for meetahmadch@gmail.com to a known value
-// and verifies the stored hash by comparing it back. Run with `npm run seed-admin`.
+// Creates the first admin row, or resets it to a known development value, and
+// verifies the stored hash by comparing it back. Run with `npm run seed-admin`.
+//
+// USE rotate-admin-password.mjs INSTEAD to set a real credential. This script
+// hardcodes its password in the file below, which is correct for a throwaway
+// debug login and completely wrong for a production one: it would commit the
+// live password to git history.
+//
+// Since the launch-blocker rotation, this script refuses to overwrite an
+// existing row whose hash no longer matches ADMIN_PASSWORD, because doing so
+// would silently downgrade a rotated production credential back to the debug
+// value. Set ADMIN_SEED_FORCE=1 if that is genuinely what you want.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -38,7 +48,7 @@ function loadEnvLocal() {
 }
 
 const ADMIN_EMAIL = 'meetahmadch@gmail.com';
-const ADMIN_PASSWORD = 'Admin@2026';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'Admin@2026';
 const ADMIN_NAME = 'Ahmad Din';
 
 async function main() {
@@ -54,7 +64,7 @@ async function main() {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
-  // Hash via JS variable — no shell escaping involved.
+  // Hash via JS variable, so no shell escaping is involved.
   const passwordHash = bcrypt.hashSync(ADMIN_PASSWORD, 12);
 
   // Try to update an existing row first.
@@ -69,6 +79,27 @@ async function main() {
   }
 
   if (existing) {
+    // Refuse to clobber a rotated credential. Before the rotation this script
+    // was the documented way to reset the debug login, so it is still reachable
+    // by muscle memory and by an npm script; without this guard, one stray run
+    // would put the production admin back on a password that is in git history.
+    const { data: current } = await supabase
+      .from('admin_users')
+      .select('password_hash')
+      .eq('id', existing.id)
+      .single();
+    const alreadyThisPassword =
+      current?.password_hash && bcrypt.compareSync(ADMIN_PASSWORD, current.password_hash);
+    if (!alreadyThisPassword && process.env.ADMIN_SEED_FORCE !== '1') {
+      console.error(
+        `Refusing to reset ${ADMIN_EMAIL}: the stored hash does not match the password this\n` +
+          'script would set, which means the credential has been rotated since.\n' +
+          'Use `npm run rotate-admin-password` to set a new one, or re-run with\n' +
+          'ADMIN_SEED_FORCE=1 if you really mean to overwrite it.',
+      );
+      process.exit(1);
+    }
+
     const { error: updErr } = await supabase
       .from('admin_users')
       .update({ password_hash: passwordHash })
@@ -116,7 +147,7 @@ async function main() {
     console.log('PASSWORD VERIFIED ✅');
     process.exit(0);
   } else {
-    console.error('PASSWORD MISMATCH ❌  — bcrypt.compareSync returned false');
+    console.error('PASSWORD MISMATCH: bcrypt.compareSync returned false');
     process.exit(1);
   }
 }
