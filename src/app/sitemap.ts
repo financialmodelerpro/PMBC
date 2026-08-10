@@ -29,6 +29,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     '/insights',
     '/financial-modeler-pro',
     '/contact',
+    '/book',
     '/privacy',
     '/terms',
   ];

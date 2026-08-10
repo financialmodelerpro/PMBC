@@ -22,6 +22,7 @@ type FormValues = Required<{
   whatsapp_number: string;
   phone_number: string;
   office_location_text: string;
+  booking_url: string;
   social_linkedin: string;
   social_twitter: string;
   default_og_image_url: string;
@@ -35,6 +36,7 @@ function defaults(initial: SiteSettings): FormValues {
     whatsapp_number: initial.whatsapp_number ?? '',
     phone_number: initial.phone_number ?? '',
     office_location_text: initial.office_location_text ?? '',
+    booking_url: initial.booking_url ?? '',
     social_linkedin: initial.social_linkedin ?? '',
     social_twitter: initial.social_twitter ?? '',
     default_og_image_url: initial.default_og_image_url ?? '',
@@ -109,6 +111,20 @@ export function SettingsForm({ initial }: { initial: SiteSettings }) {
           </Field>
           <Field label="Office location text">
             <input type="text" {...register('office_location_text')} style={adminInput} />
+          </Field>
+        </Section>
+
+        <Section title="Booking">
+          <Field
+            label="Booking calendar URL"
+            hint="Calendly event embedded on /book. Leave blank to hide the calendar."
+          >
+            <input
+              type="url"
+              placeholder="https://calendly.com/your-account/your-event"
+              {...register('booking_url')}
+              style={adminInput}
+            />
           </Field>
         </Section>
 

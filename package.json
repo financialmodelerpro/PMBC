@@ -15,7 +15,8 @@
     "seed-founder-profile": "node scripts/seed-founder-profile.mjs",
     "seed-founder-alignment": "node scripts/seed-founder-alignment.mjs",
     "strip-empty-paragraphs": "node scripts/strip-empty-paragraphs.mjs",
-    "sync-founder-photo": "node scripts/sync-founder-photo.mjs"
+    "sync-founder-photo": "node scripts/sync-founder-photo.mjs",
+    "seed-booking-page": "node scripts/seed-booking-page.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

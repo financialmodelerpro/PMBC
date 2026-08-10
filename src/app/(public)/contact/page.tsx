@@ -1,8 +1,10 @@
 import type { Metadata } from 'next';
-import { Mail, MessageCircle, MapPin } from 'lucide-react';
+import Link from 'next/link';
+import { Mail, MessageCircle, MapPin, CalendarDays } from 'lucide-react';
 
 import { fetchPage, fetchPageSections } from '@/lib/cms/pages';
 import { fetchSiteSettings } from '@/lib/cms/settings';
+import { fetchContentBySection } from '@/lib/cms/content';
 import { SectionList } from '@/components/public/SectionRenderer';
 import { SERVICES } from '@/config/services';
 import { ContactForm } from '@/components/public/ContactForm';
@@ -29,16 +31,17 @@ export default async function ContactPage(props: {
   const search = await props.searchParams;
   const isPreview = search.preview === '1';
 
-  // /services/[slug] CTAs link here as `?service=<slug>` — pre-fill the
+  // /services/[slug] CTAs link here as `?service=<slug>`, so pre-fill the
   // service-interest dropdown with the matching service title when present.
   const rawService = search.service;
   const serviceSlug = typeof rawService === 'string' ? rawService : '';
   const defaultServiceTitle =
     SERVICES.find((s) => s.slug === serviceSlug)?.title ?? undefined;
 
-  const [sections, settings] = await Promise.all([
+  const [sections, settings, bookingCopy] = await Promise.all([
     fetchPageSections('contact', { onlyVisible: !isPreview }),
     safe(fetchSiteSettings(), {}),
+    safe(fetchContentBySection('booking'), {} as Record<string, string>),
   ]);
 
   const hcaptchaSiteKey = process.env.NEXT_PUBLIC_HCAPTCHA_SITE_KEY || null;
@@ -62,6 +65,26 @@ export default async function ContactPage(props: {
                 <p className="mt-3 text-[14px] leading-relaxed text-[color:var(--pmbc-muted)]">
                   We respond to every credible enquiry within one to two business days.
                 </p>
+
+                {/* Booking alternative. Copy lives in cms_content under the
+                    `booking` section, with these fallbacks so the line still
+                    reads correctly before migration 038 is applied. */}
+                <Link
+                  href="/book"
+                  className="mt-6 flex items-center gap-3 border border-[color:var(--pmbc-border-warm)] bg-[color:var(--pmbc-surface-cream)] px-4 py-3 transition-colors duration-200 hover:border-[color:var(--pmbc-accent)]"
+                >
+                  <CalendarDays
+                    size={16}
+                    className="shrink-0"
+                    style={{ color: 'var(--pmbc-accent-muted)' }}
+                  />
+                  <span className="text-[14px] text-[color:var(--pmbc-muted)]">
+                    {bookingCopy.contact_prompt || 'Prefer to talk?'}{' '}
+                    <span className="font-medium text-[color:var(--pmbc-primary)] underline decoration-[color:var(--pmbc-accent)] underline-offset-4">
+                      {bookingCopy.contact_link_label || 'Book a meeting directly'}
+                    </span>
+                  </span>
+                </Link>
 
                 <div className="mt-8">
                   <ContactForm

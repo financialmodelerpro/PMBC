@@ -4,6 +4,26 @@ Chronological build history for the PMBC website. Split out of `CLAUDE.md` to ke
 
 ---
 
+### 2026-08-10 - Booking page /book with Calendly embed, plus CTA wiring
+
+**The Calendly URL came from FMP's database, not its source.** FMP hardcodes the URL nowhere: `CalendlyEmbed.tsx` carries one in a JSDoc example and its live value lives in `page_sections.team.content.booking_url`. Rather than trust a comment, FMP's Supabase project was queried directly and every `page_sections` row scanned for a Calendly URL. Exactly one exists, and it matches the comment, so there was nothing to disambiguate: `https://calendly.com/financialmodelerpro/60-minute-modeling-hub-advisory-meeting`.
+
+**One deliberate divergence from FMP's setup.** FMP keeps its booking URL inside the home page's founder section content, which couples a site-wide value to one section on one page and means the booking page has to load an unrelated page's sections to find it. PMBC puts it in `site_settings.booking_url`, edited under Site Settings, so one edit repoints every booking surface and any page can read it without reaching into another page's content. That required adding the key to the settings zod schema, which is a closed allowlist, or the admin save would have silently dropped it.
+
+**`CalendlyEmbed` is a server component.** `next/script` works in server components in the App Router, so nothing here ships as a client bundle. The widget container is server-rendered, meaning the page has its final layout before any third-party code runs, and `lazyOnload` injects the script once the browser is idle. Worth knowing for future verification: with `lazyOnload` the `<script>` tag is deliberately absent from the initial HTML, so the script URL appears only in the RSC flight payload. The container, its `data-url`, and every piece of copy do render server-side, which is what was actually asserted.
+
+**The founder CTA was broken in a way that looked like it was missing.** `founder_hero` on /about/ahmad-din already had `cta_secondary_label: "Book a Meeting"` with an empty `cta_secondary_href`. `FounderHero` renders a CTA only when both label and href are set, on the principle that a button going nowhere is worse than no button, so the button had simply never appeared. Migration 038 gives it a destination rather than adding a new CTA.
+
+**Copy assumption worth confirming.** The brief described the hero subtitle as "30 minutes"; the Calendly event the brief also mandated is a 60 minute meeting. Shipping "30 minutes" directly above a form that books 60 would be a visible contradiction on a credibility page, so the seeded copy says 60. It is a `page_sections` value, editable in the page builder in one click if 30 was intended and a different Calendly event is coming.
+
+**Migration 038 is idempotent and non-destructive, unlike 034.** Every statement is guarded: the URL is seeded only when blank, the page and hero inserted only when absent, the founder CTA filled only when its href is empty, and the copy rows use `ON CONFLICT DO NOTHING`. A re-run cannot overwrite admin edits. The seed script reads every write back and compares before reporting success, following the lesson from the alignment seed that once reported success on a row it had not changed.
+
+Booking copy lives in a new `booking` section in `cms_content`, which `/admin/content` picks up as an editable group with no admin code change. Every key has a hardcoded fallback in the route, so a database missing migration 038 renders shipped copy rather than blanks.
+
+Not added to the navbar, by instruction. Footer (Firm column) and `sitemap.ts` carry it. One pre-existing em dash fixed in `(public)/contact/page.tsx` while editing it.
+
+---
+
 ### 2026-08-02 - Founder photo synced across the profile hero and both founder cards
 
 **Cause 1, confirmed from the data rather than assumed.** `founder_hero` (on /about/ahmad-din) and `founder_block` (on / and /about) each store their own `photo_url` in `page_sections.content`. Checked for a shared source that a card might have been meant to read instead: `branding_config` has no photo or founder column, `site_settings` has no such key, `team_members` is empty. So there is no broken data flow, only two sections that were never given the same value. The architecture stays as it is, per the brief.

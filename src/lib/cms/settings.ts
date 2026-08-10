@@ -7,6 +7,12 @@ export type SiteSettings = {
   whatsapp_number?: string;
   phone_number?: string;
   office_location_text?: string;
+  /**
+   * Full Calendly event URL rendered by the inline widget on /book. Site-wide
+   * rather than section-scoped, so one edit repoints every booking surface.
+   * Empty is supported: /book then leads with the direct contact routes.
+   */
+  booking_url?: string;
   social_linkedin?: string;
   social_twitter?: string;
   default_og_image_url?: string;

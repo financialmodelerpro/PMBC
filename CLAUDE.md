@@ -96,6 +96,8 @@ When you find an em dash in *existing* content while doing other work, fix it as
 | Phase 20 : Founder profile page `/about/ahmad-din` | Complete (2026-08-02) | Mirrors the structure of FMP's page of the same path (read from the real source at `D:/FMP/financial-modeler-pro/app/about/ahmad-din/page.tsx`, not from a description), translated into PMBC's Phase 9.5 visual system. Nine CMS sections, all editable in the page builder: founder hero, Background, Why PaceMakers, Experience & Background (numbered), Expertise Areas (pills), Industry Focus (cards), Market Focus, Modeling Philosophy (quote), Personal. Two new section types, `founder_hero` and `founder_credentials`, plus optional `heading` on the existing `paragraphs` and `quote` (backward compatible: sections without the key render exactly as before). Home `founder_block` gained a proof-point list matching FMP's home card, and its CTA now reads "Read Full Profile" pointing at the new page. Seeded by migration 034 / `npm run seed-founder-profile`. `Person` JSON-LD linked to the existing Organization node. **This reverses Critical Reminder 4** (see the note there). Verified: 44 content and SEO assertions, 0 failures; 16 public routes and 3 admin builder routes 200; zero em dashes in rendered HTML. |
 | Phase 19 (parity 8) : Testimonials approval workflow + Pages & Nav inline edit | Complete (2026-08-02) | **Closes the FMP admin-parity programme.** Testimonials is now a moderation queue, not a generic list: status filter tabs with counts, per-row Approve and Reject, Revoke and Reconsider, inline Featured and Show-on-homepage switches, and checkbox bulk approve/reject. `approved_at` is server-owned (absent from the route's zod schemas) and only moves on a real status change, so editing an approved quote's wording does not reset its approval date. Pages & Nav dropped the drawer for an inline table: label and href pend until that row's Save, while visibility, pinning and reorder save immediately, with a new-item row at the bottom. `createCollectionApi` gained `transformWrite`, `guardWrite` and `guardDelete`; the PATCH handler now snapshots the pre-write row before shaping the patch, since both hooks need it. Migration 033 adds `site_pages.can_toggle` (**DDL, run by hand; applied 2026-08-02**), enforced server side for both hide and delete. Everything degrades on a pre-033 database: the UI hides the Pinned control when no row carries the column, and the route replays a write with `can_toggle` stripped if Postgres rejects it, narrowly enough that a 403 guard and a 422 zod failure still pass through. Verified by `scripts/verify-parity8.mjs` in **both** states: 36 of 36 with 033 unapplied (which is what exercised the degradation path), then 39 of 39 once applied. `/contact` is pinned by the migration's seed. |
 
+| Phase 21 : Booking page `/book` | Complete (2026-08-10) | Mirrors FMP's `/book-a-meeting`: one Calendly inline embed, one admin-editable URL, direct contact routes underneath. The Calendly event is the same one FMP books against, read from FMP's live `page_sections` rather than trusting the example URL in its source comments (the repo hardcodes it nowhere). **One deliberate divergence from FMP:** FMP stores its booking URL inside the home page's founder section content, coupling a site-wide setting to one section on one page. PMBC keeps it in `site_settings.booking_url`, edited under Site Settings, so any page can read it and one edit repoints every booking surface. `CalendlyEmbed` is a server component: the widget container is server-rendered so layout is final before third-party code runs, and `next/script` with `lazyOnload` injects the script once the browser is idle. Empty URL is a supported state and renders a panel plus the direct contact routes instead of an empty frame. CTAs wired via migration 038: the founder profile's secondary CTA already read "Book a Meeting" but carried an empty href, so `FounderHero` had been suppressing the button entirely. Not added to the navbar, by instruction. Footer (Firm column) and `sitemap.ts` both carry it. Verified: hero, embed container, `data-url`, fallback link and metadata all present in the server HTML, 200 on `/book`, typecheck plus build clean, zero em dashes. |
+
 **Admin login:** `meetahmadch@gmail.com`. **The password was rotated on 2026-08-02 and is deliberately not recorded here or anywhere else in this repository.** Writing it down is what made the previous one worthless. Ahmad holds it; if it is lost, `npm run rotate-admin-password` sets a new one using the service-role key in `.env.local`, so there is no lockout risk.
 
 The retired `Admin@2026` remains in this file's git history and in older `SESSION_LOG.md` entries. That history is left intact on purpose: rewriting it would not un-publish the string, and the password no longer opens anything. It is verified dead, not merely replaced (see the rotation entry in `SESSION_LOG.md`).
@@ -565,6 +567,16 @@ For v1, only two template_key rows are needed: `contact_notification` (sent to a
                                   --   rebuild on another Supabase project is safe.
                                   --   DML only, `npm run sync-founder-photo`
                                   --   (supports --dry-run). Idempotent.
+038_booking_page.sql              -- Booking page /book: site_settings.booking_url
+                                  --   (the Calendly event, site-wide and admin
+                                  --   editable), the cms_pages row (is_system),
+                                  --   its hero section, the founder profile's
+                                  --   booking CTA, and 10 cms_content rows under
+                                  --   a new `booking` section. DML only,
+                                  --   `npm run seed-booking-page` (supports
+                                  --   --dry-run). Idempotent AND non-destructive:
+                                  --   every statement is guarded, so unlike 034
+                                  --   a re-run cannot overwrite admin edits.
 ```
 
 After running migrations, manually insert one admin_users row via SQL with a bcrypt hash for the password.
@@ -687,6 +699,7 @@ Editors should:
 | `/about/ahmad-din` | about-ahmad-din | Founder profile. Nine CMS sections mirroring the structure of FMP's page of the same path. |
 | `/financial-modeler-pro` | financial-modeler-pro | Full page introducing FMP, ending in CTA to visit FMP |
 | `/contact` | contact | Contact form, direct contact info |
+| `/book` | book | Booking page. CMS hero plus a Calendly inline embed reading `site_settings.booking_url`. Deliberately not in the top nav (footer and CTAs only). |
 | `/privacy` | privacy | Privacy policy (static, hardcoded for v1) |
 | `/terms` | terms | Terms of engagement (static, hardcoded for v1) |
 
@@ -712,6 +725,8 @@ export const SERVICES = [
 Top nav (desktop): Services · Sectors · Approach · Network · About · Contact
 Top nav (mobile): hamburger menu with same items
 Persistent CTA in nav: "Start a Conversation" → links to /contact
+
+`/book` is deliberately kept out of the top nav. It is reached from the founder profile CTA, the contact page, and the footer, so the nav stays at six items.
 
 Footer columns:
 - **About**: short PMBC description, tagline

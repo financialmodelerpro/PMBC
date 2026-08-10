@@ -146,6 +146,7 @@ export function Footer({
               <li><FooterLink href="/team">Team</FooterLink></li>
               <li><FooterLink href="/financial-modeler-pro">Financial Modeler Pro</FooterLink></li>
               <li><FooterLink href="/contact">Contact</FooterLink></li>
+              <li><FooterLink href="/book">Book a Meeting</FooterLink></li>
             </ul>
           </div>
 

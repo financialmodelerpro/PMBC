@@ -12,6 +12,7 @@ const settingsSchema = z.object({
   whatsapp_number: z.string().optional(),
   phone_number: z.string().optional(),
   office_location_text: z.string().optional(),
+  booking_url: z.string().optional(),
   social_linkedin: z.string().optional(),
   social_twitter: z.string().optional(),
   default_og_image_url: z.string().optional(),
