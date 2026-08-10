@@ -17,7 +17,8 @@
     "strip-empty-paragraphs": "node scripts/strip-empty-paragraphs.mjs",
     "sync-founder-photo": "node scripts/sync-founder-photo.mjs",
     "seed-booking-page": "node scripts/seed-booking-page.mjs",
-    "seed-booking-cta": "node scripts/seed-booking-cta-prominence.mjs"
+    "seed-booking-cta": "node scripts/seed-booking-cta-prominence.mjs",
+    "seed-footer-logo-sizing": "node scripts/seed-footer-logo-sizing.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

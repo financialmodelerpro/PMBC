@@ -3,6 +3,8 @@ import type { Metadata } from 'next';
 import { AdminPageHeader } from '@/components/admin/AdminPageHeader';
 import { fetchBranding } from '@/lib/cms/branding';
 import { fetchHeaderConfig } from '@/lib/cms/headerSettings';
+import { fetchContentBySection } from '@/lib/cms/content';
+import { parseFooterConfig } from '@/lib/cms/footerSettings';
 import { adminPageMain } from '@/lib/admin/styles';
 
 import { HeaderSettingsForm } from './HeaderSettingsForm';
@@ -17,10 +19,12 @@ export const metadata: Metadata = {
 export default async function HeaderSettingsPage() {
   // Both sources load in parallel, mirroring FMP, which fetches
   // /api/admin/content and /api/branding together on mount.
-  const [header, branding] = await Promise.all([
+  const [header, branding, footerRows] = await Promise.all([
     fetchHeaderConfig(),
     safeFetchBranding(),
+    safeFetchFooterRows(),
   ]);
+  const footer = parseFooterConfig(footerRows);
 
   return (
     <div style={adminPageMain}>
@@ -30,9 +34,13 @@ export default async function HeaderSettingsPage() {
         <AdminPageHeader
           eyebrow="Content"
           title="Header Settings"
-          description="Brand colours, logo, branding text, header icon, and header layout. Applies across every public page."
+          description="Brand colours, logo, branding text, header icon, header layout, and footer logo. Applies across every public page."
         />
-        <HeaderSettingsForm initialHeader={header} initialBranding={branding} />
+        <HeaderSettingsForm
+          initialHeader={header}
+          initialBranding={branding}
+          initialFooter={footer}
+        />
       </div>
     </div>
   );
@@ -43,5 +51,15 @@ async function safeFetchBranding() {
     return await fetchBranding();
   } catch {
     return null;
+  }
+}
+
+async function safeFetchFooterRows(): Promise<Record<string, string>> {
+  try {
+    return await fetchContentBySection('footer_settings');
+  } catch {
+    // parseFooterConfig turns an empty map into the shipped defaults, so a
+    // failed read shows correct values rather than blank inputs.
+    return {};
   }
 }

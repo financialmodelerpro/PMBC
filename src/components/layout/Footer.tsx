@@ -19,6 +19,10 @@ function LinkedInIcon({ size = 14 }: { size?: number }) {
 
 import { SERVICES } from '@/config/services';
 import type { SiteSettings } from '@/lib/cms/settings';
+import {
+  DEFAULT_FOOTER_CONFIG,
+  type FooterConfig,
+} from '@/lib/cms/footerSettings';
 
 type FooterBrand = {
   name: string;
@@ -32,10 +36,13 @@ export function Footer({
   brand,
   footerContent,
   settings,
+  footerConfig = DEFAULT_FOOTER_CONFIG,
 }: {
   brand: FooterBrand;
   footerContent: Record<string, string>;
   settings: SiteSettings;
+  /** Logo sizing and visibility. Defaulted so any other caller keeps working. */
+  footerConfig?: FooterConfig;
 }) {
   const description =
     footerContent.description ||
@@ -46,7 +53,15 @@ export function Footer({
     footerContent.copyright?.replace('{year}', String(copyrightYear)) ||
     `© ${copyrightYear} PaceMakers Business Consultants LLP. All rights reserved.`;
 
-  const logoSrc = brand.logoDarkUrl || brand.logoUrl || null;
+  // Prefer the light logo: this footer sits on deep navy. Disabling the logo
+  // falls through to the same PM wordmark that a missing logo shows, so the
+  // brand column is never empty.
+  const logoSrc = footerConfig.logo_enabled
+    ? brand.logoDarkUrl || brand.logoUrl || null
+    : null;
+
+  const logoHeight = footerConfig.logo_height_px;
+  const logoWidth = footerConfig.logo_width_px;
 
   return (
     <footer
@@ -68,9 +83,16 @@ export function Footer({
                 <Image
                   src={logoSrc}
                   alt={brand.name}
-                  width={180}
-                  height={42}
-                  className="h-11 w-auto"
+                  // Intrinsic hints only. The rendered size comes from the
+                  // inline style below, so the operator's values win without
+                  // a Tailwind class needing to know them.
+                  width={logoWidth ?? 180}
+                  height={logoHeight}
+                  style={{
+                    height: logoHeight,
+                    width: logoWidth ?? 'auto',
+                    objectFit: 'contain',
+                  }}
                   unoptimized
                 />
               ) : (

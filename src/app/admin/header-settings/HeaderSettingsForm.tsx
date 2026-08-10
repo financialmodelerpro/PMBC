@@ -14,6 +14,12 @@ import {
 } from '@/lib/admin/styles';
 import type { BrandingConfig } from '@/lib/cms/branding';
 import type { HeaderConfig } from '@/lib/cms/headerSettings';
+import {
+  FOOTER_LOGO_HEIGHT_DEFAULT,
+  FOOTER_LOGO_HEIGHT_MAX,
+  FOOTER_LOGO_HEIGHT_MIN,
+  type FooterConfig,
+} from '@/lib/cms/footerSettings';
 
 const HEX = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
 /** Matches FMP's while-typing hex guard: allows a partial value as you type. */
@@ -45,17 +51,43 @@ function toBrandValues(b: BrandingConfig): BrandValues {
   };
 }
 
+/**
+ * Footer sizing is held as strings while editing, not numbers.
+ *
+ * A numeric input bound to a number cannot represent the intermediate states of
+ * typing: clearing the box to retype gives NaN, and "7" on the way to "72" is a
+ * valid number that would immediately re-render as 7. Strings let the field hold
+ * whatever the operator is mid-way through typing, and the value is validated
+ * once on save.
+ */
+type FooterValues = {
+  footer_logo_height_px: string;
+  footer_logo_width_px: string;
+  footer_logo_enabled: boolean;
+};
+
+function toFooterValues(f: FooterConfig): FooterValues {
+  return {
+    footer_logo_height_px: String(f.logo_height_px),
+    footer_logo_width_px: f.logo_width_px === null ? '' : String(f.logo_width_px),
+    footer_logo_enabled: f.logo_enabled,
+  };
+}
+
 export function HeaderSettingsForm({
   initialHeader,
   initialBranding,
+  initialFooter,
 }: {
   initialHeader: HeaderConfig;
   initialBranding: BrandingConfig | null;
+  initialFooter: FooterConfig;
 }) {
   const [header, setHeader] = useState<HeaderConfig>(initialHeader);
   const [brand, setBrand] = useState<BrandValues | null>(
     initialBranding ? toBrandValues(initialBranding) : null,
   );
+  const [footer, setFooter] = useState<FooterValues>(toFooterValues(initialFooter));
 
   const [state, setState] = useState<SaveState>('idle');
   const [errMsg, setErrMsg] = useState<string | undefined>();
@@ -66,6 +98,16 @@ export function HeaderSettingsForm({
   const b = <K extends keyof BrandValues>(key: K, value: BrandValues[K]) => {
     setBrand((prev) => (prev ? { ...prev, [key]: value } : prev));
   };
+  const f = <K extends keyof FooterValues>(key: K, value: FooterValues[K]) => {
+    setFooter((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const footerHeightNum = Number.parseInt(footer.footer_logo_height_px, 10);
+  const footerHeightInvalid =
+    footer.footer_logo_height_px !== '' &&
+    (!Number.isFinite(footerHeightNum) ||
+      footerHeightNum < FOOTER_LOGO_HEIGHT_MIN ||
+      footerHeightNum > FOOTER_LOGO_HEIGHT_MAX);
 
   /**
    * FMP fires every write in one Promise.all from a single "Save All". Kept,
@@ -119,6 +161,24 @@ export function HeaderSettingsForm({
           }),
         );
       }
+
+      // Footer keys live in the `footer_settings` section, which the
+      // header-settings route cannot write, so they go to their own endpoint in
+      // the same Save All batch. A blank height is sent as the shipped default
+      // rather than as an empty string, which the API would reject: clearing the
+      // box means "back to default", not "no height".
+      requests.push(
+        fetch('/api/admin/footer-settings', {
+          method: 'PATCH',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            footer_logo_height_px:
+              footer.footer_logo_height_px.trim() || String(FOOTER_LOGO_HEIGHT_DEFAULT),
+            footer_logo_width_px: footer.footer_logo_width_px.trim(),
+            footer_logo_enabled: footer.footer_logo_enabled,
+          }),
+        }),
+      );
 
       const responses = await Promise.all(requests);
       const failed = responses.find((r) => !r.ok);
@@ -298,26 +358,6 @@ export function HeaderSettingsForm({
 
           <div style={{ marginTop: 20 }}>
             <MediaField
-              content={{ logo_dark_url: brand.logo_dark_url }}
-              urlKey="logo_dark_url"
-              onChange={(patch) =>
-                b('logo_dark_url', (patch.logo_dark_url as string) ?? '')
-              }
-              bucket="cms-assets"
-              label="Logo for dark backgrounds (footer, navy sections)"
-              hint="Optional"
-              imagesOnly
-            />
-            <p style={hint}>
-              The footer sits on deep navy, where the standard navy and green
-              logo reads poorly. Upload a white or light version here and the
-              footer, and the social preview card, switch to it. Left empty,
-              both fall back to the standard logo, then to the PM wordmark.
-            </p>
-          </div>
-
-          <div style={{ marginTop: 20 }}>
-            <MediaField
               content={{ favicon_url: brand.favicon_url }}
               urlKey="favicon_url"
               onChange={(patch) => b('favicon_url', (patch.favicon_url as string) ?? '')}
@@ -325,6 +365,123 @@ export function HeaderSettingsForm({
               label="Favicon"
               imagesOnly
             />
+          </div>
+        </Card>
+      )}
+
+      {/* ---- Footer ----
+          All footer branding in one place: the dark logo moved here from the
+          Logo card, because that is the only surface that uses it and splitting
+          the asset from its sizing across two cards made neither obvious. */}
+      {brand && (
+        <Card
+          title="Footer"
+          description="The footer sits on deep navy. Its logo and sizing are separate from the header's."
+        >
+          <MediaField
+            content={{ logo_dark_url: brand.logo_dark_url }}
+            urlKey="logo_dark_url"
+            onChange={(patch) => b('logo_dark_url', (patch.logo_dark_url as string) ?? '')}
+            bucket="cms-assets"
+            label="Logo for dark backgrounds (footer, navy sections)"
+            hint="Optional"
+            imagesOnly
+          />
+          <p style={hint}>
+            The standard navy and green logo reads poorly on navy. Upload a white
+            or light version here and the footer, and the social preview card,
+            switch to it. Left empty, both fall back to the standard logo, then
+            to the PM wordmark.
+          </p>
+
+          <div style={{ marginTop: 18 }}>
+            <Toggle
+              checked={footer.footer_logo_enabled}
+              onChange={(v) => f('footer_logo_enabled', v)}
+              label="Show logo in footer"
+            />
+            <p style={hint}>
+              Turn this off to show the serif PM wordmark instead of an image.
+            </p>
+          </div>
+
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: 14,
+              marginTop: 18,
+            }}
+          >
+            <div>
+              <PxField
+                label={`Logo height (px, ${FOOTER_LOGO_HEIGHT_MIN} to ${FOOTER_LOGO_HEIGHT_MAX})`}
+                value={footer.footer_logo_height_px}
+                onChange={(v) => f('footer_logo_height_px', v)}
+                placeholder={String(FOOTER_LOGO_HEIGHT_DEFAULT)}
+              />
+              <p
+                style={{
+                  ...hint,
+                  color: footerHeightInvalid ? ADMIN_COLORS.danger : hint.color,
+                }}
+              >
+                {footerHeightInvalid
+                  ? `Must be between ${FOOTER_LOGO_HEIGHT_MIN} and ${FOOTER_LOGO_HEIGHT_MAX}. Saving will be rejected.`
+                  : `Leave blank for the default ${FOOTER_LOGO_HEIGHT_DEFAULT}px.`}
+              </p>
+            </div>
+            <div>
+              <PxField
+                label="Logo width (px)"
+                value={footer.footer_logo_width_px}
+                onChange={(v) => f('footer_logo_width_px', v)}
+                placeholder="auto"
+              />
+              <p style={hint}>Blank keeps the logo&rsquo;s own aspect ratio.</p>
+            </div>
+          </div>
+
+          <div style={{ marginTop: 16 }}>
+            <span style={adminLabel}>Preview on the footer background</span>
+            <div
+              style={{
+                marginTop: 6,
+                padding: 18,
+                background: '#14304F',
+                borderRadius: 8,
+                display: 'flex',
+                alignItems: 'center',
+                minHeight: 56,
+              }}
+            >
+              {footer.footer_logo_enabled && (brand.logo_dark_url || brand.logo_url) ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={brand.logo_dark_url || brand.logo_url}
+                  alt="Footer logo preview"
+                  style={{
+                    height:
+                      Number.parseInt(footer.footer_logo_height_px, 10) ||
+                      FOOTER_LOGO_HEIGHT_DEFAULT,
+                    width: Number.parseInt(footer.footer_logo_width_px, 10) || 'auto',
+                    objectFit: 'contain',
+                    display: 'block',
+                  }}
+                />
+              ) : (
+                <span
+                  style={{
+                    fontFamily: 'Georgia, serif',
+                    fontSize: 20,
+                    fontWeight: 600,
+                    color: '#FFFFFF',
+                  }}
+                >
+                  {brand.short_name || 'PaceMakers'}
+                </span>
+              )}
+            </div>
           </div>
         </Card>
       )}

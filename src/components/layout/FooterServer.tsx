@@ -1,6 +1,7 @@
 import { fetchBranding } from '@/lib/cms/branding';
 import { fetchContentBySection } from '@/lib/cms/content';
 import { fetchSiteSettings, type SiteSettings } from '@/lib/cms/settings';
+import { parseFooterConfig } from '@/lib/cms/footerSettings';
 import { Footer } from './Footer';
 
 export async function FooterServer() {
@@ -21,6 +22,9 @@ export async function FooterServer() {
       }}
       footerContent={footerContent}
       settings={settings}
+      // Parsed from the same row map the copy keys come from, so the sizing
+      // controls cost no extra query.
+      footerConfig={parseFooterConfig(footerContent)}
     />
   );
 }

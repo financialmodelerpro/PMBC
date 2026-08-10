@@ -4,6 +4,24 @@ Chronological build history for the PMBC website. Split out of `CLAUDE.md` to ke
 
 ---
 
+### 2026-08-10 - Footer logo sizing controls
+
+**The footer logo was never sizable.** It rendered at a hardcoded Tailwind `h-11` (44px), while the header has exposed `logo_height_px` and `logo_width_px` since migration 029. Three keys now sit in the existing `footer_settings` section of `cms_content`, alongside `about_blurb`, `address_line` and `copyright`, following the same one-row-per-setting convention as `header_settings`.
+
+**A separate API route, despite one Save All.** `/api/admin/header-settings` builds its upserts with the section hardcoded to `header_settings`, so footer keys routed through it would land in the wrong namespace. `/api/admin/footer-settings` is its own endpoint and joins the same Save All batch, which is exactly the pattern `/api/admin/branding` already follows from that form.
+
+**Validation moved out of the route on purpose.** It lives in `lib/cms/footerSettings.ts` for two reasons. It shares `FOOTER_LOGO_HEIGHT_MIN` / `MAX` with the read-path clamp, so the write bound and the render bound cannot drift. And a Next.js route file may only export route handlers, so a schema exported from there breaks the build. This repo has hit that exact failure once already (the `STATUSES` export in the contact-submissions route, found during Phase 10). Putting it in the lib also made it directly testable: 24 cases covering both bounds, blank, decimals, negatives, `"48px"`, and a number where a string is required.
+
+**Blank height means default, not zero, and that is enforced twice.** The API rejects a blank height with a 422, because a footer logo must have one. But the form sends the shipped default when the box is empty, since clearing it means "back to 48", not "no height". And the read path clamps independently of both, so a row hand-edited through `/admin/content` or the SQL editor still cannot produce a zero-height logo. That last layer matters more than it looks: an invisible logo produces no error anywhere, so the operator would see an empty footer column with nothing to explain it.
+
+**`logo_dark_url` moved from the Logo card to the new Footer card.** The footer is the only surface that uses it, and keeping the asset in one card while its sizing lived in another made neither obvious. The Footer card also carries a live preview against the real `#14304F` footer background, which is the only way to judge a light logo without publishing.
+
+Verified against a running server with a real uploaded logo: 48 default, 72 visibly larger, explicit width applied, disabled falling back to the PM wordmark, blank falling back to 48, non-numeric falling back to 48, and out-of-range clamping at both 24 and 120. Also with all three keys deleted, standing in for a database that has not run 040. 15 assertions, 0 failures, and both `branding_config` and the original `footer_settings` rows restored afterwards.
+
+Worth noting for the next session: `branding_config.logo_dark_url` is no longer null. A light logo (`logo-fileartboard-2.png`) has been uploaded since the previous entry, so the footer is already using it, which is presumably how the too-small rendering became visible.
+
+---
+
 ### 2026-08-10 - Direct media upload, video and GIF support, dark-background logo
 
 **Task 3 was already built, except for the part that mattered.** `logo_dark_url` has existed in `branding_config` since migration 003, `Footer` has always resolved `logoDarkUrl || logoUrl`, and `/api/og` has always preferred it. What was missing was any way to set it: the admin exposed a bare text input labelled "Dark logo URL", and the live row is null while `logo_url` holds a real PNG. So the footer has been rendering the dark navy and green logo on deep navy this whole time, exactly as described, and no schema change was needed to fix it. The field is now a labelled MediaField with an explanation of what it is for.
