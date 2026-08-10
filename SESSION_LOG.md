@@ -4,6 +4,24 @@ Chronological build history for the PMBC website. Split out of `CLAUDE.md` to ke
 
 ---
 
+### 2026-08-10 - Firm prominence pass
+
+**The brief was positioning; the substance was honesty.** Home and about were showing Ahmad's career totals under the heading of a firm track record: 200+ valuations, SAR 20B+ real estate NAV modeled, SAR 300M+ capital deployed via equity research. Those figures are real, but they are his, earned over twelve years and several employers, not PaceMakers' record since 2017. Presenting them as firm statistics overstates the firm, and it makes genuinely strong numbers deniable the moment a prospect asks which mandates they came from. They now sit in his credentials, labelled "across his career", and the firm carries its own smaller true numbers.
+
+**The firm's numbers are deliberately modest.** 30+ mandates, established 2017, SECP-registered LLP, 6 sectors served. A boutique that has done 30 mandates well is a credible boutique. One claiming 200+ valuations it cannot attribute is not.
+
+**The most misleading thing on the site was one tag.** /network described Sky Gulf as an "Execution Partner". Both relationships are referral and market access only, so that single phrase implied delivery capability the firm does not have and cannot stand behind. Sky Gulf is now "Referral Relationship", Lynkers "Equity Shareholder and Referral", and both descriptions state explicitly that delivery stays with PaceMakers. The home and about summaries carry the same correction, since a claim corrected on one page and left standing on two others is not corrected.
+
+**Partner-led, not depersonalised.** The brief asked to reframe without losing the senior-led promise, which is the actual selling point. "Every mandate is led personally by Ahmad Din" became "Every mandate is partner-led", with Ahmad named as founding partner in the body and the same commitment stated more institutionally: he wins and leads every mandate and reviews every deliverable personally. The promise is unchanged; only the frame moved from a person to a firm with a partner.
+
+**Two bugs in my own tooling, both worth recording.** The first verification run failed on "home stats are not the firm figures" when the data was correct: Postgres normalises jsonb object key order, so entries written as `{value, label}` read back as `{label, value}` and a plain `JSON.stringify` compare reported a difference. That also silently broke idempotency, because every re-run would have seen a diff and rewritten. Fixed with a key-sorting canonical compare. The second appeared only on the re-run: several sections are located by a content field that this script itself rewrites, so once the eyebrow changed the lookup could not find the row and the script aborted partway through with earlier pages already updated. Lookups now accept the pre-change and post-change values. Confirmed by running it a third time to a clean zero-change result.
+
+**Also fixed a live typo.** The home hero's primary button read "Book a Meetng". It was on the most important call to action on the site.
+
+Individual analysts are not named anywhere, per the brief. The delivery model section describes the staffing model without inventing a bench.
+
+---
+
 ### 2026-08-10 - Optional media on every section type
 
 **The whole feature is defined by its null case.** Adding an optional capability to fifteen section types is easy to get wrong in one specific way: every page that does not use it grows a wrapper element, a grid, or a stray margin. `SectionMediaLayout` returns `children` untouched when there is no media, so nothing wraps and nothing shifts. That was the assertion worth spending verification effort on, and it is what the height comparison in the test actually measures.
