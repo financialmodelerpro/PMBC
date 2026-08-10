@@ -19,7 +19,7 @@ export function PageHeroFallback({
 }) {
   return (
     <section
-      className="relative flex min-h-[72vh] items-center px-6 py-28 sm:py-32"
+      className="relative flex min-h-[70vh] items-center px-6 py-24 sm:py-28"
       style={{
         background:
           'radial-gradient(ellipse at 50% 40%, #1F4269 0%, #1B3A5F 55%, #14304F 100%)',
@@ -46,16 +46,19 @@ export function PageHeroFallback({
         >
           {eyebrow}
         </p>
+        {/* Kept in step with the CMS `hero` renderer: same heights, same
+            wrapping rules, so a page gains nothing but content when an operator
+            replaces this fallback with a real hero section. */}
         <h1
           className="pmbc-display mt-6 text-[40px] leading-[1.05] sm:text-[56px] lg:text-[64px] xl:text-[72px]"
-          style={{ color: '#FFFFFF' }}
+          style={{ color: '#FFFFFF', textWrap: 'balance' }}
         >
           {headline}
         </h1>
         {tagline && (
           <p
-            className="mx-auto mt-7 max-w-[720px] text-[18px] leading-[1.65] sm:text-[20px]"
-            style={{ color: '#E8DDC4' }}
+            className="mx-auto mt-7 max-w-[820px] text-[18px] leading-[1.65] sm:text-[20px]"
+            style={{ color: '#E8DDC4', textWrap: 'pretty' }}
           >
             {tagline}
           </p>

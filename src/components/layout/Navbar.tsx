@@ -6,6 +6,8 @@ import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { Menu, X } from 'lucide-react';
 
+import { PAGE_GUTTER, PAGE_INNER } from '@/lib/public/layout';
+
 export type NavbarBrand = {
   name: string;
   shortName: string;
@@ -144,14 +146,17 @@ export function Navbar({
           : '1px solid transparent',
       }}
     >
-      <div
-        className="mx-auto flex w-full max-w-[1280px] items-center justify-between px-6 lg:px-8"
-        style={{
-          minHeight: p.headerHeightPx ?? 80,
-          paddingTop: p.headerPaddingTopPx ?? undefined,
-          paddingBottom: p.headerPaddingBottomPx ?? undefined,
-        }}
-      >
+      {/* Gutter outside, max width inside, matching SectionContainer exactly so
+          the logo's left edge lands on the same x as the content below it. */}
+      <div className={PAGE_GUTTER}>
+        <div
+          className={`${PAGE_INNER} flex items-center justify-between`}
+          style={{
+            minHeight: p.headerHeightPx ?? 80,
+            paddingTop: p.headerPaddingTopPx ?? undefined,
+            paddingBottom: p.headerPaddingBottomPx ?? undefined,
+          }}
+        >
         {/* Brand */}
         <Link
           href="/"
@@ -286,6 +291,7 @@ export function Navbar({
               {mobileOpen ? <X size={18} /> : <Menu size={18} />}
             </button>
           )}
+          </div>
         </div>
       </div>
 
@@ -298,7 +304,8 @@ export function Navbar({
             borderTop: '1px solid var(--pmbc-border-warm)',
           }}
         >
-          <nav className="mx-auto flex max-w-[1280px] flex-col gap-1 px-6 py-5">
+          <nav className={`${PAGE_GUTTER} py-5`}>
+            <div className={`${PAGE_INNER} flex flex-col gap-1`}>
             {navItems.map((item) => {
               const active = isActive(item.href);
               return (
@@ -328,6 +335,7 @@ export function Navbar({
                 {cta.label}
               </Link>
             )}
+            </div>
           </nav>
         </div>
       )}

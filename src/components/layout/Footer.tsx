@@ -23,6 +23,7 @@ import {
   DEFAULT_FOOTER_CONFIG,
   type FooterConfig,
 } from '@/lib/cms/footerSettings';
+import { PAGE_GUTTER, PAGE_INNER } from '@/lib/public/layout';
 
 type FooterBrand = {
   name: string;
@@ -74,7 +75,8 @@ export function Footer({
         style={{ background: 'rgba(198, 156, 62, 0.45)' }}
       />
 
-      <div className="mx-auto max-w-[1280px] px-6 py-20 lg:px-8">
+      <div className={`${PAGE_GUTTER} py-20`}>
+        <div className={PAGE_INNER}>
         <div className="grid gap-14 md:grid-cols-12">
           {/* Brand column */}
           <div className="md:col-span-4">
@@ -226,12 +228,16 @@ export function Footer({
               )}
             </ul>
           </div>
+          </div>
         </div>
       </div>
 
       {/* Bottom strip */}
       <div style={{ borderTop: '1px solid rgba(232, 221, 196, 0.12)' }}>
-        <div className="mx-auto flex max-w-[1280px] flex-col items-start justify-between gap-3 px-6 py-6 text-[12px] sm:flex-row sm:items-center lg:px-8">
+        <div className={`${PAGE_GUTTER} py-6`}>
+          <div
+            className={`${PAGE_INNER} flex flex-col items-start justify-between gap-3 text-[12px] sm:flex-row sm:items-center`}
+          >
           <p style={{ color: 'rgba(168, 133, 48, 0.85)' }}>{copyright}</p>
           <div className="flex items-center gap-6">
             <Link
@@ -248,6 +254,7 @@ export function Footer({
             >
               Terms
             </Link>
+          </div>
           </div>
         </div>
       </div>

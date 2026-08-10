@@ -4,6 +4,24 @@ Chronological build history for the PMBC website. Split out of `CLAUDE.md` to ke
 
 ---
 
+### 2026-08-10 - Container alignment and hero refinements
+
+**The alignment bug was two bugs, and matching the numbers would have fixed neither.** The navbar and footer used `max-w-[1280px] px-6 lg:px-8` on a single element; sections used `max-w-[1200px]` on an inner element inside a `px-6` outer. Different widths, but also different box models: Tailwind's preflight sets `box-sizing: border-box`, so padding on the same element as `max-w` sits *inside* the max width, while the section pattern puts it *outside*. Setting both to 1200 would have left them 24px apart. The fix is a shared `PAGE_GUTTER` + `PAGE_INNER` pair in `lib/public/layout.ts` that forces the same two-element structure everywhere. The footer was fixed alongside the navbar even though only the navbar was reported, because it was the identical defect one scroll further down.
+
+**Verified by measuring rendered pixels, not by reading CSS.** The Chrome extension was not connected, so this drove headless Chrome directly over the DevTools protocol: Chrome is already installed and Node 24 ships a global `WebSocket`, so no dependency was added. Navbar brand and every content container land on exactly 112.5px at 1440, 352.5px at 1920 and 24px at 390, across home, about and services.
+
+**The first measurement run failed, and the failure was my assertion, not the layout.** Heroes reported a left edge 50px further right than everything else. They keep a narrower 1100px inner box on purpose and their text is centred, so that box is not a left-edge reference and should never have been asserted against. The probe now excludes centre-aligned containers.
+
+**The subtitle width went up, not down, contradicting the brief.** The instruction was to tighten the max-width so "family" stopped hanging at the end of line one. Extracting the real line breaks with a Range walk at nine candidate widths showed tightening does not achieve that: 700px through 580px all produce three lines, and 780 through 740 still break after "family". Only at 800px and above does line one end on the comma after "family offices,", keeping the phrase intact at two lines. Went to 820px and flagged it rather than following the letter of the instruction into a worse result. Three lines would also have given back the vertical space the 70vh change was meant to reclaim.
+
+**Headline: both fixes, not one.** The xl step drops 80px to 72px, which is what actually makes "Advisory from Structure to Exit" fit on one line at 1440 and 1920 (measured, 1 line at both). `text-wrap: balance` is insurance for whatever an operator writes later, since a longer headline will still wrap and should do so evenly.
+
+Hero height changes apply to every CMS hero, so `/contact` and `/book` got shorter too. They were equally tall and benefit identically. `PageHeroFallback` was brought from 72vh to 70vh in the same pass so a page gains nothing but content when its fallback is replaced by a real hero section.
+
+14 measurements, 0 failures, after the probe correction. All 12 public routes still 200.
+
+---
+
 ### 2026-08-10 - Favicon wired to the CMS
 
 **Both suspected causes were real, and there was a third.** The root layout's `metadata` was a static object with no `icons` key anywhere, so `branding_config.favicon_url` was stored, editable in admin, and consumed by no code path. Independently, `src/app/favicon.ico` was still the untouched create-next-app default: 25931 bytes, four embedded sizes, added by the Phase 1 scaffold commit `3b1df5d` and never opened since. So the public site has been serving **the Next.js logo** as its browser-tab icon for the entire build. Checked provenance with `git log --diff-filter=A` before deleting rather than assuming it was scaffold output.

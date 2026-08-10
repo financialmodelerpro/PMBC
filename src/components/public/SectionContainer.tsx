@@ -1,4 +1,5 @@
 import { variantStyles, type PmbcVariant } from '@/lib/public/tokens';
+import { PAGE_INNER } from '@/lib/public/layout';
 import {
   parseSectionStyles,
   sectionInnerStyle,
@@ -53,7 +54,7 @@ export function SectionContainer({
       }}
     >
       <div
-        className="mx-auto w-full max-w-[1200px]"
+        className={PAGE_INNER}
         style={sectionInnerStyle(overrides)}
       >
         {children}

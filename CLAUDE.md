@@ -106,6 +106,8 @@ When you find an em dash in *existing* content while doing other work, fix it as
 
 | Phase 24 : Favicon wired to the CMS | Complete (2026-08-10) | **Two independent faults, both live.** The root layout's `metadata` was a static object with no `icons` key at all, so `branding_config.favicon_url` was stored, editable and read by nothing. Separately, `src/app/favicon.ico` was still the untouched create-next-app default (25931 bytes, added by the Phase 1 scaffold commit and never opened), so the public site was serving **the Next.js logo** as its browser-tab icon. That file is deleted, and the root layout now exports an async `generateMetadata` that resolves the icon through `lib/cms/favicon.ts`. Resolution order: `branding_config.favicon_url`, then `header_settings.icon_url` **only when `icon_as_favicon` is true** (that toggle existed in admin and was read by nothing either, a third dead control), then `branding_config.logo_url`, then no `icons` at all rather than a broken href. `resolveFaviconUrl` cannot throw, because it runs for every page including at build time, where an error would fail the whole build rather than lose an icon. Emits `icon` (with a `type` inferred from the extension), `shortcut` and `apple-touch-icon`. **Caveat:** `/privacy`, `/terms` and the 9 `/services/[slug]` pages are prerendered, so they bake the icon at build time and need a redeploy to pick up a change; every other page is `force-dynamic` and updates immediately. Verified by view-source on 9 routes plus the full fallback chain. |
 
+| Phase 25 : Container alignment + hero refinements | Complete (2026-08-10) | **Alignment:** navbar, footer and sections had three independent container literals that had drifted, and two different box models (see §9). New `src/lib/public/layout.ts` exports `PAGE_GUTTER` + `PAGE_INNER`; navbar, footer and `SectionContainer` all use the same two-element structure. Measured in headless Chrome over CDP: navbar brand and every content container now start at exactly 112.5px at 1440, 352.5px at 1920, 24px at 390, on home, about and services. **Hero:** min-height 88vh to 70vh (`PageHeroFallback` 72vh to 70vh to match), xl headline 80px to 72px plus `text-wrap: balance` so "Advisory from Structure to Exit" fits one line instead of orphaning "Exit", subtitle max-width 720px to 820px plus `text-wrap: pretty`. Eyebrow moved off the brand name via migration 041. **The subtitle width went up, not down as the brief asked**, because measuring the real line breaks showed every width from 780px down still breaks after "family"; only 800px and above ends line one on the comma after "family offices,". Hero changes apply to `/contact` and `/book` too, which were equally tall. |
+
 **Admin login:** `meetahmadch@gmail.com`. **The password was rotated on 2026-08-02 and is deliberately not recorded here or anywhere else in this repository.** Writing it down is what made the previous one worthless. Ahmad holds it; if it is lost, `npm run rotate-admin-password` sets a new one using the service-role key in `.env.local`, so there is no lockout risk.
 
 The retired `Admin@2026` remains in this file's git history and in older `SESSION_LOG.md` entries. That history is left intact on purpose: rewriting it would not un-publish the string, and the password no longer opens anything. It is verified dead, not merely replaced (see the rotation entry in `SESSION_LOG.md`).
@@ -593,6 +595,13 @@ For v1, only two template_key rows are needed: `contact_notification` (sent to a
                                   --   `npm run seed-footer-logo-sizing`
                                   --   (supports --dry-run). Idempotent,
                                   --   ON CONFLICT DO NOTHING.
+041_home_hero_eyebrow.sql         -- Home hero eyebrow from the brand name (which
+                                  --   the logo above already says) to
+                                  --   "CORPORATE FINANCE AND TRANSACTION
+                                  --   ADVISORY". DML only, `npm run
+                                  --   seed-home-hero-eyebrow` (supports
+                                  --   --dry-run). Guarded on the old value, so a
+                                  --   re-run never overwrites an operator edit.
 039_booking_cta_prominence.sql    -- Booking CTA prominence: navbar CTA repointed
                                   --   (header_settings cta_label / cta_href ->
                                   --   Book a Meeting, /book), contact callout +
@@ -1032,7 +1041,7 @@ Decision pending on serif choice: present both during build phase. Both load via
 
 ### Layout Tokens
 
-- Max content width: 1200px (1280px for hero sections)
+- Max content width: 1200px everywhere, via `PAGE_GUTTER` + `PAGE_INNER` in `src/lib/public/layout.ts`. **Use those two constants rather than a fresh `max-w-[...]` literal.** The navbar and footer previously carried their own `max-w-[1280px] px-6 lg:px-8` while sections used `max-w-[1200px]` inside a `px-6` wrapper, so the logo sat 32px left of the content beneath it at 1440px. Matching the numbers alone would not have fixed it: a single element carrying both `max-w` and `px` puts padding *inside* the max width under `box-sizing: border-box`, while the section pattern puts it outside. Both halves are exported so every surface uses the same two-element structure. Heroes keep a narrower 1100px inner box on purpose; their text is centred, so that box is not a left-edge reference.
 - Section vertical padding: 96px desktop, 64px mobile
 - Inner block padding: 32px
 - Card radius: 8px (less rounded than FMP's 12-16px to feel more institutional)

@@ -67,7 +67,10 @@ export function Hero({
 
   return (
     <section
-      className={`relative flex min-h-[88vh] items-center px-6 py-28 sm:py-32 ${overrides.className}`.trim()}
+      // 70vh rather than the original 88vh so the next section is visible above
+      // the fold. Applies to every CMS hero, not only the home page: /contact
+      // and /book were equally tall and gain the same benefit.
+      className={`relative flex min-h-[70vh] items-center px-6 py-24 sm:py-28 ${overrides.className}`.trim()}
       style={{ background: bg, color: v.text, ...overrides.style }}
     >
       {/* Faint diagonal pattern overlay, kept extremely subtle. */}
@@ -101,9 +104,16 @@ export function Hero({
         )}
         {c.headline && (
           <h1
-            className="pmbc-display mt-6 text-[40px] leading-[1.05] sm:text-[56px] lg:text-[72px] xl:text-[80px]"
+            // The xl step drops from 80px to 72px: at 80px the shipped headline
+            // "Advisory from Structure to Exit" overflowed the 1100px column and
+            // left "Exit" alone on line two. `text-wrap: balance` is the belt to
+            // that braces, so a longer headline an operator writes later splits
+            // into even lines instead of leaving an orphan. Browsers without it
+            // simply wrap as before.
+            className="pmbc-display mt-6 text-[40px] leading-[1.05] sm:text-[56px] lg:text-[64px] xl:text-[72px]"
             style={{
               color: dark ? '#FFFFFF' : v.text,
+              textWrap: 'balance',
             }}
           >
             {c.headline}
@@ -111,10 +121,20 @@ export function Hero({
         )}
         {c.subtitle && (
           <p
-            className="mx-auto mt-7 max-w-[720px] text-[18px] leading-[1.65] sm:text-[20px]"
+            // 820px, chosen by measuring the real line breaks rather than by
+            // eye. At the previous 720px the shipped subtitle broke after
+            // "family", splitting "family offices" across two lines. Narrowing
+            // does not fix that: every width from 700px down to 580px produces
+            // three lines, and 780 to 740 still breaks after "family". Only at
+            // 800px and above does line one end on the comma after "family
+            // offices,", keeping the phrase intact and the hero at two lines.
+            // `text-wrap: pretty` then guards against a one-word last line if an
+            // operator rewrites this copy.
+            className="mx-auto mt-7 max-w-[820px] text-[18px] leading-[1.65] sm:text-[20px]"
             style={{
               color: dark ? v.textMuted : '#52606B',
               fontWeight: 400,
+              textWrap: 'pretty',
             }}
           >
             <RichText html={c.subtitle} as="span" />
