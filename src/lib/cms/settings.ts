@@ -2,7 +2,19 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
 import type { Json } from '@/types/database';
 
 export type SiteSettings = {
+  /** General enquiries. Also what the footer and /book show. */
   contact_email?: string;
+  /**
+   * The two additional public addresses shown on /contact. Kept as discrete
+   * keys per the namespace convention in CLAUDE.md section 4, and separate from
+   * `admin_email`, which is where notifications are delivered rather than an
+   * address published to visitors.
+   */
+  contact_email_advisory?: string;
+  contact_email_founder?: string;
+  contact_label_general?: string;
+  contact_label_advisory?: string;
+  contact_label_founder?: string;
   admin_email?: string;
   whatsapp_number?: string;
   phone_number?: string;

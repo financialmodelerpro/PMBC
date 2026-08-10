@@ -29,7 +29,7 @@ Two bugs were found and fixed along the way that predate the parity work: the un
 
 Two design-language notes: Phase 9.5 established the token layer (`src/lib/public/tokens.ts`, `SectionContainer`, three background variants with sequence-aware resolution). Phase 11 retuned the values to primary navy `#1B3A5F`, deep navy `#14304F`, cream `#FAF7F2`, gold `#C69C3E`, muted gold `#A88530`, cream-on-navy `#E8DDC4`, and re-anchored the hero gradient. Phase 11 also fixed the admin structure to match FMP: `/admin/page-builder` is the pages list, `/admin/pages` is the navbar menu editor over the `site_pages` table, and nav editing was removed from `/admin/header-settings` so the navbar has one source of truth.
 
-**Remaining before launch:** production env vars on Vercel (without `RESEND_API_KEY` the contact form saves to the inbox but sends no email); rotate the `Admin@2026` dev password; DNS and SSL for `pacemakersglobal.com`; counsel review of Privacy and Terms, then remove the badge; submit the sitemap to Search Console; refresh the Supabase Security Advisor; real asset uploads (logo, founder photo, network image, partner logos); and content for the four empty collections (Case Studies, Insights, Testimonials, Team), which degrade gracefully to empty until then. **There is also a genuine client enquiry from 2026-06-21 sitting unread in the inbox.** See the "Remaining Before Launch" checklist in `CLAUDE.md` for owners per item.
+**Remaining before launch:** production env vars on Vercel (without `BREVO_API_KEY` the contact form saves to the inbox but sends no email); rotate the `Admin@2026` dev password; DNS and SSL for `pacemakersglobal.com`; counsel review of Privacy and Terms, then remove the badge; submit the sitemap to Search Console; refresh the Supabase Security Advisor; real asset uploads (logo, founder photo, network image, partner logos); and content for the four empty collections (Case Studies, Insights, Testimonials, Team), which degrade gracefully to empty until then. **There is also a genuine client enquiry from 2026-06-21 sitting unread in the inbox.** See the "Remaining Before Launch" checklist in `CLAUDE.md` for owners per item.
 
 ---
 
@@ -66,7 +66,7 @@ A complete content management system identical in pattern to FMP (key-value CMS 
 - Site settings
 
 **Email system:**
-- Resend integration
+- Brevo integration
 - Two transactional templates (admin notification on contact form submission, acknowledgement to the person who submitted)
 - Branded HTML base layout
 
@@ -96,7 +96,7 @@ Everything below is deferred to phase 2 or later. Don't accidentally build any o
 FMP is a learning and modeling platform with student auth, course content, quizzes, certificates, live sessions, video tracking, and Google Apps Script integration. PMBC is a credibility website. The complexity gap is intentional.
 
 **PMBC inherits from FMP:**
-- Tech stack (Next.js, TypeScript, Tailwind, Supabase, Vercel, Resend)
+- Tech stack (Next.js, TypeScript, Tailwind, Supabase, Vercel, Brevo)
 - CMS pattern (key-value + block-based page sections)
 - Page builder admin UX
 - Branded email pattern
@@ -166,7 +166,7 @@ Two single-purpose work streams have also landed since Phase 8:
 | Open question | Notes |
 |----------------|-------|
 | Headline serif font | Source Serif Pro vs Playfair Display. Decide during Phase 5 polish. |
-| Resend account | Reuse FMP's account with new sender, or create new account for PMBC. Recommendation: separate account. |
+| Brevo account | Separate PMBC account, sending domain `pacemakersglobal.com` authenticated with SPF, DKIM and DMARC. Migrated from Resend 2026-08-10. |
 | Color tokens, exact hex values | Starting palette in CLAUDE.md is a draft. Refine against logo and brand once first pages render. |
 | Founder photo on About page | Use the existing FMP profile photo, or shoot new institutional photography. |
 | Direct booking link | Microsoft Bookings (already used by FMP) vs Calendly vs WhatsApp-only. |
@@ -191,7 +191,7 @@ The FMP founder page (`financialmodelerpro.com/about/ahmad-din`) is the canonica
 5. **Before launch:**
    - Rotate `Admin@2026` (the dev seed password for `meetahmadch@gmail.com`) to a strong production credential via `npm run seed-admin`. With RLS now on `admin_users`, the dashboard table editor cannot insert; the seed script (which uses the service-role key) is the right path.
    - DNS + SSL on Vercel for the apex and `www`.
-   - Production env vars populated (`NEXT_PUBLIC_SITE_URL`, `RESEND_API_KEY`, `EMAIL_FROM_*`, `EMAIL_TO_ADMIN`, `HCAPTCHA_*`, Supabase service role key).
+   - Production env vars populated (`NEXT_PUBLIC_SITE_URL`, `BREVO_API_KEY`, `EMAIL_FROM_*`, `EMAIL_TO_ADMIN`, `HCAPTCHA_*`, Supabase service role key).
    - Sitemap submitted to Google Search Console.
    - Counsel review of `/privacy` and `/terms`; remove the "Subject to legal review" badge once approved.
    - Refresh Supabase Security Advisor in the dashboard; confirm the 10 RLS errors are cleared.

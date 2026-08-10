@@ -155,8 +155,8 @@ Single Next.js application, single Supabase project, single Vercel project. No s
                      |
                      v
         ==========================================================
-        |  RESEND: contact notification + acknowledgement          |
-        |  (degrades gracefully when RESEND_API_KEY is absent:     |
+        |  BREVO:  contact notification + acknowledgement          |
+        |  (degrades gracefully when BREVO_API_KEY is absent:      |
         |   the submission still persists, no email is sent)       |
         ==========================================================
 

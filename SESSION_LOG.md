@@ -4,6 +4,26 @@ Chronological build history for the PMBC website. Split out of `CLAUDE.md` to ke
 
 ---
 
+### 2026-08-10 - Email migrated from Resend to Brevo, three published contact addresses
+
+**No SDK, on purpose.** Sending is one POST to one endpoint, so `@getbrevo/brevo` buys nothing while costing loose OpenAPI-generated models, a transitive HTTP stack, and CJS/ESM friction inside the Next server bundle. `src/lib/email/send.ts` posts to `https://api.brevo.com/v3/smtp/email` with plain `fetch` and about twenty lines of hand-written request types, which describe the payload more precisely than the generated ones do.
+
+**The exported surface did not change, so no caller was edited.** `sendEmail`, `SendEmailArgs` and `SendEmailResult` are identical, and the graceful fallback is preserved exactly: a missing key logs a warning and returns `{ ok: false, reason: 'not_configured' }` without throwing. Verified that path first, before the key existed, by posting a real submission: the API returned `ok: true`, the row was saved, and the log showed the warning rather than a stack trace.
+
+**`from` parses two formats.** Brevo wants sender name and address as separate fields. The Resend setup this replaces used the `Name <addr@example.com>` convention, so an existing deployment may already have `EMAIL_FROM_DEFAULT` in that shape; sending the whole string as the address would be rejected as malformed. Bare addresses and angled ones both work, and `EMAIL_FROM_NAME` fills the display name when the address carries none.
+
+**Verification went past "no error was logged".** A real contact submission was posted, then Brevo itself was asked what happened: `/v3/smtp/statistics/events` reports `requests` then `delivered` for both recipients with no bounce, block or spam events, and `/v3/smtp/emails/{uuid}` returned the actual delivered bodies, which were asserted to be full HTML documents carrying the branded shell, PMBC navy, and every `{{variable}}` resolved. Fetching the delivered body is better evidence than re-rendering the template locally, since it tests what the recipient received rather than what the code would produce.
+
+**The env var alone would not have worked.** The brief set `EMAIL_TO_ADMIN=advisory@pacemakersglobal.com`, but the contact route prefers `site_settings.admin_email`, which held `meetahmadch@gmail.com`. The database would have kept winning and notifications would have kept going to the personal Gmail. Migration 042 aligns the two, guarded on the old value so a later operator edit is not stamped over. Confirmed live: the notification was delivered to advisory@, which also proves that mailbox accepts mail.
+
+**The privacy page named the wrong sub-processor.** It disclosed "Resend, Inc. (United States)" as the party processing contact-form personal data. That is a legal disclosure, not a code comment, so it was corrected to Brevo SAS (France, European Union). Worth raising at counsel review, since the processor jurisdiction moved from the US to the EU, which changes the transfer analysis.
+
+**Two things noticed in the Brevo account that are worth a decision.** The key belongs to an account named **Financial Modeler Pro**, not a separate PMBC account, so PMBC and FMP now share sending reputation and analytics. `CLAUDE.md` section 7 had recommended separate accounts for exactly that reason. It is also a **free plan with 297 credits left**, which carries a 300 per day cap.
+
+/contact now publishes three addresses with editable labels, each row rendering only when its address is set, so clearing one removes the row rather than leaving a gap.
+
+---
+
 ### 2026-08-10 - Container alignment and hero refinements
 
 **The alignment bug was two bugs, and matching the numbers would have fixed neither.** The navbar and footer used `max-w-[1280px] px-6 lg:px-8` on a single element; sections used `max-w-[1200px]` on an inner element inside a `px-6` outer. Different widths, but also different box models: Tailwind's preflight sets `box-sizing: border-box`, so padding on the same element as `max-w` sits *inside* the max width, while the section pattern puts it *outside*. Setting both to 1200 would have left them 24px apart. The fix is a shared `PAGE_GUTTER` + `PAGE_INNER` pair in `lib/public/layout.ts` that forces the same two-element structure everywhere. The footer was fixed alongside the navbar even though only the navbar was reported, because it was the identical defect one scroll further down.

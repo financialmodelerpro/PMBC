@@ -18,6 +18,11 @@ type SaveState = 'idle' | 'saving' | 'saved' | 'error';
 
 type FormValues = Required<{
   contact_email: string;
+  contact_email_advisory: string;
+  contact_email_founder: string;
+  contact_label_general: string;
+  contact_label_advisory: string;
+  contact_label_founder: string;
   admin_email: string;
   whatsapp_number: string;
   phone_number: string;
@@ -32,6 +37,11 @@ type FormValues = Required<{
 function defaults(initial: SiteSettings): FormValues {
   return {
     contact_email: initial.contact_email ?? '',
+    contact_email_advisory: initial.contact_email_advisory ?? '',
+    contact_email_founder: initial.contact_email_founder ?? '',
+    contact_label_general: initial.contact_label_general ?? '',
+    contact_label_advisory: initial.contact_label_advisory ?? '',
+    contact_label_founder: initial.contact_label_founder ?? '',
     admin_email: initial.admin_email ?? '',
     whatsapp_number: initial.whatsapp_number ?? '',
     phone_number: initial.phone_number ?? '',
@@ -97,10 +107,31 @@ export function SettingsForm({ initial }: { initial: SiteSettings }) {
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
         <Section title="Contact">
-          <Field label="Contact email" hint="Public-facing">
+          {/* The three addresses published on /contact. Each renders only when
+              its address is filled in, so leaving one blank removes that row
+              rather than showing an empty one. */}
+          <Field label="General enquiries email" hint="Also used in the footer">
             <input type="email" {...register('contact_email')} style={adminInput} />
           </Field>
-          <Field label="Admin email" hint="Where contact-form notifications go">
+          <Field label="General enquiries label">
+            <input type="text" {...register('contact_label_general')} style={adminInput} />
+          </Field>
+          <Field label="Advisory enquiries email">
+            <input type="email" {...register('contact_email_advisory')} style={adminInput} />
+          </Field>
+          <Field label="Advisory enquiries label">
+            <input type="text" {...register('contact_label_advisory')} style={adminInput} />
+          </Field>
+          <Field label="Founder email">
+            <input type="email" {...register('contact_email_founder')} style={adminInput} />
+          </Field>
+          <Field label="Founder label">
+            <input type="text" {...register('contact_label_founder')} style={adminInput} />
+          </Field>
+          <Field
+            label="Admin email"
+            hint="Where contact-form notifications are delivered, not published"
+          >
             <input type="email" {...register('admin_email')} style={adminInput} />
           </Field>
           <Field label="Phone number">

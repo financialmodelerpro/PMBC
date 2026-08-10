@@ -17,7 +17,7 @@ The patterns below mirror Financial Modeler Pro (FMP) where they make sense, but
 | Vercel project | pmbc |
 | Hosting | Vercel |
 | Database | Supabase (new project, separate from FMP) |
-| Email | Resend (new sender domain or shared with FMP, decision pending) |
+| Email | Brevo (transactional, sender domain `pacemakersglobal.com`). Migrated from Resend 2026-08-10. |
 | Tagline | Advisory from Structure to Exit |
 | Positioning | Boutique corporate finance and transaction advisory firm serving KSA, GCC, and worldwide mandates |
 | Primary audience | Family offices, investment offices, real estate developers, corporates running M&A or valuation mandates |
@@ -108,6 +108,8 @@ When you find an em dash in *existing* content while doing other work, fix it as
 
 | Phase 25 : Container alignment + hero refinements | Complete (2026-08-10) | **Alignment:** navbar, footer and sections had three independent container literals that had drifted, and two different box models (see §9). New `src/lib/public/layout.ts` exports `PAGE_GUTTER` + `PAGE_INNER`; navbar, footer and `SectionContainer` all use the same two-element structure. Measured in headless Chrome over CDP: navbar brand and every content container now start at exactly 112.5px at 1440, 352.5px at 1920, 24px at 390, on home, about and services. **Hero:** min-height 88vh to 70vh (`PageHeroFallback` 72vh to 70vh to match), xl headline 80px to 72px plus `text-wrap: balance` so "Advisory from Structure to Exit" fits one line instead of orphaning "Exit", subtitle max-width 720px to 820px plus `text-wrap: pretty`. Eyebrow moved off the brand name via migration 041. **The subtitle width went up, not down as the brief asked**, because measuring the real line breaks showed every width from 780px down still breaks after "family"; only 800px and above ends line one on the comma after "family offices,". Hero changes apply to `/contact` and `/book` too, which were equally tall. |
 
+| Phase 26 : Brevo email migration + three contact addresses | Complete (2026-08-10) | `resend` uninstalled; `src/lib/email/send.ts` rewritten against Brevo's v3 REST API with plain `fetch` and hand-written types (see section 7 for why no SDK). Exported surface unchanged, so no caller was edited, and the graceful fallback is preserved. `from` parses both bare addresses and `Name <addr>`, since the Resend setup used the angled form. **Verified end to end against the live API:** a real contact submission produced both emails, Brevo reports `requests` then `delivered` for each, and the delivered bodies were fetched back from `/v3/smtp/emails/{uuid}` and asserted to carry the branded shell with every `{{variable}}` resolved. **/contact now publishes three addresses** (advisory@, info@, ahmad.din@) with editable labels, stored in `site_settings` via migration 042. That migration **also repoints `admin_email` from the personal Gmail to advisory@**, which was necessary rather than cosmetic: the contact route prefers `site_settings.admin_email` over `EMAIL_TO_ADMIN`, so setting the env var alone would have had no effect. Privacy page sub-processor disclosure updated from Resend, Inc. (US) to Brevo SAS (France, EU). |
+
 **Admin login:** `meetahmadch@gmail.com`. **The password was rotated on 2026-08-02 and is deliberately not recorded here or anywhere else in this repository.** Writing it down is what made the previous one worthless. Ahmad holds it; if it is lost, `npm run rotate-admin-password` sets a new one using the service-role key in `.env.local`, so there is no lockout risk.
 
 The retired `Admin@2026` remains in this file's git history and in older `SESSION_LOG.md` entries. That history is left intact on purpose: rewriting it would not un-publish the string, and the password no longer opens anything. It is verified dead, not merely replaced (see the rotation entry in `SESSION_LOG.md`).
@@ -131,7 +133,7 @@ All buildable features are done as of 2026-08-02. **The FMP admin-parity program
 > **Correction to a long-standing assumption.** Testimonials was not empty only because nobody had written any. **The form could not save one.** `testimonials` is the only collection table without an `updated_at` column, while `createCollectionApi` stamps one by default, so every create and update returned a 400. That dates to the Phase 10 collections build in June and was found and fixed on 2026-08-01 (parity 7 verification). Testimonials is genuinely writable now. The other four collections were never blocked, so those really are just unwritten.
 
 **Blockers (site is not launch-ready until these are done):**
-1. **Production env vars on Vercel.** Set `RESEND_API_KEY`, `EMAIL_FROM_DEFAULT`, `EMAIL_FROM_CONTACT`, `EMAIL_TO_ADMIN`, `HCAPTCHA_SECRET_KEY`, `NEXT_PUBLIC_HCAPTCHA_SITE_KEY`, `NEXTAUTH_SECRET`, `NEXTAUTH_URL`, `NEXT_PUBLIC_SITE_URL`, and the Supabase keys. Until Resend is configured the contact form still saves to the inbox but sends no notification or acknowledgement email (the send wrapper degrades gracefully). [user, Vercel dashboard]
+1. **Production env vars on Vercel.** Set `BREVO_API_KEY`, `EMAIL_FROM_DEFAULT`, `EMAIL_FROM_NAME`, `EMAIL_TO_ADMIN`, `HCAPTCHA_SECRET_KEY`, `NEXT_PUBLIC_HCAPTCHA_SITE_KEY`, `NEXTAUTH_SECRET`, `NEXTAUTH_URL`, `NEXT_PUBLIC_SITE_URL`, and the Supabase keys. `EMAIL_FROM_CONTACT` is optional. Until Brevo is configured the contact form still saves to the inbox but sends no notification or acknowledgement email (the send wrapper degrades gracefully). [user, Vercel dashboard]
 2. ~~**Rotate `Admin@2026`**~~ **Done 2026-08-02.** Rotated via `npm run rotate-admin-password`, bcrypt cost 12. Verified independently of the script's own report: the stored hash no longer matches `Admin@2026`, the new password logs in and reaches `/admin` (HTTP 200), and the old one is refused with no session issued. **One caveat: the replacement password was typed into a chat transcript, so it is not fully private.** It is a large improvement on a password published to GitHub, but rotating once more to a value that has never been transcribed is worth doing before launch, and now costs one command.
 3. **DNS + SSL** for `pacemakersglobal.com` (apex + `www`) on Vercel, then verify SSL provisioning. [user]
 4. **Counsel review of `/privacy` and `/terms`.** After sign-off, remove the "Subject to legal review" badge (hardcoded in both page files). [user reviews; assistant removes badge]
@@ -149,7 +151,7 @@ All buildable features are done as of 2026-08-02. **The FMP admin-parity program
 
 ## 2. Architecture Overview
 
-Single Next.js application, single domain (pacemakersglobal.com), no subdomain routing. Public marketing site plus admin CMS. No student auth, no public registration, no payment flows, no third-party integrations beyond Resend and Supabase.
+Single Next.js application, single domain (pacemakersglobal.com), no subdomain routing. Public marketing site plus admin CMS. No student auth, no public registration, no payment flows, no third-party integrations beyond Brevo and Supabase.
 
 ### Stack
 
@@ -161,7 +163,7 @@ Single Next.js application, single domain (pacemakersglobal.com), no subdomain r
 | State | Zustand | ^5 | Only if needed; most pages are server components |
 | Database | Supabase (@supabase/supabase-js) | ^2 | New project, separate from FMP |
 | Auth | NextAuth.js (JWT, admin-only) | ^4 | Single admin role, no public users |
-| Email | Resend | ^6 | Contact form notifications |
+| Email | Brevo v3 REST API | no SDK | Contact form notifications. Plain `fetch`, see section 7. |
 | Image | sharp | ^0.34 | OG image logo conversion |
 | OG Images | next/og (satori ImageResponse) | built-in | Dynamic OG cards |
 | Icons | lucide-react | ^1 | Lucide moved to a 1.x major in 2024. v1.x is current and correct : do **not** "downgrade" to 0.x. |
@@ -276,7 +278,7 @@ src/
 │   │   ├── pages.ts                    # page_sections fetchers
 │   │   └── branding.ts                 # branding_config fetcher
 │   ├── email/
-│   │   ├── send.ts                     # Resend wrapper
+│   │   ├── send.ts                     # Brevo wrapper
 │   │   ├── templates/
 │   │   │   ├── _base.ts                # baseLayoutBranded()
 │   │   │   ├── contactNotification.ts
@@ -595,6 +597,15 @@ For v1, only two template_key rows are needed: `contact_notification` (sent to a
                                   --   `npm run seed-footer-logo-sizing`
                                   --   (supports --dry-run). Idempotent,
                                   --   ON CONFLICT DO NOTHING.
+042_contact_addresses.sql         -- Three published contact addresses plus their
+                                  --   labels in site_settings (advisory@, info@,
+                                  --   ahmad.din@). ALSO repoints admin_email from
+                                  --   the personal Gmail to advisory@, because
+                                  --   the contact route prefers that key over the
+                                  --   EMAIL_TO_ADMIN env var. DML only,
+                                  --   `npm run seed-contact-addresses` (supports
+                                  --   --dry-run). Each key written only when
+                                  --   blank; admin_email guarded on the old value.
 041_home_hero_eyebrow.sql         -- Home hero eyebrow from the brand name (which
                                   --   the logo above already says) to
                                   --   "CORPORATE FINANCE AND TRANSACTION
@@ -862,11 +873,15 @@ Sections with pending edits show an amber dot in the left rail, and the top bar 
 
 ## 7. Email System
 
-### Resend Setup
+### Brevo Setup
 
-One Resend account, one verified sending domain. Decision: either reuse FMP's existing Resend account with a new sender (e.g., `noreply@pacemakersglobal.com`) or create a new Resend account specifically for PMBC. Recommendation: separate account for clean separation of analytics and reputation.
+**Migrated from Resend to Brevo on 2026-08-10.** One Brevo account, one authenticated sending domain (`pacemakersglobal.com`). Create the API key under **SMTP & API, then API Keys**. Domain authentication (SPF, DKIM, DMARC) follows Brevo's standard flow and must be completed or mail lands in spam.
 
-Domain verification (SPF, DKIM, DMARC) follows Resend's standard flow. Use `pacemakersglobal.com` as the sender domain.
+No SDK. `src/lib/email/send.ts` posts to `https://api.brevo.com/v3/smtp/email` with plain `fetch`. Sending is a single POST to a single endpoint, so `@getbrevo/brevo` buys nothing while costing loose OpenAPI-generated types, a transitive HTTP stack, and CJS/ESM friction inside the Next server bundle. The request and response are typed by hand in that file.
+
+The exported surface (`sendEmail`, `SendEmailArgs`, `SendEmailResult`) is unchanged from the Resend implementation, so no caller was edited. The graceful fallback is unchanged too: a missing `BREVO_API_KEY` or sender logs a warning and returns `{ ok: false, reason: 'not_configured' }` without throwing, so the contact form still saves to the admin inbox on a deployment where email is not wired up.
+
+`from` accepts either a bare address or `Name <addr@example.com>`; Brevo needs the two parts separately, and the old Resend setup used the angled form, so both are parsed. `EMAIL_FROM_NAME` supplies the display name when the address carries none.
 
 ### Templates
 
@@ -904,23 +919,25 @@ export async function baseLayoutBranded(content: string): Promise<string> {
 ### Send Wrapper
 
 ```typescript
-// src/lib/email/send.ts
-import { Resend } from 'resend';
+// src/lib/email/send.ts (shape only, see the file for the real implementation)
+const BREVO_ENDPOINT = 'https://api.brevo.com/v3/smtp/email';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+export async function sendEmail(args: SendEmailArgs): Promise<SendEmailResult> {
+  const apiKey = process.env.BREVO_API_KEY;
+  const sender = parseAddress(args.from || process.env.EMAIL_FROM_DEFAULT || '');
+  if (!apiKey || !sender) return { ok: false, reason: 'not_configured' };
 
-export async function sendEmail({ to, subject, html, from }: {
-  to: string | string[];
-  subject: string;
-  html: string;
-  from?: string;
-}) {
-  return resend.emails.send({
-    from: from || process.env.EMAIL_FROM_DEFAULT!,
-    to,
-    subject,
-    html,
+  const res = await fetch(BREVO_ENDPOINT, {
+    method: 'POST',
+    headers: { 'api-key': apiKey, 'content-type': 'application/json' },
+    body: JSON.stringify({
+      sender,
+      to: recipients(args.to),
+      subject: args.subject,
+      htmlContent: args.html,
+    }),
   });
+  // ... error handling, returns { ok: true, id } on success
 }
 ```
 
@@ -1063,11 +1080,13 @@ NEXTAUTH_SECRET=
 NEXTAUTH_URL=https://pacemakersglobal.com
 NEXT_PUBLIC_SITE_URL=https://pacemakersglobal.com
 
-# Resend
-RESEND_API_KEY=
-EMAIL_FROM_DEFAULT=noreply@pacemakersglobal.com
-EMAIL_FROM_CONTACT=info@pacemakersglobal.com
-EMAIL_TO_ADMIN=ahmad.din@pacemakersglobal.com
+# Brevo (transactional email)
+BREVO_API_KEY=
+EMAIL_FROM_DEFAULT=info@pacemakersglobal.com
+EMAIL_FROM_NAME=PaceMakers Business Consultants
+EMAIL_TO_ADMIN=advisory@pacemakersglobal.com
+# Optional, overrides the From on the acknowledgement to the enquirer.
+EMAIL_FROM_CONTACT=
 
 # hCaptcha
 HCAPTCHA_SECRET_KEY=

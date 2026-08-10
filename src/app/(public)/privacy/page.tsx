@@ -109,8 +109,8 @@ export default function PrivacyPage() {
             personnel.
           </li>
           <li>
-            <strong>Resend, Inc.</strong> (United States): transactional email
-            delivery for contact-form notifications and acknowledgements. Resend
+            <strong>Brevo SAS</strong> (France, European Union): transactional email
+            delivery for contact-form notifications and acknowledgements. Brevo
             processes the recipient address and message body for the limited purpose
             of email delivery and deliverability monitoring.
           </li>

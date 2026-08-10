@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Mail, MessageCircle, MapPin, CalendarDays } from 'lucide-react';
+import { Mail, MessageCircle, MapPin, CalendarDays, UserRound } from 'lucide-react';
 
 import { fetchPage, fetchPageSections, fetchFounderPhotoUrl } from '@/lib/cms/pages';
 import { fetchSiteSettings } from '@/lib/cms/settings';
@@ -127,12 +127,32 @@ export default async function ContactPage(props: {
               </p>
 
               <ul className="mt-8 space-y-5">
+                {/* Three published addresses, each routing a different kind of
+                    enquiry. Rendered from site_settings so they stay editable,
+                    and each row appears only when its address is set, so
+                    clearing one removes the row rather than leaving a gap. */}
+                {settings.contact_email_advisory && (
+                  <ContactRow
+                    icon={<Mail size={16} />}
+                    label={settings.contact_label_advisory || 'Mandate and advisory enquiries'}
+                    href={`mailto:${settings.contact_email_advisory}`}
+                    value={settings.contact_email_advisory}
+                  />
+                )}
                 {settings.contact_email && (
                   <ContactRow
                     icon={<Mail size={16} />}
-                    label="Email"
+                    label={settings.contact_label_general || 'General enquiries'}
                     href={`mailto:${settings.contact_email}`}
                     value={settings.contact_email}
+                  />
+                )}
+                {settings.contact_email_founder && (
+                  <ContactRow
+                    icon={<UserRound size={16} />}
+                    label={settings.contact_label_founder || 'Direct to the founder'}
+                    href={`mailto:${settings.contact_email_founder}`}
+                    value={settings.contact_email_founder}
                   />
                 )}
                 {settings.whatsapp_number && (

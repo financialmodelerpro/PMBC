@@ -19,7 +19,8 @@
     "seed-booking-page": "node scripts/seed-booking-page.mjs",
     "seed-booking-cta": "node scripts/seed-booking-cta-prominence.mjs",
     "seed-footer-logo-sizing": "node scripts/seed-footer-logo-sizing.mjs",
-    "seed-home-hero-eyebrow": "node scripts/seed-home-hero-eyebrow.mjs"
+    "seed-home-hero-eyebrow": "node scripts/seed-home-hero-eyebrow.mjs",
+    "seed-contact-addresses": "node scripts/seed-contact-addresses.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -39,7 +40,6 @@
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-hook-form": "^7.74.0",
-    "resend": "^6.12.2",
     "sanitize-html": "^2.17.6",
     "sharp": "^0.34.5",
     "zod": "^4.3.6",

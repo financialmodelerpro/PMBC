@@ -8,6 +8,11 @@ import type { Json } from '@/types/database';
 
 const settingsSchema = z.object({
   contact_email: z.string().email().or(z.literal('')).optional(),
+  contact_email_advisory: z.string().email().or(z.literal('')).optional(),
+  contact_email_founder: z.string().email().or(z.literal('')).optional(),
+  contact_label_general: z.string().optional(),
+  contact_label_advisory: z.string().optional(),
+  contact_label_founder: z.string().optional(),
   admin_email: z.string().email().or(z.literal('')).optional(),
   whatsapp_number: z.string().optional(),
   phone_number: z.string().optional(),
