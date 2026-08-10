@@ -4,6 +4,28 @@ Chronological build history for the PMBC website. Split out of `CLAUDE.md` to ke
 
 ---
 
+### 2026-08-10 - /about merged into home and retired
+
+**The merge was mostly deletion, and that is the finding.** /about carried eight sections. After the firm-prominence pass put the firm first on home, six of them duplicated home in substance: the same firm statistics, the same network summary, a hero restating the firm description, a founder card, a quote, and a closing CTA. Only two pieces existed on /about and nowhere else. Moving everything would have produced a home page that said each thing twice.
+
+**One conversion was necessary, not stylistic.** The firm introduction lived in a `text_image` section with no image, and that renderer draws an empty gold-framed box when `image_url` is blank. On /about that was a small blemish; imported onto the home page it would have been an empty placeholder in the middle of the site's most important page. It moved as a `paragraphs` section instead, with the /about hero's firm description folded into the same copy rather than discarded.
+
+**"Firm credentials" moved by page_slug.** Changing one column keeps the row, its id, its styles and its content, so nothing was retyped and nothing could drift in transcription.
+
+**The founder mention could not be a founder_block.** The brief asked for a short mention with no bio, no proof-point list and no photo. `FounderBlock` renders a gold-framed monogram card even when `photo_url` is empty, so there is no configuration of it that satisfies "no second photo card". The mention is a `paragraphs` section with an inline link, which the sanitiser already allows.
+
+**Navbar: relabelled to "Founder", not repointed as "About".** The brief left the choice open. Keeping the label "About" while sending it to a personal profile would be a small bait and switch now that the firm story is on home: a visitor clicking "About" expects the firm, and would land on one person. "Founder" says exactly what the destination is, and for a boutique whose selling point is the partner it is a stronger label than the generic one. The footer got the same treatment.
+
+**301 rather than Next's `permanent: true`.** That flag emits a 308. Both are permanent redirects, but 301 is what the brief asked for and what search engines and old bookmarks have handled for two decades, so `statusCode: 301` is set explicitly. Verified: `/about` resolves to `/` in one hop, and `/about/` in two, since Next normalises the trailing slash first.
+
+**Two things caught that a content-only pass would have missed.** Two hero CTAs elsewhere still pointed at /about ("About the Firm" on /network, "About PaceMakers" on the FMP page). The redirect would have caught them, but a link that redirects is a link that is quietly wrong, so both now point at /. And the typecheck failed once after deleting the route, on a stale `.next/types/validator.ts` still referencing the removed page; it passed after the rebuild regenerated route types, so it was an artifact, not a defect.
+
+**One false verification failure, from a trap already recorded in this log.** "Founder mention appears exactly once" failed at two occurrences. The second was the RSC flight payload, which duplicates every rendered string. Stripping script tags showed exactly one occurrence in the DOM. Third time this data island has produced a misleading count in this session; worth checking for before believing any string-count assertion against Next HTML.
+
+Orphan check confirms every remaining `page_sections` row belongs to a live `cms_pages` row. `/about/ahmad-din` is untouched.
+
+---
+
 ### 2026-08-10 - Firm prominence pass
 
 **The brief was positioning; the substance was honesty.** Home and about were showing Ahmad's career totals under the heading of a firm track record: 200+ valuations, SAR 20B+ real estate NAV modeled, SAR 300M+ capital deployed via equity research. Those figures are real, but they are his, earned over twelve years and several employers, not PaceMakers' record since 2017. Presenting them as firm statistics overstates the firm, and it makes genuinely strong numbers deniable the moment a prospect asks which mandates they came from. They now sit in his credentials, labelled "across his career", and the firm carries its own smaller true numbers.

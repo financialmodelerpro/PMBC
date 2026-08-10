@@ -22,7 +22,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     '/sectors',
     '/approach',
     '/network',
-    '/about',
+    // `/about` is gone: it was merged into the home page and now 301s there.
+    // The founder profile keeps its nested path.
     '/about/ahmad-din',
     '/team',
     '/case-studies',

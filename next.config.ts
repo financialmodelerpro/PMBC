@@ -50,6 +50,19 @@ const nextConfig: NextConfig = {
   images: {
     remotePatterns,
   },
+  async redirects() {
+    return [
+      {
+        // /about was merged into the home page. A 301 rather than Next's
+        // `permanent: true`, which emits a 308: both are permanent, but 301 is
+        // what search engines and old bookmarks have handled for two decades,
+        // and some older clients still mishandle 308 on a GET.
+        source: '/about',
+        destination: '/',
+        statusCode: 301,
+      },
+    ];
+  },
 };
 
 export default nextConfig;

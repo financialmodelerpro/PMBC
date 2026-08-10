@@ -114,6 +114,8 @@ When you find an em dash in *existing* content while doing other work, fix it as
 
 | Phase 28 : Firm prominence pass | Complete (2026-08-10) | The site read as one person rather than a firm. **The substantive fix was an honesty one:** home and about presented Ahmad's career totals (200+ valuations, SAR 20B+ NAV, SAR 300M+ deployed) as PMBC's track record. Those are his, earned across twelve years and several employers, not the firm's record since 2017. They moved into his credentials explicitly labelled as career figures, and the firm got its own smaller true numbers: 30+ mandates, established 2017, SECP-registered LLP, 6 sectors served. Founder language moved to partner-led phrasing with Ahmad named as founding partner. New "How mandates are staffed" section on /approach (partner-led, personally reviewed, resourced per engagement, no permanent pyramid) with a short version on /about linking to it. **/network reframed from delivery to origination**: Sky Gulf's "Execution Partner" tag was the most misleading claim on the site and is now "Referral Relationship", with explicit non-execution statements on both partners. New firm credentials block on /about. Home resequenced firm-first: hero, what we do, track record, who we serve, delivery approach, founder, network, quote, CTA. Also fixed a live typo in the home hero CTA ("Book a Meetng"). All copy via migration 044. Verified: 34 content assertions plus the rendered narrative order. |
 
+| Phase 29 : /about merged into home | Complete (2026-08-10) | After 044 put the firm first on home, /about and / said largely the same things: of its eight sections, six duplicated home in substance. **Only two moved.** The firm introduction became a `paragraphs` section, converted from `text_image` because that renderer draws an empty gold-framed box when it has no image and /about had none, so importing the row as-is would have put an empty placeholder on the home page. "Firm credentials" moved by changing `page_slug`, keeping its row and id. The home `founder_block` card was replaced by a short `paragraphs` mention naming Ahmad as founding partner with a link to the profile: no bio, no proof-point list, no photo, which `founder_block` cannot express since it renders a monogram card even with no photo set. Final home order: hero, firm introduction, what we do, firm track record, firm credentials, who we serve, delivery approach, founder mention, network, quote, CTA. `/about` 301s to `/` via `next.config.ts` (explicit `statusCode: 301` rather than `permanent: true`, which emits 308). **Nav slot relabelled to "Founder"** pointing at `/about/ahmad-din`, rather than keeping "About" on a personal page. All 8 sections and the `cms_pages` row deleted with `is_system` cleared first; orphan check confirms every remaining section belongs to a live page. `/about/ahmad-din` untouched. |
+
 **Admin login:** `meetahmadch@gmail.com`. **The password was rotated on 2026-08-02 and is deliberately not recorded here or anywhere else in this repository.** Writing it down is what made the previous one worthless. Ahmad holds it; if it is lost, `npm run rotate-admin-password` sets a new one using the service-role key in `.env.local`, so there is no lockout risk.
 
 The retired `Admin@2026` remains in this file's git history and in older `SESSION_LOG.md` entries. That history is left intact on purpose: rewriting it would not un-publish the string, and the password no longer opens anything. It is verified dead, not merely replaced (see the rotation entry in `SESSION_LOG.md`).
@@ -601,6 +603,19 @@ For v1, only two template_key rows are needed: `contact_notification` (sent to a
                                   --   `npm run seed-footer-logo-sizing`
                                   --   (supports --dry-run). Idempotent,
                                   --   ON CONFLICT DO NOTHING.
+045_merge_about_into_home.sql     -- Merges /about into home and retires it. Only
+                                  --   two pieces existed on /about and nowhere
+                                  --   else: the firm introduction (converted
+                                  --   text_image -> paragraphs, since that
+                                  --   renderer draws an empty gold box with no
+                                  --   image) and Firm credentials (moved by
+                                  --   page_slug, keeping its row). The home
+                                  --   founder_block card becomes a short
+                                  --   paragraphs mention with a profile link.
+                                  --   Deletes all 8 /about sections and the
+                                  --   cms_pages row, clearing is_system first.
+                                  --   Nav slot relabelled Founder. DML only,
+                                  --   `npm run seed-merge-about`. Idempotent.
 044_firm_prominence.sql           -- Repositions the site from one person to a
                                   --   firm led by a partner. Moves the founder's
                                   --   CAREER totals out of the firm stats (they
@@ -763,13 +778,12 @@ Editors should:
 
 | URL | Page slug | Purpose |
 |-----|-----------|---------|
-| `/` | home | Firm overview, what PMBC does, headline credentials, CTA to services and contact |
+| `/` | home | The firm in full: hero, firm introduction, what we do, firm track record, firm credentials, who we serve, delivery approach, founder mention, network, quote, CTA. **/about was merged into this page and now 301s here** (migration 045). |
 | `/services` | services | Overview of all 9 services with cards linking to detail pages |
 | `/services/[slug]` | service-{slug} | Detail page for one service. Slugs from config/services.ts |
 | `/sectors` | sectors | Sector coverage grid with descriptions |
 | `/approach` | approach | Engagement methodology (Understand → Analyse → Model → Advise) |
 | `/network` | network | Sky Gulf and Lynkers detail. Why the network matters. |
-| `/about` | about | The firm. Founder summary card linking to the full profile. |
 | `/about/ahmad-din` | about-ahmad-din | Founder profile. Nine CMS sections mirroring the structure of FMP's page of the same path. |
 | `/financial-modeler-pro` | financial-modeler-pro | Full page introducing FMP, ending in CTA to visit FMP |
 | `/contact` | contact | Contact form, direct contact info |
@@ -796,7 +810,7 @@ export const SERVICES = [
 
 ### Navigation
 
-Top nav (desktop): Services · Sectors · Approach · Network · About · Contact
+Top nav (desktop): Services · Sectors · Approach · Network · Founder · Contact
 Top nav (mobile): hamburger menu with same items
 Persistent CTA in nav: "Start a Conversation" → links to /contact
 
