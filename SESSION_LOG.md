@@ -4,6 +4,22 @@ Chronological build history for the PMBC website. Split out of `CLAUDE.md` to ke
 
 ---
 
+### 2026-08-10 - Favicon wired to the CMS
+
+**Both suspected causes were real, and there was a third.** The root layout's `metadata` was a static object with no `icons` key anywhere, so `branding_config.favicon_url` was stored, editable in admin, and consumed by no code path. Independently, `src/app/favicon.ico` was still the untouched create-next-app default: 25931 bytes, four embedded sizes, added by the Phase 1 scaffold commit `3b1df5d` and never opened since. So the public site has been serving **the Next.js logo** as its browser-tab icon for the entire build. Checked provenance with `git log --diff-filter=A` before deleting rather than assuming it was scaffold output.
+
+The third dead control: `header_settings.icon_as_favicon`. It has a "Use as favicon" toggle in admin, is validated by the API, is parsed into `HeaderConfig`, and is read by nothing. The operator had turned it **on** and separately filled in the Favicon field, with two near-identical `icon-512.png` uploads about forty seconds apart, which reads like someone trying both routes to get a favicon to appear. Neither could have worked.
+
+**Resolution order puts the dedicated field first.** `favicon_url`, then `icon_url` when `icon_as_favicon` is true, then `logo_url`, then nothing. The brief asked for `favicon_url` with a `logo_url` fallback; the header-icon step is inserted between them so the existing toggle stops being a lie, without displacing the field the brief named as primary.
+
+**`resolveFaviconUrl` cannot throw, and that matters more here than usual.** It runs inside the root layout's `generateMetadata`, which executes for every page in the app and also at build time. An unhandled rejection there would not lose an icon, it would fail metadata generation site-wide and break the production build. It returns null on any error and the layout then emits no `icons` at all. Emitting a placeholder or empty href would be worse than nothing: browsers request it, fail, and some cache the failure.
+
+**Known caveat, verified rather than assumed.** `/privacy`, `/terms` and the nine `/services/[slug]` pages are prerendered, so `generateMetadata` runs at build and the icon URL is baked into their static HTML. Confirmed by grepping the prerendered `privacy.html` in `.next/server/app`. Those pages need a redeploy to pick up a favicon change; everything else is `force-dynamic` and updates on the next request. Forcing those eleven pages dynamic to make one rarely-changed URL live would have been a bad trade, so this is documented instead.
+
+Verified with view-source on nine routes (all three link tags present, all pointing at the uploaded URL, `type="image/png"` inferred from the extension), the uploaded PNG confirmed reachable at 200, `/favicon.ico` now 404, and the full fallback chain exercised by blanking each source in turn and restoring afterwards. 15 assertions, 0 failures.
+
+---
+
 ### 2026-08-10 - Footer logo sizing controls
 
 **The footer logo was never sizable.** It rendered at a hardcoded Tailwind `h-11` (44px), while the header has exposed `logo_height_px` and `logo_width_px` since migration 029. Three keys now sit in the existing `footer_settings` section of `cms_content`, alongside `about_blurb`, `address_line` and `copyright`, following the same one-row-per-setting convention as `header_settings`.
