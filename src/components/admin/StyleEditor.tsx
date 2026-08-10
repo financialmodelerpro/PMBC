@@ -3,7 +3,7 @@
 import { useState, type CSSProperties } from 'react';
 import { ChevronDown, ChevronRight, RotateCcw } from 'lucide-react';
 
-import { MediaPickerButton } from '@/components/admin/MediaPicker';
+import { MediaField } from '@/components/admin/MediaField';
 import {
   ADMIN_COLORS,
   adminButtonGhost,
@@ -162,11 +162,17 @@ export function StyleEditor({
               />
             </div>
             <div style={{ marginTop: 14 }}>
-              <MediaPickerButton
-                value={str(styles.bg_image_url)}
-                onChange={(url) => set('bg_image_url', url || null)}
+              {/* Images only: this becomes a CSS `background-image`, which
+                  cannot play a video. */}
+              <MediaField
+                content={{ bg_image_url: str(styles.bg_image_url) }}
+                urlKey="bg_image_url"
+                onChange={(patch) =>
+                  set('bg_image_url', (patch.bg_image_url as string) || null)
+                }
                 bucket="cms-assets"
                 label="Background image"
+                imagesOnly
               />
             </div>
           </Group>

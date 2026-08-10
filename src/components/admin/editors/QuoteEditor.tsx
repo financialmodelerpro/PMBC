@@ -7,6 +7,7 @@ import {
   adminTextarea,
 } from '@/lib/admin/styles';
 import { RichTextarea } from '@/components/admin/RichTextarea';
+import { MediaField } from '@/components/admin/MediaField';
 
 import type { SectionEditorProps } from './types';
 
@@ -65,15 +66,13 @@ export function QuoteEditor({ content, onChange }: SectionEditorProps) {
         </Field>
       </div>
 
-      <Field label="Photo URL (optional)">
-        <input
-          type="text"
-          value={attribution_photo_url}
-          onChange={(e) => update({ attribution_photo_url: e.target.value })}
-          placeholder="https://…/portrait.jpg"
-          style={adminInput}
-        />
-      </Field>
+      <MediaField
+        content={content}
+        urlKey="attribution_photo_url"
+        onChange={(patch) => update(patch)}
+        label="Attribution photo (optional)"
+        bucket="team-photos"
+      />
 
       <Field label="Alignment">
         <div style={{ display: 'flex', gap: 8 }}>

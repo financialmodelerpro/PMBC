@@ -29,6 +29,8 @@ import {
   adminTextarea,
 } from '@/lib/admin/styles';
 
+import { MediaField } from '@/components/admin/MediaField';
+
 import type { SectionEditorProps } from './types';
 
 type Partner = {
@@ -39,6 +41,16 @@ type Partner = {
   description: string;
   role_tag: string;
   link: string;
+  /**
+   * Companion keys written by MediaField alongside `logo_url`
+   * (`logo_media_type`, `logo_poster_url`, the playback toggles).
+   *
+   * An index signature rather than six named optional fields, because this
+   * shape is reconstructed on every edit and anything not named here would be
+   * dropped. It costs typo checking on partner fields, which is the lesser
+   * loss: a dropped media type silently freezes a GIF with no visible cause.
+   */
+  [extra: string]: unknown;
 };
 
 let nextId = 0;
@@ -64,6 +76,9 @@ function pickPartners(c: Record<string, unknown>): Partner[] {
     }
     const o = row as Record<string, unknown>;
     return {
+      // Spread first so unknown keys survive the round trip, then normalise the
+      // known ones on top.
+      ...o,
       id: typeof o.id === 'string' ? o.id : nid(),
       logo_url: s(o.logo_url),
       name: s(o.name),
@@ -261,15 +276,12 @@ function SortablePartner({
                 style={adminInput}
               />
             </FieldShell>
-            <FieldShell label="Logo URL">
-              <input
-                type="text"
-                value={partner.logo_url}
-                onChange={(e) => onUpdate({ logo_url: e.target.value })}
-                placeholder="https://…/logo.png"
-                style={adminInput}
-              />
-            </FieldShell>
+            <MediaField
+              content={partner}
+              urlKey="logo_url"
+              onChange={(patch) => onUpdate(patch)}
+              label="Logo"
+            />
             <FieldShell label="Role tag">
               <input
                 type="text"

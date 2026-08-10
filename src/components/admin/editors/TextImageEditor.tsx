@@ -1,6 +1,7 @@
 'use client';
 
 import { RichTextEditor } from '@/components/admin/RichTextEditor';
+import { MediaField } from '@/components/admin/MediaField';
 import {
   ADMIN_COLORS,
   adminInput,
@@ -63,15 +64,13 @@ export function TextImageEditor({ content, onChange }: SectionEditorProps) {
 
       <Fieldset legend="Image">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <Field label="Image URL">
-            <input
-              type="text"
-              value={image_url}
-              onChange={(e) => update({ image_url: e.target.value })}
-              placeholder="https://…/image.jpg"
-              style={adminInput}
-            />
-          </Field>
+          <MediaField
+            content={content}
+            urlKey="image_url"
+            onChange={(patch) => update(patch)}
+            label="Image, GIF or video"
+            hint="Drag and drop, upload, or choose from the library"
+          />
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <Field label="Alt text">
               <input

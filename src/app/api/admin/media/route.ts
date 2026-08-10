@@ -3,19 +3,34 @@ import { NextResponse } from 'next/server';
 import { getAdminSession } from '@/lib/auth/requireAdmin';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { writeAudit } from '@/lib/audit';
+import {
+  DOCUMENT_MIME,
+  IMAGE_MIME,
+  MAX_IMAGE_BYTES,
+  MAX_VIDEO_BYTES,
+  VIDEO_MIME,
+  isVideoMime,
+} from '@/lib/media';
 
 const BUCKETS = ['cms-assets', 'article-covers', 'case-study-images', 'team-photos'] as const;
 type Bucket = (typeof BUCKETS)[number];
 
-const MAX_BYTES = 10 * 1024 * 1024; // 10 MB
-const ALLOWED_MIME = new Set([
-  'image/jpeg',
-  'image/png',
-  'image/gif',
-  'image/webp',
-  'image/svg+xml',
-  'application/pdf',
+// Images, animated images and documents share the 10 MB ceiling; video gets 25
+// MB, since a few seconds of even modest-bitrate mp4 clears 10 MB easily and a
+// background clip that cannot be uploaded is not a usable feature.
+const ALLOWED_MIME = new Set<string>([
+  ...IMAGE_MIME,
+  ...VIDEO_MIME,
+  ...DOCUMENT_MIME,
 ]);
+
+function maxBytesFor(mime: string): number {
+  return isVideoMime(mime) ? MAX_VIDEO_BYTES : MAX_IMAGE_BYTES;
+}
+
+function humanMb(bytes: number): string {
+  return `${Math.round(bytes / (1024 * 1024))} MB`;
+}
 
 function isBucket(v: string | null): v is Bucket {
   return !!v && (BUCKETS as readonly string[]).includes(v);
@@ -87,16 +102,19 @@ export async function POST(req: Request) {
   const uploaded: Array<{ name: string; url: string }> = [];
 
   for (const file of files) {
-    if (file.size > MAX_BYTES) {
-      return NextResponse.json(
-        { error: `${file.name} exceeds the 10 MB limit` },
-        { status: 413 },
-      );
-    }
+    // Type is checked before size, so an unsupported file reports what is
+    // actually wrong with it rather than a size limit it was never eligible for.
     if (file.type && !ALLOWED_MIME.has(file.type)) {
       return NextResponse.json(
         { error: `${file.name}: unsupported type ${file.type}` },
         { status: 415 },
+      );
+    }
+    const limit = maxBytesFor(file.type || '');
+    if (file.size > limit) {
+      return NextResponse.json(
+        { error: `${file.name} exceeds the ${humanMb(limit)} limit` },
+        { status: 413 },
       );
     }
 

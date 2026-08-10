@@ -1,8 +1,9 @@
 import Link from 'next/link';
-import Image from 'next/image';
 import { ArrowUpRight } from 'lucide-react';
 
 import { SectionContainer, SectionIntro } from '../SectionContainer';
+import { Media } from '../Media';
+import { readMediaValue, type MediaValue } from '@/lib/media';
 import { variantStyles, type PmbcVariant } from '@/lib/public/tokens';
 
 type Partner = {
@@ -12,6 +13,8 @@ type Partner = {
   description: string;
   role_tag: string;
   link: string;
+  /** Resolved once here rather than in the row, so the row stays presentational. */
+  media: MediaValue;
 };
 
 function s(v: unknown): string {
@@ -42,6 +45,7 @@ function pickPartners(c: Record<string, unknown>): {
         description,
         role_tag: s(o.role_tag),
         link: s(o.link),
+        media: readMediaValue(o, 'logo_url'),
       };
     })
     .filter((p): p is Partner => p !== null);
@@ -94,9 +98,14 @@ export function NetworkPartners({
                 <div className="flex items-start justify-between gap-3">
                   {p.logo_url ? (
                     <div className="relative h-14 w-36 flex-shrink-0">
-                      <Image
-                        src={p.logo_url}
+                      <Media
+                        src={p.media.url}
                         alt={p.name || 'Partner logo'}
+                        mediaType={p.media.mediaType}
+                        posterUrl={p.media.posterUrl}
+                        autoplay={p.media.autoplay}
+                        loop={p.media.loop}
+                        controls={p.media.controls}
                         fill
                         sizes="144px"
                         className="object-contain object-left"

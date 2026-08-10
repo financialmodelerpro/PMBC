@@ -21,6 +21,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { GripVertical, Plus, Trash2 } from 'lucide-react';
 
 import { RichTextEditor } from '@/components/admin/RichTextEditor';
+import { MediaField } from '@/components/admin/MediaField';
 import {
   ADMIN_COLORS,
   adminButtonGhost,
@@ -87,6 +88,27 @@ export function FmpIntroEditor({ content, onChange }: SectionEditorProps) {
     });
   };
 
+  /**
+   * Media writes need their own path. `writeBack` takes a closed set of named
+   * fields, so the companion keys a media slot carries (type, poster, playback
+   * toggles) have no parameter to travel in and would be silently dropped.
+   */
+  const writeMedia = (patch: Record<string, unknown>) => {
+    const { description: _legacy, features: _legacyFeatures, ...rest } = content;
+    void _legacy;
+    void _legacyFeatures;
+    onChange({
+      ...rest,
+      heading,
+      description_html,
+      cta_label,
+      cta_href,
+      logo_url,
+      feature_points: points.map((p) => p.text),
+      ...patch,
+    });
+  };
+
   const updatePoint = (id: string, text: string) =>
     writeBack({ points: points.map((p) => (p.id === id ? { ...p, text } : p)) });
 
@@ -117,15 +139,12 @@ export function FmpIntroEditor({ content, onChange }: SectionEditorProps) {
         />
       </Field>
 
-      <Field label="Logo URL (optional)">
-        <input
-          type="text"
-          value={logo_url}
-          onChange={(e) => writeBack({ logo_url: e.target.value })}
-          placeholder="https://…/fmp-logo.svg"
-          style={adminInput}
-        />
-      </Field>
+      <MediaField
+        content={content}
+        urlKey="logo_url"
+        onChange={writeMedia}
+        label="Logo (optional)"
+      />
 
       <div>
         <p style={adminLabel}>Description</p>

@@ -1,4 +1,5 @@
-import Image from 'next/image';
+import { Media } from '../Media';
+import { readMediaValue } from '@/lib/media';
 import { ArrowUpRight, CheckCircle2 } from 'lucide-react';
 
 import { SectionContainer } from '../SectionContainer';
@@ -46,6 +47,7 @@ export function FmpIntro({
   variant: PmbcVariant;
 }) {
   const c = pick(content ?? {});
+  const media = readMediaValue(content ?? {}, 'logo_url');
   if (!c.heading && !c.description_html && c.feature_points.length === 0) return null;
   const external = /^https?:/i.test(c.cta_href);
   const v = variantStyles(variant);
@@ -67,9 +69,14 @@ export function FmpIntro({
         />
         {c.logo_url && (
           <div className="relative mb-7 h-12 w-48">
-            <Image
-              src={c.logo_url}
+            <Media
+              src={media.url}
               alt="Financial Modeler Pro"
+              mediaType={media.mediaType}
+              posterUrl={media.posterUrl}
+              autoplay={media.autoplay}
+              loop={media.loop}
+              controls={media.controls}
               fill
               sizes="192px"
               className="object-contain object-left"

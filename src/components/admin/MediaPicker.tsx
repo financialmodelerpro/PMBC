@@ -9,6 +9,7 @@ import {
   adminButtonPrimary,
   adminInput,
 } from '@/lib/admin/styles';
+import { MEDIA_ACCEPT, detectMediaType } from '@/lib/media';
 
 export type MediaBucket =
   | 'cms-assets'
@@ -276,7 +277,7 @@ export function MediaModal({
             ref={fileRef}
             type="file"
             multiple
-            accept="image/jpeg,image/png,image/gif,image/webp,image/svg+xml,application/pdf"
+            accept={MEDIA_ACCEPT}
             style={{ display: 'none' }}
             onChange={(e) => upload(e.target.files)}
           />
@@ -327,6 +328,17 @@ export function MediaModal({
                   >
                     {f.mimetype === 'application/pdf' ? (
                       <span style={{ fontSize: 12, color: ADMIN_COLORS.textMuted }}>PDF</span>
+                    ) : detectMediaType(f.url) === 'video' ? (
+                      // Muted, paused preview. The library grid can hold many
+                      // clips, so autoplaying every one of them would be a
+                      // needless download on open.
+                      <video
+                        src={f.url}
+                        muted
+                        playsInline
+                        preload="metadata"
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      />
                     ) : (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img

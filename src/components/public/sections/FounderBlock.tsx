@@ -1,8 +1,9 @@
 import Link from 'next/link';
-import Image from 'next/image';
 
 import { SectionContainer, SectionIntro } from '../SectionContainer';
+import { Media } from '../Media';
 import { sanitizeRichHtml } from '@/lib/cms/sanitize';
+import { readMediaValue } from '@/lib/media';
 import { variantStyles, type PmbcVariant } from '@/lib/public/tokens';
 
 function s(v: unknown): string {
@@ -73,6 +74,7 @@ export function FounderBlock({
   variant: PmbcVariant;
 }) {
   const c = pick(content ?? {});
+  const media = readMediaValue(content ?? {}, 'photo_url');
   if (!c.name && !c.bio_html && !c.photo_url && !c.section_headline && !c.eyebrow) return null;
   const imageRight = c.layout === 'image_right';
   const v = variantStyles(variant);
@@ -106,9 +108,14 @@ export function FounderBlock({
                 style={{ background: '#1B3A5F' }}
               />
               <div className="relative aspect-[4/5] w-full overflow-hidden bg-neutral-100">
-                <Image
-                  src={c.photo_url}
+                <Media
+                  src={media.url}
                   alt={c.name || 'Founder portrait'}
+                  mediaType={media.mediaType}
+                  posterUrl={media.posterUrl}
+                  autoplay={media.autoplay}
+                  loop={media.loop}
+                  controls={media.controls}
                   fill
                   sizes="(min-width: 1024px) 440px, 90vw"
                   className="object-cover"

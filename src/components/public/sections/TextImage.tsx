@@ -1,8 +1,9 @@
 import Link from 'next/link';
-import Image from 'next/image';
 
 import { SectionContainer } from '../SectionContainer';
+import { Media } from '../Media';
 import { sanitizeRichHtml } from '@/lib/cms/sanitize';
+import { readMediaValue } from '@/lib/media';
 import { variantStyles, type PmbcVariant } from '@/lib/public/tokens';
 
 function s(v: unknown): string {
@@ -46,6 +47,7 @@ export function TextImage({
   variant: PmbcVariant;
 }) {
   const c = pick(content ?? {});
+  const media = readMediaValue(content ?? {}, 'image_url');
   if (!c.heading && !c.body_html && !c.image_url && !c.eyebrow) return null;
   const imageLeft = c.image_position === 'left';
   const v = variantStyles(variant);
@@ -70,9 +72,14 @@ export function TextImage({
                   className="absolute -inset-2 border border-[#C69C3E]"
                 />
                 <div className="relative aspect-[4/3] w-full overflow-hidden bg-neutral-100">
-                  <Image
-                    src={c.image_url}
+                  <Media
+                    src={media.url}
                     alt={c.image_alt || ''}
+                    mediaType={media.mediaType}
+                    posterUrl={media.posterUrl}
+                    autoplay={media.autoplay}
+                    loop={media.loop}
+                    controls={media.controls}
                     fill
                     sizes="(min-width: 1024px) 560px, 90vw"
                     className="object-cover"

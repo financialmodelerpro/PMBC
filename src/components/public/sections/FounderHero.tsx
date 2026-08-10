@@ -1,7 +1,8 @@
-import Image from 'next/image';
 import Link from 'next/link';
 
 import { SectionContainer } from '../SectionContainer';
+import { Media } from '../Media';
+import { readMediaValue } from '@/lib/media';
 import { variantStyles, type PmbcVariant } from '@/lib/public/tokens';
 
 function s(v: unknown): string {
@@ -92,6 +93,7 @@ export function FounderHero({
   variant: PmbcVariant;
 }) {
   const c = pick(content ?? {});
+  const media = readMediaValue(content ?? {}, 'photo_url');
   if (!c.name && !c.intro && !c.eyebrow) return null;
   const v = variantStyles(variant);
   const dark = variant === 'navy_deep';
@@ -112,9 +114,14 @@ export function FounderHero({
             />
             {c.photo_url ? (
               <div className="relative aspect-[4/5] w-full overflow-hidden bg-neutral-100">
-                <Image
-                  src={c.photo_url}
+                <Media
+                  src={media.url}
                   alt={c.name || 'Founder portrait'}
+                  mediaType={media.mediaType}
+                  posterUrl={media.posterUrl}
+                  autoplay={media.autoplay}
+                  loop={media.loop}
+                  controls={media.controls}
                   fill
                   priority
                   sizes="(min-width: 1024px) 400px, 90vw"

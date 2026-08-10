@@ -1,6 +1,6 @@
 'use client';
 
-import { MediaPickerButton } from '@/components/admin/MediaPicker';
+import { MediaField } from '@/components/admin/MediaField';
 import { adminFieldHint, adminInput, adminLabel, adminTextarea } from '@/lib/admin/styles';
 
 import type { SectionEditorProps } from './types';
@@ -15,12 +15,12 @@ export function FounderHeroEditor({ content, onChange }: SectionEditorProps) {
   return (
     <div style={{ display: 'grid', gap: 18 }}>
       <div>
-        <label style={adminLabel}>Portrait</label>
-        <MediaPickerButton
-          value={s(content.photo_url)}
+        <MediaField
+          content={content}
+          urlKey="photo_url"
           bucket="team-photos"
-          label="Founder portrait"
-          onChange={(url) => set('photo_url', url)}
+          label="Portrait"
+          onChange={(patch) => onChange({ ...content, ...patch })}
         />
         <p style={adminFieldHint}>
           Leave empty to show the gold-framed monogram fallback. Portrait crops to a 4:5 frame.

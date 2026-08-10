@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useState, type CSSProperties } from 'react';
 
 import { SaveStatus, type SaveState } from '@/components/admin/SaveStatus';
-import { MediaPickerButton } from '@/components/admin/MediaPicker';
+import { MediaField } from '@/components/admin/MediaField';
 import { SaveButton } from '@/components/admin/SaveButton';
 import {
   ADMIN_COLORS,
@@ -220,11 +220,14 @@ export function HeaderSettingsForm({
           />
 
           <div style={{ marginTop: 16 }}>
-            <MediaPickerButton
-              value={brand.logo_url}
-              onChange={(url) => b('logo_url', url)}
+            <MediaField
+              content={{ logo_url: brand.logo_url }}
+              urlKey="logo_url"
+              onChange={(patch) => b('logo_url', (patch.logo_url as string) ?? '')}
               bucket="cms-assets"
               label="Logo image"
+              hint="Used on the white header"
+              imagesOnly
             />
           </div>
 
@@ -293,28 +296,35 @@ export function HeaderSettingsForm({
             </label>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginTop: 16 }}>
-            <label>
-              <span style={adminLabel}>Dark logo URL</span>
-              <input
-                type="text"
-                value={brand.logo_dark_url}
-                onChange={(e) => b('logo_dark_url', e.target.value)}
-                style={adminInput}
-                placeholder="/logo-dark.svg or https://…"
-              />
-              <p style={hint}>Used on navy backgrounds. Optional.</p>
-            </label>
-            <label>
-              <span style={adminLabel}>Favicon URL</span>
-              <input
-                type="text"
-                value={brand.favicon_url}
-                onChange={(e) => b('favicon_url', e.target.value)}
-                style={adminInput}
-                placeholder="/favicon.ico"
-              />
-            </label>
+          <div style={{ marginTop: 20 }}>
+            <MediaField
+              content={{ logo_dark_url: brand.logo_dark_url }}
+              urlKey="logo_dark_url"
+              onChange={(patch) =>
+                b('logo_dark_url', (patch.logo_dark_url as string) ?? '')
+              }
+              bucket="cms-assets"
+              label="Logo for dark backgrounds (footer, navy sections)"
+              hint="Optional"
+              imagesOnly
+            />
+            <p style={hint}>
+              The footer sits on deep navy, where the standard navy and green
+              logo reads poorly. Upload a white or light version here and the
+              footer, and the social preview card, switch to it. Left empty,
+              both fall back to the standard logo, then to the PM wordmark.
+            </p>
+          </div>
+
+          <div style={{ marginTop: 20 }}>
+            <MediaField
+              content={{ favicon_url: brand.favicon_url }}
+              urlKey="favicon_url"
+              onChange={(patch) => b('favicon_url', (patch.favicon_url as string) ?? '')}
+              bucket="cms-assets"
+              label="Favicon"
+              imagesOnly
+            />
           </div>
         </Card>
       )}
@@ -384,11 +394,13 @@ export function HeaderSettingsForm({
         title="Header icon"
         description="A small mark shown beside the logo. Separate from the logo and the favicon."
       >
-        <MediaPickerButton
-          value={header.icon_url}
-          onChange={(url) => h('icon_url', url)}
+        <MediaField
+          content={{ icon_url: header.icon_url }}
+          urlKey="icon_url"
+          onChange={(patch) => h('icon_url', (patch.icon_url as string) ?? '')}
           bucket="cms-assets"
           label="Icon image"
+          imagesOnly
         />
         <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', marginTop: 16 }}>
           <Toggle

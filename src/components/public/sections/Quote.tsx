@@ -1,4 +1,5 @@
-import Image from 'next/image';
+import { Media } from '../Media';
+import { readMediaValue } from '@/lib/media';
 
 import { SectionContainer, SectionIntro } from '../SectionContainer';
 import { RichText } from '@/components/public/RichText';
@@ -38,6 +39,7 @@ export function Quote({
   variant: PmbcVariant;
 }) {
   const c = pick(content ?? {});
+  const media = readMediaValue(content ?? {}, 'attribution_photo_url');
   if (!c.quote_text) return null;
   const left = c.alignment === 'left';
   const v = variantStyles(variant);
@@ -96,9 +98,14 @@ export function Quote({
           >
             {c.attribution_photo_url && (
               <div className="relative h-12 w-12 overflow-hidden rounded-full bg-neutral-100">
-                <Image
-                  src={c.attribution_photo_url}
+                <Media
+                  src={media.url}
                   alt={c.attribution_name || ''}
+                  mediaType={media.mediaType}
+                  posterUrl={media.posterUrl}
+                  autoplay={media.autoplay}
+                  loop={media.loop}
+                  controls={media.controls}
                   fill
                   sizes="48px"
                   className="object-cover"

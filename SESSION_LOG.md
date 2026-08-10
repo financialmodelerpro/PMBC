@@ -4,6 +4,28 @@ Chronological build history for the PMBC website. Split out of `CLAUDE.md` to ke
 
 ---
 
+### 2026-08-10 - Direct media upload, video and GIF support, dark-background logo
+
+**Task 3 was already built, except for the part that mattered.** `logo_dark_url` has existed in `branding_config` since migration 003, `Footer` has always resolved `logoDarkUrl || logoUrl`, and `/api/og` has always preferred it. What was missing was any way to set it: the admin exposed a bare text input labelled "Dark logo URL", and the live row is null while `logo_url` holds a real PNG. So the footer has been rendering the dark navy and green logo on deep navy this whole time, exactly as described, and no schema change was needed to fix it. The field is now a labelled MediaField with an explanation of what it is for.
+
+**Optimizer bypass is two separate bugs, not one.** A GIF routed through `next/image` comes back as a single frozen frame, because re-encoding drops the animation. An SVG is refused outright unless `dangerouslyAllowSVG` is set, which this project deliberately does not set. Both produce a broken render rather than a merely suboptimal one, so `shouldBypassOptimizer` covers both. Verified by asserting the rendered `src`: a GIF must point at the raw storage URL, and a still PNG must still go through `/_next/image`, so the bypass did not quietly become universal.
+
+**Animated WebP is undetectable from a URL.** It shares the `.webp` extension with still WebP, so extension sniffing alone would freeze it with no way for an operator to fix it. That is why the stored `media_type` wins over detection rather than acting as a hint, and why MediaField shows a "Treat as" override with an "Animated" option.
+
+**Companion keys are derived from the URL key, not a bare `media_type`.** The brief suggested `content.media_type` next to `content.image_url`. That works for `text_image`, which has one media slot, but `network_partners` stores one per partner and a single bare key would collide the moment a section carries two. Keys are `<base>_media_type`, `<base>_poster_url` and so on. A bare `media_type` is still accepted on read, so content written against the simpler shape resolves.
+
+**Two editors would have silently eaten the new keys.** `FmpIntroEditor.writeBack` takes a closed set of named parameters and rebuilds content from them, so companion keys had no parameter to travel in; it got a dedicated `writeMedia` path. `NetworkPartnersEditor.pickPartners` reconstructed each partner from a fixed field list, dropping anything else on every edit; it now spreads the original object first and its `Partner` type carries an index signature. Both would have looked fine in the editor and lost the media type on save.
+
+**Reduced motion needs `load()`, not just `pause()`.** Pausing leaves whatever frame the clip reached on screen, usually a meaningless mid-motion still. Calling `load()` afterwards resets the element to the poster the operator chose. Controls are also revealed in that state, so someone who suppressed motion globally can still choose to watch one clip. `VideoMedia` is the only client component this work adds; the decision cannot be made on the server, which cannot see a per-user preference.
+
+**Images-only slots write the URL and nothing else.** The StyleEditor background becomes a CSS `background-image`, which cannot play video, and its `styles` blob is allowlisted at render so companion keys would be dead weight in the database. Same for the three logo fields.
+
+Verified against real Supabase Storage rather than fixtures: a PNG, a genuinely animated two-frame GIF and an mp4 were uploaded through the same bucket the field uses, written into a throwaway section, rendered, asserted, then deleted along with the section. 22 assertions, 0 failures, and the `/book` section count confirmed back at 1 afterwards. The dark-logo test set `logo_dark_url`, confirmed the footer switched, cleared it, confirmed the fallback to `logo_url`, and restored the original row.
+
+**Not verified end to end, and worth knowing:** the drag-and-drop gesture and the upload size ceilings were checked by reading the code and by asserting the exported constants and the route wiring, not by driving a browser or pushing a 26 MB file through a logged-in session. The admin password was rotated and is not available to this session, so the session-gated route could only be confirmed to return 401 unauthenticated. The storage round trip itself is real.
+
+---
+
 ### 2026-08-10 - Booking CTA prominence across navbar, contact and home founder card
 
 **Two of the four changes were repairs, not additions.** The navbar carried both a "Contact" nav item and a "Start a Conversation" button pointing at the same `/contact`, so one of the two was doing no work. The home founder card had `cta_secondary_label: "Connect on LinkedIn"` with an empty href, and `FounderBlock` renders a CTA only when both label and href are set, so the card had been showing one CTA where the data implied two. Both were fixed by repointing existing fields rather than adding new ones, which is why migration 039 introduces no new content shape.

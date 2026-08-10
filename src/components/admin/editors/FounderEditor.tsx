@@ -1,6 +1,7 @@
 'use client';
 
 import { RichTextEditor } from '@/components/admin/RichTextEditor';
+import { MediaField } from '@/components/admin/MediaField';
 import {
   ADMIN_COLORS,
   adminInput,
@@ -49,15 +50,14 @@ export function FounderEditor({ content, onChange }: SectionEditorProps) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-      <Field label="Photo URL">
-        <input
-          type="text"
-          value={photo_url}
-          onChange={(e) => update({ photo_url: e.target.value })}
-          placeholder="https://…/founder.jpg"
-          style={adminInput}
-        />
-      </Field>
+      <MediaField
+        content={content}
+        urlKey="photo_url"
+        onChange={(patch) => update(patch)}
+        label="Founder photo"
+        bucket="team-photos"
+        hint="Drag and drop, upload, or choose from the library"
+      />
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
         <Field label="Name">
