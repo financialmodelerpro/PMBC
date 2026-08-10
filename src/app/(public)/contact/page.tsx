@@ -1,8 +1,9 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import Image from 'next/image';
 import { Mail, MessageCircle, MapPin, CalendarDays } from 'lucide-react';
 
-import { fetchPage, fetchPageSections } from '@/lib/cms/pages';
+import { fetchPage, fetchPageSections, fetchFounderPhotoUrl } from '@/lib/cms/pages';
 import { fetchSiteSettings } from '@/lib/cms/settings';
 import { fetchContentBySection } from '@/lib/cms/content';
 import { SectionList } from '@/components/public/SectionRenderer';
@@ -38,13 +39,20 @@ export default async function ContactPage(props: {
   const defaultServiceTitle =
     SERVICES.find((s) => s.slug === serviceSlug)?.title ?? undefined;
 
-  const [sections, settings, bookingCopy] = await Promise.all([
-    fetchPageSections('contact', { onlyVisible: !isPreview }),
-    safe(fetchSiteSettings(), {}),
-    safe(fetchContentBySection('booking'), {} as Record<string, string>),
-  ]);
+  const [sections, settings, bookingCopy, contactCopy, founderPhotoUrl] =
+    await Promise.all([
+      fetchPageSections('contact', { onlyVisible: !isPreview }),
+      safe(fetchSiteSettings(), {}),
+      safe(fetchContentBySection('booking'), {} as Record<string, string>),
+      safe(fetchContentBySection('contact'), {} as Record<string, string>),
+      // Read from the founder_hero section rather than hardcoded: uploading a
+      // new portrait in the page builder updates this card too.
+      safe(fetchFounderPhotoUrl(), null),
+    ]);
 
   const hcaptchaSiteKey = process.env.NEXT_PUBLIC_HCAPTCHA_SITE_KEY || null;
+
+  const founderName = contactCopy.founder_name || 'Ahmad Din';
 
   return (
     <>
@@ -66,25 +74,35 @@ export default async function ContactPage(props: {
                   We respond to every credible enquiry within one to two business days.
                 </p>
 
-                {/* Booking alternative. Copy lives in cms_content under the
-                    `booking` section, with these fallbacks so the line still
-                    reads correctly before migration 038 is applied. */}
-                <Link
-                  href="/book"
-                  className="mt-6 flex items-center gap-3 border border-[color:var(--pmbc-border-warm)] bg-[color:var(--pmbc-surface-cream)] px-4 py-3 transition-colors duration-200 hover:border-[color:var(--pmbc-accent)]"
-                >
-                  <CalendarDays
-                    size={16}
-                    className="shrink-0"
-                    style={{ color: 'var(--pmbc-accent-muted)' }}
-                  />
-                  <span className="text-[14px] text-[color:var(--pmbc-muted)]">
-                    {bookingCopy.contact_prompt || 'Prefer to talk?'}{' '}
-                    <span className="font-medium text-[color:var(--pmbc-primary)] underline decoration-[color:var(--pmbc-accent)] underline-offset-4">
-                      {bookingCopy.contact_link_label || 'Book a meeting directly'}
-                    </span>
-                  </span>
-                </Link>
+                {/* Booking callout. Copy lives in cms_content under the
+                    `booking` section, with fallbacks here so the callout still
+                    reads correctly on a database missing migration 039. */}
+                <div className="mt-7 flex flex-col gap-5 border-l-[3px] border-[color:var(--pmbc-accent)] bg-[color:var(--pmbc-surface-cream)] p-6 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
+                  <div className="flex items-start gap-4">
+                    <CalendarDays
+                      size={22}
+                      strokeWidth={1.6}
+                      className="mt-0.5 shrink-0"
+                      style={{ color: 'var(--pmbc-accent)' }}
+                    />
+                    <div>
+                      <p className="font-serif text-[18px] font-semibold text-[color:var(--pmbc-primary)]">
+                        {bookingCopy.contact_prompt || 'Prefer to talk?'}
+                      </p>
+                      <p className="mt-1.5 text-[14px] leading-relaxed text-[color:var(--pmbc-muted)]">
+                        {bookingCopy.contact_callout_body ||
+                          'Book a 60 minute advisory meeting directly with Ahmad.'}
+                      </p>
+                    </div>
+                  </div>
+                  <Link
+                    href="/book"
+                    className="inline-flex shrink-0 items-center justify-center border border-[color:var(--pmbc-primary)] bg-[color:var(--pmbc-primary)] px-6 py-3 text-[12px] font-semibold uppercase text-[color:var(--pmbc-text-on-dark)] transition duration-200 hover:border-[color:var(--pmbc-accent)] hover:bg-[color:var(--pmbc-accent)] hover:text-[color:var(--pmbc-primary-deep)]"
+                    style={{ letterSpacing: '0.12em' }}
+                  >
+                    {bookingCopy.contact_callout_cta || 'Book a Meeting'}
+                  </Link>
+                </div>
 
                 <div className="mt-8">
                   <ContactForm
@@ -134,12 +152,78 @@ export default async function ContactPage(props: {
                   />
                 )}
               </ul>
+
+              {/* Founder direct-discussion card. Copy lives in cms_content
+                  under the `contact` section; the portrait is read from the
+                  founder_hero section, so uploading a new one in the page
+                  builder updates this card with no code change. */}
+              <div className="mt-10 border-l-[3px] border-[color:var(--pmbc-accent)] bg-[color:var(--pmbc-surface-cream)] p-7">
+                <div className="flex items-start gap-5">
+                  <div className="relative h-[72px] w-[72px] shrink-0">
+                    <div
+                      aria-hidden
+                      className="absolute -inset-1 border border-[color:var(--pmbc-accent)]"
+                    />
+                    {founderPhotoUrl ? (
+                      <div className="relative h-[72px] w-[72px] overflow-hidden bg-neutral-100">
+                        <Image
+                          src={founderPhotoUrl}
+                          alt={founderName}
+                          fill
+                          sizes="72px"
+                          className="object-cover"
+                        />
+                      </div>
+                    ) : (
+                      <div className="flex h-[72px] w-[72px] items-center justify-center bg-white">
+                        <span className="font-serif text-[24px] font-semibold text-[color:var(--pmbc-primary)]">
+                          {initials(founderName)}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <h4 className="font-serif text-[19px] font-semibold leading-snug tracking-tight text-[color:var(--pmbc-primary)]">
+                      {contactCopy.founder_heading || 'Speak directly with the founder'}
+                    </h4>
+                    <p className="mt-2.5 text-[14px] leading-relaxed text-[color:var(--pmbc-muted)]">
+                      {contactCopy.founder_body ||
+                        'Every mandate at PaceMakers is led personally by Ahmad Din. If you would rather discuss your situation before writing it down, book a call.'}
+                    </p>
+                    <Link
+                      href="/book"
+                      className="group mt-5 inline-flex items-center gap-2 text-[12px] font-semibold uppercase text-[color:var(--pmbc-primary)] transition hover:text-[color:var(--pmbc-accent)]"
+                      style={{ letterSpacing: '0.12em' }}
+                    >
+                      <span className="relative pb-1">
+                        {contactCopy.founder_cta_label || 'Book a Meeting'}
+                        <span
+                          aria-hidden
+                          className="absolute right-0 bottom-0 left-0 h-px bg-[color:var(--pmbc-accent)]"
+                        />
+                      </span>
+                      <span aria-hidden style={{ color: 'var(--pmbc-accent)' }}>
+                        &#8594;
+                      </span>
+                    </Link>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </section>
     </>
   );
+}
+
+/** Monogram fallback for the founder card when no portrait has been uploaded. */
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return 'PM';
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
 function ContactRow({

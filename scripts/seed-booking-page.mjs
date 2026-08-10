@@ -61,6 +61,11 @@ const COPY_ROWS = [
     'Self-service booking is not live yet. Reach us directly and we will find a time.',
   ],
   ['contact_prompt', 'Prefer to talk?'],
+  // Retired by 039, which replaced the subtle contact strip with a callout that
+  // reads contact_prompt and contact_callout_cta instead. Kept here so this
+  // script still applies 038 faithfully; on a fresh database 039 runs next and
+  // removes it. Do not re-run this script on a database already past 039, or
+  // the dead key comes back.
   ['contact_link_label', 'Book a meeting directly'],
 ];
 

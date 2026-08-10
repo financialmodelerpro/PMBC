@@ -4,6 +4,22 @@ Chronological build history for the PMBC website. Split out of `CLAUDE.md` to ke
 
 ---
 
+### 2026-08-10 - Booking CTA prominence across navbar, contact and home founder card
+
+**Two of the four changes were repairs, not additions.** The navbar carried both a "Contact" nav item and a "Start a Conversation" button pointing at the same `/contact`, so one of the two was doing no work. The home founder card had `cta_secondary_label: "Connect on LinkedIn"` with an empty href, and `FounderBlock` renders a CTA only when both label and href are set, so the card had been showing one CTA where the data implied two. Both were fixed by repointing existing fields rather than adding new ones, which is why migration 039 introduces no new content shape.
+
+**The founder photo is read, not hardcoded.** The brief specifically asked for the portrait to come from `founder_hero`. There is no shared founder-photo column anywhere (checked again: not in `branding_config`, `site_settings` or `team_members`), so a new `fetchFounderPhotoUrl()` in `lib/cms/pages.ts` reads it from whichever `founder_hero` carries one, most recently updated first. That is deliberately the same source and precedence `scripts/sync-founder-photo.mjs` uses, so the two can never disagree about which image is current. Null is a supported return and renders a monogram.
+
+**One side effect worth naming.** Making `FounderBlock`'s secondary CTA a solid navy button was asked for on the home card, but that component also renders `/about`'s founder card, whose secondary CTA is "Start a Conversation". It is likewise an action rather than a reference link, so the hierarchy reads correctly there too and it was left to apply. Verified rendering on both pages. Say the word if /about should keep the old text-link treatment; it would need a per-section flag rather than a component change.
+
+**A dead admin key was removed rather than left.** 038 seeded `(booking, contact_link_label)` for the subtle strip. The callout that replaced it takes its heading from `contact_prompt` and its button label from `contact_callout_cta`, leaving that key controlling nothing while still appearing in `/admin/content` inviting an edit with no effect. 039 deletes it. `scripts/seed-booking-page.mjs` still seeds it, because it applies 038 and applied migrations are not edited, but it now carries a comment warning not to re-run it on a database already past 039.
+
+**A stale server nearly produced a false pass.** The first verification run of this batch hit HTTP 200 on every page while the new build was not actually being served: `TaskStop` had not released port 3000, so `next start` failed with EADDRINUSE and curl was answered by the previous process. The 200s looked like a clean result. The port was killed explicitly and every assertion re-run against a confirmed-fresh server. Worth remembering: on this setup, check that the server you started is the server answering.
+
+Idempotency confirmed by running the seed twice: the second pass skipped all six earlier writes and applied only the new deletion.
+
+---
+
 ### 2026-08-10 - Booking page /book with Calendly embed, plus CTA wiring
 
 **The Calendly URL came from FMP's database, not its source.** FMP hardcodes the URL nowhere: `CalendlyEmbed.tsx` carries one in a JSDoc example and its live value lives in `page_sections.team.content.booking_url`. Rather than trust a comment, FMP's Supabase project was queried directly and every `page_sections` row scanned for a Calendly URL. Exactly one exists, and it matches the comment, so there was nothing to disambiguate: `https://calendly.com/financialmodelerpro/60-minute-modeling-hub-advisory-meeting`.

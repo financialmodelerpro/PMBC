@@ -98,6 +98,8 @@ When you find an em dash in *existing* content while doing other work, fix it as
 
 | Phase 21 : Booking page `/book` | Complete (2026-08-10) | Mirrors FMP's `/book-a-meeting`: one Calendly inline embed, one admin-editable URL, direct contact routes underneath. The Calendly event is the same one FMP books against, read from FMP's live `page_sections` rather than trusting the example URL in its source comments (the repo hardcodes it nowhere). **One deliberate divergence from FMP:** FMP stores its booking URL inside the home page's founder section content, coupling a site-wide setting to one section on one page. PMBC keeps it in `site_settings.booking_url`, edited under Site Settings, so any page can read it and one edit repoints every booking surface. `CalendlyEmbed` is a server component: the widget container is server-rendered so layout is final before third-party code runs, and `next/script` with `lazyOnload` injects the script once the browser is idle. Empty URL is a supported state and renders a panel plus the direct contact routes instead of an empty frame. CTAs wired via migration 038: the founder profile's secondary CTA already read "Book a Meeting" but carried an empty href, so `FounderHero` had been suppressing the button entirely. Not added to the navbar, by instruction. Footer (Firm column) and `sitemap.ts` both carry it. Verified: hero, embed container, `data-url`, fallback link and metadata all present in the server HTML, 200 on `/book`, typecheck plus build clean, zero em dashes. |
 
+| Phase 21.5 : Booking CTA prominence | Complete (2026-08-10) | Four changes, all content-driven via migration 039. **Navbar CTA** now reads "Book a Meeting" pointing at `/book`, resolving a redundancy where both the Contact nav item and the "Start a Conversation" button led to `/contact`. The nav item is untouched and `/book` is still absent from `site_pages`, so it remains a CTA rather than a seventh nav entry. **Contact page** gained a proper booking callout above the form (cream, 3px gold left border, calendar icon, navy button) replacing the subtle strip, plus a founder direct-discussion card in the right column whose portrait is read from the `founder_hero` section via the new `fetchFounderPhotoUrl()` rather than hardcoded, so a page-builder upload flows through. **Home founder card** gained a second CTA: the dormant `cta_secondary` pair (label "Connect on LinkedIn", empty href, so nothing rendered) was repurposed for "Book a Meeting" at `/book`, and `FounderBlock`'s secondary CTA became a solid navy button so the two CTAs read as a hierarchy. **That restyle also applies to `/about`'s founder card**, whose secondary CTA ("Start a Conversation") is likewise an action and now renders as a button. 039 also deletes the `(booking, contact_link_label)` row that 038 seeded, since the callout that replaced the strip no longer reads it and a live-looking admin key controlling nothing is worse than no key. |
+
 **Admin login:** `meetahmadch@gmail.com`. **The password was rotated on 2026-08-02 and is deliberately not recorded here or anywhere else in this repository.** Writing it down is what made the previous one worthless. Ahmad holds it; if it is lost, `npm run rotate-admin-password` sets a new one using the service-role key in `.env.local`, so there is no lockout risk.
 
 The retired `Admin@2026` remains in this file's git history and in older `SESSION_LOG.md` entries. That history is left intact on purpose: rewriting it would not un-publish the string, and the password no longer opens anything. It is verified dead, not merely replaced (see the rotation entry in `SESSION_LOG.md`).
@@ -577,6 +579,17 @@ For v1, only two template_key rows are needed: `contact_notification` (sent to a
                                   --   --dry-run). Idempotent AND non-destructive:
                                   --   every statement is guarded, so unlike 034
                                   --   a re-run cannot overwrite admin edits.
+039_booking_cta_prominence.sql    -- Booking CTA prominence: navbar CTA repointed
+                                  --   (header_settings cta_label / cta_href ->
+                                  --   Book a Meeting, /book), contact callout +
+                                  --   founder card copy (cms_content `booking`
+                                  --   and `contact`), and the home founder_block
+                                  --   second CTA. Also DELETEs the now-orphaned
+                                  --   (booking, contact_link_label) that 038
+                                  --   seeded. DML only, `npm run seed-booking-cta`
+                                  --   (supports --dry-run). Idempotent; the
+                                  --   navbar CTA only moves while it still holds
+                                  --   the old /contact value.
 ```
 
 After running migrations, manually insert one admin_users row via SQL with a bcrypt hash for the password.

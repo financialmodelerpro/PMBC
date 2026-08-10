@@ -51,6 +51,10 @@ function pick(c: Record<string, unknown>): FounderContent {
   };
 }
 
+/** Small solid navy button used for the founder card's secondary (action) CTA. */
+const SECONDARY_CTA_CLASS =
+  'inline-flex items-center justify-center border border-[#1B3A5F] bg-[#1B3A5F] px-6 py-2.5 text-[12px] font-semibold uppercase text-[#E8DDC4] transition duration-200 hover:border-[#C69C3E] hover:bg-[#C69C3E] hover:text-[#14304F]';
+
 function getInitials(name: string): string {
   if (!name) return 'PM';
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -196,8 +200,11 @@ export function FounderBlock({
                   <span aria-hidden className="text-[#C69C3E]">→</span>
                 </Link>
               )}
-              {/* The secondary CTA is typically an outbound profile link, so
-                  it opens in a new tab when the href leaves the site. */}
+              {/* Solid navy button, so the two CTAs read as a hierarchy rather
+                  than as two equal-weight links: the primary is the quiet
+                  underlined text link above, this one is the action. The
+                  secondary CTA is sometimes an outbound profile link, so it
+                  opens in a new tab when the href leaves the site. */}
               {c.cta_secondary_label &&
                 c.cta_secondary_href &&
                 (/^https?:\/\//i.test(c.cta_secondary_href) ? (
@@ -205,7 +212,7 @@ export function FounderBlock({
                     href={c.cta_secondary_href}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-[13px] font-medium uppercase text-[#52606B] transition hover:text-[#1B3A5F]"
+                    className={SECONDARY_CTA_CLASS}
                     style={{ letterSpacing: '0.12em' }}
                   >
                     {c.cta_secondary_label}
@@ -213,7 +220,7 @@ export function FounderBlock({
                 ) : (
                   <Link
                     href={c.cta_secondary_href}
-                    className="text-[13px] font-medium uppercase text-[#52606B] transition hover:text-[#1B3A5F]"
+                    className={SECONDARY_CTA_CLASS}
                     style={{ letterSpacing: '0.12em' }}
                   >
                     {c.cta_secondary_label}
