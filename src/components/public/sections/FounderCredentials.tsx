@@ -1,5 +1,6 @@
 import { SectionContainer, SectionIntro } from '../SectionContainer';
 import { variantStyles, type PmbcVariant } from '@/lib/public/tokens';
+import type { SectionMediaValue } from '@/lib/cms/sectionMedia';
 
 function s(v: unknown): string {
   return typeof v === 'string' ? v : '';
@@ -41,10 +42,12 @@ export function FounderCredentials({
   content,
   styles,
   variant = 'white',
+  media = null,
 }: {
   content: Record<string, unknown>;
   styles: Record<string, unknown>;
   variant: PmbcVariant;
+  media?: SectionMediaValue | null;
 }) {
   const c = pick(content ?? {});
   if (c.items.length === 0) return null;
@@ -53,7 +56,7 @@ export function FounderCredentials({
   const bodyColor = dark ? '#E8DDC4' : v.text;
 
   return (
-    <SectionContainer variant={variant} styles={styles} size="compact">
+    <SectionContainer variant={variant} styles={styles} size="compact" media={media}>
       <div className="mx-auto max-w-[820px]">
         <SectionIntro
           eyebrow=""

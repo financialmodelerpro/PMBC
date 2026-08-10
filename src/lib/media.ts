@@ -106,7 +106,10 @@ export function mediaKeys(urlKey: string) {
   const base = urlKey.replace(/_url$/, '');
   return {
     url: urlKey,
-    mediaType: `${base}_media_type`,
+    // The shared section-level slot is keyed `media_url`, and deriving from it
+    // would give `media_media_type`. Special-cased to the plain `media_type`,
+    // which is also the name the shared-media schema documents.
+    mediaType: base === 'media' ? 'media_type' : `${base}_media_type`,
     poster: `${base}_poster_url`,
     autoplay: `${base}_autoplay`,
     loop: `${base}_loop`,

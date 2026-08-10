@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { SectionContainer, SectionIntro } from '../SectionContainer';
 import { RichText } from '@/components/public/RichText';
 import { variantStyles, type PmbcVariant } from '@/lib/public/tokens';
+import type { SectionMediaValue } from '@/lib/cms/sectionMedia';
 
 type Step = { number: string; title: string; description: string };
 
@@ -42,10 +43,12 @@ export function ProcessSteps({
   content,
   styles,
   variant = 'navy_deep',
+  media = null,
 }: {
   content: Record<string, unknown>;
   styles: Record<string, unknown>;
   variant: PmbcVariant;
+  media?: SectionMediaValue | null;
 }) {
   const { eyebrow, intro, heading, steps, footer_cta_label, footer_cta_href } = pickSteps(
     content ?? {},
@@ -56,7 +59,7 @@ export function ProcessSteps({
   const dark = variant === 'navy_deep';
 
   return (
-    <SectionContainer variant={variant} styles={styles}>
+    <SectionContainer variant={variant} styles={styles} media={media}>
       <SectionIntro
         eyebrow={eyebrow}
         headline={heading}

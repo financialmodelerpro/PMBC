@@ -1,5 +1,7 @@
 import { variantStyles, type PmbcVariant } from '@/lib/public/tokens';
 import { PAGE_INNER } from '@/lib/public/layout';
+import { SectionMediaLayout } from './SectionMediaLayout';
+import type { SectionMediaValue } from '@/lib/cms/sectionMedia';
 import {
   parseSectionStyles,
   sectionInnerStyle,
@@ -23,6 +25,7 @@ export function SectionContainer({
   children,
   className = '',
   styles,
+  media = null,
 }: {
   variant?: PmbcVariant;
   size?: 'default' | 'compact';
@@ -30,6 +33,11 @@ export function SectionContainer({
   className?: string;
   /** Raw `page_sections.styles`. Omit for sections rendered outside the CMS. */
   styles?: unknown;
+  /**
+   * Optional shared media for section types that have no dedicated field.
+   * Null, which is the default, renders `children` with no wrapper at all.
+   */
+  media?: SectionMediaValue | null;
 }) {
   const v = variantStyles(variant);
   const padding =
@@ -57,7 +65,9 @@ export function SectionContainer({
         className={PAGE_INNER}
         style={sectionInnerStyle(overrides)}
       >
-        {children}
+        <SectionMediaLayout media={media} variant={variant}>
+          {children}
+        </SectionMediaLayout>
       </div>
     </section>
   );

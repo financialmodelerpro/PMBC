@@ -5,6 +5,7 @@ import { sanitizeRichHtml } from '@/lib/cms/sanitize';
 import { SERVICES } from '@/config/services';
 import { SectionContainer } from '../SectionContainer';
 import { variantStyles, type PmbcVariant } from '@/lib/public/tokens';
+import type { SectionMediaValue } from '@/lib/cms/sectionMedia';
 
 function s(v: unknown): string {
   return typeof v === 'string' ? v : '';
@@ -37,10 +38,12 @@ export function ServiceDetail({
   content,
   styles,
   variant = 'white',
+  media = null,
 }: {
   content: Record<string, unknown>;
   styles: Record<string, unknown>;
   variant: PmbcVariant;
+  media?: SectionMediaValue | null;
 }) {
   const c = pick(content ?? {});
   const service = SERVICES.find((sv) => sv.slug === c.service_slug);
@@ -57,7 +60,7 @@ export function ServiceDetail({
   const v = variantStyles(variant);
 
   return (
-    <SectionContainer variant={variant} styles={styles}>
+    <SectionContainer variant={variant} styles={styles} media={media}>
       <div className="mx-auto max-w-[1000px]">
         <div
           aria-hidden

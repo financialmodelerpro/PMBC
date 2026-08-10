@@ -1,6 +1,7 @@
 import { SectionContainer } from '../SectionContainer';
 import { RichText } from '@/components/public/RichText';
 import { variantStyles, type PmbcVariant } from '@/lib/public/tokens';
+import type { SectionMediaValue } from '@/lib/cms/sectionMedia';
 
 type Stat = { value: string; label: string };
 
@@ -24,10 +25,12 @@ export function StatsBlock({
   content,
   styles,
   variant = 'white',
+  media = null,
 }: {
   content: Record<string, unknown>;
   styles: Record<string, unknown>;
   variant: PmbcVariant;
+  media?: SectionMediaValue | null;
 }) {
   const { intro, stats } = pickStats(content ?? {});
   if (stats.length === 0 && !intro) return null;
@@ -36,7 +39,7 @@ export function StatsBlock({
   const dark = variant === 'navy_deep';
 
   return (
-    <SectionContainer variant={variant} styles={styles} size="compact">
+    <SectionContainer variant={variant} styles={styles} size="compact" media={media}>
       {intro && (
         <p
           className="mx-auto max-w-2xl text-center text-[17px] leading-[1.7]"

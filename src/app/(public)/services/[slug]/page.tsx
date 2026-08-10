@@ -68,9 +68,10 @@ export default async function ServiceDetailPage(props: {
         }}
         styles={{}}
         variant="white"
+        media={fields.media}
       />
 
-      {/* CTA — links to /contact with the service pre-selected. */}
+      {/* CTA, linking to /contact with the service pre-selected. */}
       <section
         className="px-6 py-24 text-white sm:py-28 lg:py-32"
         style={{

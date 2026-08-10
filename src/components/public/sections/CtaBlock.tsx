@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { SectionContainer } from '../SectionContainer';
 import { RichText } from '@/components/public/RichText';
 import { variantStyles, type PmbcVariant } from '@/lib/public/tokens';
+import type { SectionMediaValue } from '@/lib/cms/sectionMedia';
 
 function s(v: unknown): string {
   return typeof v === 'string' ? v : '';
@@ -44,10 +45,12 @@ export function CtaBlock({
   content,
   styles,
   variant = 'navy_deep',
+  media = null,
 }: {
   content: Record<string, unknown>;
   styles: Record<string, unknown>;
   variant: PmbcVariant;
+  media?: SectionMediaValue | null;
 }) {
   const c = pick(content ?? {});
   if (!c.headline && !c.subhead && !c.cta_primary_label) return null;
@@ -56,7 +59,7 @@ export function CtaBlock({
   const dark = variant === 'navy_deep';
 
   return (
-    <SectionContainer variant={variant} styles={styles}>
+    <SectionContainer variant={variant} styles={styles} media={media}>
       <div className="mx-auto max-w-[860px] text-center">
         <div
           aria-hidden

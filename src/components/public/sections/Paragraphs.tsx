@@ -2,15 +2,18 @@ import { SectionContainer, SectionIntro } from '../SectionContainer';
 import { isBlankHtml, sanitizeRichHtml } from '@/lib/cms/sanitize';
 import { PROSE_MEASURE, proseAlignClass, readProseAlign } from '@/lib/public/prose';
 import { variantStyles, type PmbcVariant } from '@/lib/public/tokens';
+import type { SectionMediaValue } from '@/lib/cms/sectionMedia';
 
 export function Paragraphs({
   content,
   styles,
   variant = 'white',
+  media = null,
 }: {
   content: Record<string, unknown>;
   styles: Record<string, unknown>;
   variant: PmbcVariant;
+  media?: SectionMediaValue | null;
 }) {
   const html = typeof content?.html === 'string' ? content.html : '';
   // Optional heading, added for the founder profile's Background / Why
@@ -27,7 +30,7 @@ export function Paragraphs({
   const dark = variant === 'navy_deep';
 
   return (
-    <SectionContainer variant={variant} styles={styles} size="compact">
+    <SectionContainer variant={variant} styles={styles} size="compact" media={media}>
       {/* The section background and its padding stay full-container width; only
           this text column narrows, so long-form copy holds a readable measure
           rather than running the full 1200px. */}

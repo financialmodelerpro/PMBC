@@ -1,4 +1,5 @@
 import { fetchContentBySection } from './content';
+import { readSectionMedia, type SectionMediaValue } from './sectionMedia';
 import { SERVICES, type ServiceConfig } from '@/config/services';
 
 export type ServiceDetailFields = {
@@ -6,6 +7,13 @@ export type ServiceDetailFields = {
   deliverables: string[];
   timeline_text: string;
   target_audience_text: string;
+  /**
+   * The same optional shared media every `page_sections` row supports. These
+   * nine pages are driven by `cms_content` rather than `page_sections`, so the
+   * keys are read from the `service_<slug>` namespace instead, and handed to
+   * the renderer in the same shape.
+   */
+  media: SectionMediaValue | null;
 };
 
 export const SERVICE_CONTENT_KEYS = [
@@ -13,6 +21,11 @@ export const SERVICE_CONTENT_KEYS = [
   'deliverables',
   'timeline_text',
   'target_audience_text',
+  'media_url',
+  'media_type',
+  'media_poster_url',
+  'media_position',
+  'media_caption',
 ] as const;
 
 /** Section name pattern in `cms_content` for a given service slug. */
@@ -60,5 +73,9 @@ export async function fetchServiceDetailFields(
     deliverables: parseDeliverables(rows.deliverables ?? ''),
     timeline_text: rows.timeline_text ?? '',
     target_audience_text: rows.target_audience_text ?? '',
+    // cms_content stores everything as TEXT, so the playback booleans arrive as
+    // the strings "true" / "false". readSectionMedia handles both, and returns
+    // null when media_url is blank, which is the state all nine ship in.
+    media: readSectionMedia(rows),
   };
 }

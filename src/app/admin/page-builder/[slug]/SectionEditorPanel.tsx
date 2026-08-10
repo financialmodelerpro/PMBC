@@ -19,6 +19,8 @@ import type { SectionEditorProps } from '@/components/admin/editors/types';
 import { SaveButton } from '@/components/admin/SaveButton';
 import { SaveStatus, type SaveState } from '@/components/admin/SaveStatus';
 import { StyleEditor } from '@/components/admin/StyleEditor';
+import { SectionMediaPanel } from '@/components/admin/SectionMediaPanel';
+import { sectionTypeSupportsSharedMedia } from '@/lib/cms/sectionMedia';
 import { ADMIN_COLORS } from '@/lib/admin/styles';
 import { getSectionMeta } from '@/lib/cms/sectionTypes';
 
@@ -169,6 +171,14 @@ export function SectionEditorPanel({
           Editor={Editor}
         />
       </div>
+
+      {/* Shared optional media, on the same footing as styles: a fixed set of
+          keys every section type understands. Hidden for the six types that
+          carry their own media field, so an operator is never offered two
+          images with no way to tell which one wins. */}
+      {sectionTypeSupportsSharedMedia(sectionType) && (
+        <SectionMediaPanel content={content} onChange={onChange} />
+      )}
 
       {/* Available for every section type, including ones whose content editor
           has not been built, because styles live on the row rather than in the

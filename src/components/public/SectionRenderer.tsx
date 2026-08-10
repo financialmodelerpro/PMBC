@@ -1,5 +1,10 @@
 import type { Json } from '@/types/database';
 import type { PmbcVariant } from '@/lib/public/tokens';
+import {
+  readSectionMedia,
+  sectionTypeSupportsSharedMedia,
+  type SectionMediaValue,
+} from '@/lib/cms/sectionMedia';
 
 import { Hero } from './sections/Hero';
 import { Paragraphs } from './sections/Paragraphs';
@@ -36,6 +41,13 @@ type RendererProps = {
   content: Record<string, unknown>;
   styles: Record<string, unknown>;
   variant: PmbcVariant;
+  /**
+   * Shared optional media, resolved here rather than in each renderer so the
+   * exclusion rule for types with their own media field lives in one place.
+   * Null for every section that has none, and renderers that do not support it
+   * simply ignore the prop.
+   */
+  media?: SectionMediaValue | null;
 };
 
 const REGISTRY: Record<
@@ -143,7 +155,14 @@ export function SectionRenderer({
   if (!Component) {
     return <SectionPlaceholder sectionType={section.section_type} />;
   }
-  return <Component content={content} styles={styles} variant={resolved} />;
+  // Types with a dedicated media field are excluded, so a founder card cannot
+  // end up with two competing images and no way to tell them apart.
+  const media = sectionTypeSupportsSharedMedia(section.section_type)
+    ? readSectionMedia(content)
+    : null;
+  return (
+    <Component content={content} styles={styles} variant={resolved} media={media} />
+  );
 }
 
 /**

@@ -3,6 +3,7 @@ import { resolveSectorIcon } from '@/lib/cms/sectorIcons';
 
 import { SectionContainer, SectionIntro } from '../SectionContainer';
 import { variantStyles, type PmbcVariant } from '@/lib/public/tokens';
+import type { SectionMediaValue } from '@/lib/cms/sectionMedia';
 
 type Sector = { icon_name: string; title: string; description: string };
 
@@ -41,10 +42,12 @@ export function SectorGrid({
   content,
   styles,
   variant = 'white',
+  media = null,
 }: {
   content: Record<string, unknown>;
   styles: Record<string, unknown>;
   variant: PmbcVariant;
+  media?: SectionMediaValue | null;
 }) {
   const { intro, heading, eyebrow, sectors } = pickSectors(content ?? {});
   if (sectors.length === 0 && !heading && !intro) return null;
@@ -53,7 +56,7 @@ export function SectorGrid({
   const dark = variant === 'navy_deep';
 
   return (
-    <SectionContainer variant={variant} styles={styles}>
+    <SectionContainer variant={variant} styles={styles} media={media}>
       <SectionIntro
         eyebrow={eyebrow}
         headline={heading}

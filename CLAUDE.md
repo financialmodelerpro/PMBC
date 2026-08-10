@@ -110,6 +110,8 @@ When you find an em dash in *existing* content while doing other work, fix it as
 
 | Phase 26 : Brevo email migration + three contact addresses | Complete (2026-08-10) | `resend` uninstalled; `src/lib/email/send.ts` rewritten against Brevo's v3 REST API with plain `fetch` and hand-written types (see section 7 for why no SDK). Exported surface unchanged, so no caller was edited, and the graceful fallback is preserved. `from` parses both bare addresses and `Name <addr>`, since the Resend setup used the angled form. **Verified end to end against the live API:** a real contact submission produced both emails, Brevo reports `requests` then `delivered` for each, and the delivered bodies were fetched back from `/v3/smtp/emails/{uuid}` and asserted to carry the branded shell with every `{{variable}}` resolved. **/contact now publishes three addresses** (advisory@, info@, ahmad.din@) with editable labels, stored in `site_settings` via migration 042. That migration **also repoints `admin_email` from the personal Gmail to advisory@**, which was necessary rather than cosmetic: the contact route prefers `site_settings.admin_email` over `EMAIL_TO_ADMIN`, so setting the env var alone would have had no effect. Privacy page sub-processor disclosure updated from Resend, Inc. (US) to Brevo SAS (France, EU). |
 
+| Phase 27 : Optional media on every section type | Complete (2026-08-10) | Any section can now carry an optional image, GIF or video on a fixed key set (`media_url`, `media_type`, `media_poster_url`, `media_position`, `media_caption`, plus the three playback flags). **The contract is the null case:** blank `media_url` renders `children` with no wrapper, no grid and no margin, so every existing page is unchanged. New `lib/cms/sectionMedia.ts` owns the vocabulary and the exclusion set; `SectionMediaLayout` handles the four positions and the gold-framed, small-caps-captioned frame; `SectionContainer` and `Hero` each render children through it. `SectionRenderer` resolves the media once and passes it down, so the exclusion rule lives in one place. **The six types with a dedicated media field are excluded** (`text_image`, `founder_block`, `founder_hero`, `network_partners`, `fmp_intro`, `quote`): two competing image fields with no way to tell which wins would be worse than none. Admin side is a single collapsible **Media** panel mounted beside the StyleEditor, so no section editor was touched. The 9 service detail pages are `cms_content`-driven rather than `page_sections`, so migration 043 seeds their five keys blank to make them visible in `/admin/content`. Frames carry `data-section-media` because `figure` alone cannot distinguish a media frame from `quote`'s pull-quote figure. Verified in headless Chrome: image, video and GIF set on three different section types, exactly 3 frames rendered, exactly 3 section heights moved, every other section unchanged to within 2px, and `/about` plus a service page render zero frames. |
+
 **Admin login:** `meetahmadch@gmail.com`. **The password was rotated on 2026-08-02 and is deliberately not recorded here or anywhere else in this repository.** Writing it down is what made the previous one worthless. Ahmad holds it; if it is lost, `npm run rotate-admin-password` sets a new one using the service-role key in `.env.local`, so there is no lockout risk.
 
 The retired `Admin@2026` remains in this file's git history and in older `SESSION_LOG.md` entries. That history is left intact on purpose: rewriting it would not un-publish the string, and the password no longer opens anything. It is verified dead, not merely replaced (see the rotation entry in `SESSION_LOG.md`).
@@ -597,6 +599,16 @@ For v1, only two template_key rows are needed: `contact_notification` (sent to a
                                   --   `npm run seed-footer-logo-sizing`
                                   --   (supports --dry-run). Idempotent,
                                   --   ON CONFLICT DO NOTHING.
+043_service_media_keys.sql        -- Five shared media keys, seeded BLANK, for
+                                  --   each of the 9 `service_<slug>` cms_content
+                                  --   namespaces (45 rows). Those pages are not
+                                  --   page_sections rows, and /admin/content only
+                                  --   lists keys that exist, so without this an
+                                  --   operator would have to add each by hand.
+                                  --   Blank media_url is the "no media" state, so
+                                  --   nothing renders differently. DML only,
+                                  --   `npm run seed-service-media-keys`
+                                  --   (supports --dry-run). ON CONFLICT DO NOTHING.
 042_contact_addresses.sql         -- Three published contact addresses plus their
                                   --   labels in site_settings (advisory@, info@,
                                   --   ahmad.din@). ALSO repoints admin_email from

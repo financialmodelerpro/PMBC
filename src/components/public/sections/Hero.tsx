@@ -2,6 +2,8 @@ import Link from 'next/link';
 import { ChevronDown } from 'lucide-react';
 
 import { RichText } from '@/components/public/RichText';
+import { SectionMediaLayout } from '../SectionMediaLayout';
+import type { SectionMediaValue } from '@/lib/cms/sectionMedia';
 import { variantStyles, type PmbcVariant } from '@/lib/public/tokens';
 import {
   parseSectionStyles,
@@ -40,10 +42,12 @@ export function Hero({
   content,
   styles,
   variant = 'navy_deep',
+  media = null,
 }: {
   content: Record<string, unknown>;
   styles: Record<string, unknown>;
   variant: PmbcVariant;
+  media?: SectionMediaValue | null;
 }) {
   const c = pick(content ?? {});
   const dark = variant === 'navy_deep';
@@ -89,6 +93,7 @@ export function Hero({
         className="relative mx-auto w-full max-w-[1100px] text-center"
         style={overrides.inner}
       >
+        <SectionMediaLayout media={media} variant={variant}>
         <div
           aria-hidden
           className="mx-auto h-px w-[80px]"
@@ -173,6 +178,7 @@ export function Hero({
             )}
           </div>
         )}
+        </SectionMediaLayout>
       </div>
 
       {/* Scroll indicator */}

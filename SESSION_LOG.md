@@ -4,6 +4,26 @@ Chronological build history for the PMBC website. Split out of `CLAUDE.md` to ke
 
 ---
 
+### 2026-08-10 - Optional media on every section type
+
+**The whole feature is defined by its null case.** Adding an optional capability to fifteen section types is easy to get wrong in one specific way: every page that does not use it grows a wrapper element, a grid, or a stray margin. `SectionMediaLayout` returns `children` untouched when there is no media, so nothing wraps and nothing shifts. That was the assertion worth spending verification effort on, and it is what the height comparison in the test actually measures.
+
+**Resolved once, in `SectionRenderer`, not in each renderer.** The exclusion rule for the six types that already carry a dedicated media field lives in a single set. Giving those two media slots would be a trap: an operator would see two image fields with no way to tell which one drives the picture on screen, and their bespoke layouts (a 4:5 founder portrait, a partner logo row) are the point of those types.
+
+**One admin panel, no editor edits.** The Media panel is mounted beside the StyleEditor for the same reason styles are: the keys are a fixed set every section type understands, so wiring them into fifteen editors would be fifteen chances to diverge. It is collapsed unless media is already set, so a section with none looks untouched in the builder too.
+
+**Eight renderers were patched by script, not by hand.** The edit was identical in each: add the prop, add its type, forward to `SectionContainer`, add the import. Doing that eight times by hand is eight chances to fumble one. The script asserted each of the four steps applied and reported which, so a silent partial patch would have failed loudly rather than typechecking and misbehaving later.
+
+**Two test failures that were the test's fault, worth recording.** The first run reported "empty media frames" on the baseline, before any media existed. The cause was the probe counting every `<figure>` with no image as an empty frame, which flags `quote`, whose figure and figcaption wrap a pull quote and correctly contain no image. Frames now carry `data-section-media` so the probe targets only CMS media frames. The second reported no new `<video>`. The cause was the 76-byte stub mp4 being undecodable, so `VideoMedia`'s `onError` path swapped in the poster, which is exactly the designed fallback. The video element is now asserted on the server HTML and the browser only has to show a non-empty frame.
+
+**The frame deliberately has no fixed aspect ratio.** The dedicated media slots crop to 4:5 because they hold portraits and logos in a known layout. A general-purpose section image could be a chart, a screenshot or a wide photograph, and cropping those to a portrait box would destroy them, so the asset keeps its own proportions and the gold frame follows it.
+
+**Default position is below, not above.** A section leads with its eyebrow and headline; dropping an image above those buries the point of the section behind a picture.
+
+The nine service detail pages needed migration 043 because they are driven by `cms_content` rather than `page_sections`, and `/admin/content` only lists keys that already exist. Seeded blank, so nothing renders differently; the rows exist to make the fields fillable without an operator having to know five exact key names nine times over.
+
+---
+
 ### 2026-08-10 - Email migrated from Resend to Brevo, three published contact addresses
 
 **No SDK, on purpose.** Sending is one POST to one endpoint, so `@getbrevo/brevo` buys nothing while costing loose OpenAPI-generated models, a transitive HTTP stack, and CJS/ESM friction inside the Next server bundle. `src/lib/email/send.ts` posts to `https://api.brevo.com/v3/smtp/email` with plain `fetch` and about twenty lines of hand-written request types, which describe the payload more precisely than the generated ones do.

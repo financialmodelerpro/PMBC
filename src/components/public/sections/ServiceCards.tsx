@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { SectionContainer, SectionIntro } from '../SectionContainer';
 import { RichText } from '@/components/public/RichText';
 import { variantStyles, type PmbcVariant } from '@/lib/public/tokens';
+import type { SectionMediaValue } from '@/lib/cms/sectionMedia';
 
 type Card = { number: string; title: string; description: string; link: string };
 
@@ -46,10 +47,12 @@ export function ServiceCards({
   content,
   styles,
   variant = 'cream',
+  media = null,
 }: {
   content: Record<string, unknown>;
   styles: Record<string, unknown>;
   variant: PmbcVariant;
+  media?: SectionMediaValue | null;
 }) {
   const { eyebrow, headline, intro, cards, footer_cta_label, footer_cta_href } = pickCards(
     content ?? {},
@@ -60,7 +63,7 @@ export function ServiceCards({
   const dark = variant === 'navy_deep';
 
   return (
-    <SectionContainer variant={variant} styles={styles}>
+    <SectionContainer variant={variant} styles={styles} media={media}>
       <SectionIntro
         eyebrow={eyebrow}
         headline={headline}
