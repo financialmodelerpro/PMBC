@@ -132,7 +132,7 @@ function Unavailable({
           </p>
           <p className="mt-6 text-[14px]">
             <Link
-              href="/financial-modeler-pro"
+              href="/fmp"
               className="font-semibold uppercase text-[#1B3A5F] underline decoration-[#C69C3E] underline-offset-4"
               style={{ letterSpacing: '0.1em' }}
             >

@@ -73,6 +73,18 @@ const nextConfig: NextConfig = {
         destination: '/services/refm',
         statusCode: 301,
       },
+      {
+        // The platform page moved to /fmp on 2026-08-11. Same 301 reasoning.
+        //
+        // This matches the exact path only, so the three sub-pages beneath it
+        // (/financial-modeler-pro/modeling-hub and its siblings) keep working
+        // at their own URLs. They are deliberately unlinked and out of the
+        // sitemap rather than removed, so their code and the FMP API
+        // integration stay live and reachable to anyone holding the URL.
+        source: '/financial-modeler-pro',
+        destination: '/fmp',
+        statusCode: 301,
+      },
     ];
   },
 };

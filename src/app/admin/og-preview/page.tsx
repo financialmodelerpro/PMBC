@@ -33,7 +33,7 @@ const FIRM_PAGE_OG_SUBTITLES: Record<string, string> = {
   network: 'Reach extended through partners we trust.',
   about_short: 'About PMBC',
   'about-ahmad-din': 'Founder, PaceMakers Business Consultants',
-  'financial-modeler-pro': 'The platform built by practitioners.',
+  'financial-modeler-pro': 'The platform arm of PaceMakers, served at /fmp.',
   contact: 'Tell us about the mandate.',
 };
 

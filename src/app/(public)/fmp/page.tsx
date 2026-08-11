@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic';
 export async function generateMetadata(): Promise<Metadata> {
   const page = await fetchPage('financial-modeler-pro');
   return buildPageMetadata({
-    path: '/financial-modeler-pro',
+    path: '/fmp',
     cmsPage: page,
     fallback: {
       title: 'Financial Modeler Pro | PaceMakers Business Consultants',

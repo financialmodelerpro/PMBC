@@ -20,6 +20,9 @@
 const EXPLICIT_ROUTES: Record<string, string> = {
   home: '/',
   'about-ahmad-din': '/about/ahmad-din',
+  // The page kept its CMS slug when its URL shortened to /fmp, so the row, its
+  // is_system flag and its section history stay intact. Only the route moved.
+  'financial-modeler-pro': '/fmp',
 };
 
 /** Service detail pages are stored as `service-<slug>` and served at `/services/<slug>`. */

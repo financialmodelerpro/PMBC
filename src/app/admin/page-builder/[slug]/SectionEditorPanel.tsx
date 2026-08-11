@@ -16,6 +16,8 @@ import { QuoteEditor } from '@/components/admin/editors/QuoteEditor';
 import { FmpIntroEditor } from '@/components/admin/editors/FmpIntroEditor';
 import { ServiceDetailEditor } from '@/components/admin/editors/ServiceDetailEditor';
 import { MediaSectionEditor } from '@/components/admin/editors/MediaSectionEditor';
+import { ProseChecklistEditor } from '@/components/admin/editors/ProseChecklistEditor';
+import { FeatureCardsEditor } from '@/components/admin/editors/FeatureCardsEditor';
 import type { SectionEditorProps } from '@/components/admin/editors/types';
 import { SaveButton } from '@/components/admin/SaveButton';
 import { SaveStatus, type SaveState } from '@/components/admin/SaveStatus';
@@ -42,6 +44,8 @@ const EDITORS: Record<string, (props: SectionEditorProps) => React.ReactElement>
   fmp_intro: FmpIntroEditor,
   service_detail: ServiceDetailEditor,
   media: MediaSectionEditor,
+  prose_checklist: ProseChecklistEditor,
+  feature_cards: FeatureCardsEditor,
 };
 
 /**

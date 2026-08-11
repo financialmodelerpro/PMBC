@@ -28,12 +28,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     '/team',
     '/case-studies',
     '/insights',
-    '/financial-modeler-pro',
-    // The three platform pages. Their body copy is fetched from FMP but the
-    // URLs, the markup and the metadata are PMBC's, so they belong here.
-    '/financial-modeler-pro/modeling-hub',
-    '/financial-modeler-pro/refm',
-    '/financial-modeler-pro/training-hub',
+    '/fmp',
+    // The three FMP-fed sub-pages under /financial-modeler-pro are deliberately
+    // absent. They still render and the API integration behind them still runs,
+    // but nothing links to them and they are not offered to crawlers, so /fmp
+    // is the single canonical platform page. Re-adding a line here is all it
+    // takes to bring one back.
     '/contact',
     '/book',
     '/privacy',

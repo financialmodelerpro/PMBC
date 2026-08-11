@@ -16,7 +16,9 @@ export type SectionType =
   | 'quote'
   | 'fmp_intro'
   | 'service_detail'
-  | 'media';
+  | 'media'
+  | 'prose_checklist'
+  | 'feature_cards';
 
 export type SectionTypeMeta = {
   type: SectionType;
@@ -219,6 +221,20 @@ export const SECTION_TYPES: SectionTypeMeta[] = [
       cta_href: 'https://www.financialmodelerpro.com',
       logo_url: '',
     },
+  },
+  {
+    type: 'prose_checklist',
+    label: 'Prose + checklist',
+    description: 'Long-form prose beside a gold-ticked checklist, two columns on desktop.',
+    implemented: true,
+    defaultContent: { eyebrow: '', heading: '', html: '<p></p>', list_heading: '', items: [] },
+  },
+  {
+    type: 'feature_cards',
+    label: 'Feature cards',
+    description: 'Large cards with metadata chips, a bullet list and a call to action.',
+    implemented: true,
+    defaultContent: { eyebrow: '', heading: '', intro: '', cards: [] },
   },
   {
     type: 'media',

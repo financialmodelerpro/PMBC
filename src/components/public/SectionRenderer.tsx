@@ -22,6 +22,8 @@ import { Quote } from './sections/Quote';
 import { FmpIntro } from './sections/FmpIntro';
 import { ServiceDetail } from './sections/ServiceDetail';
 import { MediaSection } from './sections/MediaSection';
+import { ProseChecklist } from './sections/ProseChecklist';
+import { FeatureCards } from './sections/FeatureCards';
 import { SectionPlaceholder } from './sections/Placeholder';
 
 type SectionRow = {
@@ -71,6 +73,8 @@ const REGISTRY: Record<
   fmp_intro: FmpIntro,
   service_detail: ServiceDetail,
   media: MediaSection,
+  prose_checklist: ProseChecklist,
+  feature_cards: FeatureCards,
 };
 
 /**
@@ -99,6 +103,8 @@ const DEFAULT_VARIANT: Record<string, PmbcVariant> = {
   // page, and the cream band separates it from the white sections it usually
   // sits between without the weight of a navy one.
   media: 'cream',
+  prose_checklist: 'white',
+  feature_cards: 'cream',
 };
 
 function readVariant(
