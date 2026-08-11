@@ -131,9 +131,24 @@ async function waitForSite(tries = 60) {
   throw new Error('site did not come up');
 }
 
-const get = async (p) => {
+const rawGet = async (p) => {
   const res = await fetch(BASE + p, { redirect: 'manual', cache: 'no-store' });
   return { status: res.status, body: await res.text() };
+};
+
+/**
+ * Fetches a route twice and returns the second response.
+ *
+ * The first request to a route in dev triggers compilation, and that response
+ * carries dev-only payload the settled one does not: on a cold `.next` the
+ * first body came back 25 KB larger than the second. One run of this script
+ * failed a single content assertion that no manual reproduction could
+ * reproduce, and discarding the compile-time response removes that class of
+ * false failure rather than leaving it to reappear.
+ */
+const get = async (p) => {
+  await rawGet(p);
+  return rawGet(p);
 };
 
 /** Exactly the payload FMP's public route builds, from FMP's own database. */
@@ -287,20 +302,35 @@ async function main() {
 
     // ---- B. cache fallback with real data ---------------------------------
     console.log('\n=== B. cache fallback, real FMP data ===');
-    const payloads = await recordPayloads();
-    for (const slug of SLUGS) {
-      const row = { payload: payloads[slug], stored_at: new Date().toISOString(), max_age: 60 };
-      await db.from('cms_content').delete().eq('section', CACHE_SECTION).eq('key', slug);
-      const { error } = await db.from('cms_content').insert({
-        section: CACHE_SECTION,
-        key: slug,
-        value: JSON.stringify(row),
-      });
-      if (error) throw new Error('prime cache: ' + error.message);
+    if (liveOk) {
+      // The endpoint works, so the only honest way to test the fallback is to
+      // take it away. The cache is left exactly as phase A's live fetch wrote
+      // it, which is a stronger fixture than a primed one: it proves the copy
+      // the app stored by itself is the copy it can serve. The server is
+      // restarted pointing at a dead port.
+      await stopSite();
+      await waitForSiteDown();
+      const { data: warm } = await db.from('cms_content').select('key').eq('section', CACHE_SECTION);
+      ok('cache still holds what the live fetch wrote', (warm ?? []).length === 3,
+        (warm ?? []).map((r) => r.key).join(', '));
+      site = startSite({ FMP_API_URL: 'http://127.0.0.1:1', FMP_API_KEY: apiKey });
+      await waitForSite();
+    } else {
+      const payloads = await recordPayloads();
+      for (const slug of SLUGS) {
+        const row = { payload: payloads[slug], stored_at: new Date().toISOString(), max_age: 60 };
+        await db.from('cms_content').delete().eq('section', CACHE_SECTION).eq('key', slug);
+        const { error } = await db.from('cms_content').insert({
+          section: CACHE_SECTION,
+          key: slug,
+          value: JSON.stringify(row),
+        });
+        if (error) throw new Error('prime cache: ' + error.message);
+      }
+      ok('cache primed with the real payloads',
+        SLUGS.every((s) => payloads[s].sections.length > 0),
+        SLUGS.map((s) => `${s}:${payloads[s].sections.length}`).join(' '));
     }
-    ok('cache primed with the real payloads',
-      SLUGS.every((s) => payloads[s].sections.length > 0),
-      SLUGS.map((s) => `${s}:${payloads[s].sections.length}`).join(' '));
 
     const cachedPages = {};
     for (const slug of SLUGS) {

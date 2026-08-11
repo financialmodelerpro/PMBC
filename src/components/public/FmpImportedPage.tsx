@@ -3,8 +3,7 @@ import Link from 'next/link';
 import { SectionList } from './SectionRenderer';
 import { SectionContainer, SectionIntro } from './SectionContainer';
 import { PAGE_GUTTER, PAGE_INNER } from '@/lib/public/layout';
-import { mapFmpSections } from '@/lib/fmp/mapSections';
-import type { FmpFetchResult } from '@/lib/fmp/types';
+import type { MappedSection } from '@/lib/fmp/mapSections';
 
 const FMP_URL = 'https://app.financialmodelerpro.com';
 
@@ -17,35 +16,34 @@ const FMP_URL = 'https://app.financialmodelerpro.com';
  * PMBC's markup and PMBC's visual system rather than an embed or an iframe.
  * That is what makes the content PMBC's for SEO.
  *
- * Three outcomes, and none of them is an error page:
- *   live     FMP answered
- *   cache    FMP did not, and a stored copy was served instead
- *   neither  a first visit during an outage, which gets a short standing
- *            notice and a link out, not a crash and not an empty page
+ * Two outcomes, and neither is an error page: sections to render, or a short
+ * standing notice with a link out. The caller decides which by mapping first,
+ * so an outage, a cold cache and a page whose sections were all skipped all
+ * arrive here as an empty list.
+ *
+ * TAKES MAPPED SECTIONS, NOT THE RAW PAYLOAD, AND THAT IS DELIBERATE.
+ * Passing `FmpFetchResult` in meant the raw feed response crossed a component
+ * boundary, and React serialises what crosses one into the RSC flight payload
+ * embedded in the page. In development that put the entire untouched FMP
+ * response into the page source, including the `_dynamic` placeholder sections
+ * this site drops and the `_visible` flags it honours. Production did not do
+ * it, but the exposure existed because the raw data was handed over at all.
+ * Mapping before this boundary means only what actually renders can ever be
+ * serialised.
  */
 export function FmpImportedPage({
-  result,
-  slug,
+  sections,
   title,
   intro,
   fmpPath,
 }: {
-  result: FmpFetchResult;
-  slug: string;
+  /** Already mapped into PMBC's vocabulary. Empty means nothing to show. */
+  sections: MappedSection[];
   title: string;
   intro: string;
   /** Where this page lives on FMP, for the link out. */
   fmpPath: string;
 }) {
-  if (!result.ok) {
-    return <Unavailable title={title} intro={intro} fmpPath={fmpPath} />;
-  }
-
-  const { sections } = mapFmpSections(result.payload.sections, slug);
-
-  // Every section was skipped, which is not a failure of the fetch but leaves
-  // nothing to show. Same treatment as an outage rather than a bare navbar and
-  // footer with a void between them.
   if (sections.length === 0) {
     return <Unavailable title={title} intro={intro} fmpPath={fmpPath} />;
   }

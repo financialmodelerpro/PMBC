@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 
 import { FmpImportedPage } from '@/components/public/FmpImportedPage';
 import { fetchFmpPage } from '@/lib/fmp/client';
+import { mapFmpSections } from '@/lib/fmp/mapSections';
 import { buildFmpPageMetadata, FMP_PAGES } from '@/lib/fmp/pages';
 
 const SLUG = 'refm' as const;
@@ -27,10 +28,12 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function Page() {
   const result = await fetchFmpPage(SLUG);
   const config = FMP_PAGES[SLUG];
+  // Mapped here rather than inside the component, so the raw feed response
+  // never crosses a component boundary and cannot reach the RSC payload.
+  const sections = result.ok ? mapFmpSections(result.payload.sections, SLUG).sections : [];
   return (
     <FmpImportedPage
-      result={result}
-      slug={SLUG}
+      sections={sections}
       title={config.title}
       intro={config.intro}
       fmpPath={config.fmpPath}
