@@ -45,7 +45,7 @@ A complete content management system identical in pattern to FMP (key-value CMS 
 
 **Public pages (all CMS-editable):**
 - Home
-- Services overview + 9 individual service detail pages (Financial Modeling, Business Valuation, Financial Due Diligence, Transaction Advisory, M&A, Real Estate Modeling, Project Finance, Investment Memorandums, CFO Advisory)
+- Services overview + 9 individual service detail pages (Financial Modeling, Business Valuation, Financial Due Diligence, Transaction Advisory, M&A, Real Estate Financial Modeling, Project Finance, Investment Memorandums, CFO Advisory)
 - Sector Coverage
 - Engagement Approach
 - Strategic Network (Sky Gulf, Lynkers)

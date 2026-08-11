@@ -42,9 +42,11 @@ export const SERVICES: ServiceConfig[] = [
       'Sell-side mandates, buy-side searches, and strategic combinations for owners and investors across the GCC and beyond.',
   },
   {
-    slug: 'real-estate-modeling',
+    // Renamed 2026-08-11 by migration 047. The previous slug 301s to this one
+    // in next.config.ts, which is the only file that still names it.
+    slug: 'refm',
     number: '06',
-    title: 'Real Estate Modeling',
+    title: 'Real Estate Financial Modeling',
     summary:
       'Hospitality, residential, mixed-use, and master-plan models with phased construction draws, IRR waterfalls, and exit scenarios.',
   },

@@ -25,6 +25,8 @@
     "seed-firm-prominence": "node scripts/seed-firm-prominence.mjs",
     "seed-merge-about": "node scripts/seed-merge-about.mjs",
     "seed-restore-founder-card": "node scripts/seed-restore-founder-card.mjs",
+    "seed-rename-refm": "node scripts/seed-rename-refm.mjs",
+    "verify-rename-refm": "node scripts/verify-rename-refm.mjs",
     "verify-section-media": "node scripts/verify-section-media-layout.mjs"
   },
   "dependencies": {

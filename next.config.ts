@@ -61,6 +61,18 @@ const nextConfig: NextConfig = {
         destination: '/',
         statusCode: 301,
       },
+      {
+        // Service 06 became "Real Estate Financial Modeling" at /services/refm
+        // on 2026-08-11 (migration 047). Same 301 reasoning as above. Straight
+        // to the final URL, not through another redirect, so an indexed link
+        // resolves in one hop and passes its signal once.
+        //
+        // This `source` is the one place in live source that still carries the
+        // old slug, and it has to: it is the address being redirected FROM.
+        source: '/services/real-estate-modeling',
+        destination: '/services/refm',
+        statusCode: 301,
+      },
     ];
   },
 };
