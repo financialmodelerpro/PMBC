@@ -3,14 +3,7 @@ import { NextResponse } from 'next/server';
 import { getAdminSession } from '@/lib/auth/requireAdmin';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { writeAudit } from '@/lib/audit';
-import {
-  DOCUMENT_MIME,
-  IMAGE_MIME,
-  MAX_IMAGE_BYTES,
-  MAX_VIDEO_BYTES,
-  VIDEO_MIME,
-  isVideoMime,
-} from '@/lib/media';
+import { ALLOWED_UPLOAD_MIME, humanBytes, maxBytesForMime } from '@/lib/media';
 
 const BUCKETS = ['cms-assets', 'article-covers', 'case-study-images', 'team-photos'] as const;
 type Bucket = (typeof BUCKETS)[number];
@@ -18,19 +11,7 @@ type Bucket = (typeof BUCKETS)[number];
 // Images, animated images and documents share the 10 MB ceiling; video gets 25
 // MB, since a few seconds of even modest-bitrate mp4 clears 10 MB easily and a
 // background clip that cannot be uploaded is not a usable feature.
-const ALLOWED_MIME = new Set<string>([
-  ...IMAGE_MIME,
-  ...VIDEO_MIME,
-  ...DOCUMENT_MIME,
-]);
-
-function maxBytesFor(mime: string): number {
-  return isVideoMime(mime) ? MAX_VIDEO_BYTES : MAX_IMAGE_BYTES;
-}
-
-function humanMb(bytes: number): string {
-  return `${Math.round(bytes / (1024 * 1024))} MB`;
-}
+const ALLOWED_MIME = ALLOWED_UPLOAD_MIME;
 
 function isBucket(v: string | null): v is Bucket {
   return !!v && (BUCKETS as readonly string[]).includes(v);
@@ -77,70 +58,140 @@ export async function GET(req: Request) {
   return NextResponse.json({ bucket, buckets: BUCKETS, files });
 }
 
+/**
+ * Upload is a two call handshake, and the file itself passes through neither.
+ *
+ * WHY THE BYTES NO LONGER COME THROUGH HERE
+ * A multipart POST of the file put the whole thing in the request body of a
+ * serverless function. Any request body ceiling anywhere in front of that
+ * function then applies to the upload, and those rejections happen before any
+ * code here runs, so nothing in this route can catch them or shape the
+ * response. The symptom was an upload dying on a plain text "Request Entity
+ * Too Large" that the admin then tried to parse as JSON.
+ *
+ * A signed upload URL removes the question. `sign` returns a short lived URL,
+ * the browser PUTs the file straight to Supabase Storage, and `complete`
+ * records it. Both calls here carry a few hundred bytes of JSON, so no body
+ * limit between the browser and this function is reachable no matter how large
+ * the file is. It is also faster and cheaper: the bytes make one trip instead
+ * of two, and no function holds a video in memory.
+ *
+ * WHAT STILL ENFORCES THE LIMITS
+ *  - `sign` refuses an unsupported type or an oversized declared size, so the
+ *    normal path gets a clear error before a byte moves.
+ *  - the declared size is a client claim, so the bucket carries a real
+ *    `file_size_limit` as well (see scripts/configure-storage-buckets.mjs).
+ *    Storage rejects an oversized PUT with a JSON 413 regardless of what the
+ *    browser claimed.
+ */
 export async function POST(req: Request) {
   const session = await getAdminSession();
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  let form: FormData;
+  let body: {
+    action?: string;
+    bucket?: string;
+    filename?: string;
+    contentType?: string;
+    size?: number;
+    name?: string;
+  };
   try {
-    form = await req.formData();
+    body = await req.json();
   } catch {
-    return NextResponse.json({ error: 'Expected multipart form data' }, { status: 400 });
+    return NextResponse.json(
+      { error: 'Expected a JSON body with an action of "sign" or "complete"' },
+      { status: 400 },
+    );
   }
 
-  const bucket = (form.get('bucket') as string) || 'cms-assets';
+  const bucket = body.bucket || 'cms-assets';
   if (!isBucket(bucket)) {
     return NextResponse.json({ error: 'Unknown bucket' }, { status: 400 });
   }
-
-  const files = form.getAll('file').filter((f): f is File => f instanceof File);
-  if (files.length === 0) {
-    return NextResponse.json({ error: 'No file provided' }, { status: 400 });
-  }
-
   const supabase = createSupabaseServerClient();
-  const uploaded: Array<{ name: string; url: string }> = [];
 
-  for (const file of files) {
-    // Type is checked before size, so an unsupported file reports what is
-    // actually wrong with it rather than a size limit it was never eligible for.
-    if (file.type && !ALLOWED_MIME.has(file.type)) {
+  if (body.action === 'sign') {
+    const filename = (body.filename || '').trim();
+    if (!filename) return NextResponse.json({ error: 'filename is required' }, { status: 400 });
+
+    const contentType = (body.contentType || '').trim();
+    // Type before size, so an unsupported file reports what is actually wrong
+    // with it rather than a size limit it was never eligible for.
+    if (contentType && !ALLOWED_MIME.has(contentType)) {
       return NextResponse.json(
-        { error: `${file.name}: unsupported type ${file.type}` },
+        { error: `${filename}: unsupported type ${contentType}` },
         { status: 415 },
       );
     }
-    const limit = maxBytesFor(file.type || '');
-    if (file.size > limit) {
+    const size = typeof body.size === 'number' && Number.isFinite(body.size) ? body.size : 0;
+    const limit = maxBytesForMime(contentType);
+    if (size > limit) {
       return NextResponse.json(
-        { error: `${file.name} exceeds the ${humanMb(limit)} limit` },
+        {
+          error: `${filename} is ${humanBytes(size)}, over the ${humanBytes(limit)} limit for this file type`,
+        },
         { status: 413 },
       );
     }
 
-    const objectName = sanitizeName(file.name);
-    const bytes = new Uint8Array(await file.arrayBuffer());
-    const { error } = await supabase.storage.from(bucket).upload(objectName, bytes, {
-      contentType: file.type || 'application/octet-stream',
-      upsert: false,
-    });
+    const objectName = sanitizeName(filename);
+    const { data, error } = await supabase.storage
+      .from(bucket)
+      .createSignedUploadUrl(objectName);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-    uploaded.push({
+    return NextResponse.json({
+      ok: true,
+      bucket,
       name: objectName,
-      url: supabase.storage.from(bucket).getPublicUrl(objectName).data.publicUrl,
+      path: data.path,
+      token: data.token,
+      signedUrl: data.signedUrl,
+      publicUrl: supabase.storage.from(bucket).getPublicUrl(objectName).data.publicUrl,
     });
   }
 
-  await writeAudit(supabase, {
-    adminId: session.user.id,
-    action: 'upload',
-    entityType: 'media',
-    entityId: bucket,
-    metadata: { names: uploaded.map((u) => u.name) },
-  });
+  if (body.action === 'complete') {
+    const name = (body.name || '').trim();
+    if (!name) return NextResponse.json({ error: 'name is required' }, { status: 400 });
 
-  return NextResponse.json({ ok: true, uploaded });
+    // Confirm the object is really there before reporting success and writing
+    // an audit row. The browser did the upload, so its word is not evidence:
+    // a PUT that failed halfway would otherwise be recorded as an upload and
+    // leave a URL in section content pointing at nothing.
+    const { data: found, error: listError } = await supabase.storage
+      .from(bucket)
+      .list('', { search: name, limit: 1 });
+    if (listError) return NextResponse.json({ error: listError.message }, { status: 500 });
+    const object = (found ?? []).find((f) => f.name === name);
+    if (!object) {
+      return NextResponse.json(
+        { error: `Upload did not complete: ${name} is not in ${bucket}` },
+        { status: 404 },
+      );
+    }
+
+    await writeAudit(supabase, {
+      adminId: session.user.id,
+      action: 'upload',
+      entityType: 'media',
+      entityId: bucket,
+      metadata: { names: [name], size: (object.metadata as { size?: number } | null)?.size ?? null },
+    });
+
+    return NextResponse.json({
+      ok: true,
+      name,
+      size: (object.metadata as { size?: number } | null)?.size ?? null,
+      url: supabase.storage.from(bucket).getPublicUrl(name).data.publicUrl,
+    });
+  }
+
+  return NextResponse.json(
+    { error: 'Unknown action. Expected "sign" or "complete".' },
+    { status: 400 },
+  );
 }
 
 export async function DELETE(req: Request) {

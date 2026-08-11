@@ -32,8 +32,44 @@ export const DOCUMENT_MIME = ['application/pdf'] as const;
 export const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10 MB
 export const MAX_VIDEO_BYTES = 25 * 1024 * 1024; // 25 MB
 
+/**
+ * The hard ceiling imposed by Supabase Storage itself, measured against the
+ * live project on 2026-08-11 rather than taken from documentation: a signed
+ * upload of 50 MB succeeds and 51 MB returns a JSON 413 ("The object exceeded
+ * the maximum allowed size").
+ *
+ * The app's own limits above are deliberately lower. This value exists so the
+ * admin can tell an operator what the absolute ceiling is, and so the bucket
+ * configuration script has one number to write.
+ */
+export const STORAGE_HARD_LIMIT_BYTES = 50 * 1024 * 1024; // 50 MB
+
+export function maxBytesForMime(mime: string): number {
+  return isVideoMime(mime) ? MAX_VIDEO_BYTES : MAX_IMAGE_BYTES;
+}
+
+export function humanBytes(bytes: number): string {
+  const mb = bytes / (1024 * 1024);
+  return `${mb >= 10 || Number.isInteger(mb) ? Math.round(mb) : mb.toFixed(1)} MB`;
+}
+
+/** One sentence naming both ceilings, for admin hint text. */
+export const MEDIA_LIMIT_HINT = `Images up to ${humanBytes(MAX_IMAGE_BYTES)}, video up to ${humanBytes(MAX_VIDEO_BYTES)}`;
+
 /** `accept` attribute for a file input that takes anything the library stores. */
 export const MEDIA_ACCEPT = [...IMAGE_MIME, ...VIDEO_MIME, ...DOCUMENT_MIME].join(',');
+
+/**
+ * Every type the uploader accepts, as a set.
+ *
+ * Shared with the browser so it can reject an unsupported file without a round
+ * trip, and with the API route so the client check is not the only one.
+ */
+export const ALLOWED_UPLOAD_MIME: ReadonlySet<string> = new Set<string>([
+  ...IMAGE_MIME,
+  ...VIDEO_MIME,
+  ...DOCUMENT_MIME,
+]);
 
 /** `accept` for slots that genuinely cannot show a video, such as a CSS background. */
 export const IMAGE_ONLY_ACCEPT = IMAGE_MIME.join(',');

@@ -10,6 +10,8 @@ import {
   adminInput,
   adminPageMain,
 } from '@/lib/admin/styles';
+import { MEDIA_ACCEPT, MEDIA_LIMIT_HINT } from '@/lib/media';
+import { readJsonResponse, uploadMediaBatch } from '@/lib/admin/uploadMedia';
 
 const BUCKETS = ['cms-assets', 'article-covers', 'case-study-images', 'team-photos'] as const;
 type Bucket = (typeof BUCKETS)[number];
@@ -43,9 +45,8 @@ export default function AdminMediaPage() {
     setError(null);
     try {
       const res = await fetch(`/api/admin/media?bucket=${b}`);
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error || 'Failed to load');
-      setFiles(json.files ?? []);
+      const json = await readJsonResponse(res, 'Failed to load');
+      setFiles((json.files as MediaFile[]) ?? []);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load');
     } finally {
@@ -63,12 +64,7 @@ export default function AdminMediaPage() {
       setUploading(true);
       setError(null);
       try {
-        const form = new FormData();
-        form.append('bucket', bucket);
-        Array.from(list).forEach((f) => form.append('file', f));
-        const res = await fetch('/api/admin/media', { method: 'POST', body: form });
-        const json = await res.json();
-        if (!res.ok) throw new Error(json.error || 'Upload failed');
+        await uploadMediaBatch(Array.from(list), bucket);
         await load(bucket);
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Upload failed');
@@ -88,8 +84,7 @@ export default function AdminMediaPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ bucket, name }),
         });
-        const json = await res.json();
-        if (!res.ok) throw new Error(json.error || 'Delete failed');
+        await readJsonResponse(res, 'Delete failed');
         await load(bucket);
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Delete failed');
@@ -114,7 +109,7 @@ export default function AdminMediaPage() {
         <AdminPageHeader
           eyebrow="Content"
           title="Media Library"
-          description="Upload, browse, and delete images. Copy a public URL to paste into any content field."
+          description={`Upload, browse, and delete media. Copy a public URL to paste into any content field. ${MEDIA_LIMIT_HINT}.`}
         />
 
         <div
@@ -150,7 +145,10 @@ export default function AdminMediaPage() {
             ref={fileRef}
             type="file"
             multiple
-            accept="image/jpeg,image/png,image/gif,image/webp,image/svg+xml,application/pdf"
+            // Was a hardcoded image and PDF list, so the library page silently
+            // refused the video types the rest of the admin has accepted since
+            // Phase 22. Shares the uploader's own list now.
+            accept={MEDIA_ACCEPT}
             style={{ display: 'none' }}
             onChange={(e) => upload(e.target.files)}
           />

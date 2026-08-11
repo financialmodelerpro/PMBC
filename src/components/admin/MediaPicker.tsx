@@ -10,6 +10,7 @@ import {
   adminInput,
 } from '@/lib/admin/styles';
 import { MEDIA_ACCEPT, detectMediaType } from '@/lib/media';
+import { readJsonResponse, uploadMediaBatch } from '@/lib/admin/uploadMedia';
 
 export type MediaBucket =
   | 'cms-assets'
@@ -134,10 +135,9 @@ export function MediaModal({
     setError(null);
     try {
       const res = await fetch(`/api/admin/media?bucket=${b}`);
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error || 'Failed to load media');
-      setFiles(json.files ?? []);
-      if (json.buckets) setBuckets(json.buckets);
+      const json = await readJsonResponse(res, 'Failed to load media');
+      setFiles((json.files as MediaFile[]) ?? []);
+      if (json.buckets) setBuckets(json.buckets as MediaBucket[]);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load media');
     } finally {
@@ -155,12 +155,7 @@ export function MediaModal({
       setUploading(true);
       setError(null);
       try {
-        const form = new FormData();
-        form.append('bucket', bucket);
-        Array.from(list).forEach((f) => form.append('file', f));
-        const res = await fetch('/api/admin/media', { method: 'POST', body: form });
-        const json = await res.json();
-        if (!res.ok) throw new Error(json.error || 'Upload failed');
+        await uploadMediaBatch(Array.from(list), bucket);
         await load(bucket);
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Upload failed');
@@ -180,8 +175,7 @@ export function MediaModal({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ bucket, name }),
         });
-        const json = await res.json();
-        if (!res.ok) throw new Error(json.error || 'Delete failed');
+        await readJsonResponse(res, 'Delete failed');
         await load(bucket);
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Delete failed');

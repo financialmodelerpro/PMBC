@@ -19,12 +19,14 @@ import {
 import {
   IMAGE_ONLY_ACCEPT,
   MEDIA_ACCEPT,
+  MEDIA_LIMIT_HINT,
   detectMediaType,
   mediaValuePatch,
   readMediaValue,
   type MediaType,
   type MediaValue,
 } from '@/lib/media';
+import { uploadMedia } from '@/lib/admin/uploadMedia';
 
 import { MediaModal, type MediaBucket } from './MediaPicker';
 
@@ -65,6 +67,8 @@ export function MediaField({
   const [showUrlBox, setShowUrlBox] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
+  /** 0 to 1 while a file is in flight, null otherwise. */
+  const [progress, setProgress] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
   const posterRef = useRef<HTMLInputElement | null>(null);
@@ -98,15 +102,13 @@ export function MediaField({
       const file = list[0];
 
       setUploading(true);
+      setProgress(0);
       setError(null);
       try {
-        const form = new FormData();
-        form.append('bucket', bucket);
-        form.append('file', file);
-        const res = await fetch('/api/admin/media', { method: 'POST', body: form });
-        const json = await res.json();
-        if (!res.ok) throw new Error(json.error || 'Upload failed');
-        const url: string | undefined = json.uploaded?.[0]?.url;
+        // Straight to storage through a signed URL. Every failure mode,
+        // including one that never reaches the app and answers with plain
+        // text, comes back from here as a readable Error.
+        const { url } = await uploadMedia(file, bucket, setProgress);
         if (!url) throw new Error('Upload succeeded but returned no URL');
 
         if (target === 'poster') commit({ posterUrl: url });
@@ -115,6 +117,7 @@ export function MediaField({
         setError(e instanceof Error ? e.message : 'Upload failed');
       } finally {
         setUploading(false);
+        setProgress(null);
       }
     },
     [bucket, commit, setUrl],
@@ -179,7 +182,11 @@ export function MediaField({
               onClick={() => fileRef.current?.click()}
             >
               {uploading ? <Loader2 size={13} className="animate-spin" /> : <UploadCloud size={13} />}
-              {uploading ? 'Uploading…' : 'Upload'}
+              {uploading
+                ? progress !== null && progress < 1
+                  ? `Uploading ${Math.round(progress * 100)}%`
+                  : 'Uploading…'
+                : 'Upload'}
             </button>
             <button type="button" style={adminButtonGhost} onClick={() => setLibraryOpen(true)}>
               Choose from library
@@ -218,9 +225,31 @@ export function MediaField({
             {dragging
               ? 'Drop to upload'
               : imagesOnly
-                ? 'Drag and drop an image here, or use the buttons above.'
-                : 'Drag and drop an image, GIF or video here, or use the buttons above.'}
+                ? `Drag and drop an image here, or use the buttons above. ${MEDIA_LIMIT_HINT}.`
+                : `Drag and drop an image, GIF or video here, or use the buttons above. ${MEDIA_LIMIT_HINT}.`}
           </p>
+
+          {uploading && progress !== null && (
+            <div
+              aria-hidden
+              style={{
+                marginTop: 8,
+                height: 4,
+                borderRadius: 999,
+                background: ADMIN_COLORS.borderInput,
+                overflow: 'hidden',
+              }}
+            >
+              <div
+                style={{
+                  width: `${Math.round(progress * 100)}%`,
+                  height: '100%',
+                  background: ADMIN_COLORS.primary,
+                  transition: 'width 120ms linear',
+                }}
+              />
+            </div>
+          )}
 
           {showUrlBox && (
             <div style={{ marginTop: 10 }}>
