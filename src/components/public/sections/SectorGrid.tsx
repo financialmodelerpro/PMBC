@@ -4,6 +4,7 @@ import { resolveSectorIcon } from '@/lib/cms/sectorIcons';
 import { SectionContainer, SectionIntro } from '../SectionContainer';
 import { variantStyles, type PmbcVariant } from '@/lib/public/tokens';
 import type { SectionMediaValue } from '@/lib/cms/sectionMedia';
+import { visibleListItems } from '@/lib/public/itemVisibility';
 
 type Sector = { icon_name: string; title: string; description: string };
 
@@ -20,10 +21,9 @@ function pickSectors(c: Record<string, unknown>): {
   const intro = s(c.intro);
   const heading = s(c.heading) || s(c.headline);
   const eyebrow = s(c.eyebrow);
-  const raw =
-    (Array.isArray(c.sectors) && (c.sectors as unknown[])) ||
-    (Array.isArray(c.items) && (c.items as unknown[])) ||
-    [];
+  const raw = visibleListItems(
+    (Array.isArray(c.sectors) && c.sectors) || (Array.isArray(c.items) && c.items) || [],
+  );
   const sectors: Sector[] = raw
     .map((row) => {
       if (!row || typeof row !== 'object') return null;

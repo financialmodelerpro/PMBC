@@ -19,7 +19,14 @@ export default async function ContentAdminPage() {
   // to avoid double-editing.
   const all = await fetchAllContent();
   const visible = all.filter(
-    (r) => !(r.section === 'header_settings' && r.key === 'nav_items'),
+    (r) =>
+      !(r.section === 'header_settings' && r.key === 'nav_items') &&
+      // Sections named with a leading underscore are internal, written by code
+      // rather than by an operator. `_fmp_cache` holds the last good response
+      // from FMP's feed as one JSON blob per page. Offering that for editing
+      // would present a screen of machine-written JSON whose only possible
+      // outcomes are no change or a corrupted fallback.
+      !r.section.startsWith('_'),
   );
 
   // Service-detail content (one section per service slug, prefixed `service_`)

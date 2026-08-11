@@ -29,6 +29,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     '/case-studies',
     '/insights',
     '/financial-modeler-pro',
+    // The three platform pages. Their body copy is fetched from FMP but the
+    // URLs, the markup and the metadata are PMBC's, so they belong here.
+    '/financial-modeler-pro/modeling-hub',
+    '/financial-modeler-pro/refm',
+    '/financial-modeler-pro/training-hub',
     '/contact',
     '/book',
     '/privacy',

@@ -2,12 +2,13 @@ import { SectionContainer } from '../SectionContainer';
 import { RichText } from '@/components/public/RichText';
 import { variantStyles, type PmbcVariant } from '@/lib/public/tokens';
 import type { SectionMediaValue } from '@/lib/cms/sectionMedia';
+import { visibleListItems } from '@/lib/public/itemVisibility';
 
 type Stat = { value: string; label: string };
 
 function pickStats(content: Record<string, unknown>): { intro: string; stats: Stat[] } {
   const intro = typeof content?.intro === 'string' ? content.intro : '';
-  const raw = Array.isArray(content?.stats) ? (content.stats as unknown[]) : [];
+  const raw = visibleListItems(content?.stats);
   const stats: Stat[] = raw
     .map((s) => {
       if (!s || typeof s !== 'object') return null;

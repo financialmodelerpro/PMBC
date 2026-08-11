@@ -29,7 +29,9 @@
     "verify-rename-refm": "node scripts/verify-rename-refm.mjs",
     "verify-section-media": "node scripts/verify-section-media-layout.mjs",
     "configure-storage-buckets": "node scripts/configure-storage-buckets.mjs",
-    "verify-media-upload": "node scripts/verify-media-upload.mjs"
+    "verify-media-upload": "node scripts/verify-media-upload.mjs",
+    "seed-fmp-parent-page": "node scripts/seed-fmp-parent-page.mjs",
+    "verify-fmp-pages": "node scripts/verify-fmp-pages.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

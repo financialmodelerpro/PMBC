@@ -1,6 +1,7 @@
 import { SectionContainer, SectionIntro } from '../SectionContainer';
 import { variantStyles, type PmbcVariant } from '@/lib/public/tokens';
 import type { SectionMediaValue } from '@/lib/cms/sectionMedia';
+import { visibleListItems } from '@/lib/public/itemVisibility';
 
 function s(v: unknown): string {
   return typeof v === 'string' ? v : '';
@@ -16,7 +17,7 @@ type CredentialsContent = {
 };
 
 function pick(c: Record<string, unknown>): CredentialsContent {
-  const raw = Array.isArray(c.items) ? c.items : [];
+  const raw = visibleListItems(c.items);
   const items = raw.map((i) => (typeof i === 'string' ? i : '')).filter(Boolean);
   const d = c.display;
   const display: CredentialsDisplay =

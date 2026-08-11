@@ -4,6 +4,7 @@ import { SectionContainer, SectionIntro } from '../SectionContainer';
 import { RichText } from '@/components/public/RichText';
 import { variantStyles, type PmbcVariant } from '@/lib/public/tokens';
 import type { SectionMediaValue } from '@/lib/cms/sectionMedia';
+import { visibleListItems } from '@/lib/public/itemVisibility';
 
 type Step = { number: string; title: string; description: string };
 
@@ -24,7 +25,7 @@ function pickSteps(c: Record<string, unknown>): {
   const heading = s(c.heading) || s(c.headline);
   const footer_cta_label = s(c.footer_cta_label);
   const footer_cta_href = s(c.footer_cta_href);
-  const raw = Array.isArray(c.steps) ? (c.steps as unknown[]) : [];
+  const raw = visibleListItems(c.steps);
   const steps: Step[] = raw
     .map((row, idx) => {
       if (!row || typeof row !== 'object') return null;

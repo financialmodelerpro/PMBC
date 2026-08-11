@@ -4,6 +4,7 @@ import { SectionContainer, SectionIntro } from '../SectionContainer';
 import { RichText } from '@/components/public/RichText';
 import { variantStyles, type PmbcVariant } from '@/lib/public/tokens';
 import type { SectionMediaValue } from '@/lib/cms/sectionMedia';
+import { visibleListItems } from '@/lib/public/itemVisibility';
 
 type Card = { number: string; title: string; description: string; link: string };
 
@@ -24,10 +25,11 @@ function pickCards(content: Record<string, unknown>): {
   const headline = s(content?.headline);
   const footer_cta_label = s(content?.footer_cta_label);
   const footer_cta_href = s(content?.footer_cta_href);
-  const raw =
-    (Array.isArray(content?.cards) && (content.cards as unknown[])) ||
-    (Array.isArray(content?.items) && (content.items as unknown[])) ||
-    [];
+  const raw = visibleListItems(
+    (Array.isArray(content?.cards) && content.cards) ||
+      (Array.isArray(content?.items) && content.items) ||
+      [],
+  );
   const cards: Card[] = raw
     .map((c) => {
       if (!c || typeof c !== 'object') return null;

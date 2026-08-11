@@ -5,6 +5,7 @@ import { SectionContainer, SectionIntro } from '../SectionContainer';
 import { Media } from '../Media';
 import { readMediaValue, type MediaValue } from '@/lib/media';
 import { variantStyles, type PmbcVariant } from '@/lib/public/tokens';
+import { visibleListItems } from '@/lib/public/itemVisibility';
 
 type Partner = {
   logo_url: string;
@@ -30,7 +31,7 @@ function pickPartners(c: Record<string, unknown>): {
   const intro = s(c.intro);
   const heading = s(c.heading) || s(c.headline);
   const eyebrow = s(c.eyebrow);
-  const raw = Array.isArray(c.partners) ? (c.partners as unknown[]) : [];
+  const raw = visibleListItems(c.partners);
   const partners: Partner[] = raw
     .map((row) => {
       if (!row || typeof row !== 'object') return null;
