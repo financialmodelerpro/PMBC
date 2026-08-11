@@ -229,3 +229,15 @@ body {
   hyphens: auto;
   -webkit-hyphens: auto;
 }
+
+/* The block above covers a whole section set to Justified in the section
+   editor. This covers the other route to justified text: a single paragraph or
+   heading justified from the rich-text toolbar, which stores an inline
+   text-align rather than a class on the wrapper. Both spellings are matched
+   because the value travels through the editor and the sanitiser, and neither
+   guarantees the space after the colon. */
+.pmbc-prose [style*="text-align: justify"],
+.pmbc-prose [style*="text-align:justify"] {
+  hyphens: auto;
+  -webkit-hyphens: auto;
+}

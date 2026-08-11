@@ -11,7 +11,7 @@ import { readMediaValue, type MediaValue } from '@/lib/media';
  *   media_url          the asset
  *   media_type         image | gif | video (see lib/media.ts)
  *   media_poster_url   still frame for video
- *   media_position     left | right | above | below
+ *   media_position     left | right | above | below (defaults to right)
  *   media_caption      optional caption under the frame
  *   media_autoplay / media_loop / media_controls   video playback
  *
@@ -43,20 +43,39 @@ export const SECTION_TYPES_WITH_OWN_MEDIA: ReadonlySet<string> = new Set([
   'network_partners',
   'fmp_intro',
   'quote',
+  // The standalone media section IS its media. It reuses the same `media_url`
+  // keys, so mounting the shared panel beside its own editor would show two
+  // controls writing the same field, which is worse than the two-competing-
+  // images problem the rest of this list exists to prevent.
+  'media',
 ]);
 
 export function sectionTypeSupportsSharedMedia(sectionType: string): boolean {
   return !SECTION_TYPES_WITH_OWN_MEDIA.has(sectionType);
 }
 
-function readPosition(raw: unknown): MediaPosition {
+/**
+ * Where media lands when the operator has not chosen a side.
+ *
+ * Right rather than below. Beside the text is the useful case: it fills the
+ * horizontal space the 1200px container already has, and keeps the section a
+ * readable height. Stacked full width is the exception, worth choosing
+ * deliberately for a wide chart or a screenshot that needs the room.
+ *
+ * Right rather than left, because the section's eyebrow, headline and opening
+ * line all start at the left edge, and putting the image there pushes the
+ * reader's entry point into the middle of the section.
+ *
+ * Exported so the admin panel and the renderer cannot drift: a panel showing
+ * one default while the page renders another is worse than either choice.
+ */
+export const DEFAULT_MEDIA_POSITION: MediaPosition = 'right';
+
+export function readPosition(raw: unknown): MediaPosition {
   if (raw === 'left' || raw === 'right' || raw === 'above' || raw === 'below') {
     return raw;
   }
-  // Below rather than above by default: a section leads with its own eyebrow
-  // and headline, and dropping an image above those buries the point of the
-  // section behind a picture.
-  return 'below';
+  return DEFAULT_MEDIA_POSITION;
 }
 
 /**

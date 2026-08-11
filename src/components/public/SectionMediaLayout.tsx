@@ -1,6 +1,18 @@
 import { Media } from './Media';
 import type { SectionMediaValue } from '@/lib/cms/sectionMedia';
+import type { MediaValue } from '@/lib/media';
 import { variantStyles, type PmbcVariant } from '@/lib/public/tokens';
+
+/**
+ * What the frame needs, which is less than a positioned section media value.
+ *
+ * `position` is widened to a string here on purpose: the frame only stamps it
+ * onto `data-section-media` for identification, and the standalone `media`
+ * section has no position relative to any text. Keeping `MediaPosition` narrow
+ * matters more, since that union drives the admin control and the layout
+ * branch, and adding a value there that neither honours would be misleading.
+ */
+export type FrameMedia = MediaValue & { position: string; caption: string };
 
 /**
  * Places a section's optional shared media around that section's own content.
@@ -24,17 +36,46 @@ export function SectionMediaLayout({
 }) {
   if (!media) return <>{children}</>;
 
-  const frame = <SectionMediaFrame media={media} variant={variant} />;
+  const beside = media.position === 'left' || media.position === 'right';
+  const frame = (
+    <SectionMediaFrame
+      media={media}
+      variant={variant}
+      // The frame fills its grid column, so the browser needs the column width,
+      // not the container width. Beside the text that column is 45% of the
+      // 1200px inner box less the gap, which lands near 500px; stacked it is
+      // the full inner box.
+      sizes={
+        beside
+          ? '(min-width: 1024px) 520px, 92vw'
+          : '(min-width: 1264px) 1200px, 92vw'
+      }
+    />
+  );
 
-  if (media.position === 'left' || media.position === 'right') {
-    const mediaFirst = media.position === 'left';
+  if (beside) {
+    const mediaLeft = media.position === 'left';
     return (
-      // Single column below lg, where a side-by-side split would squeeze both
-      // halves. The media leads on narrow screens regardless of side, matching
-      // how `text_image` already behaves.
-      <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-16">
-        <div className={mediaFirst ? 'lg:order-1' : 'lg:order-2'}>{frame}</div>
-        <div className={mediaFirst ? 'lg:order-2' : 'lg:order-1'}>{children}</div>
+      // Two real columns from lg up, 55/45 text to media, vertically centred on
+      // each other. `lg` matches the breakpoint `text_image` already uses, so
+      // the two side-by-side layouts on the site break at the same width.
+      //
+      // Both class strings are written out in full rather than composed, since
+      // Tailwind scans source text and would not see an interpolated one.
+      //
+      // Below lg this collapses to a single column and, because the text is
+      // first in the DOM, the media follows it for both sides. Ordering is done
+      // with `order` at lg only, so the mobile stack never has to be re-sorted:
+      // a section leads with its own words on a narrow screen, and an image
+      // pushed above them would bury the point of the section.
+      <div
+        className={
+          'grid items-center gap-12 lg:gap-16 ' +
+          (mediaLeft ? 'lg:grid-cols-[45fr_55fr]' : 'lg:grid-cols-[55fr_45fr]')
+        }
+      >
+        <div className={mediaLeft ? 'lg:order-2' : 'lg:order-1'}>{children}</div>
+        <div className={mediaLeft ? 'lg:order-1' : 'lg:order-2'}>{frame}</div>
       </div>
     );
   }
@@ -60,18 +101,22 @@ export function SectionMediaLayout({
  * The frame itself: PMBC's gold hairline offset from the asset, with the navy
  * accent corner used on the founder portraits, and a small-caps caption.
  *
- * Deliberately not an aspect-ratio box. The dedicated media slots crop to a
- * fixed ratio because they are portraits and logos in a known layout; a
- * general-purpose section image could be a chart, a screenshot or a wide
- * photograph, and cropping those to 4:5 would destroy them. The asset keeps its
- * own proportions and the frame follows.
+ * Deliberately not an aspect-ratio box, and deliberately not width-capped. The
+ * dedicated media slots crop to a fixed ratio because they are portraits and
+ * logos in a known layout; a general-purpose section image could be a chart, a
+ * screenshot or a wide photograph, and cropping those to 4:5 would destroy
+ * them. The asset keeps its own proportions, and the frame takes the width of
+ * whatever column it is placed in.
  */
 export function SectionMediaFrame({
   media,
   variant,
+  sizes = '(min-width: 1264px) 1200px, 92vw',
 }: {
-  media: SectionMediaValue;
+  media: FrameMedia;
   variant: PmbcVariant;
+  /** Responsive width hint. Set by the layout, which knows the column width. */
+  sizes?: string;
 }) {
   const v = variantStyles(variant);
   const dark = variant === 'navy_deep';
@@ -107,7 +152,7 @@ export function SectionMediaFrame({
             controls={media.controls}
             width={1200}
             height={800}
-            sizes="(min-width: 1024px) 600px, 90vw"
+            sizes={sizes}
             className="h-auto w-full"
           />
         </div>

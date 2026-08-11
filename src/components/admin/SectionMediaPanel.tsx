@@ -5,13 +5,16 @@ import { ChevronDown, ChevronRight, ImagePlus } from 'lucide-react';
 
 import { MediaField } from '@/components/admin/MediaField';
 import { ADMIN_COLORS, adminInput, adminLabel } from '@/lib/admin/styles';
-import type { MediaPosition } from '@/lib/cms/sectionMedia';
+import { readPosition, type MediaPosition } from '@/lib/cms/sectionMedia';
 
+// Left and right first, since beside the text is the default and the common
+// choice. Both describe the column split, so the operator knows the media does
+// not take the full width.
 const POSITIONS: { value: MediaPosition; label: string; hint: string }[] = [
+  { value: 'left', label: 'Left', hint: 'Beside the text, media in the left column' },
+  { value: 'right', label: 'Right', hint: 'Beside the text, media in the right column' },
   { value: 'above', label: 'Above', hint: 'Full width, before the section content' },
   { value: 'below', label: 'Below', hint: 'Full width, after the section content' },
-  { value: 'left', label: 'Left', hint: 'Beside the content, media on the left' },
-  { value: 'right', label: 'Right', hint: 'Beside the content, media on the right' },
 ];
 
 function s(v: unknown): string {
@@ -39,7 +42,9 @@ export function SectionMediaPanel({
   const hasMedia = s(content.media_url).trim() !== '';
   const [open, setOpen] = useState(hasMedia);
 
-  const position = (s(content.media_position) || 'below') as MediaPosition;
+  // Shared with the renderer rather than restated, so the highlighted button
+  // always matches what the public page actually does with an unset value.
+  const position = readPosition(content.media_position);
   const caption = s(content.media_caption);
 
   const patch = (p: Record<string, unknown>) => onChange({ ...content, ...p });
@@ -135,7 +140,9 @@ export function SectionMediaPanel({
             </div>
             <p style={{ margin: '6px 0 0', fontSize: 11, color: ADMIN_COLORS.textMicro }}>
               {POSITIONS.find((p) => p.value === position)?.hint}
-              {' Left and right stack to a single column on narrow screens.'}
+              {position === 'left' || position === 'right'
+                ? ' Two columns from 1024px wide, roughly 55% text to 45% media. Below that the section stacks and the media follows the text. The preview pane here is narrower than 1024px, so open the preview in a new tab to see the two columns.'
+                : ' The media spans the full content width.'}
             </p>
           </div>
 

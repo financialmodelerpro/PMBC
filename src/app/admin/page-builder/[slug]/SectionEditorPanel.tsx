@@ -15,6 +15,7 @@ import { CtaBlockEditor } from '@/components/admin/editors/CtaBlockEditor';
 import { QuoteEditor } from '@/components/admin/editors/QuoteEditor';
 import { FmpIntroEditor } from '@/components/admin/editors/FmpIntroEditor';
 import { ServiceDetailEditor } from '@/components/admin/editors/ServiceDetailEditor';
+import { MediaSectionEditor } from '@/components/admin/editors/MediaSectionEditor';
 import type { SectionEditorProps } from '@/components/admin/editors/types';
 import { SaveButton } from '@/components/admin/SaveButton';
 import { SaveStatus, type SaveState } from '@/components/admin/SaveStatus';
@@ -40,6 +41,7 @@ const EDITORS: Record<string, (props: SectionEditorProps) => React.ReactElement>
   quote: QuoteEditor,
   fmp_intro: FmpIntroEditor,
   service_detail: ServiceDetailEditor,
+  media: MediaSectionEditor,
 };
 
 /**

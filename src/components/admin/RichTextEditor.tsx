@@ -8,6 +8,7 @@ import { Color, FontSize, TextStyle } from '@tiptap/extension-text-style';
 import { useEffect, useState, type CSSProperties } from 'react';
 import {
   AlignCenter,
+  AlignJustify,
   AlignLeft,
   AlignRight,
   Bold,
@@ -271,6 +272,18 @@ export function RichTextEditor({ value, onChange, minHeight = 180, ariaLabel }: 
           onClick={() => editor.chain().focus().setTextAlign('right').run()}
         >
           <AlignRight size={15} />
+        </ToolbarButton>
+        {/* Justified copy is hyphenated by the .pmbc-prose rule that matches an
+            inline text-align: justify, so a paragraph justified from here gets
+            the same treatment as a whole block set to justified in the section
+            editor. Without hyphenation, justification opens rivers of
+            whitespace at the 780px measure. */}
+        <ToolbarButton
+          title="Justify"
+          active={editor.isActive({ textAlign: 'justify' })}
+          onClick={() => editor.chain().focus().setTextAlign('justify').run()}
+        >
+          <AlignJustify size={15} />
         </ToolbarButton>
 
         <Divider />

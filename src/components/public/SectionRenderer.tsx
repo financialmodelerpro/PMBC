@@ -21,6 +21,7 @@ import { CtaBlock } from './sections/CtaBlock';
 import { Quote } from './sections/Quote';
 import { FmpIntro } from './sections/FmpIntro';
 import { ServiceDetail } from './sections/ServiceDetail';
+import { MediaSection } from './sections/MediaSection';
 import { SectionPlaceholder } from './sections/Placeholder';
 
 type SectionRow = {
@@ -69,6 +70,7 @@ const REGISTRY: Record<
   quote: Quote,
   fmp_intro: FmpIntro,
   service_detail: ServiceDetail,
+  media: MediaSection,
 };
 
 /**
@@ -93,6 +95,10 @@ const DEFAULT_VARIANT: Record<string, PmbcVariant> = {
   quote: 'white',
   fmp_intro: 'navy_deep',
   service_detail: 'white',
+  // Cream by default: a standalone asset reads as a deliberate pause in the
+  // page, and the cream band separates it from the white sections it usually
+  // sits between without the weight of a navy one.
+  media: 'cream',
 };
 
 function readVariant(

@@ -15,7 +15,8 @@ export type SectionType =
   | 'cta_block'
   | 'quote'
   | 'fmp_intro'
-  | 'service_detail';
+  | 'service_detail'
+  | 'media';
 
 export type SectionTypeMeta = {
   type: SectionType;
@@ -217,6 +218,22 @@ export const SECTION_TYPES: SectionTypeMeta[] = [
       cta_label: 'Visit Financial Modeler Pro',
       cta_href: 'https://www.financialmodelerpro.com',
       logo_url: '',
+    },
+  },
+  {
+    type: 'media',
+    label: 'Media',
+    description:
+      'One image, GIF or video standing on its own in the page order, with an optional heading.',
+    implemented: true,
+    // No `media_position`: this section has no text to sit beside, so the key
+    // the shared panel writes would mean nothing here. `width` takes its place.
+    defaultContent: {
+      media_url: '',
+      media_caption: '',
+      eyebrow: '',
+      heading: '',
+      width: 'full',
     },
   },
   {

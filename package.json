@@ -24,7 +24,8 @@
     "seed-service-media-keys": "node scripts/seed-service-media-keys.mjs",
     "seed-firm-prominence": "node scripts/seed-firm-prominence.mjs",
     "seed-merge-about": "node scripts/seed-merge-about.mjs",
-    "seed-restore-founder-card": "node scripts/seed-restore-founder-card.mjs"
+    "seed-restore-founder-card": "node scripts/seed-restore-founder-card.mjs",
+    "verify-section-media": "node scripts/verify-section-media-layout.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
