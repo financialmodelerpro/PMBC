@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { ChevronDown } from 'lucide-react';
 
 import { RichText } from '@/components/public/RichText';
+import { visibleListItems } from '@/lib/public/itemVisibility';
 import { SectionMediaLayout } from '../SectionMediaLayout';
 import type { SectionMediaValue } from '@/lib/cms/sectionMedia';
 import { variantStyles, type PmbcVariant } from '@/lib/public/tokens';
@@ -16,6 +17,8 @@ type HeroContent = {
   badge_text?: string;
   headline?: string;
   subtitle?: string;
+  /** Short capability labels, rendered as a tidy grid under the subtitle. */
+  tags: string[];
   cta_label?: string;
   cta_href?: string;
   cta_secondary_label?: string;
@@ -31,6 +34,9 @@ function pick(c: Record<string, unknown>): HeroContent {
     badge_text: s(c.badge_text) || s(c.badge),
     headline: s(c.headline),
     subtitle: s(c.subtitle),
+    tags: visibleListItems(c.tags)
+      .map((t) => (typeof t === 'string' ? t.trim() : s((t as Record<string, unknown>)?.label)))
+      .filter(Boolean),
     cta_label: s(c.cta_label),
     cta_href: s(c.cta_href),
     cta_secondary_label: s(c.cta_secondary_label),
@@ -146,8 +152,39 @@ export function Hero({
           </p>
         )}
 
+        {/* Capability tags, directly under the subtitle so they read as part of
+            it rather than as a section of their own.
+
+            A GRID, NOT A WRAPPING FLEX ROW. Flex wrap breaks wherever the line
+            runs out, which for the eight tags on /fmp produced a ragged five
+            then three. A grid with a fixed column count per breakpoint always
+            fills rows evenly: four and four on desktop, three and three plus
+            two on tablet, two per row on mobile. `w-fit` keeps the grid itself
+            only as wide as its content so the whole block stays centred, and
+            `justify-items-center` stops each pill stretching to its column. */}
+        {c.tags.length > 0 && (
+          <ul className="mx-auto mt-8 grid w-fit grid-cols-2 justify-items-center gap-x-3 gap-y-2.5 sm:grid-cols-3 lg:grid-cols-4">
+            {c.tags.map((tag) => (
+              <li
+                key={tag}
+                className="whitespace-nowrap text-[11px] font-semibold uppercase"
+                style={{
+                  letterSpacing: '0.12em',
+                  color: dark ? '#E8DDC4' : '#1B3A5F',
+                  border: `1px solid ${dark ? 'rgba(198, 156, 62, 0.45)' : '#E8DDC4'}`,
+                  background: dark ? 'rgba(198, 156, 62, 0.08)' : 'rgba(198, 156, 62, 0.08)',
+                  padding: '6px 14px',
+                  borderRadius: 999,
+                }}
+              >
+                {tag}
+              </li>
+            ))}
+          </ul>
+        )}
+
         {(c.cta_label || c.cta_secondary_label) && (
-          <div className="mt-12 flex flex-wrap items-center justify-center gap-4">
+          <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
             {c.cta_label && c.cta_href && (
               <Link
                 href={c.cta_href}

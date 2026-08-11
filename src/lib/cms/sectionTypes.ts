@@ -40,6 +40,9 @@ export const SECTION_TYPES: SectionTypeMeta[] = [
       badge_text: '',
       headline: 'Headline goes here',
       subtitle: '',
+      // Short capability labels under the subtitle. Empty by default, so every
+      // hero authored before this field existed renders exactly as it did.
+      tags: [],
       cta_label: '',
       cta_href: '',
       cta_secondary_label: '',

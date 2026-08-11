@@ -34,7 +34,8 @@
     "verify-fmp-pages": "node scripts/verify-fmp-pages.mjs",
     "verify-fmp-live": "node scripts/verify-fmp-live.mjs",
     "seed-fmp-page-rebuild": "node scripts/seed-fmp-page-rebuild.mjs",
-    "verify-fmp-page": "node scripts/verify-fmp-page.mjs"
+    "verify-fmp-page": "node scripts/verify-fmp-page.mjs",
+    "seed-fmp-hero-tags": "node scripts/seed-fmp-hero-tags.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

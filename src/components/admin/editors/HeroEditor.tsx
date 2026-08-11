@@ -23,6 +23,9 @@ export function HeroEditor({ content, onChange }: SectionEditorProps) {
   const cta_secondary_label = s(content.cta_secondary_label);
   const cta_secondary_href = s(content.cta_secondary_href);
   const background_style = content.background_style === 'dark' ? 'dark' : 'light';
+  const tags = Array.isArray(content.tags)
+    ? (content.tags as unknown[]).filter((t): t is string => typeof t === 'string')
+    : [];
 
   const update = (patch: Record<string, unknown>) => {
     const { badge: _legacy, ...rest } = content;
@@ -37,6 +40,7 @@ export function HeroEditor({ content, onChange }: SectionEditorProps) {
       cta_secondary_label,
       cta_secondary_href,
       background_style,
+      tags,
       ...patch,
     });
   };
@@ -66,6 +70,26 @@ export function HeroEditor({ content, onChange }: SectionEditorProps) {
           value={subtitle}
           onChange={(html) => update({ subtitle: html })}
           minHeight={56}
+        />
+      </Field>
+
+      <Field
+        label="Capability tags"
+        hint="One per line. They sit directly under the subtitle and wrap into even rows, so a multiple of four reads best on desktop."
+      >
+        <textarea
+          value={tags.join('\n')}
+          rows={5}
+          placeholder={'Real Estate Models\nBusiness Valuation\nProject Finance\nRenewable Energy'}
+          onChange={(e) =>
+            update({
+              tags: e.target.value
+                .split('\n')
+                .map((line) => line.trim())
+                .filter(Boolean),
+            })
+          }
+          style={{ ...adminInput, resize: 'vertical' }}
         />
       </Field>
 
