@@ -1,5 +1,7 @@
 import { ChevronDown } from 'lucide-react';
 
+import { HERO_FRAME } from '@/lib/public/layout';
+
 /**
  * Default hero shown on a bespoke firm page when the CMS page has no `hero`
  * section yet. Once an admin adds a hero block via the page builder, that
@@ -19,7 +21,7 @@ export function PageHeroFallback({
 }) {
   return (
     <section
-      className="relative flex min-h-[70vh] items-center px-6 py-24 sm:py-28"
+      className={HERO_FRAME}
       style={{
         background:
           'radial-gradient(ellipse at 50% 40%, #1F4269 0%, #1B3A5F 55%, #14304F 100%)',

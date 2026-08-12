@@ -89,7 +89,10 @@ export function FounderBlock({
 
       <div
         className={
-          'mt-14 grid items-center gap-12 lg:grid-cols-[minmax(280px,440px)_minmax(0,1fr)] lg:gap-20 ' +
+          // Portrait narrowed from 440px and the gaps pulled in: the card was the
+          // tallest block on the home page at 1057px, and most of that was the
+          // 4:5 portrait, whose height is set by its own column width.
+          'mt-10 grid items-center gap-10 lg:grid-cols-[minmax(240px,340px)_minmax(0,1fr)] lg:gap-16 ' +
           (imageRight ? 'lg:[&>div:first-child]:order-2' : '')
         }
       >
@@ -167,7 +170,7 @@ export function FounderBlock({
           )}
           {c.bio_html && (
             <div
-              className="pmbc-prose mt-7 max-w-none"
+              className="pmbc-prose mt-6 max-w-none"
               style={{ color: v.text, fontSize: 17, lineHeight: 1.7 }}
               dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(c.bio_html) }}
             />
@@ -176,7 +179,7 @@ export function FounderBlock({
               this is a summary card, and the full list lives on the founder
               profile page. */}
           {c.credentials.length > 0 && (
-            <ul className="mt-7 flex flex-col gap-3">
+            <ul className="mt-6 flex flex-col gap-2.5">
               {c.credentials.slice(0, 5).map((item) => (
                 <li key={item} className="flex items-start gap-3">
                   <span aria-hidden className="mt-[2px] shrink-0 text-[13px] text-[#C69C3E]">
@@ -190,7 +193,7 @@ export function FounderBlock({
             </ul>
           )}
           {(c.cta_primary_label || c.cta_secondary_label) && (
-            <div className="mt-9 flex flex-wrap items-center gap-6">
+            <div className="mt-8 flex flex-wrap items-center gap-6">
               {c.cta_primary_label && c.cta_primary_href && (
                 <Link
                   href={c.cta_primary_href}

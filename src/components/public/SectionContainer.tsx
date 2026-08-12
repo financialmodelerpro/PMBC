@@ -1,5 +1,12 @@
 import { variantStyles, type PmbcVariant } from '@/lib/public/tokens';
-import { PAGE_INNER } from '@/lib/public/layout';
+import {
+  HERO_MIN_HEIGHT,
+  HERO_PADDING,
+  PAGE_GUTTER,
+  PAGE_INNER,
+  SECTION_PADDING,
+  SECTION_PADDING_COMPACT,
+} from '@/lib/public/layout';
 import { SectionMediaLayout } from './SectionMediaLayout';
 import type { SectionMediaValue } from '@/lib/cms/sectionMedia';
 import {
@@ -11,9 +18,14 @@ import {
 
 /**
  * Shared wrapper for every public section. Owns the section padding rhythm
- * (96-120px desktop / 64-80px tablet / 56-64px mobile) and the navy/cream/
- * white background variants. Children should not set their own outer
- * background or vertical padding, only inner spacing.
+ * (96px desktop / 80px tablet / 64px mobile, from `SECTION_PADDING`) and the
+ * navy/cream/white background variants. Children should not set their own
+ * outer background or vertical padding, only inner spacing.
+ *
+ * `size="hero"` is the third case: a page-leading block that fills 70vh and
+ * centres its content, shared with the standalone `Hero` and
+ * `PageHeroFallback` through `HERO_MIN_HEIGHT` / `HERO_PADDING` so a hero
+ * rendered through this container is the same height as one that is not.
  *
  * Pass the section's raw `styles` JSONB to honour the admin StyleEditor
  * (parity Phase 5). Anything the operator leaves blank falls through to the
@@ -28,7 +40,7 @@ export function SectionContainer({
   media = null,
 }: {
   variant?: PmbcVariant;
-  size?: 'default' | 'compact';
+  size?: 'default' | 'compact' | 'hero';
   children: React.ReactNode;
   className?: string;
   /** Raw `page_sections.styles`. Omit for sections rendered outside the CMS. */
@@ -40,17 +52,19 @@ export function SectionContainer({
   media?: SectionMediaValue | null;
 }) {
   const v = variantStyles(variant);
-  const padding =
-    size === 'compact'
-      ? 'px-6 py-16 sm:py-20 lg:py-24'
-      : 'px-6 py-20 sm:py-24 lg:py-32';
+  const frame =
+    size === 'hero'
+      ? `flex ${HERO_MIN_HEIGHT} items-center ${PAGE_GUTTER} ${HERO_PADDING}`
+      : size === 'compact'
+        ? `${PAGE_GUTTER} ${SECTION_PADDING_COMPACT}`
+        : `${PAGE_GUTTER} ${SECTION_PADDING}`;
 
   const overrides = parseSectionStyles(styles);
   const extraClass = sectionOuterClassName(overrides);
 
   return (
     <section
-      className={['relative', padding, className, extraClass]
+      className={['relative', frame, className, extraClass]
         .filter(Boolean)
         .join(' ')}
       style={{

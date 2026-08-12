@@ -24,6 +24,7 @@ import { ServiceDetail } from './sections/ServiceDetail';
 import { MediaSection } from './sections/MediaSection';
 import { ProseChecklist } from './sections/ProseChecklist';
 import { FeatureCards } from './sections/FeatureCards';
+import { AudienceCarousel } from './sections/AudienceCarousel';
 import { SectionPlaceholder } from './sections/Placeholder';
 
 type SectionRow = {
@@ -75,6 +76,7 @@ const REGISTRY: Record<
   media: MediaSection,
   prose_checklist: ProseChecklist,
   feature_cards: FeatureCards,
+  audience_carousel: AudienceCarousel,
 };
 
 /**
@@ -105,6 +107,7 @@ const DEFAULT_VARIANT: Record<string, PmbcVariant> = {
   media: 'cream',
   prose_checklist: 'white',
   feature_cards: 'cream',
+  audience_carousel: 'cream',
 };
 
 function readVariant(
@@ -120,34 +123,62 @@ function readVariant(
   return fallback;
 }
 
+/** Section types that open a page and keep the navy treatment. */
+const LEADING_DARK_TYPES = new Set(['hero', 'founder_hero']);
+
 /**
- * Sequence-aware variant for the home/page rendering pipeline. We compute a
- * per-section variant and, if the previous section's resolved variant is the
- * same as this one's default, we nudge to the alternate so the page always
- * shows visible rhythm even if the author hasn't set explicit variants.
+ * Sequence-aware variant for the page rendering pipeline.
+ *
+ * The rhythm is a strict two-tone alternation: navy for the hero, then cream,
+ * then white, then cream, and on down the page. It replaces a per-type default
+ * plus a nudge rule, which produced a different sequence on every page and let
+ * two navy bands land mid-page (home had one at the process steps and another
+ * at the closing CTA) purely because of which section types happened to be in
+ * the order the operator chose.
+ *
+ * Navy is now the hero's alone. That is the deliberate consequence of asking
+ * for one alternation everywhere: a section type can no longer bring its own
+ * background weight to a page, so reordering sections can never change the
+ * banding.
+ *
+ * `DEFAULT_VARIANT` is still the fallback for a section rendered on its own,
+ * outside a sequence, where there is no neighbour to alternate against.
+ *
+ * An explicit `styles.background_variant` set in the page builder still wins,
+ * and re-phases the alternation from that point, so an operator who deliberately
+ * makes one section cream does not get two cream bands touching underneath it.
  */
 function resolveVariantSequence(
   sections: SectionRow[],
 ): Map<string, PmbcVariant> {
   const out = new Map<string, PmbcVariant>();
-  let prev: PmbcVariant | null = null;
+  // The first non-hero section after the hero is cream.
+  let next: 'cream' | 'white' = 'cream';
+
   for (const s of sections) {
     const styles = asObject(s.styles);
     const explicit = styles.background_variant;
     const isExplicit =
       explicit === 'navy_deep' || explicit === 'cream' || explicit === 'white';
-    const def = DEFAULT_VARIANT[s.section_type] ?? 'white';
-    let resolved = readVariant(styles, def);
-    // If author didn't set an explicit variant and the resolved one matches
-    // the previous section, nudge to a contrasting variant so we always have
-    // visible rhythm. Hero stays navy_deep regardless.
-    if (!isExplicit && prev === resolved && s.section_type !== 'hero') {
-      if (prev === 'navy_deep') resolved = 'white';
-      else if (prev === 'white') resolved = 'cream';
-      else if (prev === 'cream') resolved = 'white';
+
+    if (isExplicit) {
+      const chosen = explicit as PmbcVariant;
+      out.set(s.id, chosen);
+      // A navy override is a break in the two-tone run rather than a step in
+      // it, so the alternation resumes where it was rather than flipping.
+      if (chosen === 'cream') next = 'white';
+      else if (chosen === 'white') next = 'cream';
+      continue;
     }
-    out.set(s.id, resolved);
-    prev = resolved;
+
+    if (LEADING_DARK_TYPES.has(s.section_type)) {
+      out.set(s.id, 'navy_deep');
+      next = 'cream';
+      continue;
+    }
+
+    out.set(s.id, next);
+    next = next === 'cream' ? 'white' : 'cream';
   }
   return out;
 }

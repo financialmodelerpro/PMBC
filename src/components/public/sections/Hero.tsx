@@ -6,6 +6,7 @@ import { visibleListItems } from '@/lib/public/itemVisibility';
 import { SectionMediaLayout } from '../SectionMediaLayout';
 import type { SectionMediaValue } from '@/lib/cms/sectionMedia';
 import { variantStyles, type PmbcVariant } from '@/lib/public/tokens';
+import { HERO_FRAME } from '@/lib/public/layout';
 import {
   parseSectionStyles,
   sectionInnerStyle,
@@ -78,9 +79,9 @@ export function Hero({
   return (
     <section
       // 70vh rather than the original 88vh so the next section is visible above
-      // the fold. Applies to every CMS hero, not only the home page: /contact
-      // and /book were equally tall and gain the same benefit.
-      className={`relative flex min-h-[70vh] items-center px-6 py-24 sm:py-28 ${overrides.className}`.trim()}
+      // the fold. Shared with PageHeroFallback and, through SectionContainer's
+      // `size="hero"`, with founder_hero, so every page opens at one height.
+      className={`${HERO_FRAME} ${overrides.className}`.trim()}
       style={{ background: bg, color: v.text, ...overrides.style }}
     >
       {/* Faint diagonal pattern overlay, kept extremely subtle. */}

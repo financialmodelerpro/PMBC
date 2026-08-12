@@ -8,6 +8,7 @@ import { fetchContentBySection } from '@/lib/cms/content';
 import { FirmPageBody } from '@/components/public/FirmPageBody';
 import { CalendlyEmbed } from '@/components/public/CalendlyEmbed';
 import { buildPageMetadata } from '@/lib/seo/metadata';
+import { PAGE_GUTTER, SECTION_PADDING } from '@/lib/public/layout';
 
 export const dynamic = 'force-dynamic';
 
@@ -62,7 +63,7 @@ export default async function BookPage(props: {
         }}
       />
 
-      <section className="bg-[color:var(--pmbc-surface-cream)] px-6 py-20 sm:py-24 lg:py-28">
+      <section className={`bg-[color:var(--pmbc-surface-cream)] ${PAGE_GUTTER} ${SECTION_PADDING}`}>
         <div className="mx-auto w-full max-w-[1200px]">
           {bookingUrl ? (
             <>

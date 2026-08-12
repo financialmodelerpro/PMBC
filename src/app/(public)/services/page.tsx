@@ -7,6 +7,7 @@ import { SectionList } from '@/components/public/SectionRenderer';
 import { SERVICES } from '@/config/services';
 import { fetchPublishedServices } from '@/lib/cms/collections';
 import { buildPageMetadata } from '@/lib/seo/metadata';
+import { PAGE_GUTTER, PAGE_INNER, SECTION_PADDING } from '@/lib/public/layout';
 
 export const dynamic = 'force-dynamic';
 
@@ -53,8 +54,12 @@ export default async function ServicesPage(props: {
     <>
       <SectionList sections={sections} />
 
-      <section className="bg-[color:var(--pmbc-surface-cream)] px-6 py-24 lg:py-32">
-        <div className="mx-auto max-w-[1200px]">
+      {/* White, and on the shared section rhythm. This grid is not a CMS row, so
+          it cannot take its variant from the sequence resolver; it is the second
+          band after the hero, where the cream/white alternation lands on white.
+          Hardcoded here, and asserted by scripts/verify-page-rhythm.mjs. */}
+      <section className={`bg-white ${PAGE_GUTTER} ${SECTION_PADDING}`}>
+        <div className={PAGE_INNER}>
           <div className="mx-auto max-w-2xl text-center">
             <div
               aria-hidden
@@ -76,7 +81,7 @@ export default async function ServicesPage(props: {
             </p>
           </div>
 
-          <ul className="mt-14 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          <ul className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {cards.map((s) => (
               <li key={s.slug}>
                 <Link

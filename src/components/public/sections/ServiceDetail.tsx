@@ -100,7 +100,7 @@ export function ServiceDetail({
           />
         )}
 
-        <div className="mt-14 grid gap-6 lg:grid-cols-3">
+        <div className="mt-10 grid gap-6 lg:grid-cols-3">
           {c.deliverables.length > 0 && (
             <div
               className="relative p-8 lg:col-span-2"

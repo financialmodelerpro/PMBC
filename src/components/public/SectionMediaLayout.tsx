@@ -88,7 +88,7 @@ export function SectionMediaLayout({
   if (media.position === 'above') {
     return (
       <>
-        <div className="mb-14">{frame}</div>
+        <div className="mb-12">{frame}</div>
         {children}
       </>
     );
@@ -97,7 +97,7 @@ export function SectionMediaLayout({
   return (
     <>
       {children}
-      <div className="mt-14">{frame}</div>
+      <div className="mt-12">{frame}</div>
     </>
   );
 }

@@ -94,7 +94,7 @@ export function FeatureCards({
 
       <div
         className={
-          'mt-14 grid gap-8 ' + (cards.length > 2 ? 'md:grid-cols-2 lg:grid-cols-3' : 'md:grid-cols-2')
+          'mt-10 grid gap-8 ' + (cards.length > 2 ? 'md:grid-cols-2 lg:grid-cols-3' : 'md:grid-cols-2')
         }
       >
         {cards.map((card) => (

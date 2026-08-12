@@ -283,7 +283,12 @@ async function main() {
     .order('display_order');
   if (readErr) throw new Error('read home: ' + readErr.message);
 
-  const targets = ['paragraphs', 'stats_block', 'service_cards']
+  // Three distinct types that all render through SectionContainer and all
+  // support shared media. service_cards was the third until the home page
+  // stopped carrying one (migration 051 turned 'What we do' into a cta_block
+  // and 'Who we serve' into a carousel), at which point this script could no
+  // longer find its fixtures.
+  const targets = ['paragraphs', 'stats_block', 'process_steps']
     .map((t) => homeRows.find((r) => r.section_type === t))
     .filter(Boolean);
   if (targets.length < 3) throw new Error('expected three distinct section types on home');
@@ -561,7 +566,8 @@ async function main() {
       const before = await browser.page.evaluate(
         `[...document.querySelectorAll('main section')].length`,
       );
-      // Slot it between the firm introduction (20) and what we do (30).
+      // Slot it between the firm introduction (20) and the firm track record
+      // (40), which is what sits either side of display_order 25 since 051.
       const insert = async (content) => {
         const { data, error } = await db
           .from('page_sections')
@@ -629,12 +635,12 @@ async function main() {
             return { index: i, total: secs.length,
                      prevHasHeading: i > 0 ? secs[i-1].textContent.includes('A boutique by design') : false,
                      nextHasHeading: i >= 0 && i < secs.length - 1
-                       ? secs[i+1].textContent.includes('WHAT WE DO') : false };
+                       ? secs[i+1].textContent.includes('Mandates Delivered') : false };
           })()
         `);
         ok(`${label}: is its own section element`, order.index >= 0 && order.total === before + 1,
           `index ${order.index}, ${order.total} sections`);
-        ok(`${label}: sits between the firm introduction and what we do`,
+        ok(`${label}: sits between the firm introduction and the track record`,
           order.prevHasHeading && order.nextHasHeading,
           `prev=${order.prevHasHeading} next=${order.nextHasHeading}`);
         await db.from('page_sections').delete().eq('id', id);

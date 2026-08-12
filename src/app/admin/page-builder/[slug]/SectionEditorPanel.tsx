@@ -18,6 +18,7 @@ import { ServiceDetailEditor } from '@/components/admin/editors/ServiceDetailEdi
 import { MediaSectionEditor } from '@/components/admin/editors/MediaSectionEditor';
 import { ProseChecklistEditor } from '@/components/admin/editors/ProseChecklistEditor';
 import { FeatureCardsEditor } from '@/components/admin/editors/FeatureCardsEditor';
+import { AudienceCarouselEditor } from '@/components/admin/editors/AudienceCarouselEditor';
 import type { SectionEditorProps } from '@/components/admin/editors/types';
 import { SaveButton } from '@/components/admin/SaveButton';
 import { SaveStatus, type SaveState } from '@/components/admin/SaveStatus';
@@ -46,6 +47,7 @@ const EDITORS: Record<string, (props: SectionEditorProps) => React.ReactElement>
   media: MediaSectionEditor,
   prose_checklist: ProseChecklistEditor,
   feature_cards: FeatureCardsEditor,
+  audience_carousel: AudienceCarouselEditor,
 };
 
 /**

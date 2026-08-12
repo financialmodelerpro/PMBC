@@ -74,7 +74,7 @@ export function ServiceCards({
       />
 
       {cards.length > 0 && (
-        <div className="mt-14 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {cards.map((card, i) => {
             const inner = (
               <>
@@ -145,7 +145,7 @@ export function ServiceCards({
       )}
 
       {footer_cta_label && footer_cta_href && (
-        <div className="mt-12 text-center">
+        <div className="mt-10 text-center">
           <Link
             href={footer_cta_href}
             className={

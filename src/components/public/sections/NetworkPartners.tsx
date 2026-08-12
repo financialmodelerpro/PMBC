@@ -80,7 +80,7 @@ export function NetworkPartners({
       {partners.length > 0 && (
         <div
           className={
-            'mt-14 grid gap-6 ' +
+            'mt-10 grid gap-6 ' +
             (partners.length >= 3
               ? 'md:grid-cols-3'
               : partners.length === 2

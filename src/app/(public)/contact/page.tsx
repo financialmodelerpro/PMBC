@@ -10,6 +10,7 @@ import { SectionList } from '@/components/public/SectionRenderer';
 import { SERVICES } from '@/config/services';
 import { ContactForm } from '@/components/public/ContactForm';
 import { buildPageMetadata } from '@/lib/seo/metadata';
+import { PAGE_GUTTER, SECTION_PADDING } from '@/lib/public/layout';
 
 export const dynamic = 'force-dynamic';
 
@@ -58,7 +59,7 @@ export default async function ContactPage(props: {
     <>
       <SectionList sections={sections} />
 
-      <section className="bg-[color:var(--pmbc-surface-cream)] px-6 py-24 lg:py-28">
+      <section className={`bg-[color:var(--pmbc-surface-cream)] ${PAGE_GUTTER} ${SECTION_PADDING}`}>
         <div className="mx-auto max-w-[1200px]">
           <div className="grid gap-12 lg:grid-cols-12">
             {/* Form */}

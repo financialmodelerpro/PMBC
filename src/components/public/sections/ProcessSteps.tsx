@@ -71,7 +71,7 @@ export function ProcessSteps({
       {steps.length > 0 && (
         <ol
           className={
-            'relative mt-16 grid gap-12 ' +
+            'relative mt-10 grid gap-10 ' +
             (steps.length === 4
               ? 'lg:grid-cols-4 lg:gap-8'
               : steps.length === 3
@@ -124,7 +124,7 @@ export function ProcessSteps({
       )}
 
       {footer_cta_label && footer_cta_href && (
-        <div className="mt-14 text-center">
+        <div className="mt-10 text-center">
           <Link
             href={footer_cta_href}
             className={

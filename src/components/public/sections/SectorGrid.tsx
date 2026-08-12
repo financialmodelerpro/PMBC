@@ -65,7 +65,7 @@ export function SectorGrid({
       />
 
       {sectors.length > 0 && (
-        <div className="mt-14 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {sectors.map((sector, i) => {
             const Icon = resolveSectorIcon(sector.icon_name);
             return (

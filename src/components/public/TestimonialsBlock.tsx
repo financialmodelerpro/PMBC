@@ -30,7 +30,7 @@ export function TestimonialsBlock({
           <h2 className="pmbc-display mt-4 text-[32px] leading-[1.12] sm:text-[40px]">{heading}</h2>
         </div>
 
-        <ul className="mt-14 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <ul className="mt-10 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {testimonials.map((t) => (
             <li
               key={t.id}

@@ -18,7 +18,8 @@ export type SectionType =
   | 'service_detail'
   | 'media'
   | 'prose_checklist'
-  | 'feature_cards';
+  | 'feature_cards'
+  | 'audience_carousel';
 
 export type SectionTypeMeta = {
   type: SectionType;
@@ -238,6 +239,20 @@ export const SECTION_TYPES: SectionTypeMeta[] = [
     description: 'Large cards with metadata chips, a bullet list and a call to action.',
     implemented: true,
     defaultContent: { eyebrow: '', heading: '', intro: '', cards: [] },
+  },
+  {
+    type: 'audience_carousel',
+    label: 'Audience carousel',
+    description:
+      'One wide card at a time, each with an image, advancing automatically with arrows.',
+    implemented: true,
+    defaultContent: {
+      eyebrow: '',
+      headline: '',
+      intro: '',
+      autoplay_seconds: 6,
+      items: [],
+    },
   },
   {
     type: 'media',

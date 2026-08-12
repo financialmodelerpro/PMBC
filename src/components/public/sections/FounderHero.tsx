@@ -102,8 +102,11 @@ export function FounderHero({
   const titleColor = dark ? '#B7CBE0' : '#1B3A5F';
 
   return (
-    <SectionContainer variant={variant} styles={styles}>
-      <div className="grid items-center gap-12 lg:grid-cols-[minmax(260px,400px)_minmax(0,1fr)] lg:gap-20">
+    // `size="hero"` rather than the default rhythm: this is the block a visitor
+    // lands on, so it takes the same 70vh every other page-leading hero does
+    // instead of being sized by its portrait.
+    <SectionContainer variant={variant} styles={styles} size="hero">
+      <div className="grid items-center gap-12 lg:grid-cols-[minmax(240px,340px)_minmax(0,1fr)] lg:gap-16">
         <div>
           <div className="relative aspect-[4/5] w-full">
             <div aria-hidden className="absolute -inset-2 border border-[#C69C3E]" />
