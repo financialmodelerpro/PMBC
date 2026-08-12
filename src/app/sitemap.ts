@@ -20,7 +20,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     '',
     '/services',
     '/sectors',
-    '/approach',
+    // `/approach` is deliberately absent since its nav item was hidden. The
+    // route still renders and nothing about the page changed, but it is no
+    // longer part of the site's own structure, so it is not offered to
+    // crawlers either. Re-adding this line and the nav item brings it back.
     '/network',
     // `/about` is gone: it was merged into the home page and now 301s there.
     // The founder profile keeps its nested path.

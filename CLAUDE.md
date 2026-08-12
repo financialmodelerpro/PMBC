@@ -134,6 +134,8 @@ When you find an em dash in *existing* content while doing other work, fix it as
 
 | Phase 38 : Hero parity, one background rhythm, home resequenced | Complete (2026-08-12) | Six public-page changes in one pass, measured at 1440x900 before and after rather than eyeballed. **(1) Hero parity.** Every hero already carried `min-h-[70vh]`, so the ones that were too tall were the ones whose content exceeded it: /fmp at 727px (its eight capability tags) and /about/ahmad-din at 756px (`founder_hero`, which was sized by its portrait and had no hero geometry at all) against home's 630px. The fix is padding, and it is free: a hero whose content fits is `items-center` inside the 70vh box, so padding is invisible there and only pushes the tall ones past everyone else. `py-24 sm:py-28` becomes a flat `py-16`, `founder_hero` gains `SectionContainer size="hero"`, and all three surfaces read `HERO_FRAME` from `lib/public/layout.ts` so "all the heroes are one height" has one place to change. All nine pages now open at 630px, /fmp at 631. **(2) One rhythm.** `resolveVariantSequence` was a per-type default plus a nudge, which produced a different sequence on every page and put navy bands mid-page purely because of which types were in the order. It is now a strict alternation: navy hero, then cream, white, cream. **Navy is the hero's alone**, which is the deliberate consequence of one alternation everywhere: the closing `cta_block` and the `process_steps` band are no longer dark. An explicit `background_variant` still wins and re-phases the run. The two bands hardcoded in page files (`/services`' grid, and `/contact` plus `/book`) were moved onto the same rhythm by hand, since no resolver reaches them. **(3, 4, 5) Home content, all via migration 051.** "What we do" was six service cards at 1267px, the tallest block on the page, listing a catalogue /services already lists in full: it became a short statement with a CTA to /services and moved below the firm track record. Its type changed from `service_cards` to `cta_block`, because two or three cards would read as a truncated list and would leave the six card rows in the JSONB for a later editor to restore. "Firm credentials" was deleted: its six facts are the six figures in the stats block directly above it. "Who we serve" became a new `audience_carousel` section type: one card at the full 1200px width, image beside copy, advancing on a timer, arrows both ways, held on hover and on keyboard focus, and with `prefers-reduced-motion` suppressing both the timer and the slide rather than merely slowing them. Off-screen slides are `inert`, so Tab cannot reach a card nobody can see. **Card images are seeded blank**: there is no stock imagery in this repo and inventing a photograph of a family office would be worse than an honest placeholder, so each card renders a navy monogram panel until an operator uploads one. **(6) Height.** `SECTION_PADDING` restores the 96px desktop figure section 9 has always documented, down from the `lg:py-32` (128px) that had drifted in, and the founder card and process steps were tightened internally. Home went from 9183px to 7107px (10.2 to 7.9 screens), /about/ahmad-din from 8.0 to 7.5, /approach from 5.3 to 4.9. Verified by `npm run verify-page-rhythm`: **87 assertions, 0 failures**, reading computed styles and bounding boxes in headless Chrome, including the reduced-motion path through real `Emulation.setEmulatedMedia` rather than a class check. `verify-section-media-layout.mjs` had fixtured on home carrying a `service_cards` row and was repointed at `process_steps`; it passes 127 of 127 again, as do `verify-media-max-height` (98) and `verify-fmp-page` (50). |
 
+| Phase 39 : /approach unreferenced | Complete (2026-08-12) | The Approach nav item was hidden in Pages & Nav, leaving five CMS links plus the footer link and the sitemap entry pointing at a page a visitor can no longer navigate to on purpose. **A page reachable only from links scattered through other pages is worse than either state**: it is neither published nor retired, and a visitor who lands on it has no way back into the site's structure. All references removed; **the page, its route and its content are untouched**, and the hidden `site_pages` row is kept rather than deleted so restoring it is one switch rather than a rebuild. Content side, migration 052: the home firm introduction's trailing sentence (**the whole sentence, not just its anchor**, since "See how mandates are staffed" with nothing to click is an instruction the reader cannot follow, and the two sentences before it already state the model; it also carried `target="_blank"` on an internal link, which was never right), the home delivery approach footer CTA, the `/network` and `/sectors` "How we work" CTAs, and the `/services` secondary hero CTA. **Both the label and the href are cleared on each pair**: every renderer involved guards on both before drawing a button, so clearing the href alone would have left three buttons that go nowhere. Code side: the footer Firm-column link, the `sitemap.ts` entry, and the `DEFAULT_HEADER_CONFIG` fallback nav, the last of these because that list is what renders when `site_pages` cannot be read, so leaving it would let a database problem silently republish a nav item the operator hid. The seed script's final sweep runs over every content-bearing table rather than trusting its own five steps. `verify-page-rhythm.mjs` gained a per-page assertion that nothing links to an unlinked route, plus a check that the route still returns 200, still renders its own content, and is absent from the sitemap: **99 assertions, 0 failures**. |
+
 **Admin login:** `meetahmadch@gmail.com`. **The password was rotated on 2026-08-02 and is deliberately not recorded here or anywhere else in this repository.** Writing it down is what made the previous one worthless. Ahmad holds it; if it is lost, `npm run rotate-admin-password` sets a new one using the service-role key in `.env.local`, so there is no lockout risk.
 
 The retired `Admin@2026` remains in this file's git history and in older `SESSION_LOG.md` entries. That history is left intact on purpose: rewriting it would not un-publish the string, and the password no longer opens anything. It is verified dead, not merely replaced (see the rotation entry in `SESSION_LOG.md`).
@@ -636,6 +638,22 @@ For v1, only two template_key rows are needed: `contact_notification` (sent to a
                                   --   `npm run seed-footer-logo-sizing`
                                   --   (supports --dry-run). Idempotent,
                                   --   ON CONFLICT DO NOTHING.
+052_unlink_approach.sql           -- Removes the five CMS links to /approach
+                                  --   after its nav item was hidden: an inline
+                                  --   sentence in the home firm introduction
+                                  --   (the whole sentence, since the anchor
+                                  --   alone would leave an instruction the
+                                  --   reader cannot follow), the home delivery
+                                  --   approach footer CTA, the /network and
+                                  --   /sectors "How we work" CTAs, and the
+                                  --   /services secondary hero CTA. Both the
+                                  --   label and the href are cleared on each
+                                  --   pair, since every renderer needs both
+                                  --   before it draws a button. The page, its
+                                  --   route and the hidden nav row all stay.
+                                  --   DML only, `npm run seed-unlink-approach`
+                                  --   (supports --dry-run). Idempotent, each
+                                  --   statement guarded on the old value.
 051_home_sequence_and_carousel.sql -- Home resequenced: "What we do" becomes a
                                   --   short statement with a CTA to /services
                                   --   and moves below the firm track record,
@@ -889,7 +907,7 @@ Editors should:
 | `/services` | services | Overview of all 9 services with cards linking to detail pages |
 | `/services/[slug]` | service-{slug} | Detail page for one service. Slugs from config/services.ts |
 | `/sectors` | sectors | Sector coverage grid with descriptions |
-| `/approach` | approach | Engagement methodology (Understand → Analyse → Model → Advise) |
+| `/approach` | approach | Engagement methodology (Understand, Analyse, Model, Advise). **Unreferenced since 2026-08-12**: the nav item was hidden in Pages & Nav, and migration 052 removed the five remaining internal links (home firm introduction, home delivery approach CTA, /network and /sectors CTAs, /services secondary hero CTA), along with the footer link and the sitemap entry. The page, its route and its content are untouched and it still returns 200; restoring the nav item and the sitemap line brings it back. |
 | `/network` | network | Sky Gulf and Lynkers detail. Why the network matters. |
 | `/about/ahmad-din` | about-ahmad-din | Founder profile. Nine CMS sections mirroring the structure of FMP's page of the same path. |
 | `/fmp` | financial-modeler-pro | The platform arm in full: hero, capability tags, what FMP is, who it is for, the Modeling and Training Hubs, the two certification paths, CTA. **Moved from `/financial-modeler-pro`, which 301s here** (migration 049). The three sub-pages beneath the old path are retained, unlinked and out of the sitemap. |
@@ -917,16 +935,18 @@ export const SERVICES = [
 
 ### Navigation
 
-Top nav (desktop): Services · Sectors · Approach · Network · Founder · Financial Modeler Pro · Contact
+Top nav (desktop), as live: Services, Sectors, Network, Financial Modeler Pro, Contact. The **Approach** and **Founder** rows are still in `site_pages` with `visible = false`, so both are one switch from returning.
 Top nav (mobile): hamburger menu with same items
-Persistent CTA in nav: "Start a Conversation" → links to /contact
+Persistent CTA in nav: "Book a Meeting", linking to /book (repointed by migration 039).
 
-`/book` is deliberately kept out of the top nav. It is reached from the founder profile CTA, the contact page, and the footer, so the nav stays at six items.
+`/book` is deliberately kept out of the top nav. It is reached from the navbar CTA, the founder profile, the contact page, and the footer.
+
+`/approach` is a different case: it is out of the nav AND out of everything else. Nothing on the site links to it, it is absent from the sitemap, and `scripts/verify-page-rhythm.mjs` asserts that on every page. A route in that state should either be linked or retired, so if it stays unreferenced for long, retiring it properly is the tidier end.
 
 Footer columns:
 - **About**: short PMBC description, tagline
 - **Services**: links to all 9 service pages
-- **Firm**: Approach, Network, About, FMP page, Contact
+- **Firm**: Network, Sectors, Case Studies, Insights, Founder, Team, FMP page, Contact, Book a Meeting. Approach was removed on 2026-08-12 when its nav item was hidden.
 - **Contact**: email, WhatsApp, location strip
 - **Legal**: Privacy, Terms
 
@@ -1115,7 +1135,7 @@ export default async function sitemap() {
     { url: `${baseUrl}/services`, lastModified: new Date() },
     ...services,
     { url: `${baseUrl}/sectors`, lastModified: new Date() },
-    { url: `${baseUrl}/approach`, lastModified: new Date() },
+    // /approach removed 2026-08-12, see the sitemap table above.
     { url: `${baseUrl}/network`, lastModified: new Date() },
     { url: `${baseUrl}/about`, lastModified: new Date() },
     { url: `${baseUrl}/financial-modeler-pro`, lastModified: new Date() },

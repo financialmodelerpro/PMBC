@@ -64,6 +64,19 @@ const PAGES = [
 /** The page height home used to have, in viewports, before this pass. */
 const HOME_SCREENS_BEFORE = 10.2;
 
+/**
+ * Routes that still render but are deliberately out of the site's structure:
+ * absent from the navbar, the footer and the sitemap, and linked from nothing.
+ *
+ * /approach was hidden in Pages & Nav. The page and its route are untouched, so
+ * nothing 404s and restoring the nav item brings it straight back, but a page
+ * reachable only through links scattered across other pages is neither
+ * published nor retired. This list is checked on every page below, including
+ * the unlinked page itself, since a self-referential link would be just as
+ * effective at keeping it half alive.
+ */
+const UNLINKED_ROUTES = ['/approach'];
+
 let passed = 0;
 const failures = [];
 function ok(name, condition, detail = '') {
@@ -340,6 +353,36 @@ async function main() {
           .map((b) => b.heading)
           .join(', '),
       );
+
+      // Nothing anywhere on the page, header and footer included, may link to
+      // a route that has been taken out of the navigation. Checked per page
+      // rather than once, since a stray link in one section's rich text is
+      // exactly what this is for.
+      for (const route of UNLINKED_ROUTES) {
+        const hits = await page.evaluate(
+          `[...document.querySelectorAll('a[href]')]
+             .map(a => a.getAttribute('href'))
+             .filter(h => h === ${JSON.stringify(route)} || h.startsWith(${JSON.stringify(route + '?')}) || h.startsWith(${JSON.stringify(route + '#')}))`,
+        );
+        ok(`${p}: nothing links to ${route}`, hits.length === 0, hits.join(', '));
+      }
+    }
+
+    // ---- the unlinked route still works ------------------------------------
+    console.log('\n=== unlinked routes still resolve');
+    for (const route of UNLINKED_ROUTES) {
+      // Unreferenced, not deleted. A visitor with the URL, and anyone holding
+      // an old bookmark or an indexed result, still gets the page.
+      const res = await fetch(BASE + route);
+      ok(`${route} still returns 200`, res.status === 200, String(res.status));
+      const html = await res.text();
+      ok(
+        `${route} still renders its own content`,
+        html.includes('How we engage') || html.includes('four-step'),
+        'page body did not contain its headline',
+      );
+      const sitemap = await (await fetch(BASE + '/sitemap.xml')).text();
+      ok(`${route} is not in the sitemap`, !sitemap.includes(route), 'still listed');
     }
 
     // ---- home sequence -----------------------------------------------------

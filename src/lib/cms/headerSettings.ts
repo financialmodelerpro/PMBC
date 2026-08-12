@@ -52,7 +52,10 @@ export const DEFAULT_HEADER_CONFIG: HeaderConfig = {
   nav_items: [
     { label: 'Services', href: '/services' },
     { label: 'Sectors', href: '/sectors' },
-    { label: 'Approach', href: '/approach' },
+    // Approach is absent here too, not only in `site_pages`. This list is the
+    // last-resort fallback when the table cannot be read, so leaving it in
+    // would mean a database problem silently republishes a nav item the
+    // operator hid, pointing at the one page nothing else on the site links to.
     { label: 'Network', href: '/network' },
     // /about was merged into the home page. The slot points at the founder
     // profile under its own label rather than keeping "About" on a personal

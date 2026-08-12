@@ -161,7 +161,10 @@ export function Footer({
           <div className="md:col-span-2">
             <FooterColumnLabel>Firm</FooterColumnLabel>
             <ul className="mt-5 space-y-3">
-              <li><FooterLink href="/approach">Approach</FooterLink></li>
+              {/* Approach is deliberately absent. The nav item was hidden in
+                  Pages & Nav, and a page reachable only from the footer is
+                  neither published nor retired. The route still resolves;
+                  restoring the nav item is what brings it back. */}
               <li><FooterLink href="/network">Network</FooterLink></li>
               <li><FooterLink href="/sectors">Sectors</FooterLink></li>
               <li><FooterLink href="/case-studies">Case Studies</FooterLink></li>

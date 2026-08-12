@@ -38,6 +38,7 @@
     "verify-fmp-page": "node scripts/verify-fmp-page.mjs",
     "seed-fmp-hero-tags": "node scripts/seed-fmp-hero-tags.mjs",
     "seed-home-sequence": "node scripts/seed-home-sequence.mjs",
+    "seed-unlink-approach": "node scripts/seed-unlink-approach.mjs",
     "verify-page-rhythm": "node scripts/verify-page-rhythm.mjs"
   },
   "dependencies": {
