@@ -7,6 +7,8 @@ import { fetchPage } from '@/lib/cms/pages';
 import { fetchServiceDetailFields, findService } from '@/lib/cms/serviceContent';
 import { SERVICES } from '@/config/services';
 import { ServiceDetail } from '@/components/public/sections/ServiceDetail';
+import { PageHeroFallback } from '@/components/public/PageHeroFallback';
+import { PAGE_GUTTER, SECTION_PADDING } from '@/lib/public/layout';
 import { buildPageMetadata, siteUrl } from '@/lib/seo/metadata';
 import { ServiceJsonLd } from '@/components/seo/ServiceJsonLd';
 
@@ -58,7 +60,16 @@ export default async function ServiceDetailPage(props: {
         description={service.summary}
         url={canonical}
       />
+      {/* The shared hero, so a service page opens at the same height as every
+          other page. The detail block below drops its own number, title and
+          summary rather than repeating them. */}
+      <PageHeroFallback
+        eyebrow={`Service ${service.number}`}
+        headline={service.title}
+        tagline={service.summary}
+      />
       <ServiceDetail
+        showHeader={false}
         content={{
           service_slug: service.slug,
           full_description_html: fields.full_description_html,
@@ -67,18 +78,12 @@ export default async function ServiceDetailPage(props: {
           target_audience_text: fields.target_audience_text,
         }}
         styles={{}}
-        variant="white"
+        variant="cream"
         media={fields.media}
       />
 
       {/* CTA, linking to /contact with the service pre-selected. */}
-      <section
-        className="px-6 py-24 text-white sm:py-28 lg:py-32"
-        style={{
-          background:
-            'radial-gradient(ellipse at 50% 40%, #1F4269 0%, #1B3A5F 55%, #14304F 100%)',
-        }}
-      >
+      <section className={`bg-white ${PAGE_GUTTER} ${SECTION_PADDING}`}>
         <div className="mx-auto flex max-w-[860px] flex-col items-center text-center">
           <div
             aria-hidden
@@ -87,16 +92,19 @@ export default async function ServiceDetailPage(props: {
           />
           <p
             className="mt-5 text-[11px] font-semibold uppercase"
-            style={{ letterSpacing: '0.18em', color: '#C69C3E' }}
+            style={{ letterSpacing: '0.18em', color: '#A88530' }}
           >
             Engage PMBC
           </p>
-          <h2 className="pmbc-display mt-5 text-[36px] leading-[1.12] sm:text-[44px] lg:text-[52px]">
+          <h2
+            className="pmbc-display mt-5 text-[36px] leading-[1.12] sm:text-[44px] lg:text-[52px]"
+            style={{ color: '#0F1B2D' }}
+          >
             Discuss a {service.title.toLowerCase()} mandate
           </h2>
           <p
             className="mx-auto mt-5 max-w-[640px] text-[17px] leading-[1.7] sm:text-[18px]"
-            style={{ color: '#E8DDC4' }}
+            style={{ color: '#52606B' }}
           >
             Tell us about the engagement. We respond to every credible enquiry within
             one to two business days.
@@ -104,7 +112,7 @@ export default async function ServiceDetailPage(props: {
           <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
             <Link
               href={`/contact?service=${service.slug}`}
-              className="inline-flex items-center gap-2 border border-[#C69C3E] px-8 py-3.5 text-[12px] font-semibold uppercase text-[#E8DDC4] transition-all duration-200 hover:bg-[#C69C3E] hover:text-[#14304F]"
+              className="inline-flex items-center gap-2 border border-[#1B3A5F] bg-[#1B3A5F] px-8 py-3.5 text-[12px] font-semibold uppercase text-white transition-all duration-200 hover:bg-[#14304F] hover:border-[#C69C3E]"
               style={{ letterSpacing: '0.12em' }}
             >
               Start a conversation
@@ -115,8 +123,8 @@ export default async function ServiceDetailPage(props: {
               className="inline-flex items-center px-8 py-3.5 text-[12px] font-semibold uppercase transition-colors duration-200"
               style={{
                 letterSpacing: '0.12em',
-                border: '1px solid rgba(232, 221, 196, 0.3)',
-                color: '#E8DDC4',
+                border: '1px solid rgba(27, 58, 95, 0.3)',
+                color: '#1B3A5F',
               }}
             >
               See all services

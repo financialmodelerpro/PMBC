@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useId, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 import { SectionContainer, SectionIntro } from '../SectionContainer';
@@ -93,6 +93,18 @@ export function AudienceCarousel({
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
   const [reduced, setReduced] = useState(false);
+  /**
+   * Whether the carousel is actually on screen.
+   *
+   * Starts false and is set by an IntersectionObserver, so a carousel far down
+   * the page is not quietly cycling while the visitor reads the top of it. Two
+   * reasons, and the second is the one that matters: it saves nothing much in
+   * work, but it means a visitor who scrolls down arrives at card one rather
+   * than at whichever card the timer had reached, which reads as a page that
+   * has been running without them.
+   */
+  const [onScreen, setOnScreen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
   const trackId = useId();
   const count = slides.length;
 
@@ -114,15 +126,35 @@ export function AudienceCarousel({
   }, []);
 
   useEffect(() => {
-    // Motion reduced, hovered, focused, or nothing to advance to: no timer at
-    // all rather than a timer whose callback returns early, so the tab is not
-    // woken every few seconds for nothing.
-    if (reduced || paused || count < 2) return;
+    const el = rootRef.current;
+    if (!el) return;
+    if (typeof IntersectionObserver === 'undefined') {
+      // No observer available: treat it as visible rather than as permanently
+      // off screen, so the carousel degrades to always advancing rather than
+      // to never advancing.
+      setOnScreen(true);
+      return;
+    }
+    // A third of the card is enough to count as arrived. Requiring the whole
+    // thing would leave a card taller than the viewport permanently paused.
+    const io = new IntersectionObserver(
+      (entries) => setOnScreen(entries[0]?.isIntersecting ?? false),
+      { threshold: 0.33 },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
+  useEffect(() => {
+    // Motion reduced, off screen, hovered, focused, or nothing to advance to:
+    // no timer at all rather than a timer whose callback returns early, so the
+    // tab is not woken every few seconds for nothing.
+    if (reduced || paused || !onScreen || count < 2) return;
     // Keyed on `index`, so a manual move restarts the wait rather than leaving
     // the next automatic advance a fraction of a second away.
     const id = window.setTimeout(() => go(index + 1), intervalMs);
     return () => window.clearTimeout(id);
-  }, [reduced, paused, count, index, intervalMs, go]);
+  }, [reduced, paused, onScreen, count, index, intervalMs, go]);
 
   if (count === 0 && !headline && !eyebrow) return null;
 
@@ -142,6 +174,7 @@ export function AudienceCarousel({
 
       {count > 0 && (
         <div
+          ref={rootRef}
           className={headline || eyebrow || intro ? 'mt-12' : ''}
           role="group"
           aria-roledescription="carousel"

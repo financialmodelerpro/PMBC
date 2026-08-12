@@ -3,6 +3,7 @@ import Link from 'next/link';
 
 import { fetchPublishedArticles } from '@/lib/cms/collections';
 import { buildPageMetadata } from '@/lib/seo/metadata';
+import { PageHeroFallback } from '@/components/public/PageHeroFallback';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,30 +33,14 @@ export default async function InsightsPage() {
 
   return (
     <main>
-      <section
-        className="px-6 pt-28 pb-16 text-white sm:pt-32"
-        style={{
-          background:
-            'radial-gradient(ellipse at 50% 30%, #1F4269 0%, #1B3A5F 55%, #14304F 100%)',
-        }}
-      >
-        <div className="mx-auto max-w-[860px] text-center">
-          <div aria-hidden className="mx-auto h-px w-[60px]" style={{ background: '#C69C3E' }} />
-          <p
-            className="mt-5 text-[11px] font-semibold uppercase"
-            style={{ letterSpacing: '0.18em', color: '#C69C3E' }}
-          >
-            Insights
-          </p>
-          <h1 className="pmbc-display mt-4 text-[40px] leading-[1.1] sm:text-[52px]">
-            Perspectives on the work
-          </h1>
-          <p className="mx-auto mt-5 max-w-[620px] text-[17px] leading-[1.7]" style={{ color: '#E8DDC4' }}>
-            Notes on valuation, transactions, and corporate finance from the people doing the
-            modelling.
-          </p>
-        </div>
-      </section>
+      {/* The shared hero, not a fourth hand-rolled copy. This band was
+          `pt-28 pb-16` with no min-height and rendered 380px against every
+          other page's 630px, which is what made the openings uneven. */}
+      <PageHeroFallback
+        eyebrow="Insights"
+        headline="Perspectives on the work"
+        tagline="Notes on valuation, transactions, and corporate finance from the people doing the modelling."
+      />
 
       <section className="bg-[color:var(--pmbc-surface-cream)] px-6 py-20 lg:py-28">
         <div className="mx-auto max-w-[1100px]">

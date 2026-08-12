@@ -75,11 +75,11 @@ export function Footer({
         style={{ background: 'rgba(198, 156, 62, 0.45)' }}
       />
 
-      <div className={`${PAGE_GUTTER} py-20`}>
+      <div className={`${PAGE_GUTTER} py-12 lg:py-14`}>
         <div className={PAGE_INNER}>
-        <div className="grid gap-14 md:grid-cols-12">
+        <div className="grid gap-10 md:grid-cols-12">
           {/* Brand column */}
-          <div className="md:col-span-4">
+          <div className="md:col-span-3">
             <Link href="/" className="inline-flex items-center gap-3">
               {logoSrc ? (
                 <Image
@@ -120,12 +120,12 @@ export function Footer({
               )}
             </Link>
             <p
-              className="mt-6 max-w-sm text-[14px] leading-[1.7]"
+              className="mt-5 max-w-sm text-[14px] leading-[1.65]"
               style={{ color: 'rgba(232, 221, 196, 0.85)' }}
             >
               {description}
             </p>
-            <div className="mt-7">
+            <div className="mt-5">
               <div
                 aria-hidden
                 className="h-px w-[40px]"
@@ -146,9 +146,12 @@ export function Footer({
           </div>
 
           {/* Services */}
-          <div className="md:col-span-3">
+          <div className="md:col-span-4">
             <FooterColumnLabel>Services</FooterColumnLabel>
-            <ul className="mt-5 space-y-3">
+            {/* Two columns from sm up. Nine services stacked in one column was
+                the tallest element in the footer by some way, and splitting it
+                shortens the whole band without dropping a link. */}
+            <ul className="mt-4 grid gap-x-6 gap-y-2 sm:grid-cols-2">
               {SERVICES.map((s) => (
                 <li key={s.slug}>
                   <FooterLink href={`/services/${s.slug}`}>{s.title}</FooterLink>
@@ -160,16 +163,18 @@ export function Footer({
           {/* Firm */}
           <div className="md:col-span-2">
             <FooterColumnLabel>Firm</FooterColumnLabel>
-            <ul className="mt-5 space-y-3">
+            <ul className="mt-4 space-y-2">
               {/* Approach is deliberately absent. The nav item was hidden in
                   Pages & Nav, and a page reachable only from the footer is
                   neither published nor retired. The route still resolves;
-                  restoring the nav item is what brings it back. */}
+                  restoring the nav item is what brings it back. The Founder
+                  link went the same way on 2026-08-12, when that nav row was
+                  hidden too. The profile is still reached from the home founder
+                  card, which is a content link rather than navigation. */}
               <li><FooterLink href="/network">Network</FooterLink></li>
               <li><FooterLink href="/sectors">Sectors</FooterLink></li>
               <li><FooterLink href="/case-studies">Case Studies</FooterLink></li>
               <li><FooterLink href="/insights">Insights</FooterLink></li>
-              <li><FooterLink href="/about/ahmad-din">Founder</FooterLink></li>
               <li><FooterLink href="/team">Team</FooterLink></li>
               <li><FooterLink href="/fmp">Financial Modeler Pro</FooterLink></li>
               <li><FooterLink href="/contact">Contact</FooterLink></li>
@@ -181,7 +186,7 @@ export function Footer({
           <div className="md:col-span-3">
             <FooterColumnLabel>Contact</FooterColumnLabel>
             <ul
-              className="mt-5 space-y-4 text-[14px]"
+              className="mt-4 space-y-2.5 text-[14px]"
               style={{ color: 'rgba(232, 221, 196, 0.85)' }}
             >
               {settings.contact_email && (
@@ -237,7 +242,7 @@ export function Footer({
 
       {/* Bottom strip */}
       <div style={{ borderTop: '1px solid rgba(232, 221, 196, 0.12)' }}>
-        <div className={`${PAGE_GUTTER} py-6`}>
+        <div className={`${PAGE_GUTTER} py-5`}>
           <div
             className={`${PAGE_INNER} flex flex-col items-start justify-between gap-3 text-[12px] sm:flex-row sm:items-center`}
           >

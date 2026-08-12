@@ -4,6 +4,7 @@ import { ArrowUpRight } from 'lucide-react';
 
 import { fetchPublishedCaseStudies } from '@/lib/cms/collections';
 import { buildPageMetadata } from '@/lib/seo/metadata';
+import { PageHeroFallback } from '@/components/public/PageHeroFallback';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,30 +27,14 @@ export default async function CaseStudiesPage() {
   return (
     <main>
       {/* Hero */}
-      <section
-        className="px-6 pt-28 pb-16 text-white sm:pt-32"
-        style={{
-          background:
-            'radial-gradient(ellipse at 50% 30%, #1F4269 0%, #1B3A5F 55%, #14304F 100%)',
-        }}
-      >
-        <div className="mx-auto max-w-[860px] text-center">
-          <div aria-hidden className="mx-auto h-px w-[60px]" style={{ background: '#C69C3E' }} />
-          <p
-            className="mt-5 text-[11px] font-semibold uppercase"
-            style={{ letterSpacing: '0.18em', color: '#C69C3E' }}
-          >
-            Case Studies
-          </p>
-          <h1 className="pmbc-display mt-4 text-[40px] leading-[1.1] sm:text-[52px]">
-            Proof of work, discreetly told
-          </h1>
-          <p className="mx-auto mt-5 max-w-[620px] text-[17px] leading-[1.7]" style={{ color: '#E8DDC4' }}>
-            Selected engagements across the sectors we serve. Some are anonymized where client
-            confidentiality requires.
-          </p>
-        </div>
-      </section>
+      {/* The shared hero, not a fourth hand-rolled copy. This band was
+          `pt-28 pb-16` with no min-height and rendered 380px against every
+          other page's 630px, which is what made the openings uneven. */}
+      <PageHeroFallback
+        eyebrow="Case Studies"
+        headline="Proof of work, discreetly told"
+        tagline="Selected engagements across the sectors we serve. Some are anonymized where client confidentiality requires."
+      />
 
       {/* Grid */}
       <section className="bg-[color:var(--pmbc-surface-cream)] px-6 py-20 lg:py-28">

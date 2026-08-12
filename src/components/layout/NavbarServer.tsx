@@ -1,6 +1,8 @@
 import { fetchBranding } from '@/lib/cms/branding';
 import { fetchHeaderConfig, DEFAULT_HEADER_CONFIG } from '@/lib/cms/headerSettings';
-import { Navbar } from './Navbar';
+import { fetchPublishedServices } from '@/lib/cms/collections';
+import { SERVICES } from '@/config/services';
+import { Navbar, type NavbarDropdowns } from './Navbar';
 
 /**
  * Parses a cms_content pixel string. Blank, non-numeric, or zero means "unset",
@@ -13,14 +15,48 @@ function px(value: string | null | undefined): number | null {
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
+/**
+ * Children for the Services nav item.
+ *
+ * Reads the managed `services` table and falls back to the static config,
+ * exactly as `/services` itself does, so the menu and the page it belongs to
+ * can never list different services. An empty list means the Navbar renders
+ * Services as a plain link, which is what it did before this existed.
+ */
+async function servicesDropdown(): Promise<NavbarDropdowns> {
+  let rows: { slug: string; title: string; number: string }[] = [];
+  try {
+    const managed = await fetchPublishedServices();
+    rows = managed.map((s) => ({
+      slug: s.slug,
+      title: s.title,
+      number: s.number ?? '',
+    }));
+  } catch {
+    rows = [];
+  }
+  if (rows.length === 0) {
+    rows = SERVICES.map((s) => ({ slug: s.slug, title: s.title, number: s.number }));
+  }
+  return {
+    '/services': rows.map((s) => ({
+      label: s.title,
+      href: `/services/${s.slug}`,
+      meta: s.number,
+    })),
+  };
+}
+
 export async function NavbarServer() {
-  const [brandingRow, header] = await Promise.all([
+  const [brandingRow, header, dropdowns] = await Promise.all([
     safeFetchBranding(),
     safeFetchHeader(),
+    servicesDropdown(),
   ]);
 
   return (
     <Navbar
+      dropdowns={dropdowns}
       brand={{
         name: brandingRow?.brand_name ?? 'PaceMakers Business Consultants',
         shortName: brandingRow?.short_name ?? 'PaceMakers',

@@ -39,11 +39,21 @@ export function ServiceDetail({
   styles,
   variant = 'white',
   media = null,
+  showHeader = true,
 }: {
   content: Record<string, unknown>;
   styles: Record<string, unknown>;
   variant: PmbcVariant;
   media?: SectionMediaValue | null;
+  /**
+   * The number, title and summary at the top of the block.
+   *
+   * False on `/services/[slug]`, which now opens with the shared hero and would
+   * otherwise print the same `h1` twice, once in the navy band and again in the
+   * white one below it. Defaults true, so the section type is unchanged
+   * anywhere it is rendered from the CMS registry.
+   */
+  showHeader?: boolean;
 }) {
   const c = pick(content ?? {});
   const service = SERVICES.find((sv) => sv.slug === c.service_slug);
@@ -62,6 +72,8 @@ export function ServiceDetail({
   return (
     <SectionContainer variant={variant} styles={styles} media={media}>
       <div className="mx-auto max-w-[1000px]">
+        {showHeader && (
+          <>
         <div
           aria-hidden
           className="h-px w-[60px]"
@@ -90,6 +102,8 @@ export function ServiceDetail({
           >
             {summary}
           </p>
+        )}
+          </>
         )}
 
         {c.full_description_html && (

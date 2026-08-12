@@ -59,10 +59,23 @@ const PAGES = [
   '/contact',
   '/book',
   '/about/ahmad-din',
+  // The six routes this list used to omit, which is exactly why their heroes
+  // were allowed to drift. /team, /case-studies and /insights each carried a
+  // hand-rolled 380px band, /privacy and /terms had no opening band at all, and
+  // a service detail page opened straight into its body block.
+  '/team',
+  '/case-studies',
+  '/insights',
+  '/privacy',
+  '/terms',
+  '/services/financial-modeling',
 ];
 
 /** The page height home used to have, in viewports, before this pass. */
 const HOME_SCREENS_BEFORE = 10.2;
+
+/** Footer height before it was tightened, measured at 1440x900. */
+const FOOTER_HEIGHT_BEFORE = 785;
 
 /**
  * Routes that still render but are deliberately out of the site's structure:
@@ -233,9 +246,13 @@ const BANDS = `
   const rect = (el) => { const r = el.getBoundingClientRect();
     return { h: Math.round(r.height), w: Math.round(r.width) }; };
   const bands = [...document.querySelectorAll('main > section, main > div > section')];
+  const footer = document.querySelector('footer');
   return {
     total: Math.round(document.body.scrollHeight),
     viewport: window.innerHeight,
+    footerHeight: footer ? Math.round(footer.getBoundingClientRect().height) : null,
+    footerLinks: [...document.querySelectorAll('footer a[href]')]
+      .map((a) => a.getAttribute('href')),
     bands: bands.map((s) => {
       const cs = getComputedStyle(s);
       const h = s.querySelector('h1, h2');
@@ -279,6 +296,10 @@ const CAROUSEL = `
   };
 })()
 `;
+
+/** Puts the carousel on screen, which is what lets its timer run. */
+const BRING_INTO_VIEW = `document.querySelector('[aria-roledescription="carousel"]')
+  .scrollIntoView({ block: 'center' })`;
 
 const clickArrow = (label) => `
 (() => {
@@ -369,6 +390,149 @@ async function main() {
     }
 
     // ---- the unlinked route still works ------------------------------------
+    // ---- footer ------------------------------------------------------------
+    console.log('\n=== footer');
+    await load(page, BASE + '/');
+    const footerData = await page.evaluate(BANDS);
+    ok(
+      'the footer is shorter than it was',
+      footerData.footerHeight !== null && footerData.footerHeight < FOOTER_HEIGHT_BEFORE,
+      `${footerData.footerHeight}px, was ${FOOTER_HEIGHT_BEFORE}px`,
+    );
+    ok(
+      'the footer still lists all nine services',
+      footerData.footerLinks.filter((h) => h.startsWith('/services/')).length === 9,
+      String(footerData.footerLinks.filter((h) => h.startsWith('/services/')).length),
+    );
+    // The nav rows an operator hid must not be reachable from the footer
+    // either, which is the whole point of hiding them.
+    for (const gone of ['/approach', '/about/ahmad-din']) {
+      ok(
+        `the footer does not link to ${gone}`,
+        !footerData.footerLinks.includes(gone),
+        'still linked',
+      );
+    }
+
+    // ---- services dropdown -------------------------------------------------
+    console.log('\n=== services dropdown');
+    const closed = await page.evaluate(
+      `!!document.querySelector('[data-nav-dropdown] [data-dropdown-panel]')`,
+    );
+    ok('the panel is closed to begin with', !closed, 'panel already open');
+    ok(
+      'the parent still links to /services',
+      await page.evaluate(
+        `document.querySelector('[data-nav-dropdown] a')?.getAttribute('href') === '/services'`,
+      ),
+      'parent is not a link to /services',
+    );
+
+    const openPanel = `
+      (() => {
+        const btn = document.querySelector('[data-nav-dropdown] button');
+        btn.click();
+        return true;
+      })()`;
+    await page.evaluate(openPanel);
+    await new Promise((r) => setTimeout(r, 120));
+    const panel = await page.evaluate(`
+      (() => {
+        const p = document.querySelector('[data-dropdown-panel]');
+        if (!p) return null;
+        const grid = p.firstElementChild;
+        const items = [...p.querySelectorAll('[data-dropdown-item]')];
+        const cols = new Set(items.map((i) => Math.round(i.getBoundingClientRect().x)));
+        return {
+          count: items.length,
+          columns: cols.size,
+          hrefs: items.map((i) => i.getAttribute('href')),
+          gridCols: getComputedStyle(grid).gridTemplateColumns.split(' ').length,
+          expanded: document.querySelector('[data-nav-dropdown] button')
+            .getAttribute('aria-expanded'),
+        };
+      })()`);
+    ok('the panel opens on the toggle', !!panel, 'no panel');
+    if (panel) {
+      ok('it lists all nine services', panel.count === 9, String(panel.count));
+      ok('laid out in two columns', panel.columns === 2 && panel.gridCols === 2,
+        `x positions ${panel.columns}, grid ${panel.gridCols}`);
+      ok(
+        'every item links to its own service page',
+        panel.hrefs.length === 9 && panel.hrefs.every((h) => /^\/services\/[a-z-]+$/.test(h)),
+        panel.hrefs.join(', '),
+      );
+      ok('the toggle reports expanded', panel.expanded === 'true', String(panel.expanded));
+    }
+
+    // Escape closes it and returns focus to the toggle, which is what makes it
+    // usable without a mouse.
+    await page.evaluate(
+      `document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`,
+    );
+    await new Promise((r) => setTimeout(r, 120));
+    ok(
+      'Escape closes the panel',
+      !(await page.evaluate(`!!document.querySelector('[data-dropdown-panel]')`)),
+      'still open',
+    );
+    ok(
+      'Escape returns focus to the toggle',
+      await page.evaluate(
+        `document.activeElement === document.querySelector('[data-nav-dropdown] button')`,
+      ),
+      'focus went elsewhere',
+    );
+
+    await page.evaluate(openPanel);
+    await new Promise((r) => setTimeout(r, 120));
+    await page.evaluate(
+      `document.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))`,
+    );
+    await new Promise((r) => setTimeout(r, 120));
+    ok(
+      'a click outside closes the panel',
+      !(await page.evaluate(`!!document.querySelector('[data-dropdown-panel]')`)),
+      'still open',
+    );
+
+    // Below the breakpoint the panel is gone and the children are listed inside
+    // the existing mobile menu instead.
+    await page.send('Emulation.setDeviceMetricsOverride', {
+      width: 390,
+      height: 844,
+      deviceScaleFactor: 1,
+      mobile: true,
+    });
+    await page.send('Page.navigate', { url: BASE + '/' });
+    await waitFor(async () => page.evaluate("document.readyState === 'complete'"), 80, 250);
+    await new Promise((r) => setTimeout(r, 400));
+    const mobile = await page.evaluate(`
+      (() => {
+        const toggle = [...document.querySelectorAll('header button[aria-label]')]
+          .find((b) => /menu$/i.test(b.getAttribute('aria-label') || '')
+            && !b.closest('[data-nav-dropdown]'));
+        if (!toggle) return null;
+        toggle.click();
+        return new Promise((res) => setTimeout(() => res({
+          serviceLinks: [...document.querySelectorAll('header a[href^="/services/"]')].length,
+          // A panel that exists but is display:none below the breakpoint is
+          // still not shown to anyone, so this asks the layout rather than the
+          // DOM.
+          desktopPanel: [...document.querySelectorAll('[data-dropdown-panel]')]
+            .some((p) => p.getBoundingClientRect().height > 0),
+        }), 200));
+      })()`);
+    ok('the mobile menu opens', !!mobile, 'no toggle found');
+    if (mobile) {
+      ok(
+        'the nine services are listed in the mobile menu',
+        mobile.serviceLinks === 9,
+        String(mobile.serviceLinks),
+      );
+      ok('no floating panel on mobile', !mobile.desktopPanel, 'panel rendered');
+    }
+
     console.log('\n=== unlinked routes still resolve');
     for (const route of UNLINKED_ROUTES) {
       // Unreferenced, not deleted. A visitor with the URL, and anyone holding
@@ -446,7 +610,9 @@ async function main() {
       ok('the slide has a transition', c0.transition !== '0s', c0.transition);
 
       // Advances on its own, right to left: the track's translateX goes
-      // negative, which pulls the next card in from the right edge.
+      // negative, which pulls the next card in from the right edge. Scrolled
+      // into view first, because a carousel below the fold deliberately holds.
+      await page.evaluate(BRING_INTO_VIEW);
       const advanced = await waitFor(
         async () => {
           const c = await page.evaluate(CAROUSEL);
@@ -507,9 +673,88 @@ async function main() {
       );
     }
 
+    // ---- the same carousel on /fmp -----------------------------------------
+    console.log('\n=== fmp carousel');
+    await load(page, BASE + '/fmp');
+    const f0 = await page.evaluate(CAROUSEL);
+    ok('the /fmp audience block is a carousel', !!f0, 'not found');
+    if (f0) {
+      ok('it has six cards', f0.slideCount === 6, String(f0.slideCount));
+      ok('exactly one card is visible', f0.visibleCount === 1, String(f0.visibleCount));
+      ok(
+        'both arrows are present',
+        f0.arrows.includes('Previous') && f0.arrows.includes('Next'),
+        f0.arrows.join(', '),
+      );
+      await page.evaluate(BRING_INTO_VIEW);
+      const fAdvanced = await waitFor(
+        async () => {
+          const c = await page.evaluate(CAROUSEL);
+          return c.activeIndex !== 0 ? c : null;
+        },
+        40,
+        500,
+      );
+      ok('it advances on its own', fAdvanced.activeIndex === 1, String(fAdvanced.activeIndex));
+      await page.evaluate(clickArrow('Next'));
+      const fNext = await page.evaluate(CAROUSEL);
+      ok(
+        'the arrows work',
+        fNext.activeIndex === (fAdvanced.activeIndex + 1) % 6,
+        String(fNext.activeIndex),
+      );
+    }
+
+    // ---- off screen means paused -------------------------------------------
+    //
+    // The point is not the saved work, it is what a visitor sees: scrolling
+    // down to a carousel that has been cycling since the page loaded means
+    // arriving mid-sequence at a card chosen by a timer rather than at the
+    // first one. This asserts the card is still the first after two full
+    // intervals spent above it.
+    console.log('\n=== off screen');
+    await load(page, BASE + '/');
+    const offScreen = await page.evaluate(`
+      (() => {
+        const root = document.querySelector('[aria-roledescription="carousel"]');
+        window.scrollTo(0, 0);
+        const r = root.getBoundingClientRect();
+        return { top: Math.round(r.top), viewport: window.innerHeight };
+      })()`);
+    ok(
+      'the carousel starts below the fold',
+      offScreen.top > offScreen.viewport,
+      `top ${offScreen.top}, viewport ${offScreen.viewport}`,
+    );
+    if (offScreen.top > offScreen.viewport) {
+      await new Promise((r) => setTimeout(r, 13000));
+      const held = await page.evaluate(CAROUSEL);
+      ok(
+        'it did not advance while off screen',
+        held.activeIndex === 0,
+        `advanced to ${held.activeIndex} over two intervals`,
+      );
+      // Scrolling to it starts the timer, so the behaviour is a hold rather
+      // than a permanent stop.
+      await page.evaluate(
+        `document.querySelector('[aria-roledescription="carousel"]')
+           .scrollIntoView({ block: 'center' })`,
+      );
+      const woke = await waitFor(
+        async () => {
+          const c = await page.evaluate(CAROUSEL);
+          return c.activeIndex !== 0 ? c : null;
+        },
+        40,
+        500,
+      );
+      ok('it starts once scrolled into view', woke.activeIndex === 1, String(woke.activeIndex));
+    }
+
     // ---- reduced motion ----------------------------------------------------
     console.log('\n=== reduced motion');
     await load(page, BASE + '/', { reducedMotion: true });
+    await page.evaluate(BRING_INTO_VIEW);
     const r0 = await page.evaluate(CAROUSEL);
     ok('carousel still renders with motion reduced', !!r0, 'not found');
     if (r0) {

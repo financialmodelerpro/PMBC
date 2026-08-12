@@ -7,6 +7,7 @@ import { usePathname } from 'next/navigation';
 import { Menu, X } from 'lucide-react';
 
 import { PAGE_GUTTER, PAGE_INNER } from '@/lib/public/layout';
+import { NavDropdown, type DropdownItem } from './NavDropdown';
 
 export type NavbarBrand = {
   name: string;
@@ -17,6 +18,15 @@ export type NavbarBrand = {
 };
 
 export type NavbarItem = { label: string; href: string };
+
+/**
+ * Child links for a nav item, keyed by that item's href.
+ *
+ * Keyed by href rather than label so a rename in Pages & Nav does not silently
+ * drop the menu: the label is operator-editable, the destination is what the
+ * children actually belong to.
+ */
+export type NavbarDropdowns = Record<string, DropdownItem[]>;
 
 /**
  * Header presentation, driven by cms_content section='header_settings' and
@@ -61,12 +71,14 @@ export function Navbar({
   cta,
   mobileMenuEnabled,
   presentation,
+  dropdowns = {},
 }: {
   brand: NavbarBrand;
   navItems: NavbarItem[];
   cta: { label: string; href: string } | null;
   mobileMenuEnabled: boolean;
   presentation?: Partial<NavbarPresentation>;
+  dropdowns?: NavbarDropdowns;
 }) {
   const pathname = usePathname();
   const [scrolled, setScrolled] = useState(false);
@@ -237,6 +249,18 @@ export function Navbar({
         >
           {navItems.map((item) => {
             const active = isActive(item.href);
+            const children = dropdowns[item.href];
+            if (children && children.length > 0) {
+              return (
+                <NavDropdown
+                  key={item.href}
+                  label={item.label}
+                  href={item.href}
+                  items={children}
+                  active={active}
+                />
+              );
+            }
             return (
               <Link
                 key={item.href}
@@ -308,19 +332,42 @@ export function Navbar({
             <div className={`${PAGE_INNER} flex flex-col gap-1`}>
             {navItems.map((item) => {
               const active = isActive(item.href);
+              const children = dropdowns[item.href];
               return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className="px-3 py-3 text-[15px] font-medium transition-colors duration-200"
-                  style={{
-                    color: active ? '#1B3A5F' : '#0F1B2D',
-                    borderLeft: active ? '2px solid #C69C3E' : '2px solid transparent',
-                    paddingLeft: active ? 14 : 12,
-                  }}
-                >
-                  {item.label}
-                </Link>
+                <div key={item.href} className="flex flex-col">
+                  <Link
+                    href={item.href}
+                    className="px-3 py-3 text-[15px] font-medium transition-colors duration-200"
+                    style={{
+                      color: active ? '#1B3A5F' : '#0F1B2D',
+                      borderLeft: active ? '2px solid #C69C3E' : '2px solid transparent',
+                      paddingLeft: active ? 14 : 12,
+                    }}
+                  >
+                    {item.label}
+                  </Link>
+                  {/* Children are listed under the parent rather than behind a
+                      second tap. The mobile menu is a stacked list with room to
+                      scroll, so an accordion would add a control and hide the
+                      nine destinations it exists to reveal. */}
+                  {children && children.length > 0 && (
+                    <div className="mb-1 flex flex-col" style={{ paddingLeft: 18 }}>
+                      {children.map((child) => (
+                        <Link
+                          key={child.href}
+                          href={child.href}
+                          className="px-3 py-2 text-[14px] transition-colors duration-200"
+                          style={{
+                            color: isActive(child.href) ? '#1B3A5F' : '#52606B',
+                            borderLeft: '1px solid rgba(198, 156, 62, 0.35)',
+                          }}
+                        >
+                          {child.label}
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+                </div>
               );
             })}
             {cta && (
