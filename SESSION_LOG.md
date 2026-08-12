@@ -4,6 +4,60 @@ Chronological build history for the PMBC website. Split out of `CLAUDE.md` to ke
 
 ---
 
+### 2026-08-12, Phases 37 to 40: media height control, hero parity, page rhythm, home restructure, navbar dropdown
+
+Four commits across four phases. Each has a full row in the `CLAUDE.md` status table; this entry records the reasoning and the things that went wrong, which the table does not carry.
+
+**Phase 37. Media maximum height.** A portrait video in the standalone media section on `/services` rendered taller than the viewport. Fixed with a control rather than a number in the stylesheet, because the right height is a property of the asset an operator uploaded, not of the layout: a wide chart wants the room the video needed taking away. One `media_max_height` key on the shared set, so it serves the standalone section, the panel every other section type carries, and the nine `cms_content`-driven service pages that read the same keys. **Blank is the whole contract**: absent, empty, non-numeric and zero all resolve to null, and null renders the previous markup exactly, down to not adding the `object-contain` class that would otherwise be inert. Letterboxed rather than cropped: the box keeps its full column width and only its height is capped. Presets sit beside the number box because the operator's real question is "does this fit on screen next to the text", not "how tall is this file".
+
+**Phase 38. Hero parity, one background rhythm, home resequenced.** Six changes, measured before and after rather than eyeballed.
+
+The heroes all carried `min-h-[70vh]` already, so the ones that were too tall were the ones whose content exceeded it: `/fmp` at 727px (its eight capability tags) and `/about/ahmad-din` at 756px (`founder_hero`, sized by its portrait and carrying no hero geometry) against home's 630px. Padding is the fix and it costs nothing, because a hero whose content fits is centred inside the 70vh box, so padding there is invisible and only pushes the tall ones past everyone else.
+
+The variant resolver was a per-type default plus a nudge rule, which produced a different sequence on every page and put navy bands mid-page purely because of which section types happened to be in the order. It became a strict alternation: navy hero, then cream, white, cream. **Navy is now the hero's alone**, which is the deliberate consequence of asking for one alternation everywhere.
+
+On home, "What we do" was six service cards at 1267px, the tallest block on the page, listing a catalogue `/services` already lists in full. Its type changed from `service_cards` to `cta_block` rather than keeping fewer cards, because two or three cards read as a truncated list and would have left the six card rows in the JSONB for a later editor to find and restore. "Firm credentials" was deleted: its six facts are the six figures in the stats block directly above it. "Who we serve" became a new `audience_carousel`.
+
+`SECTION_PADDING` also restored the 96px desktop figure section 9 has always documented, down from the `lg:py-32` that had drifted in. Home went from 9183px to 7107px.
+
+**Phase 39. `/approach` left unreferenced.** The nav item had been hidden in Pages & Nav, leaving five CMS links plus the footer link and the sitemap entry pointing at a page a visitor could no longer navigate to on purpose. A page reachable only through links scattered across other pages is worse than either state: neither published nor retired, and a visitor who lands on it has no way back into the site's structure. The page, its route and its content are untouched, and the hidden `site_pages` row is kept rather than deleted, so restoring it is one switch.
+
+**Phase 40. Services dropdown, hero parity across every route, shorter footer, carousels.** Six more changes, and the first is a correction of Phase 38's own work.
+
+**Four things that went wrong or were found, recorded because each changes how the next pass should work**
+
+1. **"Every page" meant nine pages, and the site has fifteen.** Phase 38 measured nine routes and made those nine equal, then reported hero parity. The six it never listed were exactly the ones that differed: `/team`, `/case-studies` and `/insights` each carried a hand-rolled navy band at `pt-28 pb-16` with no min-height, rendering **380px**; `/privacy` and `/terms` had no opening band at all; and `/services/[slug]` opened straight into its 1417px detail block. The verification script's page list was the bug, not the components. All fifteen now render the shared `PageHeroFallback` at exactly 630px, and the list holds all fifteen. **The lesson generalises: a verification script's fixture list is itself an assertion, and an incomplete one passes.**
+
+2. **Measuring against a dev server produced confident nonsense.** The first hero measurement reported the home hero at 176px with 0px padding on every section. Tailwind's stylesheet had not applied yet: in dev, CSS arrives after `readyState === 'complete'`, so every geometry reading was taken from an unstyled document. Inline styles (the background variants) were correct throughout, which is what made the numbers look plausible rather than obviously broken. All measurement moved to a production build. Related: running `next build` while `next start` was still serving from `.next` corrupted the output twice, once producing `Cannot find module './vendor-chunks/@supabase.js'` and once a React Client Manifest error. Kill the server before building.
+
+3. **Opening the dropdown on focus silently disabled Escape.** Escape closed the panel and returned focus to the toggle, and the toggle's focus handler immediately reopened it, so the key did nothing at all. Removed the focus-open entirely: a keyboard user opens with Enter, Space or Down, all already handled, so focus never needed to open anything.
+
+4. **A mobile test that passed against the wrong element.** The check selected `header button[aria-label]` to find the hamburger, but the dropdown chevron carries an `aria-label` too and comes first. It was opening the desktop panel and counting its nine links while reporting success on mobile. Now matched by label and by not being inside the dropdown, and the panel is `display:none` below the breakpoint so it cannot be revealed there by any route.
+
+**Two content decisions worth recording.** The home network block was cut to a three sentence mention with an inline link to `/network`, and its video was dropped rather than carried over, because the video was what made it a block rather than a mention; the URL is recorded in migration 053 so restoring it is one paste. And the carousel image slots on both carousels are seeded blank: there is no stock imagery in this repository, and inventing a photograph of a family office would be worse than an honest monogram placeholder.
+
+**Carousel behaviour.** Both carousels hold six seconds a card, pause on hover and on keyboard focus, suppress both the timer and the transition under `prefers-reduced-motion` while keeping the arrows live, and pause while off screen. That last one is not about saved work: without it, scrolling down to a carousel means arriving mid-sequence at a card a timer chose rather than at the first one.
+
+**Pre-rule en dashes cleared.** The nine service timeline strings from migration 010 held en dashes in numeric ranges, which `CLAUDE.md` listed as known pre-rule content to fix when next touching it. The whole-table sweep in migration 053's seed script is what next touched them, so they are rewritten as words. Only a dash between digits is rewritten, because that is the one case where the replacement is unambiguous; anything else stops the script rather than being guessed at.
+
+**Verification totals:** 98 (media max height), 87 then 99 then 154 (page rhythm, growing as each phase added to it), plus 127 (section media layout) and 50 (`/fmp`) re-run green after their fixtures were repointed. All green at close.
+
+**Migrations applied:** 051, 052, 053, all DML, all applied through their companion scripts.
+
+### 2026-08-12, Checkpoint: closing for the day
+
+**State at close.** `main` clean and pushed at `f67c86d`. Typecheck and build clean. Zero em or en dashes across every touched file and across the whole `page_sections` and `cms_content` tables.
+
+**Measured at 1440x900 on a production build.** All fifteen public routes open at exactly 630px. Footer 785px to 453px. Home 9183px to 6560px, which is 10.2 screens down to 7.3.
+
+**Two live-data notes carried forward.**
+- The `/fmp` "What you get" checklist still holds the four items the operator left mid-edit on 2026-08-11, one reading "Structured Excel and investor PDF export". Untouched again this session; it is item 10 on the launch checklist.
+- Both contact submissions remain opened but not marked responded. The 2026-06-21 one (Leslie Merricroft, Al-Mashrea Law Firm) is now roughly seven weeks old and is still the most overdue item on the list.
+
+**Open items are consolidated in the `CLAUDE.md` launch checklist**, updated this session with the carousel imagery and the two nav rows now hidden.
+
+---
+
 ### 2026-08-10 - /about merged into home and retired
 
 **The merge was mostly deletion, and that is the finding.** /about carried eight sections. After the firm-prominence pass put the firm first on home, six of them duplicated home in substance: the same firm statistics, the same network summary, a hero restating the firm description, a founder card, a quote, and a closing CTA. Only two pieces existed on /about and nowhere else. Moving everything would have produced a home page that said each thing twice.
@@ -1156,7 +1210,7 @@ Single-purpose session: applied the new **Content Style Rules** retroactively ac
 **Database (migration 012, applied to Supabase via JS apply script that mirrors the SQL exactly)**
 - `cms_pages.meta_title` × 16: `: PaceMakers Business Consultants` brand suffix replaced with ` | PaceMakers Business Consultants`. Plus the special-case home title (`PaceMakers Business Consultants: Advisory from Structure to Exit` → ` | `, em dash mid-string rather than as suffix).
 - `email_templates.subject` × 2: `New contact submission: {{name}}` → `New contact submission: {{name}}`; `Thank you for reaching out: PaceMakers Business Consultants` → ` | `.
-- `cms_content` × 11 across the 9 `service_<slug>` namespaces: targeted per-key `REPLACE` for the em-dash phrases in `full_description`, `target_audience_text`, and one `timeline_text`. En dashes in numeric ranges (`3–9 months`, `4–6 weeks`, etc.) preserved per the rule's number-range exception.
+- `cms_content` × 11 across the 9 `service_<slug>` namespaces: targeted per-key `REPLACE` for the em-dash phrases in `full_description`, `target_audience_text`, and one `timeline_text`. En dashes in numeric ranges ("3 en dash 9 months", "4 en dash 6 weeks", and so on) preserved per the rule's number-range exception. **Superseded 2026-08-12**: migration 053 rewrote all nine as words ("4 to 6 weeks"), so no numeric range on the site carries a dash any more.
 - `page_sections` (page_slug='home') × 7: per-section JSONB rewrites cast to text and back. Covers founder bio, service-cards "What we do" (intro + 3 card descriptions), service-cards "Who we serve" (Investment Offices), process_steps (Understand + Advise), text_image (Strategic Network), quote, and cta_block subhead.
 - `page_sections` Phase 6 smoke-seed rows × 6 (tagged `styles->>smoke = 'phase6'`): em dashes stripped from /approach process_steps, /sectors sector_grid, /about founder_block + text_image, /financial-modeler-pro fmp_intro, and /service-business-valuation service_detail.
 
@@ -1187,7 +1241,7 @@ Final verification: zero em dashes remain in any content row across `cms_pages`,
 
 **Decision notes worth keeping**
 - **Separator choice for titles**: ` | ` chosen as the brand-suffix separator. Aligns with the `template: '%s | PaceMakers Business Consultants'` already in the root layout, so all titles render with one consistent separator regardless of whether they came through the template or the absolute-title bypass.
-- **Number ranges kept with en dash** (`3–5 weeks`, `4–6 weeks`, `1–2 business days`). User explicitly granted this exception ("keep them in number ranges and similar formatting use") even though CLAUDE.md's stricter form would write them out as words. The user's instruction wins for live content.
+- **Number ranges kept with en dash** ("3 en dash 5 weeks", "4 en dash 6 weeks", "1 en dash 2 business days"). User explicitly granted this exception ("keep them in number ranges and similar formatting use") even though CLAUDE.md's stricter form would write them out as words. The user's instruction wins for live content. **This exception was superseded on 2026-08-12**, when the universal no-dash rule was applied to the nine remaining service timeline strings and they were rewritten as words.
 - **Why per-row REPLACE in the migration, not blanket regex**: em dashes in PMBC's content carry different roles in different sentences (mid-clause pause → comma; explanation → colon; strong break → period; parenthetical pair → parentheses). A blanket `': '` → `, ` would produce wrong copy in roughly half the cases. So each row was hand-rewritten.
 
 **Open items for the next session**
