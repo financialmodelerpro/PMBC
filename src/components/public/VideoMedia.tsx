@@ -32,6 +32,7 @@ export function VideoMedia({
   width,
   height,
   className = '',
+  style,
 }: {
   src: string;
   alt: string;
@@ -43,6 +44,8 @@ export function VideoMedia({
   width?: number;
   height?: number;
   className?: string;
+  /** Merged over the fill defaults, so a caller can set a height ceiling. */
+  style?: React.CSSProperties;
 }) {
   const ref = useRef<HTMLVideoElement>(null);
   const [reduced, setReduced] = useState(false);
@@ -71,6 +74,8 @@ export function VideoMedia({
 
   const fillClass = fill ? 'absolute inset-0 h-full w-full' : '';
   const combined = [fillClass, className].filter(Boolean).join(' ');
+  const combinedStyle: React.CSSProperties | undefined =
+    fill || style ? { ...(fill ? { objectFit: 'cover' as const } : null), ...style } : undefined;
 
   // A video that cannot load falls back to its poster, then to a neutral
   // panel. A broken media element with no fallback would leave a hole in the
@@ -79,7 +84,7 @@ export function VideoMedia({
     if (posterUrl) {
       return (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={posterUrl} alt={alt} className={combined} />
+        <img src={posterUrl} alt={alt} className={combined} style={combinedStyle} />
       );
     }
     return (
@@ -107,7 +112,7 @@ export function VideoMedia({
       preload={posterUrl ? 'metadata' : 'auto'}
       aria-label={alt || undefined}
       className={combined}
-      style={fill ? { objectFit: 'cover' } : undefined}
+      style={combinedStyle}
       width={fill ? undefined : width}
       height={fill ? undefined : height}
       onError={() => setFailed(true)}

@@ -26,6 +26,7 @@ export const SERVICE_CONTENT_KEYS = [
   'media_poster_url',
   'media_position',
   'media_caption',
+  'media_max_height',
 ] as const;
 
 /** Section name pattern in `cms_content` for a given service slug. */

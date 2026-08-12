@@ -1,6 +1,7 @@
 import { SectionContainer, SectionIntro } from '../SectionContainer';
 import { SectionMediaFrame } from '../SectionMediaLayout';
 import { readMediaValue } from '@/lib/media';
+import { MEDIA_MAX_HEIGHT_KEY, readMediaMaxHeight } from '@/lib/cms/sectionMedia';
 import type { PmbcVariant } from '@/lib/public/tokens';
 
 function s(v: unknown): string {
@@ -59,6 +60,9 @@ export function MediaSection({
     // `data-section-media` attribute will carry.
     position: 'standalone' as const,
     caption: s(c.media_caption),
+    // Read through the same helper the shared panel uses, so a ceiling means
+    // the same thing whether the asset stands alone or sits beside text.
+    maxHeight: readMediaMaxHeight(c[MEDIA_MAX_HEIGHT_KEY]),
   };
 
   const eyebrow = s(c.eyebrow);

@@ -1,6 +1,7 @@
 'use client';
 
 import { MediaField } from '@/components/admin/MediaField';
+import { MediaHeightControl } from '@/components/admin/MediaHeightControl';
 import { ADMIN_COLORS, adminFieldHint, adminInput, adminLabel } from '@/lib/admin/styles';
 
 import type { SectionEditorProps } from './types';
@@ -103,6 +104,10 @@ export function MediaSectionEditor({ content, onChange }: SectionEditorProps) {
           {WIDTHS.find((w) => w.value === width)?.hint}
         </p>
       </div>
+
+      {/* Width caps the frame, height caps the asset inside it. Together they
+          are how a portrait clip is kept to a sensible size on a wide page. */}
+      <MediaHeightControl content={content} onChange={patch} />
 
       <div>
         <label style={adminLabel}>Caption (optional)</label>

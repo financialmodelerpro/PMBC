@@ -13,6 +13,7 @@ import { readMediaValue, type MediaValue } from '@/lib/media';
  *   media_poster_url   still frame for video
  *   media_position     left | right | above | below (defaults to right)
  *   media_caption      optional caption under the frame
+ *   media_max_height   optional ceiling in pixels (blank means natural height)
  *   media_autoplay / media_loop / media_controls   video playback
  *
  * Absent or blank `media_url` means the section renders exactly as it did
@@ -25,6 +26,8 @@ export type MediaPosition = 'left' | 'right' | 'above' | 'below';
 export type SectionMediaValue = MediaValue & {
   position: MediaPosition;
   caption: string;
+  /** Pixel ceiling on the rendered height. Null means the asset's own height. */
+  maxHeight: number | null;
 };
 
 /**
@@ -79,6 +82,67 @@ export function readPosition(raw: unknown): MediaPosition {
 }
 
 /**
+ * Content key holding the optional pixel ceiling on a media frame's height.
+ *
+ * Named as a companion of `media_url` like every other key in this set, so the
+ * standalone `media` section and the shared panel read and write the same
+ * field. A video shot in portrait, or a tall screenshot, otherwise renders at
+ * the full width of its column and overruns the viewport.
+ */
+export const MEDIA_MAX_HEIGHT_KEY = 'media_max_height';
+
+/**
+ * Bounds on the stored value.
+ *
+ * The floor exists because a frame small enough to be unreadable is never what
+ * an operator meant, and a stray keystroke ("4" while typing "480") should not
+ * be able to produce one. The ceiling is above any plausible viewport height,
+ * so it only catches a value typed in the wrong unit.
+ */
+export const MIN_MEDIA_MAX_HEIGHT = 80;
+export const MAX_MEDIA_MAX_HEIGHT = 1600;
+
+/**
+ * Quick picks, so the common case is one click rather than a guessed number.
+ *
+ * The values are chosen against viewport height rather than against any asset:
+ * the whole point of the control is that the frame fits on screen alongside the
+ * section's own text, and a laptop viewport is around 750px of usable height.
+ * `null` clears the ceiling.
+ */
+export const MEDIA_MAX_HEIGHT_PRESETS: {
+  value: number | null;
+  label: string;
+  hint: string;
+}[] = [
+  { value: null, label: 'Natural', hint: 'No ceiling. The asset keeps its own height.' },
+  { value: 320, label: 'Short', hint: '320px. A band, comfortably inside any viewport.' },
+  { value: 480, label: 'Medium', hint: '480px. Fits a laptop screen with room for the text.' },
+  { value: 640, label: 'Tall', hint: '640px. Most of a laptop screen.' },
+];
+
+/**
+ * Reads the ceiling, returning null for every value that cannot drive one.
+ *
+ * Blank, absent, non-numeric and zero all mean "natural height", which is the
+ * state every section shipped in and must stay the state they render in. Out of
+ * range values are clamped rather than rejected, so a mistyped ceiling still
+ * produces a visible frame instead of a collapsed or unbounded one.
+ */
+export function readMediaMaxHeight(raw: unknown): number | null {
+  const n =
+    typeof raw === 'number'
+      ? raw
+      : typeof raw === 'string'
+        ? Number(raw.trim())
+        : Number.NaN;
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return Math.round(
+    Math.min(Math.max(n, MIN_MEDIA_MAX_HEIGHT), MAX_MEDIA_MAX_HEIGHT),
+  );
+}
+
+/**
  * Returns null when no media is set, which callers treat as "render the
  * section exactly as before" rather than "render an empty frame".
  */
@@ -92,5 +156,6 @@ export function readSectionMedia(
     ...base,
     position: readPosition(c.media_position),
     caption: typeof c.media_caption === 'string' ? c.media_caption : '',
+    maxHeight: readMediaMaxHeight(c[MEDIA_MAX_HEIGHT_KEY]),
   };
 }

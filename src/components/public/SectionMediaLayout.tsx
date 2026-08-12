@@ -12,7 +12,12 @@ import { variantStyles, type PmbcVariant } from '@/lib/public/tokens';
  * matters more, since that union drives the admin control and the layout
  * branch, and adding a value there that neither honours would be misleading.
  */
-export type FrameMedia = MediaValue & { position: string; caption: string };
+export type FrameMedia = MediaValue & {
+  position: string;
+  caption: string;
+  /** Pixel ceiling on the rendered height. Null or absent means natural height. */
+  maxHeight?: number | null;
+};
 
 /**
  * Places a section's optional shared media around that section's own content.
@@ -107,6 +112,13 @@ export function SectionMediaLayout({
  * screenshot or a wide photograph, and cropping those to 4:5 would destroy
  * them. The asset keeps its own proportions, and the frame takes the width of
  * whatever column it is placed in.
+ *
+ * `maxHeight` is the one exception to "takes whatever height it needs", and it
+ * still does not crop. The box stays the full column width and its height is
+ * clamped, with `object-fit: contain` scaling the asset down inside it, so a
+ * portrait video that would otherwise run past the bottom of the viewport is
+ * letterboxed against the frame's own surface colour instead. Unset, none of
+ * this applies and the markup is what it always was.
  */
 export function SectionMediaFrame({
   media,
@@ -120,6 +132,7 @@ export function SectionMediaFrame({
 }) {
   const v = variantStyles(variant);
   const dark = variant === 'navy_deep';
+  const maxHeight = media.maxHeight ?? null;
 
   return (
     // `data-section-media` marks this as a CMS-driven shared media frame.
@@ -153,7 +166,13 @@ export function SectionMediaFrame({
             width={1200}
             height={800}
             sizes={sizes}
-            className="h-auto w-full"
+            // `object-contain` is added only alongside a ceiling. On its own it
+            // would be inert, since without a clamped height the box already
+            // matches the asset's ratio, but adding a class to every existing
+            // frame for no effect is exactly the kind of drift that makes a
+            // later "renders identically" claim hard to check.
+            className={maxHeight ? 'h-auto w-full object-contain' : 'h-auto w-full'}
+            style={maxHeight ? { maxHeight } : undefined}
           />
         </div>
       </div>

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { ChevronDown, ChevronRight, ImagePlus } from 'lucide-react';
 
 import { MediaField } from '@/components/admin/MediaField';
+import { MediaHeightControl } from '@/components/admin/MediaHeightControl';
 import { ADMIN_COLORS, adminInput, adminLabel } from '@/lib/admin/styles';
 import { readPosition, type MediaPosition } from '@/lib/cms/sectionMedia';
 
@@ -144,6 +145,10 @@ export function SectionMediaPanel({
                 ? ' Two columns from 1024px wide, roughly 55% text to 45% media. Below that the section stacks and the media follows the text. The preview pane here is narrower than 1024px, so open the preview in a new tab to see the two columns.'
                 : ' The media spans the full content width.'}
             </p>
+          </div>
+
+          <div style={{ marginTop: 16 }}>
+            <MediaHeightControl content={content} onChange={patch} />
           </div>
 
           <label style={{ display: 'block', marginTop: 16 }}>

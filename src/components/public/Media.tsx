@@ -24,6 +24,12 @@ export type MediaProps = {
   height?: number;
   sizes?: string;
   className?: string;
+  /**
+   * Inline style for the media element itself. Exists for values a utility
+   * class cannot carry because they are operator-set at runtime, such as the
+   * CMS max-height ceiling.
+   */
+  style?: React.CSSProperties;
   priority?: boolean;
 };
 
@@ -52,6 +58,7 @@ export function Media({
   height,
   sizes,
   className = '',
+  style,
   priority = false,
 }: MediaProps) {
   if (!src) return null;
@@ -71,6 +78,7 @@ export function Media({
         width={width}
         height={height}
         className={className}
+        style={style}
       />
     );
   }
@@ -85,6 +93,7 @@ export function Media({
         fill
         sizes={sizes}
         className={className}
+        style={style}
         priority={priority}
         unoptimized={unoptimized}
       />
@@ -99,6 +108,7 @@ export function Media({
       height={height ?? 600}
       sizes={sizes}
       className={className}
+      style={style}
       priority={priority}
       unoptimized={unoptimized}
     />
