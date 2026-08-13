@@ -36,7 +36,10 @@ export default async function TeamPage() {
       />
 
       <section className="bg-[color:var(--pmbc-surface-cream)] px-6 py-20 lg:py-28">
-        <div className="mx-auto max-w-[1100px]">
+        {/* The row count is published so the sitemap check can ask the page
+            whether this collection has anything in it, rather than matching the
+            empty-state wording, which is copy and will change. */}
+        <div className="mx-auto max-w-[1100px]" data-collection-count={team.length}>
           {team.length === 0 ? (
             <p className="text-center text-[16px] text-[color:var(--pmbc-muted)]">
               Profiles are being prepared and will appear here shortly.

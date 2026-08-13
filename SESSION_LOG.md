@@ -4,6 +4,22 @@ Chronological build history for the PMBC website. Split out of `CLAUDE.md` to ke
 
 ---
 
+### 2026-08-13, follow-up: the three empty collection pages leave the sitemap
+
+`/team`, `/case-studies` and `/insights` have no rows, and their footer links were hidden earlier the same day, so the sitemap was the last thing still advertising them. Submitting an unlinked page with nothing on it asks a crawler to index nothing, and a visitor who arrives from search lands on a hero over an empty state, which is a worse first impression than not appearing at all.
+
+**They are derived rather than deleted.** The obvious change was to take three strings out of the array. It was not the right one: this repository has twice now had to remember to undo a hardcoded removal by hand, and "put it back when the collection is populated" is exactly the kind of instruction that survives in a comment and not in anyone's memory. The sitemap already fetches case studies and articles for their detail URLs, so the index pages now come from the same counts, with `fetchVisibleTeam` added for the third. Writing the first case study puts `/case-studies` back with no code change and no decision.
+
+That is also the more honest coupling. What belongs in a sitemap is a question about whether there is content to index, not about whether the footer happens to link to it today. The two controls are deliberately different in kind: the sitemap follows the data, while the footer link stays an operator switch in Footer Links, because whether a link earns a place in the footer is a judgment rather than a fact.
+
+**The verification asks the page rather than asserting today's answer.** Each of the three index pages publishes `data-collection-count` on its list wrapper, so the check reads the real row count and asserts the matching sitemap state. Matching the empty-state copy instead would have tied the test to a sentence an operator can edit, and hardcoding "these three are absent" would have gone red the day someone wrote a case study, which is the failure mode Phase 36 already had to fix once on `/fmp`. As written, the check flips from "absent" to "present" on its own.
+
+All three routes are untouched and still return 200.
+
+**One thing that went wrong, worth recording.** `verify-page-rhythm.mjs` launches Chrome on a fixed debug port (9336). Two runs were started in one shell invocation, the second could not bind, and it hung at the first page rather than reporting the conflict. The port had to be cleared by hand before the suite would run. Not fixed here, but if it bites again the fix is a port picked at launch rather than a constant.
+
+---
+
 ### 2026-08-13, Phase 41: the footer's links become content, dropdown row alignment, /fmp certification
 
 One commit. The full row is in the `CLAUDE.md` status table; this entry records the reasoning and the two things the verification caught.

@@ -97,6 +97,18 @@ const FOOTER_HEIGHT_WITH_SERVICE_LIST = 453;
  */
 const UNLINKED_ROUTES = ['/approach'];
 
+/**
+ * Routes that are out of the sitemap while their collection is empty.
+ *
+ * Different from UNLINKED_ROUTES in one way that matters: these are expected to
+ * come back on their own. The sitemap derives them from the content rather than
+ * from a hardcoded list, so adding the first case study puts /case-studies back
+ * with no code change, and this check turns from "absent" into "present"
+ * automatically. That is why it asks the collection first rather than asserting
+ * a fixed answer.
+ */
+const COLLECTION_INDEX_ROUTES = ['/team', '/case-studies', '/insights'];
+
 let passed = 0;
 const failures = [];
 function ok(name, condition, detail = '') {
@@ -655,6 +667,34 @@ async function main() {
       );
       const sitemap = await (await fetch(BASE + '/sitemap.xml')).text();
       ok(`${route} is not in the sitemap`, !sitemap.includes(route), 'still listed');
+    }
+
+    // ---- collection index pages follow their own content -------------------
+    // An index page with nothing on it is not offered to crawlers, and one with
+    // content is. The assertion asks the page for its row count rather than
+    // hardcoding today's answer, so populating a collection flips this check
+    // from "absent" to "present" without an edit here.
+    console.log('\n=== collection index pages in the sitemap');
+    const sitemapXml = await (await fetch(BASE + '/sitemap.xml')).text();
+    for (const route of COLLECTION_INDEX_ROUTES) {
+      const res = await fetch(BASE + route);
+      ok(`${route} still returns 200`, res.status === 200, String(res.status));
+      const html = await res.text();
+      const match = html.match(/data-collection-count="(\d+)"/);
+      ok(`${route} publishes its row count`, !!match, 'marker missing');
+      if (!match) continue;
+
+      const count = Number(match[1]);
+      // The trailing quote pins the match to the index URL: without it,
+      // /case-studies/<slug> in the sitemap would read as the index being there.
+      const listed = sitemapXml.includes(`${route}</loc>`);
+      ok(
+        count === 0
+          ? `${route} is empty, so it is out of the sitemap`
+          : `${route} has ${count} entries, so it is in the sitemap`,
+        count === 0 ? !listed : listed,
+        `count ${count}, listed ${listed}`,
+      );
     }
 
     // ---- home sequence -----------------------------------------------------

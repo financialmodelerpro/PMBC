@@ -38,7 +38,8 @@ export default async function CaseStudiesPage() {
 
       {/* Grid */}
       <section className="bg-[color:var(--pmbc-surface-cream)] px-6 py-20 lg:py-28">
-        <div className="mx-auto max-w-[1200px]">
+        {/* See the note on /team: the count is for the sitemap verification. */}
+        <div className="mx-auto max-w-[1200px]" data-collection-count={studies.length}>
           {studies.length === 0 ? (
             <p className="text-center text-[16px] text-[color:var(--pmbc-muted)]">
               Case studies are being prepared and will appear here shortly.

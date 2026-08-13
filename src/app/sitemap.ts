@@ -4,6 +4,7 @@ import { SERVICES } from '@/config/services';
 import {
   fetchPublishedCaseStudies,
   fetchPublishedArticles,
+  fetchVisibleTeam,
 } from '@/lib/cms/collections';
 
 function baseUrl(): string {
@@ -15,6 +16,39 @@ function baseUrl(): string {
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const base = baseUrl();
   const now = new Date();
+
+  const [studies, articles, team] = await Promise.all([
+    fetchPublishedCaseStudies(),
+    fetchPublishedArticles(),
+    fetchVisibleTeam(),
+  ]);
+
+  /**
+   * `/team`, `/case-studies` and `/insights` are offered to crawlers only once
+   * their collection has something in it.
+   *
+   * All three are empty, and on 2026-08-13 their footer links were hidden, so
+   * nothing on the site links to them. An index page that is unlinked and has
+   * no content is a hero over an empty state: submitting it asks a crawler to
+   * index nothing and gives a visitor arriving from search a worse first
+   * impression than not appearing at all. The routes are untouched and still
+   * return 200.
+   *
+   * Derived from the content rather than hardcoded out, so populating a
+   * collection puts its page back in the sitemap with no code change. That is
+   * also the honest coupling: what belongs in a sitemap is a question about
+   * content, not about whether the footer happens to link to it today.
+   *
+   * These fetchers return an empty array on error, so a database problem at
+   * build time drops the page for that build. That is the same soft failure the
+   * detail URLs below have always had, and the alternative (submitting a page
+   * that may be empty) is worse.
+   */
+  const collectionIndexRoutes = [
+    ...(team.length > 0 ? ['/team'] : []),
+    ...(studies.length > 0 ? ['/case-studies'] : []),
+    ...(articles.length > 0 ? ['/insights'] : []),
+  ];
 
   const firmRoutes = [
     '',
@@ -28,9 +62,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // `/about` is gone: it was merged into the home page and now 301s there.
     // The founder profile keeps its nested path.
     '/about/ahmad-din',
-    '/team',
-    '/case-studies',
-    '/insights',
+    // /team, /case-studies and /insights sit here when they have content. See
+    // collectionIndexRoutes above.
+    ...collectionIndexRoutes,
     '/fmp',
     // The three FMP-fed sub-pages under /financial-modeler-pro are deliberately
     // absent. They still render and the API integration behind them still runs,
@@ -45,10 +79,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   const serviceRoutes = SERVICES.map((s) => `/services/${s.slug}`);
 
-  const [studies, articles] = await Promise.all([
-    fetchPublishedCaseStudies(),
-    fetchPublishedArticles(),
-  ]);
   const caseStudyRoutes = studies.map((s) => `/case-studies/${s.slug}`);
   const insightRoutes = articles.map((a) => `/insights/${a.slug}`);
 
