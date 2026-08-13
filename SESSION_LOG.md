@@ -4,6 +4,71 @@ Chronological build history for the PMBC website. Split out of `CLAUDE.md` to ke
 
 ---
 
+### 2026-08-13, Checkpoint: closing for the day
+
+Four commits, three phases, two migrations applied, and a documentation split.
+The three phase entries below this one carry the reasoning; this is the summary
+and the state to pick up from.
+
+**What shipped.**
+
+*Footer and navigation (Phase 41).* The footer's links stopped being hardcoded
+and became `(footer_settings, links)`, edited at a new `/admin/footer-links` that
+mirrors Pages and Nav. Case Studies, Insights and Team ship hidden, since those
+collections are empty. The nine service links became one, which took the footer
+from 453px to 357px, and Book a Meeting moved to the Contact column beside the
+address. The services dropdown stopped breaking into ragged rows. `/team`,
+`/case-studies` and `/insights` left the sitemap, derived from their row count
+rather than deleted, so the first entry written into a collection puts its page
+back with no code change.
+
+*Content (Phases 41 and 43).* The `/fmp` certification band stopped naming 3SFM
+and BVM with session counts and course UUIDs, since none of that is something
+this page can know has changed; it is a short statement and a link to the
+catalogue now. The two platforms became full-width stacked rows with media slots,
+which also removed the gap under Training Hub's shorter bullet list.
+
+*Contact and email (Phases 42 and 43).* The phone field gained a country code,
+first as a native select and then, after it turned out to show the ISO code
+without the country name, as a searchable ARIA combobox. The country list went
+from six GCC states plus "Other" to all 206. Both transactional emails were
+rebuilt on FMP's shell structure in PMBC's palette, which fixed two faults at
+once: placeholder templates, and an `email_branding` row that had been created
+empty in migration 003 and never filled. A new `/confidentiality` statement
+joined the legal row and the sitemap.
+
+**The documentation split, and why.** `CLAUDE.md` had reached 177KB and is loaded
+into context at the start of every session. 75KB of it was a phase table with
+paragraph-length rows, and 25KB was migration rationale duplicating what each
+migration file's own header already says. The phase table moved verbatim to
+`PHASE_HISTORY.md`, the migration list became an index, and the launch checklist
+was rewritten in order of what actually blocks a launch rather than by the date
+each item was added. The file is now 82KB. Nothing was deleted: everything cut
+moved across unedited, so a claim about what was true in June is still a claim
+about June.
+
+**State to pick up from.** Nothing in the codebase blocks launch. What remains is
+operational and is listed in order in the `CLAUDE.md` checklist: production
+environment variables on Vercel, DNS and SSL, counsel review with confidentiality
+going first, a content pass on a deployed build, and the 2026-06-21 enquiry that
+has now gone roughly eight weeks without a recorded reply. Three credential
+rotations are worth doing before the site is public. Ten carousel images and two
+`/fmp` platform images are the highest-value asset gaps, and all twelve slots
+render an honest monogram placeholder until they arrive.
+
+**One thing not verified, carried forward deliberately.** The assembled HTML of
+the two emails has never been sent. Rendering it means running the contact route,
+which mails the advisory inbox and writes a row into the live enquiry list. The
+stored templates, the branding rows and the shell's composition rules are each
+checked separately. One real submission before launch closes it, and it pairs
+naturally with the Brevo key rotation.
+
+**Verification suites, all green on the final build:** `verify-page-rhythm` 204,
+`verify-contact-and-legal` 95, `verify-section-media-layout` 127,
+`verify-media-max-height` 98, `verify-fmp-page` 46.
+
+---
+
 ### 2026-08-13, Phase 43: searchable country combobox, /fmp platforms as full-width rows
 
 Two changes, both fixing something shipped earlier the same day.
