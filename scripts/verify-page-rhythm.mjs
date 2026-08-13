@@ -69,6 +69,7 @@ const PAGES = [
   '/privacy',
   '/terms',
   '/services/financial-modeling',
+  '/confidentiality',
 ];
 
 /** The page height home used to have, in viewports, before this pass. */
@@ -674,6 +675,32 @@ async function main() {
     // content is. The assertion asks the page for its row count rather than
     // hardcoding today's answer, so populating a collection flips this check
     // from "absent" to "present" without an edit here.
+    // ---- the contact form's phone default ----------------------------------
+    // Read from the live control rather than the markup. The value is applied by
+    // react-hook-form after hydration, so the server HTML carries no `selected`
+    // attribute and a source check would prove nothing about what the form
+    // actually submits.
+    console.log('\n=== contact form phone default');
+    await load(page, BASE + '/contact');
+    const phoneDefault = await page.evaluate(`
+      (() => {
+        const s = document.querySelector('select[aria-label="Phone country code"]');
+        if (!s) return null;
+        return {
+          value: s.value,
+          optionCount: s.options.length,
+          firstThree: [...s.options].slice(0, 3).map((o) => o.value),
+        };
+      })()`);
+    ok('the phone country select is on the form', !!phoneDefault, 'not found');
+    if (phoneDefault) {
+      ok('it is set to Saudi Arabia', phoneDefault.value === 'SA', phoneDefault.value);
+      ok('it offers the full country list', phoneDefault.optionCount > 190,
+        String(phoneDefault.optionCount));
+      ok('the GCC leads the list',
+        phoneDefault.firstThree.join(',') === 'SA,AE,QA', phoneDefault.firstThree.join(','));
+    }
+
     console.log('\n=== collection index pages in the sitemap');
     const sitemapXml = await (await fetch(BASE + '/sitemap.xml')).text();
     for (const route of COLLECTION_INDEX_ROUTES) {

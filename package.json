@@ -42,7 +42,9 @@
     "seed-network-and-fmp-carousel": "node scripts/seed-network-and-fmp-carousel.mjs",
     "seed-footer-links": "node scripts/seed-footer-links.mjs",
     "seed-fmp-certification-line": "node scripts/seed-fmp-certification-line.mjs",
-    "verify-page-rhythm": "node scripts/verify-page-rhythm.mjs"
+    "verify-page-rhythm": "node scripts/verify-page-rhythm.mjs",
+    "seed-email-branding": "node scripts/seed-email-branding.mjs",
+    "verify-contact-and-legal": "node scripts/verify-contact-and-legal.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

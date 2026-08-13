@@ -141,6 +141,11 @@ export function sanitizeEmailHtml(html: string | null | undefined): string {
     ...BASE,
     allowedTags: [
       ...BLOCK_TAGS,
+      // `div` is not in BLOCK_TAGS because the rich text editor never emits
+      // one. Email HTML is full of them, and dropping the wrapper while keeping
+      // its children made the admin preview a worse likeness of the real email
+      // than it needed to be.
+      'div',
       'table',
       'thead',
       'tbody',

@@ -5,23 +5,24 @@ import { usePathname } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import HCaptcha from '@hcaptcha/react-hcaptcha';
 
-type Service = { slug: string; title: string };
+import {
+  COUNTRIES,
+  DEFAULT_DIAL_COUNTRY,
+  OTHER_COUNTRIES,
+  PINNED_COUNTRIES,
+  composePhone,
+} from '@/lib/public/countries';
 
-const COUNTRIES = [
-  'Saudi Arabia',
-  'United Arab Emirates',
-  'Qatar',
-  'Kuwait',
-  'Bahrain',
-  'Oman',
-  'Other',
-] as const;
+type Service = { slug: string; title: string };
 
 type FormValues = {
   name: string;
   email: string;
   company?: string;
+  /** The locally-typed part only. Joined to the dial code on submit. */
   phone?: string;
+  /** ISO code of the dialling country, never sent on its own. */
+  phone_country?: string;
   country?: string;
   service_interest?: string;
   message: string;
@@ -53,9 +54,10 @@ export function ContactForm({
     reset,
     formState: { errors },
   } = useForm<FormValues>({
-    defaultValues: defaultServiceTitle
-      ? { service_interest: defaultServiceTitle }
-      : undefined,
+    defaultValues: {
+      phone_country: DEFAULT_DIAL_COUNTRY,
+      ...(defaultServiceTitle ? { service_interest: defaultServiceTitle } : {}),
+    },
   });
 
   // Allow another submission after success message has been shown for a while.
@@ -73,12 +75,19 @@ export function ContactForm({
 
     setStatus({ kind: 'submitting' });
 
+    // The dial code and the typed digits are two controls but one fact, so they
+    // are joined here and the number is stored in full international form. The
+    // ISO code itself is not sent: it is how the visitor picked a prefix, not
+    // something the inbox needs a column for.
+    const { phone_country, phone, ...rest } = values;
+
     try {
       const res = await fetch('/api/contact', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ...values,
+          ...rest,
+          phone: composePhone(phone_country ?? DEFAULT_DIAL_COUNTRY, phone ?? ''),
           source_page: pathname,
           hcaptcha_token: captchaToken ?? undefined,
         }),
@@ -136,21 +145,58 @@ export function ContactForm({
           />
         </Field>
         <Field label="Phone">
-          <input
-            type="tel"
-            autoComplete="tel"
-            className={inputCls}
-            {...register('phone')}
-          />
+          {/* Two controls, one value. The code select is deliberately narrow and
+              fixed-width so the number field keeps the room: the visitor changes
+              the prefix once, if at all, and types into the field beside it. */}
+          <div className="flex gap-2">
+            <select
+              aria-label="Phone country code"
+              className={`${inputCls} w-[128px] shrink-0`}
+              {...register('phone_country')}
+            >
+              {PINNED_COUNTRIES.map((c) => (
+                <option key={`pin-${c.code}`} value={c.code}>
+                  {c.code} +{c.dial}
+                </option>
+              ))}
+              <option disabled value="">
+                {'─'.repeat(8)}
+              </option>
+              {OTHER_COUNTRIES.map((c) => (
+                <option key={c.code} value={c.code}>
+                  {c.code} +{c.dial}
+                </option>
+              ))}
+            </select>
+            <input
+              type="tel"
+              autoComplete="tel-national"
+              placeholder="5X XXX XXXX"
+              className={inputCls}
+              {...register('phone')}
+            />
+          </div>
         </Field>
         <Field label="Country">
+          {/* The seven most likely answers first, then every country in
+              alphabetical order. The group labels are what stop the pinned
+              seven reading as a sorting fault. */}
           <select className={inputCls} defaultValue="" {...register('country')}>
             <option value="">Select a country</option>
-            {COUNTRIES.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
+            <optgroup label="Frequently selected">
+              {PINNED_COUNTRIES.map((c) => (
+                <option key={`pin-${c.code}`} value={c.name}>
+                  {c.name}
+                </option>
+              ))}
+            </optgroup>
+            <optgroup label="All countries">
+              {COUNTRIES.map((c) => (
+                <option key={c.code} value={c.name}>
+                  {c.name}
+                </option>
+              ))}
+            </optgroup>
           </select>
         </Field>
         <Field label="Service of interest">
@@ -216,8 +262,8 @@ export function ContactForm({
 
       {status.kind === 'success' && (
         <div className="rounded-md border border-[color:var(--pmbc-secondary)]/30 bg-[color:var(--pmbc-secondary)]/10 px-4 py-3 text-[13.5px] text-[color:var(--pmbc-text)]">
-          Thank you. We&apos;ve received your message and will respond within 1–2
-          business days.
+          Thank you. We&apos;ve received your message and will respond within one
+          to two business days.
         </div>
       )}
       {status.kind === 'error' && (

@@ -29,6 +29,12 @@ import {
 } from '@/lib/cms/footerLinks';
 import { PAGE_GUTTER, PAGE_INNER } from '@/lib/public/layout';
 
+const LEGAL_LINKS = [
+  { href: '/privacy', label: 'Privacy' },
+  { href: '/terms', label: 'Terms' },
+  { href: '/confidentiality', label: 'Confidentiality' },
+] as const;
+
 type FooterBrand = {
   name: string;
   shortName: string;
@@ -259,21 +265,20 @@ export function Footer({
             className={`${PAGE_INNER} flex flex-col items-start justify-between gap-3 text-[12px] sm:flex-row sm:items-center`}
           >
           <p style={{ color: 'rgba(168, 133, 48, 0.85)' }}>{copyright}</p>
-          <div className="flex items-center gap-6">
-            <Link
-              href="/privacy"
-              className="transition-colors duration-200 hover:text-white"
-              style={{ color: 'rgba(232, 221, 196, 0.7)' }}
-            >
-              Privacy
-            </Link>
-            <Link
-              href="/terms"
-              className="transition-colors duration-200 hover:text-white"
-              style={{ color: 'rgba(232, 221, 196, 0.7)' }}
-            >
-              Terms
-            </Link>
+          {/* The legal row stays in code rather than joining Footer Links. All
+              three are statements the firm is held to, and a switch that can
+              hide a privacy policy by accident is a switch worth not having. */}
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+            {LEGAL_LINKS.map((l) => (
+              <Link
+                key={l.href}
+                href={l.href}
+                className="transition-colors duration-200 hover:text-white"
+                style={{ color: 'rgba(232, 221, 196, 0.7)' }}
+              >
+                {l.label}
+              </Link>
+            ))}
           </div>
           </div>
         </div>

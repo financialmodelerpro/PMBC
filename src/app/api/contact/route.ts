@@ -23,7 +23,7 @@ const ContactSchema = z.object({
 
 async function verifyHcaptcha(token: string | undefined): Promise<boolean> {
   const secret = process.env.HCAPTCHA_SECRET_KEY;
-  if (!secret) return true; // captcha not configured — allow
+  if (!secret) return true; // captcha not configured, so allow the submission
   if (!token) return false;
   try {
     const params = new URLSearchParams({ secret, response: token });
@@ -92,7 +92,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Could not save submission' }, { status: 500 });
   }
 
-  // Send the two emails. Failures here should NOT fail the request — the
+  // Send the two emails. Failures here should NOT fail the request: the
   // submission is already saved and visible in the admin inbox.
   await Promise.all([
     sendNotification(inserted.id, data),
@@ -128,7 +128,7 @@ async function sendNotification(id: string, data: ContactData) {
     process.env.EMAIL_TO_ADMIN ||
     process.env.EMAIL_FROM_DEFAULT;
   if (!adminEmail) {
-    console.warn('[contact] no admin email configured — skipping notification');
+    console.warn('[contact] no admin email configured, skipping notification');
     return;
   }
   const templates = await loadTemplates();
@@ -141,12 +141,22 @@ async function sendNotification(id: string, data: ContactData) {
   const vars: Record<string, string | undefined> = {
     name: data.name,
     email: data.email,
-    company: data.company || '-',
-    phone: data.phone || '-',
-    country: data.country || '-',
-    service_interest: data.service_interest || '-',
+    company: data.company || 'Not given',
+    phone: data.phone || 'Not given',
+    country: data.country || 'Not given',
+    service_interest: data.service_interest || 'Not specified',
     source_page: data.source_page || '-',
+    // Puts the company in the subject line without leaving a dangling comma
+    // when there is none. The inbox is scanned by subject, and "New enquiry:
+    // Leslie Merricroft, Al-Mashrea Law Firm" is worth more at a glance than
+    // the name alone.
+    company_suffix: data.company ? `, ${data.company}` : '',
     message: data.message,
+    // Same text, with the enquirer's line breaks preserved. `{{message}}` is
+    // escaped but its newlines collapse in HTML, so a message written in
+    // paragraphs arrived as one block. The template uses this one; `{{message}}`
+    // still resolves, since an operator may have it in an edited template.
+    message_html: data.message,
     submission_id: id,
   };
   const subject = renderSubject(tpl.subject, vars);
@@ -168,7 +178,18 @@ async function sendAcknowledgement(data: ContactData) {
     console.warn('[contact] contact_acknowledgement template missing or disabled');
     return;
   }
-  const vars: Record<string, string | undefined> = { name: data.name };
+  // The acknowledgement echoes what was sent, so the enquirer has a record of
+  // it without going back to the site. Same variable names as the notification,
+  // so an operator editing either template does not have to learn two sets.
+  const vars: Record<string, string | undefined> = {
+    name: data.name,
+    email: data.email,
+    company: data.company || 'Not given',
+    country: data.country || 'Not given',
+    service_interest: data.service_interest || 'Not specified',
+    message: data.message,
+    message_html: data.message,
+  };
   const subject = renderSubject(tpl.subject, vars);
   const body = renderTemplate(tpl.body_html, vars);
   const html = await baseLayoutBranded(body);

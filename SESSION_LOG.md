@@ -4,6 +4,30 @@ Chronological build history for the PMBC website. Split out of `CLAUDE.md` to ke
 
 ---
 
+### 2026-08-13, Phase 42: contact form country controls, branded emails, confidentiality statement
+
+Four changes. The full row is in the `CLAUDE.md` status table; this entry records the reasoning and the two things worth remembering.
+
+**The phone field.** A dial-code select beside the number, defaulting to Saudi Arabia. The select is the easy half. The joining is where a phone control actually goes wrong, and there are three cases that all produce an unreachable number if the two parts are simply concatenated: an empty number becoming a bare `+966`, a number the visitor already typed in full getting prefixed twice, and a national trunk zero surviving in front of an international code. `composePhone` handles all three and the verification asserts each one rather than describing it.
+
+**The country list.** 206 entries, with the GCC six plus Pakistan pinned. The group labels matter as much as the order: seven countries out of alphabetical sequence with no explanation reads as a sorting fault, not a convenience. The pinned seven also stay in their alphabetical positions, because someone scrolling to S expects Saudi Arabia to be where the alphabet says it is. One module serves both the location dropdown and the dial-code select, since a country you can select as your location but not as your dialling code is the sort of gap nobody notices until a real enquiry hits it.
+
+**The emails, and what was actually wrong with them.** The templates were the placeholders migration 008 seeded, which was the visible half. The half that mattered more was that `email_branding` had been created empty by migration 003 and never filled: logo_url, signature_html and footer_html were all NULL, so the shell had nothing to render and fell back to a text wordmark and a single copyright line. Both halves are fixed, the shell in code and the content in migration 056.
+
+The shell follows FMP's `_base.ts` structure, which was the instruction and is also the right call: tables and inline styles throughout, because that is what survives Outlook. The palette is PMBC's and the voice is serif rather than FMP's sans, so the two properties are recognisably related without looking like the same firm.
+
+**The logo is deliberately not seeded.** The shell resolves it through `email_branding.logo_url`, then `branding_config.logo_dark_url`, then a wordmark. The middle step is the one that matters: the header band is navy, and the site's ordinary `logo_url` is the light-background mark, so using it would put a navy logo on navy. `logo_dark_url` exists for exactly this and is already uploaded. Seeding the URL into `email_branding` as well would copy a project-specific storage path into a second place, where it would go stale the next time the logo is replaced.
+
+**A defect found while rewriting the templates.** `{{message}}` was escaped, correctly, but its newlines collapsed in HTML, so an enquiry written in paragraphs arrived in the admin inbox as one unbroken block. Any variable whose name ends `_html` now keeps its line breaks. It is still escaped first, so the only tag that can reach the output is the `<br />` we insert: the suffix changes the whitespace handling, not the trust level.
+
+**The confidentiality statement.** Hardcoded like `/privacy` and `/terms`, which are this project's documented exception to CMS-first. The reason applies with more force here: this page makes specific operational commitments (analysts bound by written obligations no less strict than the firm's own, declining rather than relying on information barriers where a mandate would put PMBC on both sides, notice before compelled disclosure where the law permits it), and a statement settled by counsel should not be editable from an admin console afterwards. It is linked from every acknowledgement email, so it should go to counsel first of the three.
+
+The footer legal row stays in code for the same class of reason rather than joining Footer Links: a switch that can hide a privacy policy by accident is a switch worth not having.
+
+**What is not verified, and why.** The assembled email HTML. Rendering it means running the contact route, and running the route sends real mail to the advisory inbox and writes a row into the live enquiry list, which is a live side effect rather than a test. The two halves are checked separately instead: the stored templates and branding rows from the database, and the shell's composition rules against its own source. A live send remains worth doing once before launch, together with the Brevo key rotation that is already on the checklist.
+
+---
+
 ### 2026-08-13, follow-up: the three empty collection pages leave the sitemap
 
 `/team`, `/case-studies` and `/insights` have no rows, and their footer links were hidden earlier the same day, so the sitemap was the last thing still advertising them. Submitting an unlinked page with nothing on it asks a crawler to index nothing, and a visitor who arrives from search lands on a hero over an empty state, which is a worse first impression than not appearing at all.

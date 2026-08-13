@@ -75,6 +75,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     '/book',
     '/privacy',
     '/terms',
+    '/confidentiality',
   ];
 
   const serviceRoutes = SERVICES.map((s) => `/services/${s.slug}`);
