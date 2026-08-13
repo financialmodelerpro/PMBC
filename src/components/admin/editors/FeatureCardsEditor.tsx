@@ -2,11 +2,18 @@
 
 import { Plus, Trash2 } from 'lucide-react';
 
+import { MediaField } from '@/components/admin/MediaField';
 import { ADMIN_COLORS, adminButtonGhost, adminFieldHint, adminInput, adminLabel } from '@/lib/admin/styles';
 
 import type { SectionEditorProps } from './types';
 
-type Card = {
+/**
+ * A card is a loose record rather than a fixed shape, because the media slot
+ * writes six keys (`media_url` plus its type, poster and three playback flags)
+ * and they travel with the card. Naming them here would mean naming them again
+ * in the renderer and in `lib/media.ts`, which is three places for one list.
+ */
+type Card = Record<string, unknown> & {
   title: string;
   code: string;
   description: string;
@@ -15,6 +22,7 @@ type Card = {
   cta_label: string;
   cta_href: string;
   note: string;
+  media_alt: string;
 };
 
 function s(v: unknown): string {
@@ -30,6 +38,10 @@ function readCards(raw: unknown): Card[] {
   return raw.map((r) => {
     const o = (r ?? {}) as Record<string, unknown>;
     return {
+      // Unknown keys are carried through rather than dropped: the media slot's
+      // six keys live on the card, and rebuilding the object from a fixed field
+      // list would silently discard them on the next edit to any other field.
+      ...o,
       title: s(o.title),
       code: s(o.code),
       description: s(o.description),
@@ -38,6 +50,7 @@ function readCards(raw: unknown): Card[] {
       cta_label: s(o.cta_label),
       cta_href: s(o.cta_href),
       note: s(o.note),
+      media_alt: s(o.media_alt),
     };
   });
 }
@@ -67,6 +80,24 @@ export function FeatureCardsEditor({ content, onChange }: SectionEditorProps) {
           />
         </div>
       ))}
+
+      <div>
+        <label style={adminLabel}>Layout</label>
+        <select
+          value={content.layout === 'rows' ? 'rows' : 'cards'}
+          onChange={(e) => patch({ layout: e.target.value })}
+          style={adminInput}
+        >
+          <option value="cards">Cards side by side</option>
+          <option value="rows">Full-width rows, media alternating sides</option>
+        </select>
+        <p style={adminFieldHint}>
+          Rows give each entry the full width and put its media on the opposite
+          side to the one above it, starting with the media on the right. Rows
+          also remove the uneven heights two side-by-side cards get when one has
+          fewer bullets than the other.
+        </p>
+      </div>
 
       <div>
         <p style={adminLabel}>Cards</p>
@@ -166,6 +197,29 @@ export function FeatureCardsEditor({ content, onChange }: SectionEditorProps) {
                 />
               </label>
 
+              {/* Only meaningful in the rows layout, and shown regardless: an
+                  operator switching to rows should find the asset already set,
+                  not discover a control that appeared after the switch. */}
+              <div>
+                <MediaField
+                  content={card}
+                  urlKey="media_url"
+                  onChange={(p) => update(i, p as Partial<Card>)}
+                  label="Media, used by the rows layout"
+                  hint="Image, GIF or video. Empty renders a monogram panel, so the row keeps its shape until you upload."
+                />
+                <label>
+                  <span style={adminLabel}>Media alt text</span>
+                  <input
+                    type="text"
+                    value={s(card.media_alt)}
+                    placeholder="Defaults to the card title"
+                    onChange={(e) => update(i, { media_alt: e.target.value })}
+                    style={adminInput}
+                  />
+                </label>
+              </div>
+
               <div style={{ display: 'grid', gap: 8, gridTemplateColumns: '1fr 1fr' }}>
                 <label>
                   <span style={adminLabel}>CTA label</span>
@@ -194,7 +248,17 @@ export function FeatureCardsEditor({ content, onChange }: SectionEditorProps) {
           onClick={() =>
             setCards([
               ...cards,
-              { title: '', code: '', description: '', meta: [], bullets: [], cta_label: '', cta_href: '', note: '' },
+              {
+                title: '',
+                code: '',
+                description: '',
+                meta: [],
+                bullets: [],
+                cta_label: '',
+                cta_href: '',
+                note: '',
+                media_alt: '',
+              },
             ])
           }
           style={{ ...adminButtonGhost, marginTop: 10 }}

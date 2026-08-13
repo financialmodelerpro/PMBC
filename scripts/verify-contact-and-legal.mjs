@@ -133,24 +133,28 @@ async function main() {
   // ---- the form as it renders ----------------------------------------------
   console.log('\n=== contact form');
   const contact = await (await fetch(BASE + '/contact')).text();
-  ok('the phone field has a country code select',
-    contact.includes('aria-label="Phone country code"'), 'select missing');
-  // The selected value is set by react-hook-form after hydration, so the server
-  // HTML carries no `selected` attribute and this cannot be read here. What is
-  // checked instead is the property that makes the default hold in both states:
-  // SA is the first option, so it is what a browser shows before hydration, and
-  // DEFAULT_DIAL_COUNTRY is what the form defaults to after. The live selected
-  // value is asserted in verify-page-rhythm, which has a browser.
-  const dialSelect = contact.slice(contact.indexOf('aria-label="Phone country code"'));
-  ok('Saudi Arabia is the first dialling option',
-    /^[\s\S]{0,400}?<option value="SA">/.test(dialSelect), 'SA is not first');
-  ok('the pinned seven lead the dialling list',
-    PINNED_COUNTRY_CODES.every((code, i) => {
-      const at = dialSelect.indexOf(`<option value="${code}">`);
-      const prev = i === 0 ? -1 : dialSelect.indexOf(`<option value="${PINNED_COUNTRY_CODES[i - 1]}">`);
-      return at > prev;
-    }),
-    'pinned order is wrong');
+  ok('the phone field has a country control',
+    contact.includes('aria-label="Phone country code"'), 'control missing');
+  // The dial-code control is a combobox now, not a native select, so its list
+  // does not exist in the served HTML: it is built when the control opens, and
+  // its value is applied by react-hook-form after hydration. What is checkable
+  // here is that the control is announced correctly before any of that. The
+  // list, the filtering, the keyboard contract and the live value are all
+  // driven in a real browser in verify-page-rhythm, which is the only place
+  // they can honestly be asserted.
+  const combobox = (contact.match(/<input[^>]*aria-label="Phone country code"[^>]*>/) || [''])[0];
+  ok('the country control is announced as a combobox',
+    /role="combobox"/.test(combobox), combobox.slice(0, 120));
+  ok('it declares list autocomplete and a collapsed state',
+    /aria-autocomplete="list"/.test(combobox) && /aria-expanded="false"/.test(combobox),
+    combobox.slice(0, 200));
+  ok('it points at the listbox it controls', /aria-controls="/.test(combobox), 'no aria-controls');
+  ok('the 206-option native select is gone',
+    !/<select[^>]*aria-label="Phone country code"/.test(contact), 'the select is still rendered');
+  // Both controls sit inside one <label>, which can only name the first of
+  // them, so the number box has to name itself.
+  ok('the number box is named independently of the combobox',
+    /<input[^>]*aria-label="Phone number"/.test(contact), 'no accessible name');
   ok('the country dropdown groups the pinned seven',
     contact.includes('Frequently selected') && contact.includes('All countries'),
     'optgroup labels missing');

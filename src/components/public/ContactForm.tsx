@@ -8,10 +8,10 @@ import HCaptcha from '@hcaptcha/react-hcaptcha';
 import {
   COUNTRIES,
   DEFAULT_DIAL_COUNTRY,
-  OTHER_COUNTRIES,
   PINNED_COUNTRIES,
   composePhone,
 } from '@/lib/public/countries';
+import { CountryCombobox } from './CountryCombobox';
 
 type Service = { slug: string; title: string };
 
@@ -52,6 +52,8 @@ export function ContactForm({
     register,
     handleSubmit,
     reset,
+    setValue,
+    watch,
     formState: { errors },
   } = useForm<FormValues>({
     defaultValues: {
@@ -59,6 +61,10 @@ export function ContactForm({
       ...(defaultServiceTitle ? { service_interest: defaultServiceTitle } : {}),
     },
   });
+
+  // The combobox is not a native input, so its value is held in form state
+  // rather than registered. Watched so the control re-renders on selection.
+  const phoneCountry = watch('phone_country');
 
   // Allow another submission after success message has been shown for a while.
   useEffect(() => {
@@ -145,31 +151,25 @@ export function ContactForm({
           />
         </Field>
         <Field label="Phone">
-          {/* Two controls, one value. The code select is deliberately narrow and
-              fixed-width so the number field keeps the room: the visitor changes
-              the prefix once, if at all, and types into the field beside it. */}
-          <div className="flex gap-2">
-            <select
-              aria-label="Phone country code"
-              className={`${inputCls} w-[128px] shrink-0`}
-              {...register('phone_country')}
-            >
-              {PINNED_COUNTRIES.map((c) => (
-                <option key={`pin-${c.code}`} value={c.code}>
-                  {c.code} +{c.dial}
-                </option>
-              ))}
-              <option disabled value="">
-                {'─'.repeat(8)}
-              </option>
-              {OTHER_COUNTRIES.map((c) => (
-                <option key={c.code} value={c.code}>
-                  {c.code} +{c.dial}
-                </option>
-              ))}
-            </select>
+          {/* Two controls, one value, stacked rather than side by side. The
+              combobox shows the country name next to the dial code, which is
+              what makes the list's order legible, and that does not fit beside
+              a number field in half a form row without truncating one of them. */}
+          <div className="grid gap-2">
+            <CountryCombobox
+              value={phoneCountry || DEFAULT_DIAL_COUNTRY}
+              onChange={(code) =>
+                setValue('phone_country', code, { shouldDirty: true })
+              }
+              ariaLabel="Phone country code"
+            />
             <input
               type="tel"
+              // The field's visible "Phone" label is inside a <label> that wraps
+              // both controls, so it attaches to the first one, the combobox,
+              // which then overrides it with its own aria-label. That leaves the
+              // number box unnamed unless it names itself.
+              aria-label="Phone number"
               autoComplete="tel-national"
               placeholder="5X XXX XXXX"
               className={inputCls}

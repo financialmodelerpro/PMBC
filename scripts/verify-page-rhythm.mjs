@@ -680,25 +680,172 @@ async function main() {
     // react-hook-form after hydration, so the server HTML carries no `selected`
     // attribute and a source check would prove nothing about what the form
     // actually submits.
-    console.log('\n=== contact form phone default');
+    // ---- the phone country combobox ----------------------------------------
+    // Driven entirely in the browser: it filters, it commits on Enter, and its
+    // ARIA state changes as it opens. None of that is visible in the markup, so
+    // every assertion here drives the real control and reads what it did.
+    console.log('\n=== contact form phone combobox');
     await load(page, BASE + '/contact');
-    const phoneDefault = await page.evaluate(`
+
+    const CB = 'input[role=\"combobox\"][aria-label=\"Phone country code\"]';
+    const cbState = () => page.evaluate(`
       (() => {
-        const s = document.querySelector('select[aria-label="Phone country code"]');
-        if (!s) return null;
+        const el = document.querySelector('${CB}');
+        if (!el) return null;
+        const listId = el.getAttribute('aria-controls');
+        const list = listId ? document.getElementById(listId) : null;
+        const opts = list ? [...list.querySelectorAll('[role=\"option\"]')] : [];
+        const active = opts.find((o) => o.getAttribute('data-active') === 'true');
         return {
-          value: s.value,
-          optionCount: s.options.length,
-          firstThree: [...s.options].slice(0, 3).map((o) => o.value),
+          value: el.value,
+          expanded: el.getAttribute('aria-expanded'),
+          activeDescendant: el.getAttribute('aria-activedescendant'),
+          count: opts.length,
+          first: opts.slice(0, 3).map((o) => o.textContent.trim()),
+          activeText: active ? active.textContent.trim() : null,
+          groups: [...(list ? list.querySelectorAll('[role=\"group\"]') : [])]
+            .map((g) => (document.getElementById(g.getAttribute('aria-labelledby')) || {}).textContent)
+            .filter(Boolean),
+          selected: opts.filter((o) => o.getAttribute('aria-selected') === 'true')
+            .map((o) => o.textContent.trim()),
         };
       })()`);
-    ok('the phone country select is on the form', !!phoneDefault, 'not found');
-    if (phoneDefault) {
-      ok('it is set to Saudi Arabia', phoneDefault.value === 'SA', phoneDefault.value);
-      ok('it offers the full country list', phoneDefault.optionCount > 190,
-        String(phoneDefault.optionCount));
-      ok('the GCC leads the list',
-        phoneDefault.firstThree.join(',') === 'SA,AE,QA', phoneDefault.firstThree.join(','));
+
+    const cbKey = (key) => page.evaluate(`
+      (() => {
+        const el = document.querySelector('${CB}');
+        el.focus();
+        el.dispatchEvent(new KeyboardEvent('keydown', { key: '${key}', bubbles: true }));
+        return true;
+      })()`);
+
+    const cbType = (text) => page.evaluate(`
+      (() => {
+        const el = document.querySelector('${CB}');
+        const setter = Object.getOwnPropertyDescriptor(
+          window.HTMLInputElement.prototype, 'value',
+        ).set;
+        setter.call(el, '${text}');
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+        return true;
+      })()`);
+
+    const closedCb = await cbState();
+    ok('the phone country control is a combobox', !!closedCb, 'not found');
+    if (closedCb) {
+      ok('it opens on Saudi Arabia', closedCb.value === 'Saudi Arabia (+966)', closedCb.value);
+      ok('it reports collapsed before it is used', closedCb.expanded === 'false', String(closedCb.expanded));
+      ok('no list is rendered while collapsed', closedCb.count === 0, String(closedCb.count));
+    }
+
+    await cbKey('ArrowDown');
+    await new Promise((r) => setTimeout(r, 140));
+    const openedCb = await cbState();
+    if (openedCb) {
+      ok('ArrowDown opens the list', openedCb.expanded === 'true', String(openedCb.expanded));
+      ok('it lists every country', openedCb.count > 190, String(openedCb.count));
+      ok('the pinned group is labelled and first',
+        openedCb.groups[0] === 'Frequently selected' && openedCb.groups[1] === 'All countries',
+        openedCb.groups.join(' | '));
+      ok('the first rows are the GCC, each showing its name and dial code',
+        openedCb.first[0].includes('Saudi Arabia') && openedCb.first[0].includes('+966') &&
+          openedCb.first[1].includes('United Arab Emirates'),
+        openedCb.first.join(' / '));
+      ok('the current selection is marked for a screen reader',
+        openedCb.selected.some((t) => t.includes('Saudi Arabia')), openedCb.selected.join(', '));
+      ok('the active row is published as aria-activedescendant',
+        !!openedCb.activeDescendant, 'absent');
+    }
+
+    await cbType('paki');
+    await new Promise((r) => setTimeout(r, 140));
+    const byName = await cbState();
+    if (byName) {
+      ok('typing a country name filters the list', byName.count > 0 && byName.count < 10,
+        `${byName.count} rows`);
+      ok('the match is Pakistan', byName.first.join(' ').includes('Pakistan'), byName.first.join(' / '));
+    }
+
+    await cbType('+971');
+    await new Promise((r) => setTimeout(r, 140));
+    const byDial = await cbState();
+    if (byDial) {
+      ok('typing a dial code filters the list', byDial.count > 0 && byDial.count < 10,
+        String(byDial.count));
+      ok('the match is the United Arab Emirates',
+        byDial.first.join(' ').includes('United Arab Emirates'), byDial.first.join(' / '));
+    }
+
+    await cbKey('Enter');
+    await new Promise((r) => setTimeout(r, 140));
+    const committedCb = await cbState();
+    if (committedCb) {
+      ok('Enter commits the highlighted country',
+        committedCb.value === 'United Arab Emirates (+971)', committedCb.value);
+      ok('committing closes the list', committedCb.expanded === 'false', String(committedCb.expanded));
+    }
+
+    await cbKey('ArrowDown');
+    await new Promise((r) => setTimeout(r, 100));
+    await cbKey('Escape');
+    await new Promise((r) => setTimeout(r, 140));
+    const afterEscape = await cbState();
+    if (afterEscape) {
+      ok('Escape closes the list', afterEscape.expanded === 'false', String(afterEscape.expanded));
+      ok('Escape leaves the selection alone',
+        afterEscape.value === 'United Arab Emirates (+971)', afterEscape.value);
+      ok('Escape returns focus to the field',
+        await page.evaluate(`document.activeElement === document.querySelector('${CB}')`),
+        'focus went elsewhere');
+    }
+
+    // ---- /fmp two platforms, as rows ---------------------------------------
+    // Measured rather than read from the markup: the point of the change is the
+    // geometry, and \"the shorter card leaves a gap\" is a fact about boxes.
+    console.log('\n=== /fmp two platforms rows');
+    await load(page, BASE + '/fmp');
+    const platforms = await page.evaluate(`
+      (() => {
+        const heads = [...document.querySelectorAll('h3')]
+          .filter((h) => /Modeling Hub|Training Hub/.test(h.textContent));
+        if (heads.length !== 2) return { heads: heads.length };
+        const rows = heads.map((h) => h.closest('article'));
+        const box = (el) => {
+          const r = el.getBoundingClientRect();
+          return { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width), h: Math.round(r.height) };
+        };
+        const media = rows.map((r) => r.querySelector('div[style*=\"aspect-ratio\"]'));
+        return {
+          heads: 2,
+          titles: heads.map((h) => h.textContent.trim()),
+          rows: rows.map(box),
+          copyX: rows.map((r) => Math.round(r.firstElementChild.getBoundingClientRect().x)),
+          mediaX: media.map((m) => (m ? Math.round(m.getBoundingClientRect().x) : null)),
+          mediaW: media.map((m) => (m ? Math.round(m.getBoundingClientRect().width) : null)),
+          container: Math.round(rows[0].parentElement.getBoundingClientRect().width),
+        };
+      })()`);
+
+    ok('both platform rows render', platforms.heads === 2, String(platforms.heads));
+    if (platforms.heads === 2) {
+      ok('Modeling Hub comes first', platforms.titles[0] === 'Modeling Hub', platforms.titles.join(', '));
+      ok('they are stacked, not side by side',
+        platforms.rows[1].y >= platforms.rows[0].y + platforms.rows[0].h,
+        `row 1 at ${platforms.rows[0].y} height ${platforms.rows[0].h}, row 2 at ${platforms.rows[1].y}`);
+      ok('each row is the full container width',
+        platforms.rows.every((r) => Math.abs(r.w - platforms.container) <= 2),
+        `${platforms.rows.map((r) => r.w).join(', ')} vs ${platforms.container}`);
+      ok('row 1 puts its media to the right of its text',
+        platforms.mediaX[0] > platforms.copyX[0],
+        `media ${platforms.mediaX[0]}, copy ${platforms.copyX[0]}`);
+      ok('row 2 puts its media to the left of its text',
+        platforms.mediaX[1] < platforms.copyX[1],
+        `media ${platforms.mediaX[1]}, copy ${platforms.copyX[1]}`);
+      ok('the empty media slot still renders a frame',
+        platforms.mediaW.every((w) => w && w > 200), platforms.mediaW.join(', '));
+      ok('the two rows no longer share a height',
+        platforms.rows[0].h !== platforms.rows[1].h,
+        `both ${platforms.rows[0].h}px, which means they are still side by side`);
     }
 
     console.log('\n=== collection index pages in the sitemap');

@@ -1,8 +1,10 @@
 import Link from 'next/link';
 
 import { SectionContainer, SectionIntro } from '../SectionContainer';
+import { Media } from '../Media';
 import { visibleListItems } from '@/lib/public/itemVisibility';
 import { variantStyles, type PmbcVariant } from '@/lib/public/tokens';
+import { readMediaValue, type MediaValue } from '@/lib/media';
 import type { SectionMediaValue } from '@/lib/cms/sectionMedia';
 
 /**
@@ -30,7 +32,25 @@ type Card = {
   ctaLabel: string;
   ctaHref: string;
   note: string;
+  /** Per-card media, used by the rows layout. Blank renders a monogram panel. */
+  media: MediaValue;
+  mediaAlt: string;
 };
+
+/**
+ * `cards` puts them side by side, `rows` stacks them full width with the media
+ * alternating sides.
+ *
+ * Rows exist because two cards side by side are only as short as the taller
+ * one: on /fmp the Training Hub card carried fewer bullets than Modeling Hub
+ * and sat under a visible gap. Stacking removes the comparison entirely, and
+ * gives each platform the width its description was written for.
+ */
+type Layout = 'cards' | 'rows';
+
+function readLayout(raw: unknown): Layout {
+  return raw === 'rows' ? 'rows' : 'cards';
+}
 
 function s(v: unknown): string {
   return typeof v === 'string' ? v.trim() : '';
@@ -58,9 +78,23 @@ function pickCards(raw: unknown): Card[] {
         ctaLabel: s(o.cta_label),
         ctaHref: s(o.cta_href),
         note: s(o.note),
+        // Same key set and the same reader as every other media slot on the
+        // site, so an upload made in the card editor behaves identically here.
+        media: readMediaValue(o, 'media_url'),
+        mediaAlt: s(o.media_alt),
       };
     })
     .filter((c): c is Card => !!c);
+}
+
+/** Two letters for the placeholder panel, as the audience carousel does. */
+function initials(title: string): string {
+  return title
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase() ?? '')
+    .join('');
 }
 
 const isExternal = (href: string) => /^https?:\/\//i.test(href);
@@ -82,15 +116,41 @@ export function FeatureCards({
 
   const v = variantStyles(variant);
   const dark = variant === 'navy_deep';
+  const layout = readLayout(c.layout);
+
+  const intro = (
+    <SectionIntro
+      eyebrow={s(c.eyebrow)}
+      headline={s(c.heading) || s(c.headline)}
+      intro={s(c.intro)}
+      variant={variant}
+    />
+  );
+
+  if (layout === 'rows') {
+    return (
+      <SectionContainer variant={variant} styles={styles} media={media}>
+        {intro}
+        <div className="mt-12 flex flex-col gap-14 lg:gap-20">
+          {cards.map((card, i) => (
+            <FeatureRow
+              key={card.title}
+              card={card}
+              // The first row puts its media on the right and they alternate
+              // from there, so the page reads text, media, media, text down the
+              // centre line rather than repeating the same shape twice.
+              mediaLeft={i % 2 === 1}
+              variant={variant}
+            />
+          ))}
+        </div>
+      </SectionContainer>
+    );
+  }
 
   return (
     <SectionContainer variant={variant} styles={styles} media={media}>
-      <SectionIntro
-        eyebrow={s(c.eyebrow)}
-        headline={s(c.heading) || s(c.headline)}
-        intro={s(c.intro)}
-        variant={variant}
-      />
+      {intro}
 
       <div
         className={
@@ -108,41 +168,7 @@ export function FeatureCards({
               padding: '36px 32px',
             }}
           >
-            {card.code && (
-              <p
-                className="text-[11px] font-semibold uppercase"
-                style={{ letterSpacing: '0.18em', color: v.eyebrow }}
-              >
-                {card.code}
-              </p>
-            )}
-            <h3
-              className="pmbc-display mt-3 text-[26px] leading-[1.2] sm:text-[30px]"
-              style={{ color: v.text }}
-            >
-              {card.title}
-            </h3>
-
-            {card.meta.length > 0 && (
-              <ul className="mt-5 flex flex-wrap gap-2">
-                {card.meta.map((m) => (
-                  <li
-                    key={m}
-                    className="text-[11px] font-semibold uppercase"
-                    style={{
-                      letterSpacing: '0.1em',
-                      color: dark ? '#E8DDC4' : '#1B3A5F',
-                      border: `1px solid ${dark ? 'rgba(232,221,196,0.3)' : '#E8DDC4'}`,
-                      background: dark ? 'rgba(255,255,255,0.04)' : 'rgba(198,156,62,0.08)',
-                      padding: '5px 11px',
-                      borderRadius: 999,
-                    }}
-                  >
-                    {m}
-                  </li>
-                ))}
-              </ul>
-            )}
+            <CardHead card={card} variant={variant} />
 
             {card.description && (
               <p
@@ -153,22 +179,7 @@ export function FeatureCards({
               </p>
             )}
 
-            {card.bullets.length > 0 && (
-              <ul className="mt-7 flex flex-col gap-3">
-                {card.bullets.map((b) => (
-                  <li key={b} className="flex items-start gap-3">
-                    <span
-                      aria-hidden
-                      className="mt-[7px] h-[5px] w-[5px] shrink-0 rounded-full"
-                      style={{ background: dark ? '#C69C3E' : '#A88530' }}
-                    />
-                    <span className="text-[14.5px] leading-[1.6]" style={{ color: v.textMuted }}>
-                      {b}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
+            <Bullets bullets={card.bullets} variant={variant} className="mt-7" />
 
             {card.note && (
               <p
@@ -180,31 +191,215 @@ export function FeatureCards({
             )}
 
             {card.ctaLabel && card.ctaHref && (
-              <div className="mt-8 pt-2" style={{ marginTop: 'auto', paddingTop: 32 }}>
-                {isExternal(card.ctaHref) ? (
-                  <a
-                    href={card.ctaHref}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center justify-center border border-[#1B3A5F] bg-[#1B3A5F] px-7 py-3 text-[12px] font-semibold uppercase text-[#E8DDC4] transition duration-200 hover:border-[#C69C3E] hover:bg-[#C69C3E] hover:text-[#14304F]"
-                    style={{ letterSpacing: '0.12em' }}
-                  >
-                    {card.ctaLabel}
-                  </a>
-                ) : (
-                  <Link
-                    href={card.ctaHref}
-                    className="inline-flex items-center justify-center border border-[#1B3A5F] bg-[#1B3A5F] px-7 py-3 text-[12px] font-semibold uppercase text-[#E8DDC4] transition duration-200 hover:border-[#C69C3E] hover:bg-[#C69C3E] hover:text-[#14304F]"
-                    style={{ letterSpacing: '0.12em' }}
-                  >
-                    {card.ctaLabel}
-                  </Link>
-                )}
+              <div style={{ marginTop: 'auto', paddingTop: 32 }}>
+                <CardCta label={card.ctaLabel} href={card.ctaHref} />
               </div>
             )}
           </article>
         ))}
       </div>
     </SectionContainer>
+  );
+}
+
+/**
+ * The code line, the title and the metadata chips.
+ *
+ * Shared by both layouts rather than written twice, so a change to the chip
+ * treatment cannot land in one layout and not the other.
+ */
+function CardHead({ card, variant }: { card: Card; variant: PmbcVariant }) {
+  const v = variantStyles(variant);
+  const dark = variant === 'navy_deep';
+  return (
+    <>
+      {card.code && (
+        <p
+          className="text-[11px] font-semibold uppercase"
+          style={{ letterSpacing: '0.18em', color: v.eyebrow }}
+        >
+          {card.code}
+        </p>
+      )}
+      <h3
+        className="pmbc-display mt-3 text-[26px] leading-[1.2] sm:text-[30px]"
+        style={{ color: v.text }}
+      >
+        {card.title}
+      </h3>
+
+      {card.meta.length > 0 && (
+        <ul className="mt-5 flex flex-wrap gap-2">
+          {card.meta.map((m) => (
+            <li
+              key={m}
+              className="text-[11px] font-semibold uppercase"
+              style={{
+                letterSpacing: '0.1em',
+                color: dark ? '#E8DDC4' : '#1B3A5F',
+                border: `1px solid ${dark ? 'rgba(232,221,196,0.3)' : '#E8DDC4'}`,
+                background: dark ? 'rgba(255,255,255,0.04)' : 'rgba(198,156,62,0.08)',
+                padding: '5px 11px',
+                borderRadius: 999,
+              }}
+            >
+              {m}
+            </li>
+          ))}
+        </ul>
+      )}
+    </>
+  );
+}
+
+function Bullets({
+  bullets,
+  variant,
+  className = '',
+}: {
+  bullets: string[];
+  variant: PmbcVariant;
+  className?: string;
+}) {
+  if (bullets.length === 0) return null;
+  const v = variantStyles(variant);
+  const dark = variant === 'navy_deep';
+  return (
+    <ul className={`flex flex-col gap-3 ${className}`}>
+      {bullets.map((b) => (
+        <li key={b} className="flex items-start gap-3">
+          <span
+            aria-hidden
+            className="mt-[7px] h-[5px] w-[5px] shrink-0 rounded-full"
+            style={{ background: dark ? '#C69C3E' : '#A88530' }}
+          />
+          <span className="text-[14.5px] leading-[1.6]" style={{ color: v.textMuted }}>
+            {b}
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function CardCta({ label, href }: { label: string; href: string }) {
+  const cls =
+    'inline-flex items-center justify-center border border-[#1B3A5F] bg-[#1B3A5F] px-7 py-3 text-[12px] font-semibold uppercase text-[#E8DDC4] transition duration-200 hover:border-[#C69C3E] hover:bg-[#C69C3E] hover:text-[#14304F]';
+  const style = { letterSpacing: '0.12em' };
+  return isExternal(href) ? (
+    <a href={href} target="_blank" rel="noopener noreferrer" className={cls} style={style}>
+      {label}
+    </a>
+  ) : (
+    <Link href={href} className={cls} style={style}>
+      {label}
+    </Link>
+  );
+}
+
+/**
+ * One full-width row: the copy on one side, the media on the other.
+ *
+ * The split and the stacking rule are the ones the shared media layout settled
+ * on in Phase 31, deliberately: 55/45 in favour of the text from 1024px up, and
+ * the text first in the DOM so a narrow screen always leads with the words. The
+ * sides are resolved with `order` at `lg` only, which is what makes both of
+ * those true at once.
+ */
+function FeatureRow({
+  card,
+  mediaLeft,
+  variant,
+}: {
+  card: Card;
+  mediaLeft: boolean;
+  variant: PmbcVariant;
+}) {
+  const v = variantStyles(variant);
+
+  const copy = (
+    <div className={mediaLeft ? 'lg:order-2' : 'lg:order-1'}>
+      <CardHead card={card} variant={variant} />
+
+      {card.description && (
+        <p className="mt-6 text-[16px] leading-[1.75]" style={{ color: v.textMuted }}>
+          {card.description}
+        </p>
+      )}
+
+      <Bullets bullets={card.bullets} variant={variant} className="mt-7" />
+
+      {card.note && (
+        <p
+          className="mt-6 text-[13px] leading-[1.55]"
+          style={{ color: v.textMuted, fontStyle: 'italic' }}
+        >
+          {card.note}
+        </p>
+      )}
+
+      {card.ctaLabel && card.ctaHref && (
+        <div className="mt-8">
+          <CardCta label={card.ctaLabel} href={card.ctaHref} />
+        </div>
+      )}
+    </div>
+  );
+
+  const frame = (
+    <div className={mediaLeft ? 'lg:order-1' : 'lg:order-2'}>
+      <div
+        className="relative overflow-hidden"
+        style={{
+          border: `1px solid ${v.cardBorder}`,
+          // A fixed aspect box rather than a natural height. The slots are empty
+          // today, and a frame that collapses to nothing would make the row read
+          // as a text block with a stray border until someone uploads.
+          aspectRatio: '4 / 3',
+        }}
+      >
+        {card.media.url ? (
+          <Media
+            src={card.media.url}
+            alt={card.mediaAlt || card.title}
+            mediaType={card.media.mediaType}
+            posterUrl={card.media.posterUrl}
+            autoplay={card.media.autoplay}
+            loop={card.media.loop}
+            controls={card.media.controls}
+            fill
+            sizes="(min-width: 1024px) 45vw, 100vw"
+            className="object-cover"
+          />
+        ) : (
+          // Same placeholder as an audience carousel card with no image yet: a
+          // monogram panel, so an unfilled slot looks deliberate rather than
+          // broken, and the row keeps the shape it will have once filled.
+          <div
+            className="flex h-full w-full items-center justify-center"
+            style={{
+              background:
+                'radial-gradient(ellipse at 50% 35%, #1F4269 0%, #1B3A5F 60%, #14304F 100%)',
+            }}
+          >
+            <span className="pmbc-display text-[44px]" style={{ color: '#C69C3E' }}>
+              {initials(card.title)}
+            </span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  return (
+    <article
+      className={
+        'grid items-center gap-10 lg:gap-16 ' +
+        (mediaLeft ? 'lg:grid-cols-[45fr_55fr]' : 'lg:grid-cols-[55fr_45fr]')
+      }
+    >
+      {copy}
+      {frame}
+    </article>
   );
 }

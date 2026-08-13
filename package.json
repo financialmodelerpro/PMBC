@@ -44,7 +44,8 @@
     "seed-fmp-certification-line": "node scripts/seed-fmp-certification-line.mjs",
     "verify-page-rhythm": "node scripts/verify-page-rhythm.mjs",
     "seed-email-branding": "node scripts/seed-email-branding.mjs",
-    "verify-contact-and-legal": "node scripts/verify-contact-and-legal.mjs"
+    "verify-contact-and-legal": "node scripts/verify-contact-and-legal.mjs",
+    "seed-fmp-two-platforms": "node scripts/seed-fmp-two-platforms.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

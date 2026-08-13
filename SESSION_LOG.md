@@ -4,6 +4,30 @@ Chronological build history for the PMBC website. Split out of `CLAUDE.md` to ke
 
 ---
 
+### 2026-08-13, Phase 43: searchable country combobox, /fmp platforms as full-width rows
+
+Two changes, both fixing something shipped earlier the same day.
+
+**The country control, and what was actually wrong with it.** Phase 42 replaced a seven-item list with all 206 countries in a native `<select>`, showing the ISO code and the dial code: "AF +93, AL +355, DZ +213, AD +376". That list was alphabetical by country name, but the name was the one thing it did not show, so the order was invisible and it read as random.
+
+Worth separating the two complaints, because only one of them is about sorting. Putting the name on every row fixes the ordering by making it legible, and no re-sort was needed. Being able to type is a separate requirement that a native select cannot meet at all, which is what forced a custom combobox.
+
+Matching is loose across three fields on purpose. Someone reaching for this control knows the country name, or the dial code, or the two-letter code, and having to work out which one the box wants is the same failure as not being able to type at all.
+
+**The keyboard contract had to be written out**, because a native select was giving it away for free and a div-based listbox gives nothing. ArrowDown opens, arrows walk, Home and End jump, Enter commits, Escape closes and returns focus without changing the selection. Tab closes and commits nothing, deliberately: committing whatever happened to be highlighted on the way past would set a value the visitor never chose. Nineteen assertions drive the real control in headless Chrome rather than reading markup, since none of this exists in the served HTML.
+
+**One layout consequence worth recording.** Showing the name next to the dial code means the closed control needs roughly 190px, and it cannot sit beside a number box in half a form row without truncating one of them. The two controls stack inside the field instead. That also surfaced a pre-existing gap: both sit inside one `<label>`, which can only name the first of them, so the number box had no accessible name until it was given its own.
+
+**The /fmp platforms block.** Training Hub sat under a visible gap between its last bullet and its CTA. The gap was not a copy problem: the CTA is pinned to the bottom of the card on purpose, and two cards in a row are only as short as the taller one, so unequal bullet counts produce it every time. Stacking removes the comparison rather than papering over it, and gives each description the width it was written for.
+
+`feature_cards` gained a `layout` key rather than a new section type, since the two differ only in arrangement. Absent or unrecognised means `cards`, so every other block of that type is untouched, and the card body was factored into shared pieces so the two layouts cannot drift apart.
+
+**The side alternation is not stored per card.** It is a property of the layout: storing it would let an operator set both rows to the same side and lose the only thing that makes rows worth having over a stack of identical shapes.
+
+**The media slots ship blank, which is the honest state.** There is no stock imagery in this repository and an invented platform screenshot would be worse than nothing. An empty slot renders the same navy monogram panel an audience carousel card shows before its image arrives, so the row already has the shape it will have once filled, and the operator can see exactly where the asset goes.
+
+---
+
 ### 2026-08-13, Phase 42: contact form country controls, branded emails, confidentiality statement
 
 Four changes. The full row is in the `CLAUDE.md` status table; this entry records the reasoning and the two things worth remembering.
