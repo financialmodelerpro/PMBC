@@ -78,6 +78,13 @@ const HOME_SCREENS_BEFORE = 10.2;
 const FOOTER_HEIGHT_BEFORE = 785;
 
 /**
+ * Footer height after that tightening but before the nine service links became
+ * one, measured the same way. The column of nine was the tallest thing left in
+ * the footer, so dropping it has to show up here.
+ */
+const FOOTER_HEIGHT_WITH_SERVICE_LIST = 453;
+
+/**
  * Routes that still render but are deliberately out of the site's structure:
  * absent from the navbar, the footer and the sitemap, and linked from nothing.
  *
@@ -394,15 +401,39 @@ async function main() {
     console.log('\n=== footer');
     await load(page, BASE + '/');
     const footerData = await page.evaluate(BANDS);
+    console.log(`  measured ${footerData.footerHeight}px at 1440x900`);
     ok(
       'the footer is shorter than it was',
       footerData.footerHeight !== null && footerData.footerHeight < FOOTER_HEIGHT_BEFORE,
       `${footerData.footerHeight}px, was ${FOOTER_HEIGHT_BEFORE}px`,
     );
     ok(
-      'the footer still lists all nine services',
-      footerData.footerLinks.filter((h) => h.startsWith('/services/')).length === 9,
-      String(footerData.footerLinks.filter((h) => h.startsWith('/services/')).length),
+      'the footer is shorter again without the service list',
+      footerData.footerHeight !== null &&
+        footerData.footerHeight < FOOTER_HEIGHT_WITH_SERVICE_LIST,
+      `${footerData.footerHeight}px, was ${FOOTER_HEIGHT_WITH_SERVICE_LIST}px`,
+    );
+    // The nine service pages are listed in full, with a summary each, on
+    // /services. Repeating them here made the footer long and told the reader
+    // nothing that page does not tell them better.
+    ok(
+      'the footer lists no individual service pages',
+      footerData.footerLinks.filter((h) => h.startsWith('/services/')).length === 0,
+      footerData.footerLinks.filter((h) => h.startsWith('/services/')).join(', '),
+    );
+    ok(
+      'the footer links to /services once',
+      footerData.footerLinks.filter((h) => h === '/services').length === 1,
+      String(footerData.footerLinks.filter((h) => h === '/services').length),
+    );
+    // Booking moved out of the Firm list and in with the other ways of reaching
+    // the firm. Which column it renders in is now content, so this asserts the
+    // link survives the move rather than asserting where a given operator has
+    // since put it.
+    ok(
+      'the footer still offers a booking link',
+      footerData.footerLinks.includes('/book'),
+      'no /book link',
     );
     // The nav rows an operator hid must not be reachable from the footer
     // either, which is the whole point of hiding them.
@@ -463,6 +494,83 @@ async function main() {
         panel.hrefs.join(', '),
       );
       ok('the toggle reports expanded', panel.expanded === 'true', String(panel.expanded));
+    }
+
+    // Row alignment. The panel fills left to right, so an item that wraps onto
+    // a second line used to make its row taller and leave the item beside it
+    // sitting in a gap. Measured twice: as it renders today, then again with an
+    // item forced to wrap, since a fix that only holds for the nine titles that
+    // happen to exist now is not a fix.
+    const ROWS = `
+      (() => {
+        const items = [...document.querySelectorAll('[data-dropdown-item]')];
+        if (!items.length) return null;
+        const rows = new Map();
+        for (const it of items) {
+          const r = it.getBoundingClientRect();
+          const key = Math.round(r.y);
+          if (!rows.has(key)) rows.set(key, []);
+          rows.get(key).push(Math.round(r.height));
+        }
+        const heights = [...rows.values()];
+        return {
+          rowCount: rows.size,
+          // Items sharing a row must be the same height as each other, and
+          // every row must be the same height as every other row.
+          evenWithinRows: heights.every((h) => new Set(h).size === 1),
+          rowHeights: heights.map((h) => h[0]),
+          tallest: Math.max(...items.map((i) => Math.round(i.getBoundingClientRect().height))),
+        };
+      })()`;
+
+    const beforeWrap = await page.evaluate(ROWS);
+    ok('the panel rows measure', !!beforeWrap, 'no items');
+    if (beforeWrap) {
+      ok(
+        'items sharing a row have the same height',
+        beforeWrap.evenWithinRows,
+        JSON.stringify(beforeWrap.rowHeights),
+      );
+      ok(
+        'every row is the same height',
+        new Set(beforeWrap.rowHeights).size === 1,
+        JSON.stringify(beforeWrap.rowHeights),
+      );
+    }
+
+    // Force a wrap by lengthening one label in place. This is the case the fix
+    // exists for: FMP-length service names, or any title added later.
+    await page.evaluate(`
+      (() => {
+        const items = [...document.querySelectorAll('[data-dropdown-item]')];
+        const last = items[items.length - 1];
+        const span = last.querySelector('span:last-child');
+        span.textContent = 'A Deliberately Long Service Title That Has To Wrap Onto Several Lines';
+        return true;
+      })()`);
+    await new Promise((r) => setTimeout(r, 120));
+    const afterWrap = await page.evaluate(ROWS);
+    if (afterWrap && beforeWrap) {
+      ok(
+        'a wrapping item still leaves every row the same height',
+        new Set(afterWrap.rowHeights).size === 1,
+        JSON.stringify(afterWrap.rowHeights),
+      );
+      ok(
+        'a wrapping item still leaves its neighbour the same height',
+        afterWrap.evenWithinRows,
+        JSON.stringify(afterWrap.rowHeights),
+      );
+      ok(
+        'the wrap really did make the item taller',
+        afterWrap.tallest > beforeWrap.tallest,
+        `${afterWrap.tallest}px vs ${beforeWrap.tallest}px`,
+      );
+      ok(
+        'nothing wraps at the shipped titles',
+        beforeWrap.rowHeights[0] < afterWrap.rowHeights[0],
+        `${beforeWrap.rowHeights[0]}px, wrapped ${afterWrap.rowHeights[0]}px`,
+      );
     }
 
     // Escape closes it and returns focus to the toggle, which is what makes it

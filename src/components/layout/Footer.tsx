@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import Image from 'next/image';
-import { Mail, MessageCircle, MapPin } from 'lucide-react';
+import { CalendarDays, Mail, MessageCircle, MapPin } from 'lucide-react';
 
 function LinkedInIcon({ size = 14 }: { size?: number }) {
   return (
@@ -17,12 +17,16 @@ function LinkedInIcon({ size = 14 }: { size?: number }) {
   );
 }
 
-import { SERVICES } from '@/config/services';
 import type { SiteSettings } from '@/lib/cms/settings';
 import {
   DEFAULT_FOOTER_CONFIG,
   type FooterConfig,
 } from '@/lib/cms/footerSettings';
+import {
+  DEFAULT_FOOTER_LINKS,
+  footerLinksFor,
+  type FooterLink,
+} from '@/lib/cms/footerLinks';
 import { PAGE_GUTTER, PAGE_INNER } from '@/lib/public/layout';
 
 type FooterBrand = {
@@ -38,13 +42,19 @@ export function Footer({
   footerContent,
   settings,
   footerConfig = DEFAULT_FOOTER_CONFIG,
+  links = DEFAULT_FOOTER_LINKS,
 }: {
   brand: FooterBrand;
   footerContent: Record<string, string>;
   settings: SiteSettings;
   /** Logo sizing and visibility. Defaulted so any other caller keeps working. */
   footerConfig?: FooterConfig;
+  /** Navigation links and their per-link visibility, edited at /admin/footer-links. */
+  links?: FooterLink[];
 }) {
+  const firmLinks = footerLinksFor(links, 'firm');
+  const contactLinks = footerLinksFor(links, 'contact');
+
   const description =
     footerContent.description ||
     'Boutique corporate finance and transaction advisory firm serving KSA, GCC, and worldwide mandates.';
@@ -79,7 +89,7 @@ export function Footer({
         <div className={PAGE_INNER}>
         <div className="grid gap-10 md:grid-cols-12">
           {/* Brand column */}
-          <div className="md:col-span-3">
+          <div className="md:col-span-5">
             <Link href="/" className="inline-flex items-center gap-3">
               {logoSrc ? (
                 <Image
@@ -145,45 +155,33 @@ export function Footer({
             </div>
           </div>
 
-          {/* Services */}
-          <div className="md:col-span-4">
-            <FooterColumnLabel>Services</FooterColumnLabel>
-            {/* Two columns from sm up. Nine services stacked in one column was
-                the tallest element in the footer by some way, and splitting it
-                shortens the whole band without dropping a link. */}
-            <ul className="mt-4 grid gap-x-6 gap-y-2 sm:grid-cols-2">
-              {SERVICES.map((s) => (
-                <li key={s.slug}>
-                  <FooterLink href={`/services/${s.slug}`}>{s.title}</FooterLink>
-                </li>
-              ))}
-            </ul>
-          </div>
-
           {/* Firm */}
-          <div className="md:col-span-2">
-            <FooterColumnLabel>Firm</FooterColumnLabel>
-            <ul className="mt-4 space-y-2">
-              {/* Approach is deliberately absent. The nav item was hidden in
-                  Pages & Nav, and a page reachable only from the footer is
-                  neither published nor retired. The route still resolves;
-                  restoring the nav item is what brings it back. The Founder
-                  link went the same way on 2026-08-12, when that nav row was
-                  hidden too. The profile is still reached from the home founder
-                  card, which is a content link rather than navigation. */}
-              <li><FooterLink href="/network">Network</FooterLink></li>
-              <li><FooterLink href="/sectors">Sectors</FooterLink></li>
-              <li><FooterLink href="/case-studies">Case Studies</FooterLink></li>
-              <li><FooterLink href="/insights">Insights</FooterLink></li>
-              <li><FooterLink href="/team">Team</FooterLink></li>
-              <li><FooterLink href="/fmp">Financial Modeler Pro</FooterLink></li>
-              <li><FooterLink href="/contact">Contact</FooterLink></li>
-              <li><FooterLink href="/book">Book a Meeting</FooterLink></li>
-            </ul>
-          </div>
+          {/* Every entry here comes from (footer_settings, links), including
+              whether it renders at all. The nine service pages used to be
+              listed in a column of their own: /services lists all nine in full
+              with a summary each, so repeating them in the footer was the
+              longest thing in it and the least informative. One link now points
+              at the page that does the job properly.
+
+              Approach and the founder profile are absent for a different
+              reason: their nav rows were hidden in Pages & Nav, and a page
+              reachable only from the footer is neither published nor retired.
+              Both routes still resolve. */}
+          {firmLinks.length > 0 && (
+            <div className="md:col-span-3">
+              <FooterColumnLabel>Firm</FooterColumnLabel>
+              <ul className="mt-4 space-y-2">
+                {firmLinks.map((l) => (
+                  <li key={l.id}>
+                    <FooterNavLink href={l.href}>{l.label}</FooterNavLink>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           {/* Contact */}
-          <div className="md:col-span-3">
+          <div className="md:col-span-4">
             <FooterColumnLabel>Contact</FooterColumnLabel>
             <ul
               className="mt-4 space-y-2.5 text-[14px]"
@@ -234,6 +232,20 @@ export function Footer({
                   </a>
                 </li>
               )}
+              {/* Booking sits with the other ways of reaching the firm rather
+                  than in the Firm list, where it read as another page. It is
+                  the same kind of thing as the email address above it. */}
+              {contactLinks.map((l) => (
+                <li key={l.id} className="flex items-start gap-2.5">
+                  <CalendarDays size={14} className="mt-1" style={{ color: '#C69C3E' }} />
+                  <Link
+                    href={l.href}
+                    className="transition-colors duration-200 hover:text-white"
+                  >
+                    {l.label}
+                  </Link>
+                </li>
+              ))}
             </ul>
           </div>
           </div>
@@ -284,7 +296,7 @@ function FooterColumnLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
-function FooterLink({ href, children }: { href: string; children: React.ReactNode }) {
+function FooterNavLink({ href, children }: { href: string; children: React.ReactNode }) {
   return (
     <Link
       href={href}

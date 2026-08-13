@@ -157,7 +157,18 @@ export function NavDropdown({
               'grid gap-x-8 gap-y-1 p-5 ' + (columns === 2 ? 'grid-cols-2' : 'grid-cols-1')
             }
             style={{
-              minWidth: columns === 2 ? 520 : 260,
+              // Wide enough that the longest service title stays on one line.
+              // The panel is filled left to right, so a title that wraps makes
+              // its row taller and leaves the shorter item beside it sitting in
+              // a gap. Width removes the cause; `gridAutoRows: 1fr` below deals
+              // with the case anyway, so a longer title added later cannot
+              // reintroduce the ragged rows.
+              minWidth: columns === 2 ? 620 : 300,
+              // Every row takes the height of the tallest item in the panel, so
+              // items line up across the two columns whatever they contain. In
+              // an auto-height grid a `1fr` track resolves to the largest of
+              // the equal tracks, which is exactly the rule wanted here.
+              gridAutoRows: '1fr',
               background: '#FFFFFF',
               border: '1px solid rgba(198, 156, 62, 0.28)',
               boxShadow: '0 18px 48px rgba(15, 37, 64, 0.12)',

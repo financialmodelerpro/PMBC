@@ -40,6 +40,8 @@
     "seed-home-sequence": "node scripts/seed-home-sequence.mjs",
     "seed-unlink-approach": "node scripts/seed-unlink-approach.mjs",
     "seed-network-and-fmp-carousel": "node scripts/seed-network-and-fmp-carousel.mjs",
+    "seed-footer-links": "node scripts/seed-footer-links.mjs",
+    "seed-fmp-certification-line": "node scripts/seed-fmp-certification-line.mjs",
     "verify-page-rhythm": "node scripts/verify-page-rhythm.mjs"
   },
   "dependencies": {

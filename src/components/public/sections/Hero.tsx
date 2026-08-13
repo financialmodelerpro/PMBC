@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import { SectionLink } from '../SectionLink';
 import { ChevronDown } from 'lucide-react';
 
 import { RichText } from '@/components/public/RichText';
@@ -187,7 +187,7 @@ export function Hero({
         {(c.cta_label || c.cta_secondary_label) && (
           <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
             {c.cta_label && c.cta_href && (
-              <Link
+              <SectionLink
                 href={c.cta_href}
                 className={
                   'group inline-flex items-center justify-center px-8 py-3.5 text-[13px] font-semibold uppercase transition duration-200 ' +
@@ -198,10 +198,10 @@ export function Hero({
                 style={{ letterSpacing: '0.12em' }}
               >
                 {c.cta_label}
-              </Link>
+              </SectionLink>
             )}
             {c.cta_secondary_label && c.cta_secondary_href && (
-              <Link
+              <SectionLink
                 href={c.cta_secondary_href}
                 className={
                   'inline-flex items-center justify-center px-8 py-3.5 text-[13px] font-semibold uppercase transition duration-200 ' +
@@ -212,7 +212,7 @@ export function Hero({
                 style={{ letterSpacing: '0.12em' }}
               >
                 {c.cta_secondary_label}
-              </Link>
+              </SectionLink>
             )}
           </div>
         )}

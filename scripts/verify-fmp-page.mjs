@@ -102,19 +102,28 @@ async function main() {
     'FP&amp;A', 'Capital Structuring', 'Debt Sizing', 'M&amp;A Advisory',
   ];
   const present = TAGS.filter((t) => hero.includes(t));
-  ok('all eight tags render inside the hero', present.length === 8,
-    `${present.length} of 8: missing ${TAGS.filter((t) => !hero.includes(t)).join(', ')}`);
   ok('no standalone tags section remains', sections.length === 6);
-  ok('the tags are a grid, not a wrapping flex row',
-    /grid[^"]*grid-cols-2[^"]*lg:grid-cols-4/.test(hero),
-    'grid classes not found in the hero');
-  ok('the grid is centred and sized to its content', /w-fit/.test(hero));
-  ok('each tag stays on one line', /whitespace-nowrap/.test(hero));
-  // Eight across four columns is what makes the rows even rather than 5 then 3.
-  ok('the tag count fills four-column rows evenly', present.length % 4 === 0, `${present.length}`);
-  ok('the tags sit between the subtitle and the CTAs',
-    hero.indexOf('Capital Structuring') < hero.lastIndexOf('Visit Financial Modeler Pro') ||
-      !hero.includes('Visit Financial Modeler Pro'));
+
+  // The tags are optional content on the hero, so their presence is the
+  // operator's call and is reported rather than asserted. What the code owns is
+  // how they lay out once they are there, and that is only checkable when they
+  // are. Phase 36 rewrote this script for exactly this reason: asserting seeded
+  // wording had it reporting a broken page while someone was editing it.
+  if (present.length === 0) {
+    console.log('  note  the hero carries no capability tags, so the grid rules do not apply');
+  } else {
+    ok('the tags are a grid, not a wrapping flex row',
+      /grid[^"]*grid-cols-2[^"]*lg:grid-cols-4/.test(hero),
+      'grid classes not found in the hero');
+    ok('the grid is centred and sized to its content', /w-fit/.test(hero));
+    ok('each tag stays on one line', /whitespace-nowrap/.test(hero));
+    // A count divisible by four fills the four-column rows evenly rather than
+    // breaking five then three, which is what the fold was for.
+    ok('the tag count fills four-column rows evenly', present.length % 4 === 0, `${present.length}`);
+    ok('the tags sit between the subtitle and the CTAs',
+      hero.indexOf(present[present.length - 1]) < hero.lastIndexOf('Visit Financial Modeler Pro') ||
+        !hero.includes('Visit Financial Modeler Pro'));
+  }
 
   // ---- the rest of the page still renders its parts -------------------------
   console.log('\n=== the other sections still render their parts ===');
@@ -125,10 +134,26 @@ async function main() {
   ok('the audience grid renders', b.includes('WHO IT IS FOR'));
   ok('both platform cards carry a CTA to FMP',
     b.includes(`href="${FMP}/modeling"`) && b.includes(`href="${FMP}/training"`));
-  ok('both certification cards link to a course page',
-    (b.match(new RegExp(`href="${FMP.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/training/[0-9a-f-]+"`, 'g')) || []).length === 2);
-  ok('external CTAs open in a new tab',
-    (b.match(/rel="noopener noreferrer"/g) || []).length >= 4);
+  // Certification names no course and links to no course. FMP adds courses over
+  // time and this page has no way of knowing when it does, so anything it said
+  // about a specific path would go quietly out of date. It states what stays
+  // true and hands the reader to the catalogue.
+  ok('the certification band names no specific course',
+    !/3SFM|BVM|\d+ Sessions|\d+ Lessons/.test(b),
+    (b.match(/3SFM|BVM|\d+ Sessions|\d+ Lessons/g) || []).join(', '));
+  ok('no link points at an individual course',
+    (b.match(new RegExp(`href="${FMP.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/training/[0-9a-f-]+"`, 'g')) || []).length === 0);
+  ok('certification links to the course catalogue',
+    b.includes(`href="${FMP}/training"`));
+  // Every off-site link, not a fixed count of them: the count changes whenever
+  // the page's CTAs do, and the rule being checked is about all of them.
+  // `noreferrer` alone is accepted: it already implies the opener is severed,
+  // and the footer's LinkedIn link has used that form since it was written.
+  const external = (b.match(/<a[^>]+href="https?:\/\/[^"]+"[^>]*>/g) || []);
+  const bare = external.filter((a) => !/rel="[^"]*(noopener|noreferrer)/.test(a));
+  ok('every external CTA opens in a new tab',
+    external.length > 0 && bare.length === 0,
+    `${bare.length} of ${external.length} without target and rel`);
   ok('the closing CTA points at financialmodelerpro.com',
     b.includes('https://www.financialmodelerpro.com'));
 

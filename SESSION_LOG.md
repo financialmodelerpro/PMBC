@@ -4,6 +4,32 @@ Chronological build history for the PMBC website. Split out of `CLAUDE.md` to ke
 
 ---
 
+### 2026-08-13, Phase 41: the footer's links become content, dropdown row alignment, /fmp certification
+
+One commit. The full row is in the `CLAUDE.md` status table; this entry records the reasoning and the two things the verification caught.
+
+**The footer's links, and why they are a row rather than a table.** Every link in the footer was written into `Footer.tsx`. Hiding one meant a code change and a deploy, which is why three links pointing at empty collections had stayed live: nobody was going to open a pull request to hide them. They are now `(footer_settings, links)`, a single JSON array, edited at `/admin/footer-links`.
+
+A `footer_links` table would have mirrored Pages and Nav more exactly, and the reason it is not one is worth recording because it will come up again. `CREATE TABLE` is DDL, supabase-js cannot execute DDL, and this repository has no direct Postgres connection string, so migrations 031, 032 and 033 all had to be pasted into the Supabase SQL editor by hand. A visibility control that only starts working after the operator runs SQL is not a control that has been delivered. `(header_settings, nav_items)` is the standing precedent for a naturally list-shaped value in one row, so the pattern already existed. The cost is real and small: a write replaces the whole array, so one audit row covers a change rather than one per link. With one admin, last write wins is the correct behaviour rather than a compromise.
+
+The parser is deliberately forgiving, because it runs on every public page render and the value is hand-editable in `/admin/content`. A malformed entry is dropped rather than thrown, and the shipped list is used only when nothing parses at all. **An operator hiding every link is honoured, not overridden**, since those entries still parse: the fallback exists for an unreadable value, not for an empty-looking footer.
+
+Case Studies, Insights and Team ship hidden rather than deleted. Present but off means turning one on is a switch; deleted means remembering the link ever existed.
+
+**The nine service links became one, which is the change that actually shortened the footer.** They were two columns of five since Phase 40, and `/services` lists all nine with a summary each, so the footer copy was the longest thing in it and the least informative part of it. 453px to 357px measured at 1440x900, on top of Phase 40's 785 to 453.
+
+**Ragged rows in the services dropdown.** A two-line title made its grid row taller and left the item beside it sitting in a gap. Fixed at both ends rather than one: the panel widened from 520 to 620 so the longest shipped title stays on one line, and `grid-auto-rows: 1fr` makes every row take the height of the tallest item. The second half is the part that matters, since the first only holds for the nine titles that exist today. The verification forces a wrap by lengthening one label in the browser and re-measures, which is the only way to test the rule rather than the current data.
+
+**/fmp certification.** Migration 049 gave the page a band naming 3SFM and BVM with session counts, hour counts, difficulty levels and course links by UUID. Every one of those is a fact about Financial Modeler Pro's catalogue on the day it was read. FMP will add courses, and when it does this page states there are two paths when there are more, with nothing anywhere to prompt an edit. A page that cannot track what it describes should not describe it. It now states what stays true, which is that certification is free, assessed rather than attendance-based, and ends in a verifiable certificate, and hands the reader to the catalogue.
+
+**Two things the verification caught.**
+
+The first is a real bug that predates this work. `Hero` and `CtaBlock` used `next/link` for their CTAs, and `next/link` adds no target for an absolute URL, so three off-site buttons on `/fmp` dropped the reader out of the site in the same tab while the `feature_cards` CTAs beside them opened a new one. The old assertion had been counting occurrences of `rel="noopener noreferrer"` and passing on four, which the two course cards happened to supply; removing them is what exposed it. Rewritten to check every external anchor rather than a count, and fixed with a shared `SectionLink` that picks the element from the href.
+
+The second is not a bug. Four assertions in `verify-fmp-page.mjs` went red on the hero's capability tags, which the operator had removed in the page builder on 2026-08-12. Phase 36 rewrote that script precisely to stop it asserting seeded copy, and these had survived. The presence of the tags is now reported rather than asserted; the grid rules they exist to check still run whenever tags are there.
+
+---
+
 ### 2026-08-12, Phases 37 to 40: media height control, hero parity, page rhythm, home restructure, navbar dropdown
 
 Four commits across four phases. Each has a full row in the `CLAUDE.md` status table; this entry records the reasoning and the things that went wrong, which the table does not carry.
