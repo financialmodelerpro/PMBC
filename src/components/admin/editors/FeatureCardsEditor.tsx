@@ -3,6 +3,7 @@
 import { Plus, Trash2 } from 'lucide-react';
 
 import { MediaField } from '@/components/admin/MediaField';
+import { MediaHeightControl } from '@/components/admin/MediaHeightControl';
 import { ADMIN_COLORS, adminButtonGhost, adminFieldHint, adminInput, adminLabel } from '@/lib/admin/styles';
 
 import type { SectionEditorProps } from './types';
@@ -206,7 +207,7 @@ export function FeatureCardsEditor({ content, onChange }: SectionEditorProps) {
                   urlKey="media_url"
                   onChange={(p) => update(i, p as Partial<Card>)}
                   label="Media, used by the rows layout"
-                  hint="Image, GIF or video. Empty renders a monogram panel, so the row keeps its shape until you upload."
+                  hint="Image, GIF or video, framed in the gold hairline used everywhere else on the site. Empty renders a monogram panel, so the row keeps its shape until you upload."
                 />
                 <label>
                   <span style={adminLabel}>Media alt text</span>
@@ -218,6 +219,15 @@ export function FeatureCardsEditor({ content, onChange }: SectionEditorProps) {
                     style={adminInput}
                   />
                 </label>
+                {/* One ceiling per card, not one for the section. Two rows hold
+                    two different assets, and a single number would be a ceiling
+                    for whichever of them happens to be taller. */}
+                <div style={{ marginTop: 10 }}>
+                  <MediaHeightControl
+                    content={card}
+                    onChange={(p) => update(i, p as Partial<Card>)}
+                  />
+                </div>
               </div>
 
               <div style={{ display: 'grid', gap: 8, gridTemplateColumns: '1fr 1fr' }}>

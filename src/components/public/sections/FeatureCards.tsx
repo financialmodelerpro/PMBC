@@ -2,10 +2,15 @@ import Link from 'next/link';
 
 import { SectionContainer, SectionIntro } from '../SectionContainer';
 import { Media } from '../Media';
+import { MediaFrameChrome } from '../SectionMediaLayout';
 import { visibleListItems } from '@/lib/public/itemVisibility';
 import { variantStyles, type PmbcVariant } from '@/lib/public/tokens';
 import { readMediaValue, type MediaValue } from '@/lib/media';
-import type { SectionMediaValue } from '@/lib/cms/sectionMedia';
+import {
+  MEDIA_MAX_HEIGHT_KEY,
+  readMediaMaxHeight,
+  type SectionMediaValue,
+} from '@/lib/cms/sectionMedia';
 
 /**
  * Large cards carrying a description, metadata chips, a bullet list and a CTA.
@@ -35,6 +40,8 @@ type Card = {
   /** Per-card media, used by the rows layout. Blank renders a monogram panel. */
   media: MediaValue;
   mediaAlt: string;
+  /** Pixel ceiling on this card's frame. Null means the asset's own height. */
+  mediaMaxHeight: number | null;
 };
 
 /**
@@ -82,6 +89,11 @@ function pickCards(raw: unknown): Card[] {
         // site, so an upload made in the card editor behaves identically here.
         media: readMediaValue(o, 'media_url'),
         mediaAlt: s(o.media_alt),
+        // The same key, bounds and clamping as every other media ceiling on the
+        // site, read per card rather than per section: two rows sitting one
+        // above the other hold different assets, and one number covering both
+        // would be a ceiling for whichever of them is taller.
+        mediaMaxHeight: readMediaMaxHeight(o[MEDIA_MAX_HEIGHT_KEY]),
       };
     })
     .filter((c): c is Card => !!c);
@@ -346,17 +358,23 @@ function FeatureRow({
     </div>
   );
 
+  const maxHeight = card.mediaMaxHeight;
+
   const frame = (
     <div className={mediaLeft ? 'lg:order-1' : 'lg:order-2'}>
-      <div
-        className="relative overflow-hidden"
-        style={{
-          border: `1px solid ${v.cardBorder}`,
-          // A fixed aspect box rather than a natural height. The slots are empty
-          // today, and a frame that collapses to nothing would make the row read
-          // as a text block with a stray border until someone uploads.
-          aspectRatio: '4 / 3',
-        }}
+      <MediaFrameChrome
+        variant={variant}
+        // A filled slot takes the asset's own proportions, as every other framed
+        // media on the site does, and the ceiling clamps its height without
+        // cropping any of it. An empty slot has no proportions to take, so it
+        // keeps the 4:3 box that holds the row's shape until someone uploads:
+        // a frame collapsing to nothing would read as a text block with a stray
+        // gold rule beside it.
+        style={
+          card.media.url
+            ? undefined
+            : { aspectRatio: '4 / 3', maxHeight: maxHeight ?? undefined }
+        }
       >
         {card.media.url ? (
           <Media
@@ -367,9 +385,11 @@ function FeatureRow({
             autoplay={card.media.autoplay}
             loop={card.media.loop}
             controls={card.media.controls}
-            fill
-            sizes="(min-width: 1024px) 45vw, 100vw"
-            className="object-cover"
+            width={1200}
+            height={800}
+            sizes="(min-width: 1024px) 520px, 92vw"
+            className={maxHeight ? 'h-auto w-full object-contain' : 'h-auto w-full'}
+            style={maxHeight ? { maxHeight } : undefined}
           />
         ) : (
           // Same placeholder as an audience carousel card with no image yet: a
@@ -387,7 +407,7 @@ function FeatureRow({
             </span>
           </div>
         )}
-      </div>
+      </MediaFrameChrome>
     </div>
   );
 

@@ -103,8 +103,57 @@ export function SectionMediaLayout({
 }
 
 /**
- * The frame itself: PMBC's gold hairline offset from the asset, with the navy
- * accent corner used on the founder portraits, and a small-caps caption.
+ * The frame treatment on its own: the gold hairline offset from the asset, the
+ * navy accent corner used on the founder portraits, and the surface the asset
+ * sits on.
+ *
+ * Separated from `SectionMediaFrame` so a media slot that is not a shared
+ * section media value can wear the same treatment. `feature_cards` in its rows
+ * layout is the first: its per-card slot is part of the card, not of the
+ * section, so it cannot go through the frame above, and before this it was the
+ * only media on the site rendering with a plain card border. Two hand-copied
+ * frames is how the gold thread ends up two pixels apart on one page.
+ *
+ * `style` reaches the surface box rather than the outer wrapper, because the
+ * hairline is positioned against the surface and an aspect ratio or a height
+ * set anywhere else would leave it behind.
+ */
+export function MediaFrameChrome({
+  variant,
+  children,
+  style,
+}: {
+  variant: PmbcVariant;
+  children: React.ReactNode;
+  style?: React.CSSProperties;
+}) {
+  const v = variantStyles(variant);
+  const dark = variant === 'navy_deep';
+  return (
+    <div className="relative">
+      <div
+        aria-hidden
+        className="absolute -inset-2 border"
+        style={{ borderColor: '#C69C3E' }}
+      />
+      <div
+        aria-hidden
+        className="absolute -right-2 -bottom-2 h-8 w-8"
+        style={{ background: dark ? '#C69C3E' : '#1B3A5F' }}
+      />
+      <div
+        className="relative overflow-hidden"
+        style={{ background: dark ? 'rgba(255,255,255,0.04)' : v.cardBg, ...style }}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The frame itself: the chrome above, wrapped around a shared section media
+ * value, with a small-caps caption under it.
  *
  * Deliberately not an aspect-ratio box, and deliberately not width-capped. The
  * dedicated media slots crop to a fixed ratio because they are portraits and
@@ -140,42 +189,27 @@ export function SectionMediaFrame({
     // figcaption for a pull quote with no image, which is semantically correct
     // and must not be mistaken for an empty media frame.
     <figure className="relative" data-section-media={media.position}>
-      <div className="relative">
-        <div
-          aria-hidden
-          className="absolute -inset-2 border"
-          style={{ borderColor: '#C69C3E' }}
+      <MediaFrameChrome variant={variant}>
+        <Media
+          src={media.url}
+          alt={media.caption || ''}
+          mediaType={media.mediaType}
+          posterUrl={media.posterUrl}
+          autoplay={media.autoplay}
+          loop={media.loop}
+          controls={media.controls}
+          width={1200}
+          height={800}
+          sizes={sizes}
+          // `object-contain` is added only alongside a ceiling. On its own it
+          // would be inert, since without a clamped height the box already
+          // matches the asset's ratio, but adding a class to every existing
+          // frame for no effect is exactly the kind of drift that makes a
+          // later "renders identically" claim hard to check.
+          className={maxHeight ? 'h-auto w-full object-contain' : 'h-auto w-full'}
+          style={maxHeight ? { maxHeight } : undefined}
         />
-        <div
-          aria-hidden
-          className="absolute -right-2 -bottom-2 h-8 w-8"
-          style={{ background: dark ? '#C69C3E' : '#1B3A5F' }}
-        />
-        <div
-          className="relative overflow-hidden"
-          style={{ background: dark ? 'rgba(255,255,255,0.04)' : v.cardBg }}
-        >
-          <Media
-            src={media.url}
-            alt={media.caption || ''}
-            mediaType={media.mediaType}
-            posterUrl={media.posterUrl}
-            autoplay={media.autoplay}
-            loop={media.loop}
-            controls={media.controls}
-            width={1200}
-            height={800}
-            sizes={sizes}
-            // `object-contain` is added only alongside a ceiling. On its own it
-            // would be inert, since without a clamped height the box already
-            // matches the asset's ratio, but adding a class to every existing
-            // frame for no effect is exactly the kind of drift that makes a
-            // later "renders identically" claim hard to check.
-            className={maxHeight ? 'h-auto w-full object-contain' : 'h-auto w-full'}
-            style={maxHeight ? { maxHeight } : undefined}
-          />
-        </div>
-      </div>
+      </MediaFrameChrome>
       {media.caption && (
         <figcaption
           className="mt-6 text-[11px] font-semibold uppercase"
