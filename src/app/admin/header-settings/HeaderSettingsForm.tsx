@@ -14,6 +14,7 @@ import {
 } from '@/lib/admin/styles';
 import type { BrandingConfig } from '@/lib/cms/branding';
 import type { HeaderConfig } from '@/lib/cms/headerSettings';
+import { HEADER_BACKGROUNDS, headerSurface } from '@/lib/public/headerSurface';
 import {
   FOOTER_LOGO_HEIGHT_DEFAULT,
   FOOTER_LOGO_HEIGHT_MAX,
@@ -143,6 +144,7 @@ export function HeaderSettingsForm({
             header_padding_top_px: header.header_padding_top_px,
             header_padding_bottom_px: header.header_padding_bottom_px,
             header_layout: header.header_layout,
+            header_background: header.header_background,
           }),
         }),
       ];
@@ -286,7 +288,7 @@ export function HeaderSettingsForm({
               onChange={(patch) => b('logo_url', (patch.logo_url as string) ?? '')}
               bucket="cms-assets"
               label="Logo image"
-              hint="Used on the white header"
+              hint="Shown in the header. On a deep navy header the light logo set under Footer is used in its place."
               imagesOnly
             />
           </div>
@@ -583,6 +585,84 @@ export function HeaderSettingsForm({
 
       {/* ---- Header Layout ---- */}
       <Card title="Header layout">
+        <div style={{ marginBottom: 20 }}>
+          <span style={adminLabel}>Header background</span>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 6 }}>
+            {HEADER_BACKGROUNDS.map((option) => {
+              const active = header.header_background === option.value;
+              const swatch = headerSurface(option.value);
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  title={option.hint}
+                  onClick={() => h('header_background', option.value)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 9,
+                    padding: '8px 14px 8px 10px',
+                    borderRadius: 8,
+                    fontSize: 12.5,
+                    fontWeight: 700,
+                    border: `1px solid ${active ? ADMIN_COLORS.primary : ADMIN_COLORS.borderInput}`,
+                    boxShadow: active ? `inset 0 0 0 1px ${ADMIN_COLORS.primary}` : undefined,
+                    background: '#FFFFFF',
+                    color: ADMIN_COLORS.primaryDeep,
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                  }}
+                >
+                  {/* The swatch is the real surface colour, with the real link
+                      and CTA colours on it, so the choice is made by looking
+                      rather than by reading three words. */}
+                  <span
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 5,
+                      width: 58,
+                      height: 24,
+                      padding: '0 6px',
+                      borderRadius: 5,
+                      background: swatch.bg,
+                      border: `1px solid ${ADMIN_COLORS.borderInput}`,
+                    }}
+                  >
+                    <span
+                      style={{
+                        width: 20,
+                        height: 3,
+                        borderRadius: 2,
+                        background: swatch.link,
+                      }}
+                    />
+                    <span
+                      style={{
+                        width: 16,
+                        height: 10,
+                        borderRadius: 2,
+                        background: swatch.ctaBg,
+                      }}
+                    />
+                  </span>
+                  {option.label}
+                </button>
+              );
+            })}
+          </div>
+          <p style={hint}>
+            {HEADER_BACKGROUNDS.find((o) => o.value === header.header_background)?.hint}
+            {header.header_background === 'navy_deep' && !brand?.logo_dark_url && (
+              <>
+                {' '}
+                No light logo is set, so the standard one is used. Upload one under
+                Footer to give the navy header a logo that reads on it.
+              </>
+            )}
+          </p>
+        </div>
+
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14 }}>
           <PxField
             label="Header height (px)"

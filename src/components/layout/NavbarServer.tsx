@@ -78,6 +78,7 @@ export async function NavbarServer() {
        * blank, missing, or the migration has not been applied yet.
        */
       presentation={{
+        headerBackground: header.header_background,
         headerHeightPx: px(header.header_height_px),
         headerPaddingTopPx: px(header.header_padding_top_px),
         headerPaddingBottomPx: px(header.header_padding_bottom_px),

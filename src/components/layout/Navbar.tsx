@@ -1,12 +1,17 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { Menu, X } from 'lucide-react';
 
 import { PAGE_GUTTER, PAGE_INNER } from '@/lib/public/layout';
+import {
+  DEFAULT_HEADER_BACKGROUND,
+  headerSurface,
+  type HeaderBackground,
+} from '@/lib/public/headerSurface';
 import { NavDropdown, type DropdownItem } from './NavDropdown';
 
 export type NavbarBrand = {
@@ -35,6 +40,8 @@ export type NavbarDropdowns = Record<string, DropdownItem[]>;
  * zero-height header or a zero-height logo.
  */
 export type NavbarPresentation = {
+  /** The surface the header sits on. See lib/public/headerSurface.ts. */
+  headerBackground: HeaderBackground;
   headerHeightPx: number | null;
   headerPaddingTopPx: number | null;
   headerPaddingBottomPx: number | null;
@@ -51,6 +58,7 @@ export type NavbarPresentation = {
 
 /** The values the navbar shipped with before these fields were wired up. */
 const PRESENTATION_DEFAULTS: NavbarPresentation = {
+  headerBackground: DEFAULT_HEADER_BACKGROUND,
   headerHeightPx: 80,
   headerPaddingTopPx: null,
   headerPaddingBottomPx: null,
@@ -124,6 +132,13 @@ export function Navbar({
 
   const logoHeight = p.logoHeightPx ?? 40;
   const iconSize = p.iconSizePx ?? 20;
+  const surface = headerSurface(p.headerBackground);
+
+  // On a dark header the standard navy and green logo disappears into the
+  // background, so the light version is used when one has been uploaded. Left
+  // empty it falls back to the standard logo rather than to nothing, which is
+  // the same chain the footer uses.
+  const logoSrc = surface.dark ? brand.logoDarkUrl || brand.logoUrl : brand.logoUrl;
 
   // Brand placement inside the header row, driven by logo_position:
   //   left   brand, nav, actions   (default)
@@ -142,21 +157,29 @@ export function Navbar({
         ? { flex: 1, justifyContent: 'space-around' as const }
         : {};
 
-  const showWordmark = !p.logoEnabled || !brand.logoUrl;
+  const showWordmark = !p.logoEnabled || !logoSrc;
 
   return (
     <header
-      className={
-        'sticky top-0 z-40 w-full transition-all duration-200 ' +
-        (scrolled
-          ? 'bg-white/95 shadow-[0_2px_12px_rgba(15,37,64,0.06)] backdrop-blur'
-          : 'bg-white')
+      className={'sticky top-0 z-40 w-full transition-all duration-200 ' + (scrolled ? 'backdrop-blur' : '')}
+      style={
+        {
+          background: scrolled ? surface.bgScrolled : surface.bg,
+          boxShadow: scrolled ? surface.shadowScrolled : undefined,
+          borderBottom: scrolled
+            ? `1px solid ${surface.borderScrolled}`
+            : '1px solid transparent',
+          // Link colours travel to the nav items and to the dropdown trigger as
+          // inherited custom properties rather than as props. The trigger lives
+          // inside NavDropdown, which knows nothing about the header's surface
+          // and should not have to: hover and focus states are a stylesheet
+          // concern, and threading four colours through a component to set them
+          // in JavaScript would mean reimplementing :hover by hand.
+          '--pmbc-header-link': surface.link,
+          '--pmbc-header-link-active': surface.linkActive,
+          '--pmbc-header-link-muted': surface.linkMuted,
+        } as CSSProperties
       }
-      style={{
-        borderBottom: scrolled
-          ? '1px solid rgba(198, 156, 62, 0.18)'
-          : '1px solid transparent',
-      }}
     >
       {/* Gutter outside, max width inside, matching SectionContainer exactly so
           the logo's left edge lands on the same x as the content below it. */}
@@ -190,7 +213,7 @@ export function Navbar({
           )}
           {!showWordmark ? (
             <Image
-              src={brand.logoUrl as string}
+              src={logoSrc as string}
               alt={brand.name}
               width={p.logoWidthPx ?? 160}
               height={logoHeight}
@@ -210,8 +233,8 @@ export function Navbar({
                 style={{
                   height: logoHeight,
                   width: logoHeight,
-                  background: '#1B3A5F',
-                  color: '#C69C3E',
+                  background: surface.monogramBg,
+                  color: surface.monogramText,
                   fontFamily: 'var(--font-source-serif), serif',
                   fontWeight: 600,
                   fontSize: Math.max(12, Math.round(logoHeight * 0.45)),
@@ -223,15 +246,19 @@ export function Navbar({
               {p.showBrandName && (
                 <div className="flex flex-col">
                   <span
-                    className="font-serif text-[18px] font-semibold tracking-tight text-[color:var(--pmbc-primary-deep)]"
-                    style={{ letterSpacing: '-0.01em' }}
+                    className="font-serif text-[18px] font-semibold tracking-tight"
+                    style={{ letterSpacing: '-0.01em', color: surface.wordmark }}
                   >
                     {brand.shortName}
                   </span>
                   {p.showTagline && brand.tagline && (
                     <span
-                      className="text-[11px] text-[color:var(--pmbc-muted)]"
-                      style={{ letterSpacing: '0.04em', lineHeight: 1.3 }}
+                      className="text-[11px]"
+                      style={{
+                        letterSpacing: '0.04em',
+                        lineHeight: 1.3,
+                        color: surface.tagline,
+                      }}
                     >
                       {brand.tagline}
                     </span>
@@ -269,8 +296,8 @@ export function Navbar({
                 className={
                   'pmbc-link-underline text-[13px] font-medium uppercase transition-colors duration-200 ' +
                   (active
-                    ? 'text-[color:var(--pmbc-primary)]'
-                    : 'text-[color:var(--pmbc-text)] hover:text-[color:var(--pmbc-primary)]')
+                    ? 'text-[color:var(--pmbc-header-link-active)]'
+                    : 'text-[color:var(--pmbc-header-link)] hover:text-[color:var(--pmbc-header-link-active)]')
                 }
                 style={{ letterSpacing: '0.08em' }}
               >
@@ -285,19 +312,20 @@ export function Navbar({
           {cta && (
             <Link
               href={cta.href}
-              className="hidden items-center justify-center px-5 py-2.5 text-[12px] font-semibold uppercase text-white transition-all duration-200 md:inline-flex"
+              className="hidden items-center justify-center px-5 py-2.5 text-[12px] font-semibold uppercase transition-all duration-200 md:inline-flex"
               style={{
-                background: '#1B3A5F',
+                background: surface.ctaBg,
+                color: surface.ctaText,
                 letterSpacing: '0.12em',
-                border: '1px solid #1B3A5F',
+                border: `1px solid ${surface.ctaBorder}`,
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.background = '#14304F';
-                e.currentTarget.style.borderColor = '#C69C3E';
+                e.currentTarget.style.background = surface.ctaHoverBg;
+                e.currentTarget.style.borderColor = surface.ctaHoverBorder;
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.background = '#1B3A5F';
-                e.currentTarget.style.borderColor = '#1B3A5F';
+                e.currentTarget.style.background = surface.ctaBg;
+                e.currentTarget.style.borderColor = surface.ctaBorder;
               }}
             >
               {cta.label}
@@ -309,8 +337,11 @@ export function Navbar({
               aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
               aria-expanded={mobileOpen}
               onClick={() => setMobileOpen((v) => !v)}
-              className="inline-flex h-10 w-10 items-center justify-center text-[color:var(--pmbc-primary-deep)] transition-colors duration-200 hover:text-[color:var(--pmbc-accent)] md:hidden"
-              style={{ border: '1px solid var(--pmbc-border)' }}
+              className="inline-flex h-10 w-10 items-center justify-center transition-colors duration-200 hover:text-[color:var(--pmbc-accent)] md:hidden"
+              style={{
+                color: surface.toggleText,
+                border: `1px solid ${surface.toggleBorder}`,
+              }}
             >
               {mobileOpen ? <X size={18} /> : <Menu size={18} />}
             </button>
@@ -324,8 +355,8 @@ export function Navbar({
         <div
           className="md:hidden"
           style={{
-            background: '#FAF7F2',
-            borderTop: '1px solid var(--pmbc-border-warm)',
+            background: surface.menuBg,
+            borderTop: `1px solid ${surface.menuBorder}`,
           }}
         >
           <nav className={`${PAGE_GUTTER} py-5`}>
@@ -339,7 +370,7 @@ export function Navbar({
                     href={item.href}
                     className="px-3 py-3 text-[15px] font-medium transition-colors duration-200"
                     style={{
-                      color: active ? '#1B3A5F' : '#0F1B2D',
+                      color: active ? surface.menuActiveText : surface.menuText,
                       borderLeft: active ? '2px solid #C69C3E' : '2px solid transparent',
                       paddingLeft: active ? 14 : 12,
                     }}
@@ -358,8 +389,10 @@ export function Navbar({
                           href={child.href}
                           className="px-3 py-2 text-[14px] transition-colors duration-200"
                           style={{
-                            color: isActive(child.href) ? '#1B3A5F' : '#52606B',
-                            borderLeft: '1px solid rgba(198, 156, 62, 0.35)',
+                            color: isActive(child.href)
+                              ? surface.menuActiveText
+                              : surface.menuChildText,
+                            borderLeft: `1px solid ${surface.menuChildBorder}`,
                           }}
                         >
                           {child.label}
@@ -373,9 +406,10 @@ export function Navbar({
             {cta && (
               <Link
                 href={cta.href}
-                className="mt-3 inline-flex items-center justify-center px-4 py-3 text-[12px] font-semibold uppercase text-white"
+                className="mt-3 inline-flex items-center justify-center px-4 py-3 text-[12px] font-semibold uppercase"
                 style={{
-                  background: '#1B3A5F',
+                  background: surface.ctaBg,
+                  color: surface.ctaText,
                   letterSpacing: '0.12em',
                 }}
               >

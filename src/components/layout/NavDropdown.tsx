@@ -107,10 +107,13 @@ export function NavDropdown({
           href={href}
           data-active={active ? 'true' : undefined}
           className={
+            // The header sets --pmbc-header-link and its two companions to suit
+            // whatever surface it is on, so this trigger follows the plain nav
+            // links onto a cream or navy header without knowing about either.
             'pmbc-link-underline text-[13px] font-medium uppercase transition-colors duration-200 ' +
             (active
-              ? 'text-[color:var(--pmbc-primary)]'
-              : 'text-[color:var(--pmbc-text)] hover:text-[color:var(--pmbc-primary)]')
+              ? 'text-[color:var(--pmbc-header-link-active)]'
+              : 'text-[color:var(--pmbc-header-link)] hover:text-[color:var(--pmbc-header-link-active)]')
           }
           style={{ letterSpacing: '0.08em' }}
         >
@@ -135,7 +138,7 @@ export function NavDropdown({
               });
             }
           }}
-          className="inline-flex h-6 w-5 items-center justify-center text-[color:var(--pmbc-muted)] transition-colors duration-200 hover:text-[color:var(--pmbc-primary)]"
+          className="inline-flex h-6 w-5 items-center justify-center text-[color:var(--pmbc-header-link-muted)] transition-colors duration-200 hover:text-[color:var(--pmbc-header-link-active)]"
         >
           <ChevronDown
             size={14}

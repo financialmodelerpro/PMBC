@@ -15,6 +15,15 @@
   --pmbc-surface-alt: #FAF7F2;    /* legacy alias for older callers */
   --pmbc-border: #E5E7EB;         /* cool grey border for white sections */
   --pmbc-border-warm: #E8E2D6;    /* warmer border for cream sections */
+
+  /* Header link colours. The Navbar overrides all three inline to suit the
+     background chosen in Header Settings, and the nav items and the dropdown
+     trigger read them rather than the brand tokens above, so both follow the
+     header onto cream or navy. Declared here so the values are never undefined
+     if the navbar is ever rendered outside that wrapper. */
+  --pmbc-header-link: #0F1B2D;
+  --pmbc-header-link-active: #1B3A5F;
+  --pmbc-header-link-muted: #6B7280;
 }
 
 @theme inline {

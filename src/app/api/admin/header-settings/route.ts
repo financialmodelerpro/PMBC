@@ -49,6 +49,10 @@ const configSchema = z.object({
   header_padding_top_px: pxField.optional(),
   header_padding_bottom_px: pxField.optional(),
   header_layout: z.enum(['default', 'centered', 'spread']).optional(),
+  // An enum rather than a hex string: the header's link, CTA and mobile panel
+  // colours all follow from this one value, and they are only known to work for
+  // the three surfaces the palette owns. See lib/public/headerSurface.ts.
+  header_background: z.enum(['white', 'cream', 'navy_deep']).optional(),
 });
 
 async function handleMutation(req: Request) {
@@ -113,6 +117,7 @@ async function handleMutation(req: Request) {
   putIf('header_padding_top_px', d.header_padding_top_px);
   putIf('header_padding_bottom_px', d.header_padding_bottom_px);
   putIf('header_layout', d.header_layout);
+  putIf('header_background', d.header_background);
 
   if (d.nav_items) {
     put('nav_items', JSON.stringify(d.nav_items));

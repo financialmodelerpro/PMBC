@@ -1,4 +1,9 @@
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import {
+  DEFAULT_HEADER_BACKGROUND,
+  readHeaderBackground,
+  type HeaderBackground,
+} from '@/lib/public/headerSurface';
 
 export type NavItem = { label: string; href: string };
 
@@ -43,6 +48,11 @@ export type HeaderConfig = {
   header_padding_bottom_px: string;
   /** PMBC addition (migration 030), not one of FMP's 17 keys. */
   header_layout: HeaderLayout;
+  /**
+   * PMBC addition (migration 058). The surface the header sits on, named with
+   * the same three words the page builder uses for a section background.
+   */
+  header_background: HeaderBackground;
 };
 
 /** How nav items distribute across the header. See migration 030. */
@@ -85,6 +95,7 @@ export const DEFAULT_HEADER_CONFIG: HeaderConfig = {
   header_padding_top_px: '',
   header_padding_bottom_px: '',
   header_layout: 'default',
+  header_background: DEFAULT_HEADER_BACKGROUND,
 };
 
 function parseBool(v: string | null | undefined, fallback: boolean): boolean {
@@ -229,6 +240,7 @@ export async function fetchHeaderConfig(): Promise<HeaderConfig> {
     header_padding_top_px: str('header_padding_top_px'),
     header_padding_bottom_px: str('header_padding_bottom_px'),
     header_layout: parseLayout(rows.get('header_layout')),
+    header_background: readHeaderBackground(rows.get('header_background')),
   };
 }
 
