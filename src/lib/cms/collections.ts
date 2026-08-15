@@ -68,11 +68,41 @@ export async function fetchVisibleTeam(): Promise<TeamMemberRow[]> {
       .from('team_members')
       .select('*')
       .eq('visible', true)
-      .order('display_order', { ascending: true });
+      .order('display_order', { ascending: true })
+      // Tiebreak on creation, because `display_order` defaults to 0 for every
+      // member added through the admin. Without this, two members on the same
+      // order sort arbitrarily and the page can reshuffle between renders for
+      // no reason a reader or an operator could see.
+      .order('created_at', { ascending: true });
     if (error) return [];
     return data ?? [];
   } catch {
     return [];
+  }
+}
+
+/**
+ * How many members would render on /team, without pulling their rows.
+ *
+ * Runs on every public page render (the navbar and footer both ask, so /team is
+ * offered as a destination only once it has something on it), so it is a
+ * count-only query rather than a select of the rows themselves.
+ *
+ * Returns 0 on any failure, which hides the link. That is the right way to fail:
+ * a hidden link to a populated page is a missed click, while a shown link to an
+ * empty one is a dead end for the reader.
+ */
+export async function countVisibleTeam(): Promise<number> {
+  try {
+    const supabase = createSupabaseServerClient();
+    const { count, error } = await supabase
+      .from('team_members')
+      .select('id', { count: 'exact', head: true })
+      .eq('visible', true);
+    if (error) return 0;
+    return count ?? 0;
+  } catch {
+    return 0;
   }
 }
 

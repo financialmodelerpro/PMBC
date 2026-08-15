@@ -1,6 +1,7 @@
 import { fetchBranding } from '@/lib/cms/branding';
 import { fetchHeaderConfig, DEFAULT_HEADER_CONFIG } from '@/lib/cms/headerSettings';
 import { fetchPublishedServices } from '@/lib/cms/collections';
+import { fetchSuppressedNavHrefs, isSuppressed } from '@/lib/public/collectionGates';
 import { SERVICES } from '@/config/services';
 import { Navbar, type NavbarDropdowns } from './Navbar';
 
@@ -48,11 +49,22 @@ async function servicesDropdown(): Promise<NavbarDropdowns> {
 }
 
 export async function NavbarServer() {
-  const [brandingRow, header, dropdowns] = await Promise.all([
+  const [brandingRow, header, dropdowns, suppressed] = await Promise.all([
     safeFetchBranding(),
     safeFetchHeader(),
     servicesDropdown(),
+    fetchSuppressedNavHrefs(),
   ]);
+
+  /*
+   * Drop any nav item whose page has nothing on it yet. Today that is /team,
+   * which carries a `site_pages` row so it can take its place in the menu the
+   * moment the first profile is written, without an operator having to notice.
+   *
+   * This subtracts from the operator's list and never adds to it: a row hidden
+   * in Pages & Nav was already gone before this ran.
+   */
+  const navItems = header.nav_items.filter((item) => !isSuppressed(item.href, suppressed));
 
   return (
     <Navbar
@@ -64,7 +76,7 @@ export async function NavbarServer() {
         logoUrl: brandingRow?.logo_url ?? null,
         logoDarkUrl: brandingRow?.logo_dark_url ?? null,
       }}
-      navItems={header.nav_items}
+      navItems={navItems}
       cta={
         header.show_cta && header.cta_label && header.cta_href
           ? { label: header.cta_label, href: header.cta_href }

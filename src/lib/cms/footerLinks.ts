@@ -45,9 +45,15 @@ export const FOOTER_LINK_COLUMNS: { value: FooterLinkColumn; label: string }[] =
 /**
  * What the footer renders when the stored value is missing or unreadable.
  *
- * Case Studies, Insights and Team ship hidden: all three collections are empty,
- * and a linked page that opens onto an empty state is a weaker impression than
- * no link. They are one switch from returning once there is something on them.
+ * Case Studies and Insights ship hidden: both collections are empty, and a
+ * linked page that opens onto an empty state is a weaker impression than no
+ * link. They are one switch from returning once there is something on them.
+ *
+ * Team is the exception, and ships visible. It is no longer an operator's job to
+ * remember: /team is gated on its own row count in
+ * `src/lib/public/collectionGates.ts`, so this link is withheld while the table
+ * is empty and appears the moment the first profile is published. Setting it
+ * false here still hides it for good, since the gate can only subtract.
  */
 export const DEFAULT_FOOTER_LINKS: FooterLink[] = [
   { id: 'services', label: 'Services', href: '/services', column: 'firm', visible: true },
@@ -55,7 +61,7 @@ export const DEFAULT_FOOTER_LINKS: FooterLink[] = [
   { id: 'sectors', label: 'Sectors', href: '/sectors', column: 'firm', visible: true },
   { id: 'case-studies', label: 'Case Studies', href: '/case-studies', column: 'firm', visible: false },
   { id: 'insights', label: 'Insights', href: '/insights', column: 'firm', visible: false },
-  { id: 'team', label: 'Team', href: '/team', column: 'firm', visible: false },
+  { id: 'team', label: 'Team', href: '/team', column: 'firm', visible: true },
   { id: 'fmp', label: 'Financial Modeler Pro', href: '/fmp', column: 'firm', visible: true },
   { id: 'contact', label: 'Contact', href: '/contact', column: 'firm', visible: true },
   { id: 'book', label: 'Book a Meeting', href: '/book', column: 'contact', visible: true },

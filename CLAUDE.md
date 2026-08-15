@@ -69,7 +69,7 @@ When you find an em dash in *existing* content while doing other work, fix it as
 
 ## Current Status
 
-**All 43 phases are complete except Phase 9, and everything remaining in Phase 9 is operational rather than code**: content population, counsel review, DNS, production environment variables. The public site renders on fifteen routes, the admin console is complete and at parity with FMP, and 57 migrations are applied.
+**All 44 phases are complete except Phase 9, and everything remaining in Phase 9 is operational rather than code**: content population, counsel review, DNS, production environment variables. The public site renders on sixteen routes, the admin console is complete and at parity with FMP, and 59 migrations are applied.
 
 | Phases | Date | What they left behind |
 |--------|------|-----------------------|
@@ -91,6 +91,7 @@ When you find an em dash in *existing* content while doing other work, fix it as
 | 41 | 2026-08-13 | Footer links became content with per-link visibility, the nine service links became one, Book a Meeting moved to Contact, dropdown rows evened, `/fmp` certification band replaced, empty collections dropped from the sitemap by row count. |
 | 42 | 2026-08-13 | Contact form country controls, the two transactional emails rebuilt on FMP's shell structure in PMBC's palette, and the new `/confidentiality` statement. |
 | 43 | 2026-08-13 | The phone country control became a searchable ARIA combobox, and `/fmp`'s two platforms became full-width stacked rows with media slots. |
+| 44 | 2026-08-15 | `/team` wired up: the founding partner's card seeded from the founder profile rather than retyped, the admin editor cut to the seven fields a card renders, and the navbar and footer links gated on the row count the way the sitemap already was. |
 
 **Full detail for every phase, including the reasoning and the things that went wrong, is in [`PHASE_HISTORY.md`](./PHASE_HISTORY.md).** It was split out of this file on 2026-08-13 for the reason stated at the top of it: this file is loaded into context at the start of every session, and that table had grown to 75KB.
 
@@ -193,15 +194,25 @@ Ordered by what stops a launch, not by when it was added.
 
 ### Collections, which are empty rather than broken
 
-10. **Case Studies, Insights, Team and Testimonials have no rows.** `/team`,
-    `/case-studies` and `/insights` are now fully out of the site's structure:
-    their footer links were hidden on 2026-08-13 and the same day they left the
-    sitemap. **Both halves reverse themselves as content arrives, but not the
-    same way.** The sitemap is derived from the row count, so the first entry
-    puts a page back with no code change and no decision. The footer link is an
-    operator switch in **Footer Links**, because whether a link belongs in the
-    footer is a judgment rather than a fact about the data. The routes are
-    untouched and still return 200. [user populates]
+10. **Case Studies, Insights and Testimonials have no rows.** `/case-studies`
+    and `/insights` are out of the site's structure: their footer links were
+    hidden on 2026-08-13 and the same day they left the sitemap. **Both halves
+    reverse themselves as content arrives, but not the same way.** The sitemap is
+    derived from the row count, so the first entry puts a page back with no code
+    change and no decision. The footer link is an operator switch in **Footer
+    Links**. The routes are untouched and still return 200. [user populates]
+
+    > **Team is no longer one of them.** Phase 44 wired `/team` up: it carries
+    > the founding partner's card, a nav row and a visible footer link, and both
+    > links are gated on the row count rather than left as a switch someone has
+    > to remember. It holds one member, so **the page is live but thin.** Adding
+    > the analytical bench is content work, not code. Note that the seeded card
+    > deliberately keeps a short experience paragraph, since it links through to
+    > the full profile.
+    >
+    > That gate is now the pattern to copy if Case Studies or Insights are ever
+    > turned on: one line each in `fetchSuppressedNavHrefs`, and their footer
+    > links can then ship visible like Team's.
 
     > Testimonials was not empty only because nobody had written any: **the form
     > could not save one.** `testimonials` is the only collection table without
@@ -686,6 +697,7 @@ Three flags matter when rebuilding:
 056  email_branding_and_templates  signature, footer, and both transactional emails rebuilt
 057  fmp_two_platforms_rows    the two platforms become full-width rows with media slots
 058  header_background         (header_settings, header_background). white | cream | navy_deep
+059  team_page                 the founding partner's card, derived from the founder profile, plus the footer link and the nav row
 ```
 
 After running migrations, manually insert one admin_users row via SQL with a bcrypt hash for the password.
@@ -806,6 +818,7 @@ Editors should:
 | `/network` | network | Sky Gulf and Lynkers detail. Why the network matters. |
 | `/about/ahmad-din` | about-ahmad-din | Founder profile. Nine CMS sections mirroring the structure of FMP's page of the same path. |
 | `/fmp` | financial-modeler-pro | The platform arm in full: hero with capability tags, what FMP is, who it is for (an `audience_carousel` since migration 053), the Modeling and Training Hubs, a short certification statement with a CTA to the FMP course catalogue (migration 055 removed the band that named 3SFM and BVM: their session counts, hour counts and course UUIDs are facts about FMP's catalogue that this page cannot track), CTA. **Moved from `/financial-modeler-pro`, which 301s here** (migration 049). The three sub-pages beneath the old path are retained, unlinked and out of the sitemap. |
+| `/team` | (none) | The firm's people, fed entirely by the `team_members` table rather than by `page_sections`. The founding partner leads the page in a wider card carrying the gold-framed portrait, and links through to `/about/ahmad-din` rather than repeating the bio that already lives there; everyone else follows in the three-up card grid the other collection pages use. Which member is the founder is not hardcoded: `src/lib/cms/founderProfile.ts` asks the profile page's own `founder_hero` section for the name, so a rename in the page builder moves the match with it. **Offered in the navbar and footer only while a member is published** (see `src/lib/public/collectionGates.ts`), the same row-count test the sitemap has used since 2026-08-13. |
 | `/contact` | contact | Contact form, direct contact info |
 | `/book` | book | Booking page. CMS hero plus a Calendly inline embed reading `site_settings.booking_url`. Deliberately not in the top nav (footer and CTAs only). |
 | `/privacy` | privacy | Privacy policy (static, hardcoded for v1) |
@@ -831,7 +844,7 @@ export const SERVICES = [
 
 ### Navigation
 
-Top nav (desktop), as live: Services, Sectors, Network, Financial Modeler Pro, Contact. **Services opens a dropdown** listing all nine service pages in two columns (`NavDropdown`, added 2026-08-12); the parent still links to /services, and below the navbar breakpoint the nine are listed under it inside the mobile menu. The **Approach** and **Founder** rows are still in `site_pages` with `visible = false`, so both are one switch from returning.
+Top nav (desktop), as live: Services, Sectors, Network, Financial Modeler Pro, Team, Contact. **Team is conditional**: its `site_pages` row is visible, but `NavbarServer` drops it while no team member is published, so it appears and disappears with the collection rather than with an operator's memory. **Services opens a dropdown** listing all nine service pages in two columns (`NavDropdown`, added 2026-08-12); the parent still links to /services, and below the navbar breakpoint the nine are listed under it inside the mobile menu. The **Approach** and **Founder** rows are still in `site_pages` with `visible = false`, so both are one switch from returning.
 Top nav (mobile): hamburger menu with same items
 Persistent CTA in nav: "Book a Meeting", linking to /book (repointed by migration 039).
 
@@ -841,7 +854,7 @@ Persistent CTA in nav: "Book a Meeting", linking to /book (repointed by migratio
 
 Footer columns, three since 2026-08-13:
 - **Brand**: short PMBC description, tagline
-- **Firm**: every link is a row in `(footer_settings, links)` and is editable at `/admin/footer-links`, including whether it renders. Shipped visible: Services, Network, Sectors, Financial Modeler Pro, Contact. Shipped hidden: Case Studies, Insights, Team, since all three collections are empty and a link onto an empty state is a weaker impression than no link. The nine service pages used to have a column of their own and are now one Services link, because `/services` lists all nine with a summary each. Approach and Founder were removed on 2026-08-12 when their nav rows were hidden, and are absent from the seeded list rather than hidden in it.
+- **Firm**: every link is a row in `(footer_settings, links)` and is editable at `/admin/footer-links`, including whether it renders. Shipped visible: Services, Network, Sectors, Financial Modeler Pro, Team, Contact. Shipped hidden: Case Studies and Insights, since both collections are empty and a link onto an empty state is a weaker impression than no link. **Team ships visible but is gated**, so it is withheld while `team_members` has no published row and returns on its own; setting it hidden in Footer Links still wins, because the gate can only subtract. The nine service pages used to have a column of their own and are now one Services link, because `/services` lists all nine with a summary each. Approach and Founder were removed on 2026-08-12 when their nav rows were hidden, and are absent from the seeded list rather than hidden in it.
 - **Contact**: email, WhatsApp, location, LinkedIn, then any link whose `column` is `contact`. Book a Meeting is seeded there: it is a way of reaching the firm, like the address above it, rather than another page in the Firm list.
 - **Legal**, in the bottom strip: Privacy, Terms, Confidentiality. Not editable in Footer Links, by design: a switch that can hide a privacy policy by accident is a switch worth not having.
 

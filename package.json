@@ -46,7 +46,8 @@
     "seed-email-branding": "node scripts/seed-email-branding.mjs",
     "verify-contact-and-legal": "node scripts/verify-contact-and-legal.mjs",
     "seed-fmp-two-platforms": "node scripts/seed-fmp-two-platforms.mjs",
-    "seed-header-background": "node scripts/seed-header-background.mjs"
+    "seed-header-background": "node scripts/seed-header-background.mjs",
+    "seed-team-page": "node scripts/seed-team-page.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
