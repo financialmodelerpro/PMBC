@@ -49,7 +49,8 @@
     "seed-header-background": "node scripts/seed-header-background.mjs",
     "seed-team-page": "node scripts/seed-team-page.mjs",
     "verify-container-widths": "node scripts/verify-container-widths.mjs",
-    "seed-logo-trim": "node scripts/seed-logo-trim.mjs"
+    "seed-logo-trim": "node scripts/seed-logo-trim.mjs",
+    "seed-home-content-pass": "node scripts/seed-home-content-pass.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

@@ -23,6 +23,17 @@ type FounderContent = {
   cta_secondary_href: string;
   /** Short proof points, shown as a gold-ticked list under the bio. */
   credentials: string[];
+  /**
+   * A line above the proof points saying whose record they are.
+   *
+   * These are career figures, largely earned in senior roles before and
+   * alongside PaceMakers, and they sit on a page that also carries the firm's
+   * own track record. Two sets of numbers on one page with nothing separating
+   * them invites a reader to add them together, which is the specific confusion
+   * migration 044 was written to undo. The stats block above already carries the
+   * other half of the same sentence, and this is its counterpart.
+   */
+  credentials_label: string;
   layout: 'image_left' | 'image_right';
 };
 
@@ -48,6 +59,7 @@ function pick(c: Record<string, unknown>): FounderContent {
     credentials: Array.isArray(c.credentials)
       ? c.credentials.map((i) => (typeof i === 'string' ? i : '')).filter(Boolean)
       : [],
+    credentials_label: s(c.credentials_label),
     layout,
   };
 }
@@ -178,8 +190,22 @@ export function FounderBlock({
           {/* Proof points, mirroring FMP's home founder card. Capped at five:
               this is a summary card, and the full list lives on the founder
               profile page. */}
+          {c.credentials.length > 0 && c.credentials_label && (
+            <p
+              className="mt-6 text-[13px] leading-[1.6]"
+              // Muted and small, because it is a caption on the list rather than
+              // a claim of its own. Not faded further: the whole point is that a
+              // reader takes it in before the numbers, so it has to be readable
+              // at a glance rather than merely present.
+              style={{ color: v.textMuted }}
+            >
+              {c.credentials_label}
+            </p>
+          )}
           {c.credentials.length > 0 && (
-            <ul className="mt-6 flex flex-col gap-2.5">
+            <ul
+              className={`${c.credentials_label ? 'mt-3' : 'mt-6'} flex flex-col gap-2.5`}
+            >
               {c.credentials.slice(0, 5).map((item) => (
                 <li key={item} className="flex items-start gap-3">
                   <span aria-hidden className="mt-[2px] shrink-0 text-[13px] text-[#C69C3E]">

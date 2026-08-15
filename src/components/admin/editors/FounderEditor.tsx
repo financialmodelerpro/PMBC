@@ -27,6 +27,7 @@ export function FounderEditor({ content, onChange }: SectionEditorProps) {
   const credentials = Array.isArray(content.credentials)
     ? content.credentials.map((i) => (typeof i === 'string' ? i : ''))
     : [];
+  const credentials_label = s(content.credentials_label);
 
   const update = (patch: Record<string, unknown>) => {
     const { bio: _legacy, title: _legacyTitle, ...rest } = content;
@@ -43,6 +44,7 @@ export function FounderEditor({ content, onChange }: SectionEditorProps) {
       cta_secondary_label,
       cta_secondary_href,
       credentials,
+      credentials_label,
       layout,
       ...patch,
     });
@@ -89,6 +91,19 @@ export function FounderEditor({ content, onChange }: SectionEditorProps) {
           minHeight={200}
         />
       </div>
+
+      {/* Says whose record the proof points are. They are career figures rather
+          than firm figures, and the home page carries both, so the counterpart
+          of the stats block's own note belongs here. Renders only when there is
+          at least one proof point. */}
+      <Field label="Proof points label">
+        <input
+          style={adminInput}
+          value={credentials_label}
+          onChange={(e) => update({ credentials_label: e.target.value })}
+          placeholder="The partner's career record, distinct from the firm's."
+        />
+      </Field>
 
       {/* Proof points under the bio, mirroring FMP's home founder card. The
           renderer shows at most five; this is a summary, and the full list

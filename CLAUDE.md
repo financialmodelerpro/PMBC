@@ -69,7 +69,7 @@ When you find an em dash in *existing* content while doing other work, fix it as
 
 ## Current Status
 
-**All 45 phases are complete except Phase 9, and everything remaining in Phase 9 is operational rather than code**: content population, counsel review, DNS, production environment variables. The public site renders on sixteen routes, the admin console is complete and at parity with FMP, and 60 migrations are applied.
+**All 46 phases are complete except Phase 9, and everything remaining in Phase 9 is operational rather than code**: content population, counsel review, DNS, production environment variables. The public site renders on sixteen routes, the admin console is complete and at parity with FMP, and 61 migrations are applied.
 
 | Phases | Date | What they left behind |
 |--------|------|-----------------------|
@@ -93,6 +93,7 @@ When you find an em dash in *existing* content while doing other work, fix it as
 | 43 | 2026-08-13 | The phone country control became a searchable ARIA combobox, and `/fmp`'s two platforms became full-width stacked rows with media slots. |
 | 44 | 2026-08-15 | `/team` wired up: the founding partner's card seeded from the founder profile rather than retyped, the admin editor cut to the seven fields a card renders, and the navbar and footer links gated on the row count the way the sitemap already was. |
 | 45 | 2026-08-15 | The navbar container measured rather than assumed (it was correct), the nav given room after Team filled the row, then the two logo files trimmed of the transparent margins that were the real cause of the indent, with all five dependent heights retuned. |
+| 46 | 2026-08-15 | Home content pass: the count that did not match its list, the founder proof points labelled as career rather than firm figures, the four generic verbs replaced with how the work is actually run, one call to action per section, and one label for the booking action. |
 
 **Full detail for every phase, including the reasoning and the things that went wrong, is in [`PHASE_HISTORY.md`](./PHASE_HISTORY.md).** It was split out of this file on 2026-08-13 for the reason stated at the top of it: this file is loaded into context at the start of every session, and that table had grown to 75KB.
 
@@ -140,8 +141,14 @@ Ordered by what stops a launch, not by when it was added.
 
 4. **Content pass over the whole site on a deployed build.** Thirteen phases of
    copy shipped between 2026-08-10 and 2026-08-13 (migrations 044 to 057) and
-   none of it has been read end to end anywhere but locally. Three specific
-   things to look at first:
+   none of it has been read end to end anywhere but locally.
+
+   **Home has now had one** (migration 061, 2026-08-15): a count that did not
+   match the list under it, the founder proof points labelled as the partner's
+   career record rather than the firm's, the four generic process verbs replaced
+   with how the work is actually run, and the page's eight calls to action cut to
+   five, one per section with two kept only in the hero. **The other pages have
+   not**, and the three items below still stand:
    - **Home is materially different.** What-we-do moved below the firm track
      record and lost its six service cards, firm credentials was deleted as a
      duplicate of the stats block above it, who-we-serve became a carousel, and
@@ -700,6 +707,7 @@ Three flags matter when rebuilding:
 058  header_background         (header_settings, header_background). white | cream | navy_deep
 059  team_page                 the founding partner's card, derived from the founder profile, plus the footer link and the nav row
 060  logo_trim                 the two logo files trimmed of their transparent margins, and the five heights that depended on the old aspect ratio
+061  home_content_pass         the count that did not match its list, the founder proof points labelled, the engagement model rewritten, one CTA per section
 ```
 
 After running migrations, manually insert one admin_users row via SQL with a bcrypt hash for the password.
