@@ -69,7 +69,7 @@ When you find an em dash in *existing* content while doing other work, fix it as
 
 ## Current Status
 
-**All 46 phases are complete except Phase 9, and everything remaining in Phase 9 is operational rather than code**: content population, counsel review, DNS, production environment variables. The public site renders on sixteen routes, the admin console is complete and at parity with FMP, and 61 migrations are applied.
+**All 47 phases are complete except Phase 9, and everything remaining in Phase 9 is operational rather than code**: content population, counsel review, DNS, production environment variables. The public site renders on sixteen routes, the admin console is complete and at parity with FMP, and 62 migrations are applied.
 
 | Phases | Date | What they left behind |
 |--------|------|-----------------------|
@@ -94,6 +94,7 @@ When you find an em dash in *existing* content while doing other work, fix it as
 | 44 | 2026-08-15 | `/team` wired up: the founding partner's card seeded from the founder profile rather than retyped, the admin editor cut to the seven fields a card renders, and the navbar and footer links gated on the row count the way the sitemap already was. |
 | 45 | 2026-08-15 | The navbar container measured rather than assumed (it was correct), the nav given room after Team filled the row, then the two logo files trimmed of the transparent margins that were the real cause of the indent, with all five dependent heights retuned. |
 | 46 | 2026-08-15 | Home content pass: the count that did not match its list, the founder proof points labelled as career rather than firm figures, the four generic verbs replaced with how the work is actually run, one call to action per section, and one label for the booking action. |
+| 47 | 2026-08-15 | The home founder card rewritten to say who Ahmad is and what he brings, rather than restating the delivery model the firm introduction had already given the reader two screens earlier. |
 
 **Full detail for every phase, including the reasoning and the things that went wrong, is in [`PHASE_HISTORY.md`](./PHASE_HISTORY.md).** It was split out of this file on 2026-08-13 for the reason stated at the top of it: this file is loaded into context at the start of every session, and that table had grown to 75KB.
 
@@ -157,11 +158,14 @@ Ordered by what stops a launch, not by when it was added.
      on 2026-08-11 and holds four items rather than the six seeded, one reading
      "Structured Excel and investor PDF export", which looks like a slip
      mid-edit.
-   - **Home says the same thing twice.** The firm introduction ("the partner
-     wins the engagement, leads it, and reviews every deliverable personally")
-     and the founder card's first bio paragraph restate each other. Flagged at
-     the time and left rather than edited, because trimming it meant rewriting
-     copy a brief had asked to restore verbatim. [user reviews; assistant edits]
+   - ~~**Home says the same thing twice.**~~ **Fixed** by migration 062. The
+     firm introduction keeps the delivery model, since it is the firm's own
+     paragraph and reaches the reader first, and the founder card was rewritten
+     to say who Ahmad is and what he brings to a mandate. The card's heading and
+     eyebrow moved with the body: "Every mandate is partner-led" over
+     "PARTNER-LED DELIVERY" was the same claim a third time, in the largest type
+     on the card, so cutting it from the paragraph alone would have fixed the
+     prose and kept the repetition.
 
 5. **The 2026-06-21 enquiry still has no reply recorded.** Leslie Merricroft,
    Al-Mashrea Law Firm, in `/admin/contact-submissions`. Opened but not marked
@@ -708,6 +712,7 @@ Three flags matter when rebuilding:
 059  team_page                 the founding partner's card, derived from the founder profile, plus the footer link and the nav row
 060  logo_trim                 the two logo files trimmed of their transparent margins, and the five heights that depended on the old aspect ratio
 061  home_content_pass         the count that did not match its list, the founder proof points labelled, the engagement model rewritten, one CTA per section
+062  home_founder_card_body    the founder card stops restating the firm introduction's delivery model
 ```
 
 After running migrations, manually insert one admin_users row via SQL with a bcrypt hash for the password.
