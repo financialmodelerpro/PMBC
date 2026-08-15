@@ -69,7 +69,7 @@ When you find an em dash in *existing* content while doing other work, fix it as
 
 ## Current Status
 
-**All 44 phases are complete except Phase 9, and everything remaining in Phase 9 is operational rather than code**: content population, counsel review, DNS, production environment variables. The public site renders on sixteen routes, the admin console is complete and at parity with FMP, and 59 migrations are applied.
+**All 45 phases are complete except Phase 9, and everything remaining in Phase 9 is operational rather than code**: content population, counsel review, DNS, production environment variables. The public site renders on sixteen routes, the admin console is complete and at parity with FMP, and 60 migrations are applied.
 
 | Phases | Date | What they left behind |
 |--------|------|-----------------------|
@@ -92,6 +92,7 @@ When you find an em dash in *existing* content while doing other work, fix it as
 | 42 | 2026-08-13 | Contact form country controls, the two transactional emails rebuilt on FMP's shell structure in PMBC's palette, and the new `/confidentiality` statement. |
 | 43 | 2026-08-13 | The phone country control became a searchable ARIA combobox, and `/fmp`'s two platforms became full-width stacked rows with media slots. |
 | 44 | 2026-08-15 | `/team` wired up: the founding partner's card seeded from the founder profile rather than retyped, the admin editor cut to the seven fields a card renders, and the navbar and footer links gated on the row count the way the sitemap already was. |
+| 45 | 2026-08-15 | The navbar container measured rather than assumed (it was correct), the nav given room after Team filled the row, then the two logo files trimmed of the transparent margins that were the real cause of the indent, with all five dependent heights retuned. |
 
 **Full detail for every phase, including the reasoning and the things that went wrong, is in [`PHASE_HISTORY.md`](./PHASE_HISTORY.md).** It was split out of this file on 2026-08-13 for the reason stated at the top of it: this file is loaded into context at the start of every session, and that table had grown to 75KB.
 
@@ -698,6 +699,7 @@ Three flags matter when rebuilding:
 057  fmp_two_platforms_rows    the two platforms become full-width rows with media slots
 058  header_background         (header_settings, header_background). white | cream | navy_deep
 059  team_page                 the founding partner's card, derived from the founder profile, plus the footer link and the nav row
+060  logo_trim                 the two logo files trimmed of their transparent margins, and the five heights that depended on the old aspect ratio
 ```
 
 After running migrations, manually insert one admin_users row via SQL with a bcrypt hash for the password.
@@ -1145,7 +1147,9 @@ Decision pending on serif choice: present both during build phase. Both load via
 
   **Check this by measuring, not by reading.** `npm run verify-container-widths` drives headless Chrome over `/`, `/team`, `/services`, `/contact`, `/fmp`, `/sectors` and `/network` at 1440 and 1920, and asserts that every container in the header, the sections and the footer reports the same left edge and the same width. Which constants a file imports does not settle where the pixels land. It also asserts that the desktop nav does not close up against the CTA: the header container is capped at 1200px, so the room the nav has is fixed above 1248px, and adding one nav item too many silently spends it. Adding Team on 2026-08-15 left a 1px gap, which is why the nav gap went from `gap-9` to `gap-6` and the actions group gained `md:ml-6` as a floor. There is now 43px.
 
-  **A flush container does not guarantee a flush logo.** The brand box can start exactly on the container edge while the logo still looks indented, because the padding is inside the PNG. The current file is 7033x2239 with 493px of transparent pixels on its left, which is 22px of dead space at the rendered width, and it is also only 52% ink vertically. No CSS can see or correct that. The fix is to trim the file and re-upload it in Header Settings, remembering that trimming changes the aspect ratio, so `logo_height_px` (and the footer's own logo height from migration 040) need retuning to keep the mark the same visual size. The same asset feeds the footer, the OG card and the email header, which is why it is worth doing once at the source.
+  **A flush container does not guarantee a flush logo.** The brand box can start exactly on the container edge while the mark still looks indented, because the padding is inside the PNG and CSS cannot see transparent pixels. That is what was actually wrong: the two logo files carried roughly 490px of transparent margin down their left edges and were only 52.5% ink vertically, which put 22px of dead space before the mark. **Migration 060 fixed it at the source**, and the rule it leaves behind is that a logo file must be trimmed before it is uploaded.
+
+  **If the logo is ever replaced, five numbers move with it.** Every surface sizes this asset by height and lets the width follow, so a new file with a different aspect ratio silently resizes the mark everywhere. `logo_height_px` and `header_height_px` in Header Settings, `footer_logo_height_px` in the footer, the `width`/`height` pair in `src/app/api/og/route.tsx`, and the `height` attribute plus `max-height` in `src/lib/email/templates/_base.ts`. The email needs both halves because Outlook honours the attribute and ignores much of the style. `npm run seed-logo-trim` re-inspects the live files and reports what it would remove, so it is also the quickest way to check whether a newly uploaded logo carries padding.
 - Section vertical padding: 96px desktop, 80px tablet, 64px mobile, via `SECTION_PADDING` in `src/lib/public/layout.ts`. The shipped value had drifted to `lg:py-32` (128px) and was brought back to the documented 96px in Phase 38. Heroes are separate: `HERO_FRAME` in the same file, 70vh with `py-16`, shared by `hero`, `PageHeroFallback` and `founder_hero`
 - Inner block padding: 32px
 - Card radius: 8px (less rounded than FMP's 12-16px to feel more institutional)

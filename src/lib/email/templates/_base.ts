@@ -98,8 +98,19 @@ export async function baseLayoutBranded(content: string): Promise<string> {
     String(new Date().getFullYear()),
   );
 
+  /*
+   * 22px rather than 42px.
+   *
+   * The brand logo files carried transparent margins until migration 060, and
+   * were only 52.5% ink vertically, so a 42px box drew a 22px mark. Now that
+   * the files are trimmed the box is the mark, and 22px keeps the header band
+   * looking exactly as it does today. Both the attribute and the max-height
+   * move together: Outlook honours the attribute and ignores much of the style,
+   * so leaving one at 42 would render the logo at twice the intended size in
+   * the client least able to cope with it.
+   */
   const headerInner = logo
-    ? `<img src="${escapeHtml(logo)}" alt="${escapeHtml(brandName)}" height="42" style="display:block;margin:0 auto;border:0;outline:none;max-height:42px;" />`
+    ? `<img src="${escapeHtml(logo)}" alt="${escapeHtml(brandName)}" height="22" style="display:block;margin:0 auto;border:0;outline:none;max-height:22px;" />`
     : `<div style="font-family:${SERIF};font-size:20px;font-weight:600;color:#ffffff;letter-spacing:0.01em;">${escapeHtml(brandName)}</div>`;
 
   return `<!DOCTYPE html>

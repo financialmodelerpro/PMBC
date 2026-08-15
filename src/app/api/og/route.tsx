@@ -4,7 +4,7 @@ import { fetchBranding } from '@/lib/cms/branding';
 import { loadGoogleFont } from '@/lib/og/fonts';
 
 export const runtime = 'nodejs';
-// OG cards are dynamic — driven by query params and branding config.
+// OG cards are dynamic, driven by query params and branding config.
 export const dynamic = 'force-dynamic';
 
 const WIDTH = 1200;
@@ -67,7 +67,7 @@ export async function GET(req: Request) {
   try {
     const branding = await fetchBranding();
     if (branding) {
-      // Use the deeper navy if primary is the lighter brand navy — gives
+      // Use the deeper navy if primary is the lighter brand navy, which gives
       // OG cards more contrast than the in-page primary.
       primary = branding.primary_color || FALLBACK_NAVY;
       if (primary.toLowerCase() === '#1b3a5f') primary = '#0F2540';
@@ -77,7 +77,7 @@ export async function GET(req: Request) {
       logoUrl = branding.logo_dark_url || branding.logo_url || null;
     }
   } catch {
-    // Ignore — use fallbacks.
+    // Ignore, use fallbacks.
   }
 
   const title = clamp(titleQ || brandName, 90);
@@ -127,16 +127,33 @@ export async function GET(req: Request) {
             padding: '56px 72px 56px 72px',
           }}
         >
-          {/* Top row — logo or wordmark */}
+          {/* Top row: logo or wordmark */}
           <div style={{ display: 'flex', alignItems: 'center' }}>
             {logoDataUrl ? (
+              /*
+               * 130x25 rather than 200x48.
+               *
+               * The brand logo files carried transparent margins until
+               * migration 060, and were only 52.5% ink vertically. A 48px box
+               * therefore drew a 25px mark, and the 200px width left the mark
+               * floating in horizontal slack because `contain` centres what it
+               * fits. Now that the files are trimmed, the box is the mark, so
+               * these are the dimensions the mark already rendered at: the card
+               * is unchanged, and the logo is flush with the text below it
+               * rather than inset by the file's own padding.
+               *
+               * Sized here rather than from a setting because the OG card is a
+               * fixed 1200x630 composition. If the logo is ever replaced with
+               * one of a different aspect ratio, this pair needs revisiting
+               * along with the two height settings migration 060 retuned.
+               */
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={logoDataUrl}
                 alt={brandName}
-                width={200}
-                height={48}
-                style={{ height: 48, objectFit: 'contain' }}
+                width={130}
+                height={25}
+                style={{ height: 25, objectFit: 'contain' }}
               />
             ) : (
               <div
@@ -153,7 +170,7 @@ export async function GET(req: Request) {
             )}
           </div>
 
-          {/* Center — eyebrow + headline + subtitle */}
+          {/* Center: eyebrow, headline, subtitle */}
           <div
             style={{
               display: 'flex',
@@ -204,7 +221,7 @@ export async function GET(req: Request) {
             )}
           </div>
 
-          {/* Bottom row — tagline + URL */}
+          {/* Bottom row: tagline and URL */}
           <div
             style={{
               display: 'flex',
