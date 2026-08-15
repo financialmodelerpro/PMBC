@@ -47,7 +47,8 @@
     "verify-contact-and-legal": "node scripts/verify-contact-and-legal.mjs",
     "seed-fmp-two-platforms": "node scripts/seed-fmp-two-platforms.mjs",
     "seed-header-background": "node scripts/seed-header-background.mjs",
-    "seed-team-page": "node scripts/seed-team-page.mjs"
+    "seed-team-page": "node scripts/seed-team-page.mjs",
+    "verify-container-widths": "node scripts/verify-container-widths.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

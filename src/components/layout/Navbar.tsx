@@ -269,9 +269,29 @@ export function Navbar({
           )}
         </Link>
 
-        {/* Desktop nav */}
+        {/*
+          Desktop nav.
+
+          `gap-6` rather than `gap-9`. The header inner is capped at 1200px like
+          every other container, so the room the nav has is fixed once the
+          viewport passes 1248px: a wider screen does not give it more. At 36px
+          between items the row measured 717px, and with the 314px wordmark and
+          the 167px CTA that came to 1198 of the 1200 available, leaving a 1px
+          gap between the last link and the CTA. That reads as the word running
+          into the button.
+
+          Adding a nav item is what consumed the slack, and the next one would
+          have overflowed. 24px gives the row 60px back and leaves 38px of
+          headroom, and the explicit margin on the actions group below is a floor
+          on the separation even if that headroom is ever spent.
+
+          Flat rather than widening at `xl`, which was tried: the container does
+          not grow past 1248px, so a wider gap at a wider viewport spends the
+          headroom without gaining any room to spend it from. At `xl:gap-8` the
+          row measured exactly full again at 1920.
+        */}
         <nav
-          className="hidden items-center gap-9 md:flex"
+          className="hidden items-center gap-6 md:flex"
           style={{ order: navOrder, ...navFlex }}
         >
           {navItems.map((item) => {
@@ -307,8 +327,10 @@ export function Navbar({
           })}
         </nav>
 
-        {/* CTA + mobile toggle */}
-        <div className="flex items-center gap-3" style={{ order: actionsOrder }}>
+        {/* CTA + mobile toggle. `md:ml-6` is a floor on the space before the
+            button: `justify-between` only separates these groups with whatever
+            room is left over, which is nothing once the row is full. */}
+        <div className="flex items-center gap-3 md:ml-6" style={{ order: actionsOrder }}>
           {cta && (
             <Link
               href={cta.href}
