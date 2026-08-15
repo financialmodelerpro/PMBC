@@ -69,7 +69,7 @@ When you find an em dash in *existing* content while doing other work, fix it as
 
 ## Current Status
 
-**All 47 phases are complete except Phase 9, and everything remaining in Phase 9 is operational rather than code**: content population, counsel review, DNS, production environment variables. The public site renders on sixteen routes, the admin console is complete and at parity with FMP, and 62 migrations are applied.
+**All 48 phases are complete except Phase 9, and everything remaining in Phase 9 is operational rather than code**: content population, counsel review, DNS, production environment variables. The public site renders on sixteen routes, the admin console is complete and at parity with FMP, and 63 migrations are applied.
 
 | Phases | Date | What they left behind |
 |--------|------|-----------------------|
@@ -95,6 +95,7 @@ When you find an em dash in *existing* content while doing other work, fix it as
 | 45 | 2026-08-15 | The navbar container measured rather than assumed (it was correct), the nav given room after Team filled the row, then the two logo files trimmed of the transparent margins that were the real cause of the indent, with all five dependent heights retuned. |
 | 46 | 2026-08-15 | Home content pass: the count that did not match its list, the founder proof points labelled as career rather than firm figures, the four generic verbs replaced with how the work is actually run, one call to action per section, and one label for the booking action. |
 | 47 | 2026-08-15 | The home founder card rewritten to say who Ahmad is and what he brings, rather than restating the delivery model the firm introduction had already given the reader two screens earlier. |
+| 48 | 2026-08-15 | `/fmp` content pass: the launching-soon contradiction corrected against the card, the four-paragraph intro cut to two that answer why a firm carries a platform, "What you get" restored to six, one CTA per section, and the certification section folded into the Training Hub card it repeated. |
 
 **Full detail for every phase, including the reasoning and the things that went wrong, is in [`PHASE_HISTORY.md`](./PHASE_HISTORY.md).** It was split out of this file on 2026-08-13 for the reason stated at the top of it: this file is loaded into context at the start of every session, and that table had grown to 75KB.
 
@@ -154,10 +155,11 @@ Ordered by what stops a launch, not by when it was added.
      record and lost its six service cards, firm credentials was deleted as a
      duplicate of the stats block above it, who-we-serve became a carousel, and
      the network block became three sentences. 10.2 screens down to 7.3.
-   - **The `/fmp` "What you get" checklist** was edited live in the page builder
-     on 2026-08-11 and holds four items rather than the six seeded, one reading
-     "Structured Excel and investor PDF export", which looks like a slip
-     mid-edit.
+   - ~~**The `/fmp` "What you get" checklist.**~~ **Fixed** by migration 063,
+     along with the rest of that page: it is back to six items, and the export
+     title is "Formula-linked Excel and investor PDF export" again, which is
+     also what the Modeling Hub card's own note claims. The intro no longer says
+     the Modeling Hub is launching soon while the card says it is live.
    - ~~**Home says the same thing twice.**~~ **Fixed** by migration 062. The
      firm introduction keeps the delivery model, since it is the firm's own
      paragraph and reaches the reader first, and the founder card was rewritten
@@ -187,20 +189,24 @@ Ordered by what stops a launch, not by when it was added.
 
 ### Assets, all of which degrade gracefully today
 
-7. **Carousel card images.** Ten blank slots: four on the home "Who we serve"
-   carousel, six on `/fmp` "Who it is for". Each renders a navy monogram panel,
-   which is deliberate rather than unfinished, since there is no stock imagery in
-   this repository and inventing a photograph of a family office would be worse
-   than an honest placeholder. **The highest-value asset gap on the site**, because
-   a carousel card is full width and its left half is currently a monogram.
+7. ~~**Carousel card images.**~~ **Done.** All ten slots are filled: the four on
+   the home "Who we serve" carousel and the six on `/fmp` "Who it is for", each
+   verified rendering its own image as the carousel advances. The monogram
+   fallback still exists for a slot added later. Checked 2026-08-15, which is
+   also when the alt text stopped falling back to the card title: with every
+   `image_alt` blank, a screen reader was announcing each audience twice, once
+   for the picture and once for the heading it sits beside.
 
-8. **The `/fmp` two-platform rows** each carry an empty media slot as of
-   2026-08-13, rendering the same monogram panel. Two images or short clips
-   finish that section. Upload through the card editor in the page builder.
+8. ~~**The `/fmp` two-platform rows.**~~ **Done.** Both carry their media
+   (`modeling-hub-2.png` and `training-hub.png`), letterboxed under the 560px
+   ceiling and alternating sides. Note for whoever changes them: filling those
+   two slots quietly broke three assertions in `verify-page-rhythm`, which
+   located the frame by the inline `aspect-ratio` only a **blank** slot carries.
+   Fixed 2026-08-15; the layout had been correct the whole time.
 
-9. **Real PMBC logo** (`branding_config.logo_url`, currently a monogram fallback
-   in the navbar) and **partner logos** on `/network`. The Ahmad portrait is set
-   and is copied onto the home founder card by migration 037. Any new image host
+9. **Partner logos** on `/network`. The PMBC logo is set and was trimmed of its
+   transparent margins by migration 060, and the Ahmad portrait is set and is
+   copied onto the home founder card by migration 037. Any new image host
    needs a line in `next.config.ts` `images.remotePatterns`; Supabase and
    Cloudinary are already allowed. [user provides; assistant wires]
 
@@ -713,6 +719,7 @@ Three flags matter when rebuilding:
 060  logo_trim                 the two logo files trimmed of their transparent margins, and the five heights that depended on the old aspect ratio
 061  home_content_pass         the count that did not match its list, the founder proof points labelled, the engagement model rewritten, one CTA per section
 062  home_founder_card_body    the founder card stops restating the firm introduction's delivery model
+063  fmp_page_pass             the intro cut and corrected, the checklist restored to six, one CTA per section, the certification section folded into the card
 ```
 
 After running migrations, manually insert one admin_users row via SQL with a bcrypt hash for the password.
@@ -832,7 +839,7 @@ Editors should:
 | `/approach` | approach | Engagement methodology (Understand, Analyse, Model, Advise). **Unreferenced since 2026-08-12**: the nav item was hidden in Pages & Nav, and migration 052 removed the five remaining internal links (home firm introduction, home delivery approach CTA, /network and /sectors CTAs, /services secondary hero CTA), along with the footer link and the sitemap entry. The page, its route and its content are untouched and it still returns 200; restoring the nav item and the sitemap line brings it back. |
 | `/network` | network | Sky Gulf and Lynkers detail. Why the network matters. |
 | `/about/ahmad-din` | about-ahmad-din | Founder profile. Nine CMS sections mirroring the structure of FMP's page of the same path. |
-| `/fmp` | financial-modeler-pro | The platform arm in full: hero with capability tags, what FMP is, who it is for (an `audience_carousel` since migration 053), the Modeling and Training Hubs, a short certification statement with a CTA to the FMP course catalogue (migration 055 removed the band that named 3SFM and BVM: their session counts, hour counts and course UUIDs are facts about FMP's catalogue that this page cannot track), CTA. **Moved from `/financial-modeler-pro`, which 301s here** (migration 049). The three sub-pages beneath the old path are retained, unlinked and out of the sitemap. |
+| `/fmp` | financial-modeler-pro | The platform arm in full: hero with capability tags, what FMP is, who it is for (an `audience_carousel` since migration 053), the Modeling and Training Hubs, CTA. Five sections since migration 063 cut the certification block: it restated the Training Hub card immediately above it, bullet for bullet, down to the same CTA to the same page, and the one thing it added ("assessed rather than attendance-based") folded into that card. Migration 055 had already reduced it once, removing the band that named 3SFM and BVM, since their session counts, hour counts and course UUIDs are facts about FMP's catalogue that this page cannot track. **The intro answers why an advisory firm carries a platform**, which was previously left to the closing block at the bottom of the page. **Moved from `/financial-modeler-pro`, which 301s here** (migration 049). The three sub-pages beneath the old path are retained, unlinked and out of the sitemap. |
 | `/team` | (none) | The firm's people, fed entirely by the `team_members` table rather than by `page_sections`. The founding partner leads the page in a wider card carrying the gold-framed portrait, and links through to `/about/ahmad-din` rather than repeating the bio that already lives there; everyone else follows in the three-up card grid the other collection pages use. Which member is the founder is not hardcoded: `src/lib/cms/founderProfile.ts` asks the profile page's own `founder_hero` section for the name, so a rename in the page builder moves the match with it. **Offered in the navbar and footer only while a member is published** (see `src/lib/public/collectionGates.ts`), the same row-count test the sitemap has used since 2026-08-13. |
 | `/contact` | contact | Contact form, direct contact info |
 | `/book` | book | Booking page. CMS hero plus a Calendly inline embed reading `site_settings.booking_url`. Deliberately not in the top nav (footer and CTAs only). |

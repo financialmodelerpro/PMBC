@@ -51,7 +51,8 @@
     "verify-container-widths": "node scripts/verify-container-widths.mjs",
     "seed-logo-trim": "node scripts/seed-logo-trim.mjs",
     "seed-home-content-pass": "node scripts/seed-home-content-pass.mjs",
-    "seed-founder-card-body": "node scripts/seed-founder-card-body.mjs"
+    "seed-founder-card-body": "node scripts/seed-founder-card-body.mjs",
+    "seed-fmp-page-pass": "node scripts/seed-fmp-page-pass.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

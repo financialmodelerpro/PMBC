@@ -319,7 +319,7 @@ function SortableSlide({
             <input
               type="text"
               value={slide.image_alt}
-              placeholder="Falls back to the card title"
+              placeholder="Leave blank unless the image adds something the title does not"
               onChange={(e) => onUpdate({ image_alt: e.target.value })}
               style={adminInput}
             />

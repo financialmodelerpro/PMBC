@@ -222,7 +222,23 @@ export function AudienceCarousel({
                       {slide.imageUrl ? (
                         <Media
                           src={slide.imageUrl}
-                          alt={slide.imageAlt || slide.title}
+                          /*
+                           * Falls back to empty, not to the title.
+                           *
+                           * The title is rendered as a heading a few lines
+                           * below, inside the same card, so an alt that repeats
+                           * it makes a screen reader announce the audience
+                           * twice per slide: once for the picture and once for
+                           * the heading it already labels. No slide carries an
+                           * explicit alt, so that was every slide.
+                           *
+                           * These photographs illustrate the copy rather than
+                           * carrying information of their own, which is the
+                           * case an empty alt exists for. An operator who has
+                           * something to add about a specific image can still
+                           * type it, and then it is read.
+                           */
+                          alt={slide.imageAlt}
                           fill
                           sizes="(min-width: 768px) 540px, 100vw"
                           className="object-cover"

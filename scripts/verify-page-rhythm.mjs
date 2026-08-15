@@ -814,7 +814,17 @@ async function main() {
           const r = el.getBoundingClientRect();
           return { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width), h: Math.round(r.height) };
         };
-        const media = rows.map((r) => r.querySelector('div[style*=\"aspect-ratio\"]'));
+        // The media frame, whether the slot is filled or blank.
+        //
+        // This used to look only for div[style*="aspect-ratio"], which is the
+        // 4:3 box a BLANK slot renders its monogram panel in. Both slots were
+        // blank when these assertions were written and both have since been
+        // filled, so a filled frame takes the asset's own proportions, carries
+        // no inline aspect-ratio, and the selector matched nothing. Three
+        // assertions then failed while the layout was correct.
+        const media = rows.map(
+          (r) => r.querySelector('img, video') || r.querySelector('div[style*=\"aspect-ratio\"]'),
+        );
         return {
           heads: 2,
           titles: heads.map((h) => h.textContent.trim()),
@@ -822,6 +832,7 @@ async function main() {
           copyX: rows.map((r) => Math.round(r.firstElementChild.getBoundingClientRect().x)),
           mediaX: media.map((m) => (m ? Math.round(m.getBoundingClientRect().x) : null)),
           mediaW: media.map((m) => (m ? Math.round(m.getBoundingClientRect().width) : null)),
+          mediaH: media.map((m) => (m ? Math.round(m.getBoundingClientRect().height) : null)),
           container: Math.round(rows[0].parentElement.getBoundingClientRect().width),
         };
       })()`);
@@ -841,11 +852,19 @@ async function main() {
       ok('row 2 puts its media to the left of its text',
         platforms.mediaX[1] < platforms.copyX[1],
         `media ${platforms.mediaX[1]}, copy ${platforms.copyX[1]}`);
-      ok('the empty media slot still renders a frame',
+      ok('each row renders a media frame',
         platforms.mediaW.every((w) => w && w > 200), platforms.mediaW.join(', '));
-      ok('the two rows no longer share a height',
-        platforms.rows[0].h !== platforms.rows[1].h,
-        `both ${platforms.rows[0].h}px, which means they are still side by side`);
+      // Was "the two rows no longer share a height", on the reasoning that two
+      // side-by-side cards get padded to a shared height and two stacked ones do
+      // not. Equal heights were evidence of the bug when the rows were unequal
+      // in content. They are not evidence of anything now: both slots carry an
+      // image capped at the same ceiling, so the rows land at the same height by
+      // arithmetic rather than by being side by side. Stacking is asserted
+      // directly three lines above, which is the honest test, so this now checks
+      // the thing the ceiling exists for instead.
+      ok('each row keeps its media under the height ceiling',
+        platforms.mediaH.every((h) => h === null || h <= 560),
+        platforms.mediaH.join(', '));
     }
 
     console.log('\n=== collection index pages in the sitemap');
