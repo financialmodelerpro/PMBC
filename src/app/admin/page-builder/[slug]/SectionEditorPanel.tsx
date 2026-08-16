@@ -21,6 +21,7 @@ import { FeatureCardsEditor } from '@/components/admin/editors/FeatureCardsEdito
 import { AudienceCarouselEditor } from '@/components/admin/editors/AudienceCarouselEditor';
 import { ContactBodyEditor } from '@/components/admin/editors/ContactBodyEditor';
 import { BookingBodyEditor } from '@/components/admin/editors/BookingBodyEditor';
+import { ServiceGridEditor } from '@/components/admin/editors/ServiceGridEditor';
 import type { SectionEditorProps } from '@/components/admin/editors/types';
 import { SaveButton } from '@/components/admin/SaveButton';
 import { SaveStatus, type SaveState } from '@/components/admin/SaveStatus';
@@ -52,6 +53,7 @@ const EDITORS: Record<string, (props: SectionEditorProps) => React.ReactElement>
   audience_carousel: AudienceCarouselEditor,
   contact_body: ContactBodyEditor,
   booking_body: BookingBodyEditor,
+  service_grid: ServiceGridEditor,
 };
 
 /**

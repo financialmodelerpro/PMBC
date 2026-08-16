@@ -21,7 +21,8 @@ export type SectionType =
   | 'feature_cards'
   | 'audience_carousel'
   | 'contact_body'
-  | 'booking_body';
+  | 'booking_body'
+  | 'service_grid';
 
 export type SectionTypeMeta = {
   type: SectionType;
@@ -298,6 +299,19 @@ export const SECTION_TYPES: SectionTypeMeta[] = [
       founder_body:
         'Every mandate at PaceMakers is partner-led. If you would rather discuss your situation before writing it down, book a call.',
       founder_cta_label: 'Book a Meeting',
+    },
+  },
+  {
+    type: 'service_grid',
+    label: 'Service card grid',
+    description:
+      'The nine service cards on /services, under an editable heading block. The cards come from the Services collection, not from this section.',
+    implemented: true,
+    defaultContent: {
+      eyebrow: 'Practice Areas',
+      heading: 'Nine disciplines, one standard of work',
+      intro:
+        'Each engagement is led directly by the partner, modelled to institutional standards, and delivered with the documentation a board, lender, or investor will accept without rework.',
     },
   },
   {

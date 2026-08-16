@@ -7,6 +7,7 @@ import { ContactForm } from '@/components/public/ContactForm';
 import { SectionContainer } from '@/components/public/SectionContainer';
 import type { PmbcVariant } from '@/lib/public/tokens';
 import type { SectionContext } from '@/lib/public/sectionContext';
+import { sectionCopy } from '@/lib/public/sectionCopy';
 
 /**
  * The body of /contact: the form panel and the direct-contact column beside it.
@@ -40,15 +41,52 @@ export function ContactBody({
 
   const founderName = s(content.founder_name) || 'Ahmad Din';
 
-  // Absent and empty are different states for this one. `??` rather than `||`,
-  // so a section authored before the key existed still renders the shipped
-  // sentence, while clearing the field in the builder removes the line rather
-  // than restoring it. Migration 065 cleared it: the hero says the same thing
-  // two lines above.
-  const responseNote =
-    typeof content.form_response_note === 'string'
-      ? content.form_response_note
-      : 'We respond to every credible enquiry within one to two business days.';
+  // Every string below follows one rule: absent means the shipped wording,
+  // empty means the operator cleared the field and the element does not render.
+  // See `sectionCopy` for why that distinction has to be made in one place.
+  const formEyebrow = sectionCopy(content, 'form_eyebrow', 'Enquiry');
+  const formHeading = sectionCopy(content, 'form_heading', 'Tell us about the mandate');
+  const responseNote = sectionCopy(
+    content,
+    'form_response_note',
+    'We respond to every credible enquiry within one to two business days.',
+  );
+
+  const bookingPrompt = sectionCopy(content, 'booking_prompt', 'Prefer to talk?');
+  const bookingBody = sectionCopy(
+    content,
+    'booking_body',
+    'Book a 60 minute advisory meeting directly with Ahmad.',
+  );
+  const bookingCtaLabel = sectionCopy(content, 'booking_cta_label', 'Book a Meeting');
+  // Clearing all three removes the callout rather than leaving a bordered box
+  // with a calendar icon and nothing to read.
+  const showBookingCallout =
+    bookingPrompt !== '' || bookingBody !== '' || bookingCtaLabel !== '';
+
+  const directEyebrow = sectionCopy(content, 'direct_eyebrow', 'Direct');
+  const directHeading = sectionCopy(content, 'direct_heading', 'Other ways to reach us');
+  const directIntro = sectionCopy(
+    content,
+    'direct_intro',
+    'For urgent matters or referrals, you can reach the firm directly.',
+  );
+
+  const founderHeading = sectionCopy(
+    content,
+    'founder_heading',
+    'Speak directly with the founder',
+  );
+  const founderBody = sectionCopy(
+    content,
+    'founder_body',
+    'Every mandate at PaceMakers is partner-led. If you would rather discuss your situation before writing it down, book a call.',
+  );
+  const founderCtaLabel = sectionCopy(content, 'founder_cta_label', 'Book a Meeting');
+  // The portrait is not a reason to keep the card: with no heading, no body and
+  // no link it is a framed photograph with nothing to say.
+  const showFounderCard =
+    founderHeading !== '' || founderBody !== '' || founderCtaLabel !== '';
 
   return (
     <SectionContainer variant={variant} styles={styles}>
@@ -56,45 +94,56 @@ export function ContactBody({
         {/* Form */}
         <div className="lg:col-span-7">
           <div className="rounded-lg border border-[color:var(--pmbc-border)] bg-white p-8 shadow-[0_1px_3px_rgba(15,37,64,0.04)] sm:p-10">
-            <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-[color:var(--pmbc-primary)]">
-              {s(content.form_eyebrow) || 'Enquiry'}
-            </p>
-            <h2 className="mt-3 font-serif text-2xl font-semibold tracking-tight text-[color:var(--pmbc-text)] sm:text-3xl">
-              {s(content.form_heading) || 'Tell us about the mandate'}
-            </h2>
-            {responseNote.trim() !== '' ? (
+            {formEyebrow && (
+              <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-[color:var(--pmbc-primary)]">
+                {formEyebrow}
+              </p>
+            )}
+            {formHeading && (
+              <h2 className="mt-3 font-serif text-2xl font-semibold tracking-tight text-[color:var(--pmbc-text)] sm:text-3xl">
+                {formHeading}
+              </h2>
+            )}
+            {responseNote && (
               <p className="mt-3 text-[14px] leading-relaxed text-[color:var(--pmbc-muted)]">
                 {responseNote}
               </p>
-            ) : null}
+            )}
 
-            {/* Booking callout. */}
-            <div className="mt-7 flex flex-col gap-5 border-l-[3px] border-[color:var(--pmbc-accent)] bg-[color:var(--pmbc-surface-cream)] p-6 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
-              <div className="flex items-start gap-4">
-                <CalendarDays
-                  size={22}
-                  strokeWidth={1.6}
-                  className="mt-0.5 shrink-0"
-                  style={{ color: 'var(--pmbc-accent)' }}
-                />
-                <div>
-                  <p className="font-serif text-[18px] font-semibold text-[color:var(--pmbc-primary)]">
-                    {s(content.booking_prompt) || 'Prefer to talk?'}
-                  </p>
-                  <p className="mt-1.5 text-[14px] leading-relaxed text-[color:var(--pmbc-muted)]">
-                    {s(content.booking_body) ||
-                      'Book a 60 minute advisory meeting directly with Ahmad.'}
-                  </p>
+            {/* Booking callout. Clearing its three fields removes it. */}
+            {showBookingCallout && (
+              <div className="mt-7 flex flex-col gap-5 border-l-[3px] border-[color:var(--pmbc-accent)] bg-[color:var(--pmbc-surface-cream)] p-6 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
+                <div className="flex items-start gap-4">
+                  <CalendarDays
+                    size={22}
+                    strokeWidth={1.6}
+                    className="mt-0.5 shrink-0"
+                    style={{ color: 'var(--pmbc-accent)' }}
+                  />
+                  <div>
+                    {bookingPrompt && (
+                      <p className="font-serif text-[18px] font-semibold text-[color:var(--pmbc-primary)]">
+                        {bookingPrompt}
+                      </p>
+                    )}
+                    {bookingBody && (
+                      <p className="mt-1.5 text-[14px] leading-relaxed text-[color:var(--pmbc-muted)]">
+                        {bookingBody}
+                      </p>
+                    )}
+                  </div>
                 </div>
+                {bookingCtaLabel && (
+                  <Link
+                    href="/book"
+                    className="inline-flex shrink-0 items-center justify-center border border-[color:var(--pmbc-primary)] bg-[color:var(--pmbc-primary)] px-6 py-3 text-[12px] font-semibold uppercase text-[color:var(--pmbc-text-on-dark)] transition duration-200 hover:border-[color:var(--pmbc-accent)] hover:bg-[color:var(--pmbc-accent)] hover:text-[color:var(--pmbc-primary-deep)]"
+                    style={{ letterSpacing: '0.12em' }}
+                  >
+                    {bookingCtaLabel}
+                  </Link>
+                )}
               </div>
-              <Link
-                href="/book"
-                className="inline-flex shrink-0 items-center justify-center border border-[color:var(--pmbc-primary)] bg-[color:var(--pmbc-primary)] px-6 py-3 text-[12px] font-semibold uppercase text-[color:var(--pmbc-text-on-dark)] transition duration-200 hover:border-[color:var(--pmbc-accent)] hover:bg-[color:var(--pmbc-accent)] hover:text-[color:var(--pmbc-primary-deep)]"
-                style={{ letterSpacing: '0.12em' }}
-              >
-                {s(content.booking_cta_label) || 'Book a Meeting'}
-              </Link>
-            </div>
+            )}
 
             <div className="mt-8">
               <ContactForm
@@ -108,16 +157,21 @@ export function ContactBody({
 
         {/* Contact info column */}
         <div className="lg:col-span-5">
-          <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-[color:var(--pmbc-primary)]">
-            {s(content.direct_eyebrow) || 'Direct'}
-          </p>
-          <h3 className="mt-3 font-serif text-2xl font-semibold tracking-tight text-[color:var(--pmbc-text)]">
-            {s(content.direct_heading) || 'Other ways to reach us'}
-          </h3>
-          <p className="mt-3 text-[14px] leading-relaxed text-[color:var(--pmbc-muted)]">
-            {s(content.direct_intro) ||
-              'For urgent matters or referrals, you can reach the firm directly.'}
-          </p>
+          {directEyebrow && (
+            <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-[color:var(--pmbc-primary)]">
+              {directEyebrow}
+            </p>
+          )}
+          {directHeading && (
+            <h3 className="mt-3 font-serif text-2xl font-semibold tracking-tight text-[color:var(--pmbc-text)]">
+              {directHeading}
+            </h3>
+          )}
+          {directIntro && (
+            <p className="mt-3 text-[14px] leading-relaxed text-[color:var(--pmbc-muted)]">
+              {directIntro}
+            </p>
+          )}
 
           <ul className="mt-8 space-y-5">
             {/* Three published addresses, each routing a different kind of
@@ -168,7 +222,9 @@ export function ContactBody({
 
           {/* Founder direct-discussion card. The portrait is read from the
               founder_hero section, so uploading a new one in the page builder
-              updates this card with no code change. */}
+              updates this card with no code change. Clearing its heading, body
+              and link label removes the card. */}
+          {showFounderCard && (
           <div className="mt-10 border-l-[3px] border-[color:var(--pmbc-accent)] bg-[color:var(--pmbc-surface-cream)] p-7">
             <div className="flex items-start gap-5">
               <div className="relative h-[72px] w-[72px] shrink-0">
@@ -196,32 +252,38 @@ export function ContactBody({
               </div>
 
               <div>
-                <h4 className="font-serif text-[19px] font-semibold leading-snug tracking-tight text-[color:var(--pmbc-primary)]">
-                  {s(content.founder_heading) || 'Speak directly with the founder'}
-                </h4>
-                <p className="mt-2.5 text-[14px] leading-relaxed text-[color:var(--pmbc-muted)]">
-                  {s(content.founder_body) ||
-                    'Every mandate at PaceMakers is partner-led. If you would rather discuss your situation before writing it down, book a call.'}
-                </p>
-                <Link
-                  href="/book"
-                  className="group mt-5 inline-flex items-center gap-2 text-[12px] font-semibold uppercase text-[color:var(--pmbc-primary)] transition hover:text-[color:var(--pmbc-accent)]"
-                  style={{ letterSpacing: '0.12em' }}
-                >
-                  <span className="relative pb-1">
-                    {s(content.founder_cta_label) || 'Book a Meeting'}
-                    <span
-                      aria-hidden
-                      className="absolute right-0 bottom-0 left-0 h-px bg-[color:var(--pmbc-accent)]"
-                    />
-                  </span>
-                  <span aria-hidden style={{ color: 'var(--pmbc-accent)' }}>
-                    &#8594;
-                  </span>
-                </Link>
+                {founderHeading && (
+                  <h4 className="font-serif text-[19px] font-semibold leading-snug tracking-tight text-[color:var(--pmbc-primary)]">
+                    {founderHeading}
+                  </h4>
+                )}
+                {founderBody && (
+                  <p className="mt-2.5 text-[14px] leading-relaxed text-[color:var(--pmbc-muted)]">
+                    {founderBody}
+                  </p>
+                )}
+                {founderCtaLabel && (
+                  <Link
+                    href="/book"
+                    className="group mt-5 inline-flex items-center gap-2 text-[12px] font-semibold uppercase text-[color:var(--pmbc-primary)] transition hover:text-[color:var(--pmbc-accent)]"
+                    style={{ letterSpacing: '0.12em' }}
+                  >
+                    <span className="relative pb-1">
+                      {founderCtaLabel}
+                      <span
+                        aria-hidden
+                        className="absolute right-0 bottom-0 left-0 h-px bg-[color:var(--pmbc-accent)]"
+                      />
+                    </span>
+                    <span aria-hidden style={{ color: 'var(--pmbc-accent)' }}>
+                      &#8594;
+                    </span>
+                  </Link>
+                )}
               </div>
             </div>
           </div>
+          )}
         </div>
       </div>
     </SectionContainer>

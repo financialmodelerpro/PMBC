@@ -1,13 +1,12 @@
-import Link from 'next/link';
 import type { Metadata } from 'next';
-import { ArrowUpRight } from 'lucide-react';
 
 import { fetchPage, fetchPageSections } from '@/lib/cms/pages';
 import { SectionList } from '@/components/public/SectionRenderer';
+import { ServiceGrid } from '@/components/public/sections/ServiceGrid';
 import { SERVICES } from '@/config/services';
 import { fetchPublishedServices } from '@/lib/cms/collections';
 import { buildPageMetadata } from '@/lib/seo/metadata';
-import { PAGE_GUTTER, PAGE_INNER, SECTION_PADDING } from '@/lib/public/layout';
+import type { SectionContext } from '@/lib/public/sectionContext';
 
 export const dynamic = 'force-dynamic';
 
@@ -31,11 +30,13 @@ export default async function ServicesPage(props: {
   const search = await props.searchParams;
   const isPreview = search.preview === '1';
 
-  const sections = await fetchPageSections('services', { onlyVisible: !isPreview });
+  const [sections, managed] = await Promise.all([
+    fetchPageSections('services', { onlyVisible: !isPreview }),
+    // Prefer the managed services collection; fall back to static config so the
+    // grid still renders before migration 021 is applied / rows are published.
+    fetchPublishedServices(),
+  ]);
 
-  // Prefer the managed services collection; fall back to static config so the
-  // grid still renders before migration 021 is applied / rows are published.
-  const managed = await fetchPublishedServices();
   const cards = managed.length
     ? managed.map((s) => ({
         slug: s.slug,
@@ -50,66 +51,21 @@ export default async function ServicesPage(props: {
         summary: s.summary,
       }));
 
+  const context: SectionContext = { services: cards };
+
+  // The grid was written into this file and rendered after every CMS section
+  // regardless of the order the builder showed, so a cta_block placed after it
+  // came out above it. It is a `service_grid` section now (migration 068), which
+  // is what makes the builder order the page order.
+  const hasGrid = sections.some((s) => s.section_type === 'service_grid');
+
   return (
     <>
-      <SectionList sections={sections} />
-
-      {/* White, and on the shared section rhythm. This grid is not a CMS row, so
-          it cannot take its variant from the sequence resolver; it is the second
-          band after the hero, where the cream/white alternation lands on white.
-          Hardcoded here, and asserted by scripts/verify-page-rhythm.mjs. */}
-      <section className={`bg-white ${PAGE_GUTTER} ${SECTION_PADDING}`}>
-        <div className={PAGE_INNER}>
-          <div className="mx-auto max-w-2xl text-center">
-            <div
-              aria-hidden
-              className="mx-auto h-px w-[60px] bg-[color:var(--pmbc-accent-muted)]"
-            />
-            <p
-              className="mt-5 text-[11px] font-semibold uppercase text-[color:var(--pmbc-accent-muted)]"
-              style={{ letterSpacing: '0.18em' }}
-            >
-              Practice Areas
-            </p>
-            <h2 className="pmbc-display mt-4 text-[34px] leading-[1.12] sm:text-[42px] lg:text-[48px]">
-              Nine disciplines, one standard of work
-            </h2>
-            <p className="mt-5 text-[17px] leading-[1.7] text-[#52606B] sm:text-[18px]">
-              Each engagement is led directly by the partner, modelled to institutional
-              standards, and delivered with the documentation a board, lender, or
-              investor will accept without rework.
-            </p>
-          </div>
-
-          <ul className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {cards.map((s) => (
-              <li key={s.slug}>
-                <Link
-                  href={`/services/${s.slug}`}
-                  className="group flex h-full flex-col rounded-[2px] border border-t-2 border-[color:var(--pmbc-border-warm)] bg-white p-9 transition hover:-translate-y-0.5 hover:border-[color:var(--pmbc-primary)] hover:shadow-[0_12px_36px_rgba(15,37,64,0.08)]"
-                  style={{ borderTopColor: '#C69C3E' }}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="font-serif text-2xl font-semibold text-[color:var(--pmbc-accent-muted)]">
-                      {s.number}
-                    </span>
-                    <ArrowUpRight
-                      size={16}
-                      className="text-[color:var(--pmbc-muted)] transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-[color:var(--pmbc-primary)]"
-                    />
-                  </div>
-                  <h3 className="mt-5 font-serif text-[22px] font-semibold leading-tight text-[color:var(--pmbc-text)]">
-                    {s.title}
-                  </h3>
-                  <p className="mt-3 text-[15px] leading-[1.7] text-[color:var(--pmbc-muted)]">
-                    {s.summary}
-                  </p>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </section>
+      <SectionList sections={sections} context={context} />
+      {/* A database that has not run 068 has no grid row, and /services without
+          its nine cards is not a page worth serving. Same fallback reasoning as
+          /contact and /book. */}
+      {!hasGrid && <ServiceGrid content={{}} variant="white" context={context} />}
     </>
   );
 }

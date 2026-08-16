@@ -51,13 +51,14 @@ export const SECTION_TYPES_WITH_OWN_MEDIA: ReadonlySet<string> = new Set([
   // controls writing the same field, which is worse than the two-competing-
   // images problem the rest of this list exists to prevent.
   'media',
-  // These two are the odd case out: they carry no media field of their own and
-  // render no asset at all. They are page bodies, a form and a calendar, whose
-  // layout has nowhere for one to go. Offering the shared panel would give an
-  // operator an upload control with no effect, which is the same trap by a
-  // different route.
+  // These three are the odd case out: they carry no media field of their own
+  // and render no asset at all. Two are page bodies, a form and a calendar, and
+  // the third is a card grid; none has anywhere for an image to go. Offering the
+  // shared panel would give an operator an upload control with no effect, which
+  // is the same trap by a different route.
   'contact_body',
   'booking_body',
+  'service_grid',
 ]);
 
 export function sectionTypeSupportsSharedMedia(sectionType: string): boolean {

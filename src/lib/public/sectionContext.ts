@@ -30,4 +30,21 @@ export type SectionContext = {
   defaultServiceTitle?: string;
   /** Calendly event URL, from `site_settings.booking_url`. Empty is a supported state. */
   bookingUrl?: string;
+  /**
+   * The nine service cards for the `/services` grid: the managed `services`
+   * collection when it has rows, the static config otherwise.
+   *
+   * Not section content, and deliberately so. The same nine drive the related
+   * services cards, the contact form's dropdown, the sitemap and the JSON-LD,
+   * so a second copy inside one section row would be a second place to edit
+   * them and a second place for them to go stale.
+   */
+  services?: ServiceCard[];
+};
+
+export type ServiceCard = {
+  slug: string;
+  number: string;
+  title: string;
+  summary: string;
 };

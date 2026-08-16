@@ -27,6 +27,7 @@ import { FeatureCards } from './sections/FeatureCards';
 import { AudienceCarousel } from './sections/AudienceCarousel';
 import { ContactBody } from './sections/ContactBody';
 import { BookingBody } from './sections/BookingBody';
+import { ServiceGrid } from './sections/ServiceGrid';
 import { SectionPlaceholder } from './sections/Placeholder';
 import type { SectionContext } from '@/lib/public/sectionContext';
 
@@ -88,6 +89,7 @@ const REGISTRY: Record<
   audience_carousel: AudienceCarousel,
   contact_body: ContactBody,
   booking_body: BookingBody,
+  service_grid: ServiceGrid,
 };
 
 /**
@@ -124,6 +126,9 @@ const DEFAULT_VARIANT: Record<string, PmbcVariant> = {
   // because cream is the surface the hardcoded markup carried before the move.
   contact_body: 'cream',
   booking_body: 'cream',
+  // White is what the hardcoded grid carried, and what the alternation lands on
+  // when it follows the video under the /services hero.
+  service_grid: 'white',
 };
 
 function readVariant(
