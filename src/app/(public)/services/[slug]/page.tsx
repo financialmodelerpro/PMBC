@@ -10,6 +10,7 @@ import { ServiceDetail } from '@/components/public/sections/ServiceDetail';
 import { SectionList } from '@/components/public/SectionRenderer';
 import { PageHeroFallback } from '@/components/public/PageHeroFallback';
 import { PAGE_GUTTER, SECTION_PADDING } from '@/lib/public/layout';
+import { withIndefiniteArticle } from '@/lib/public/grammar';
 import { buildPageMetadata, siteUrl } from '@/lib/seo/metadata';
 import { ServiceJsonLd } from '@/components/seo/ServiceJsonLd';
 
@@ -114,40 +115,37 @@ export default async function ServiceDetailPage(props: {
             className="mt-5 text-[11px] font-semibold uppercase"
             style={{ letterSpacing: '0.18em', color: '#A88530' }}
           >
-            Engage PMBC
+            Engage PaceMakers
           </p>
+          {/* The title keeps its own casing, and the article is chosen by the
+              sound it starts with rather than the letter. Lowercasing produced
+              "Discuss a m&a advisory mandate", and a vowel-letter test would
+              still have given "a M&A", since M is said "em". See
+              `indefiniteArticle`. */}
           <h2
             className="pmbc-display mt-5 text-[36px] leading-[1.12] sm:text-[44px] lg:text-[52px]"
             style={{ color: '#0F1B2D' }}
           >
-            Discuss a {service.title.toLowerCase()} mandate
+            Discuss {withIndefiniteArticle(service.title)} mandate
           </h2>
           <p
             className="mx-auto mt-5 max-w-[640px] text-[17px] leading-[1.7] sm:text-[18px]"
             style={{ color: '#52606B' }}
           >
-            Tell us about the engagement. We respond to every credible enquiry within
-            one to two business days.
+            Tell us about the engagement.
           </p>
+          {/* One call to action. The second was "See all services", which points
+              back the way the reader came, and this block's job is to move them
+              forward. The `?service=` pre-fill selects this service in the
+              contact form's dropdown. */}
           <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
             <Link
               href={`/contact?service=${service.slug}`}
               className="inline-flex items-center gap-2 border border-[#1B3A5F] bg-[#1B3A5F] px-8 py-3.5 text-[12px] font-semibold uppercase text-white transition-all duration-200 hover:bg-[#14304F] hover:border-[#C69C3E]"
               style={{ letterSpacing: '0.12em' }}
             >
-              Start a conversation
+              Send an Enquiry
               <ArrowRight size={14} />
-            </Link>
-            <Link
-              href="/services"
-              className="inline-flex items-center px-8 py-3.5 text-[12px] font-semibold uppercase transition-colors duration-200"
-              style={{
-                letterSpacing: '0.12em',
-                border: '1px solid rgba(27, 58, 95, 0.3)',
-                color: '#1B3A5F',
-              }}
-            >
-              See all services
             </Link>
           </div>
         </div>
