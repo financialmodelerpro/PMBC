@@ -60,6 +60,7 @@ export const SECTION_TYPES_WITH_OWN_MEDIA: ReadonlySet<string> = new Set([
   'booking_body',
   'service_grid',
   'testimonials',
+  'testimonial_form',
 ]);
 
 export function sectionTypeSupportsSharedMedia(sectionType: string): boolean {

@@ -29,6 +29,7 @@ import { ContactBody } from './sections/ContactBody';
 import { BookingBody } from './sections/BookingBody';
 import { ServiceGrid } from './sections/ServiceGrid';
 import { Testimonials } from './sections/Testimonials';
+import { TestimonialForm } from './sections/TestimonialForm';
 import { SectionPlaceholder } from './sections/Placeholder';
 import type { SectionContext } from '@/lib/public/sectionContext';
 import { fetchApprovedTestimonials } from '@/lib/cms/collections';
@@ -93,6 +94,7 @@ const REGISTRY: Record<
   booking_body: BookingBody,
   service_grid: ServiceGrid,
   testimonials: Testimonials,
+  testimonial_form: TestimonialForm,
 };
 
 /**
@@ -134,6 +136,9 @@ const DEFAULT_VARIANT: Record<string, PmbcVariant> = {
   service_grid: 'white',
   // The quote cards are cream, so the band behind them is white by default.
   testimonials: 'white',
+  // Cream: the form is a panel on a surface, and the white card inside it needs
+  // a band behind it to sit on.
+  testimonial_form: 'cream',
 };
 
 function readVariant(

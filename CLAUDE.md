@@ -102,6 +102,15 @@ Ordered by what stops a launch, not by when it was added.
 
 ### Blocking
 
+0. **Migration 072 needs pasting into the Supabase SQL editor.** It is DDL, so
+   supabase-js cannot run it and `npm run seed-testimonial-submissions` can only
+   report what is missing. Until it runs, client testimonial submission works in
+   a reduced form: a submission is still stored as pending and still notifies by
+   email, but without its LinkedIn URL, photo, consent flag or link attribution,
+   and Testimonial Links reports itself unavailable. Nothing errors, and the
+   public site is unchanged. [user, Supabase SQL editor]
+
+
 1. **Production environment variables on Vercel.** `BREVO_API_KEY`,
    `EMAIL_FROM_DEFAULT`, `EMAIL_FROM_NAME`, `EMAIL_TO_ADMIN`,
    `HCAPTCHA_SECRET_KEY`, `NEXT_PUBLIC_HCAPTCHA_SITE_KEY`, `NEXTAUTH_SECRET`,
@@ -464,6 +473,7 @@ extend.
 - `founder_credentials`: heading plus a list of short strings, rendered as `numbered`, `pills`, or `cards` per a `display` key. One type rather than three, because the three founder-profile list blocks differ only in presentation
 - `feature_cards`: large cards carrying a code, metadata chips, a description, a bullet list, a note and a per-card CTA. `service_cards` has none of the last four. A `layout` key chooses between `cards` (side by side, the default) and `rows` (added 2026-08-13: full width, stacked, each card's media on the opposite side to the one above it, starting with the media on the right). Rows carry a per-card media slot on the same key set every other media field uses, including `media_max_height`, which is read per card because two rows hold two different assets. The slot wears the shared gold frame (`MediaFrameChrome`, split out of `SectionMediaFrame` on 2026-08-14 so the two cannot drift), takes the asset's own proportions, and letterboxes under a ceiling rather than cropping. A blank slot renders a navy monogram panel in a 4:3 box rather than collapsing the row
 - `audience_carousel`: one wide card at a time, each with an image beside its copy, advancing on a timer with arrows for manual control. Added 2026-08-12 for the home "Who we serve" block, which had been a three-across `service_cards` grid with no room for imagery. Holds on hover and on keyboard focus; with `prefers-reduced-motion` it neither advances nor animates, and the arrows still work. Off-screen slides are `inert`. A card with no `image_url` renders a navy monogram panel rather than a gap
+- `testimonial_form`: lets a client submit their own testimonial, placeable on any page. Added 2026-08-16. Collects name, role, company, the testimonial, an optional LinkedIn URL and an optional photo, behind an **unticked consent box the form cannot be submitted without**, because `/confidentiality` commits the firm to not publishing a client's involvement without agreement and the `consent_given` column is what makes that checkable later. Carries the same honeypot and three-second floor as the contact form. **Everything arrives `pending`**; nothing it collects can reach a public page without approval. A `?t=TOKEN` on whatever page carries it stamps the submission with the private link it came through
 - `testimonials`: approved client quotes under an editable eyebrow and heading, addable to any page. Registered 2026-08-16; the component had existed since Phase 10 and rendered nowhere, because the public half was never put in the registry. **The quotes are not section content**: they come from the `testimonials` table so `/admin/testimonials` stays the one place a quote is approved, ordered or withdrawn. An `only_landing` switch narrows it to the quotes flagged for the homepage, which is how a short selection goes on one page and the full set on another. With nothing approved it renders **nothing at all**, not an empty band under a heading. **This is the one section type whose data `SectionList` fetches itself**, rather than the route supplying it through the context: the block can be added to any page, and a route that forgot to pass the quotes would render it as silence. The fetch only runs when the page actually carries one
 - `service_grid`: the nine service cards on `/services`, under an editable eyebrow, heading and standfirst. Added 2026-08-16 by migration 068. **The cards are not section content**: they come from the managed Services collection, falling back to `config/services.ts`, because the same nine feed each detail page's related-services cards, the contact form's dropdown, the sitemap and the JSON-LD
 - `contact_body`: the `/contact` enquiry form panel and the direct-contact column beside it, including the booking callout inside the panel and the founder card under the addresses. Added 2026-08-16 by migration 066, which moved thirteen `cms_content` rows into it. **One section rather than one per visual block**, because the two columns are one grid: split into a section each they would render as stacked bands, which would have been a layout rewrite rather than a move. Carries no addresses: those are the firm's rather than the page's, the footer publishes the same values, and they stay in Site Settings
@@ -492,7 +502,7 @@ chosen instead, and why. **Read the file before re-running one.** The list below
 is an index, not a substitute.
 
 Three flags matter when rebuilding:
-- **DDL** migrations (031, 032, 033) use `ALTER TABLE`, which supabase-js cannot
+- **DDL** migrations (031, 032, 033, 072) use `ALTER TABLE`, which supabase-js cannot
   execute. Paste them into the Supabase SQL editor by hand. Everything that reads
   those columns degrades safely if they are absent.
 - **Destructive on re-run** (034, 048, 049) delete and reinsert, so re-applying
@@ -557,11 +567,12 @@ Three flags matter when rebuilding:
 069  services_engagement_block "How an engagement runs" on /services at order 27, a `paragraphs` section between the cards and the closing CTA
 070  collection_page_heroes  /team, /case-studies and /insights get a cms_pages row and a hero section. The last routes whose copy was code only
 071  team_meta_description   the /team meta description stops promising "practitioners who lead every mandate", which is the plural claim the firm does not make
+072  testimonial_submissions **DDL, HAND-RUN.** Six columns on `testimonials` plus the `testimonial_links` table, for client-submitted testimonials
 ```
 
 After running migrations, manually insert one admin_users row via SQL with a bcrypt hash for the password.
 
-**DDL migrations must be run by hand.** 031, 032 and 033 use `ALTER TABLE`, which supabase-js cannot execute. The Supabase CLI is not installed and `.env.local` carries no direct Postgres connection string, so the seed-script pattern used for 029 does not work for them. Paste them into the Supabase SQL editor. Every consumer of those columns degrades safely if the migration has not run: the page list treats a missing `is_system` as "system" so nothing is deletable, `writeAudit` retries without the diff columns rather than failing the mutation, and `/api/admin/site-pages` replays a write with `can_toggle` stripped when Postgres rejects the column (so Pages & Nav keeps working, minus pinning).
+**DDL migrations must be run by hand.** 031, 032, 033 and 072 use `ALTER TABLE` or `CREATE TABLE`, which supabase-js cannot execute. The Supabase CLI is not installed and `.env.local` carries no direct Postgres connection string, so the seed-script pattern used for 029 does not work for them. Paste them into the Supabase SQL editor. Every consumer of those columns degrades safely if the migration has not run: the page list treats a missing `is_system` as "system" so nothing is deletable, `writeAudit` retries without the diff columns rather than failing the mutation, and `/api/admin/site-pages` replays a write with `can_toggle` stripped when Postgres rejects the column (so Pages & Nav keeps working, minus pinning).
 
 ---
 

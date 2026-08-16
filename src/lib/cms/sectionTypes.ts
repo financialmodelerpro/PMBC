@@ -23,7 +23,8 @@ export type SectionType =
   | 'contact_body'
   | 'booking_body'
   | 'service_grid'
-  | 'testimonials';
+  | 'testimonials'
+  | 'testimonial_form';
 
 export type SectionTypeMeta = {
   type: SectionType;
@@ -316,6 +317,24 @@ export const SECTION_TYPES: SectionTypeMeta[] = [
       // Every approved quote by default. The homepage flag is a narrowing an
       // operator opts into, not the starting state.
       only_landing: false,
+    },
+  },
+  {
+    type: 'testimonial_form',
+    label: 'Testimonial form',
+    description:
+      'Lets a client submit their own testimonial. Everything arrives pending in the moderation queue and appears nowhere until approved.',
+    implemented: true,
+    defaultContent: {
+      eyebrow: 'In your words',
+      heading: 'Share your experience',
+      intro:
+        'If we have worked together and you would be willing to say so publicly, we would be glad to hear it. Nothing you write appears anywhere until you have approved the wording and we have published it.',
+      consent_label:
+        'I agree that PaceMakers may publish this testimonial, with my name, role and company, on its website and in its materials.',
+      button_label: 'Submit testimonial',
+      success_message:
+        'Thank you. Your testimonial has been received and will be reviewed before anything is published.',
     },
   },
   {

@@ -2,6 +2,7 @@ import { SectionContainer } from '@/components/public/SectionContainer';
 import type { PmbcVariant } from '@/lib/public/tokens';
 import type { SectionContext } from '@/lib/public/sectionContext';
 import { sectionCopy } from '@/lib/public/sectionCopy';
+import { normaliseExternalUrl } from '@/lib/public/externalUrl';
 
 /**
  * Approved client quotes, as a section an operator can add to any page.
@@ -66,7 +67,17 @@ export function Testimonials({
       )}
 
       <ul className="mt-10 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {testimonials.map((t) => (
+        {testimonials.map((t) => {
+          // Read loosely: migration 072 is DDL and hand-run, so a database
+          // without it has neither column and both must simply be absent rather
+          // than throwing. Normalised at render as well as on submit, so a row
+          // stored before the normaliser existed still links off-site instead
+          // of resolving against pacemakersglobal.com.
+          const extra = t as unknown as { photo_url?: string | null; linkedin_url?: string | null };
+          const photo = (extra.photo_url ?? '').trim();
+          const linkedin = normaliseExternalUrl(extra.linkedin_url);
+          const attribution = [t.role, t.company].filter(Boolean).join(', ');
+          return (
           <li
             key={t.id}
             className="flex flex-col rounded-[2px] border border-t-2 border-[color:var(--pmbc-border-warm)] bg-[color:var(--pmbc-surface-cream)] p-8"
@@ -81,18 +92,41 @@ export function Testimonials({
             <blockquote className="mt-2 flex-1 font-serif text-[17px] italic leading-[1.7] text-[color:var(--pmbc-text)]">
               {t.text}
             </blockquote>
-            <div className="mt-6">
-              <p className="text-[14px] font-semibold text-[color:var(--pmbc-text)]">
-                {t.name}
-              </p>
-              {(t.role || t.company) && (
-                <p className="mt-0.5 text-[13px] text-[color:var(--pmbc-muted)]">
-                  {[t.role, t.company].filter(Boolean).join(', ')}
-                </p>
+            <div className="mt-6 flex items-center gap-3">
+              {photo && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={photo}
+                  alt=""
+                  className="h-12 w-12 shrink-0 rounded-full object-cover"
+                  style={{ border: '1px solid var(--pmbc-border-warm)' }}
+                />
               )}
+              <div className="min-w-0">
+                <p className="text-[14px] font-semibold text-[color:var(--pmbc-text)]">
+                  {linkedin ? (
+                    <a
+                      href={linkedin}
+                      target="_blank"
+                      rel="noreferrer noopener"
+                      className="underline decoration-[color:var(--pmbc-accent)] underline-offset-4 hover:text-[color:var(--pmbc-primary)]"
+                    >
+                      {t.name}
+                    </a>
+                  ) : (
+                    t.name
+                  )}
+                </p>
+                {attribution && (
+                  <p className="mt-0.5 text-[13px] text-[color:var(--pmbc-muted)]">
+                    {attribution}
+                  </p>
+                )}
+              </div>
             </div>
           </li>
-        ))}
+          );
+        })}
       </ul>
     </SectionContainer>
   );

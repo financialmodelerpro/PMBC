@@ -15,6 +15,13 @@ const FIELDS: FieldDef[] = [
   { key: 'role', label: 'Role', type: 'text' },
   { key: 'company', label: 'Company', type: 'text' },
   { key: 'text', label: 'Testimonial', type: 'textarea' },
+  // Added with migration 072, for the fields a client can now submit. Both are
+  // editable here because a submitted LinkedIn URL is typed by hand and a
+  // submitted photo is sometimes the wrong crop, and correcting either in the
+  // queue is quicker than asking the client to submit again. Blank on every row
+  // that predates 072, which renders exactly as it did.
+  { key: 'linkedin_url', label: 'LinkedIn URL', type: 'text' },
+  { key: 'photo_url', label: 'Photo URL', type: 'text' },
   { key: 'rating', label: 'Rating (1 to 5)', type: 'number' },
   {
     key: 'status',
