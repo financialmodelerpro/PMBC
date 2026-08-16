@@ -1797,3 +1797,123 @@ for `TestimonialsBlock`, the FMP test seams, and the overlapping verify scripts.
 
 **State at close.** `main` clean and pushed. Typecheck and build clean.
 `verify-page-rhythm` 205 of 205, `verify-contact-and-legal` 104 of 104.
+
+---
+
+## 2026-08-16, later: the admin grows up, and the build closes
+
+Continues the same day. The morning moved page copy into the builder and tidied
+the documentation; this half added the things the console had been missing, and
+ended with development complete.
+
+### Spam protection, without hCaptcha
+
+The contact form had no spam protection at all once the hCaptcha keys came out.
+It has a **honeypot and a three-second floor** now, and the two decisions that
+make it work are both about what a bot does rather than what a person does.
+
+The field is hidden **by position**, not by `display:none` or `type="hidden"`,
+because the well-written bots skip both of those and skipping it is the only
+thing that defeats the trick. And both rejections return **the same 200 and the
+same shape a real submission gets**: a bot told it was blocked changes something
+and retries, a bot told it succeeded stops.
+
+**hCaptcha is still wired and dormant.** Unset keys mean `verifyHcaptcha` passes
+everything through, so turning it back on is two environment variables and no
+code change. Those two variables are no longer needed on Vercel.
+
+### Passwords, and then an emailed code
+
+A **Change Password** screen first: current password, new one twice, bcrypt at
+cost 12 to match the rotation script, and the stored hash read back before
+success is reported, because a silent write failure there locks the account.
+
+Then a **six-digit code** on top of it. Step one validates and parks the change;
+step two applies it once the code comes back from the account's own inbox. So
+knowing the current password stopped being enough on its own, which matters for
+an unlocked screen or a password reused from somewhere else.
+
+**Stored in `cms_content` under `_password_codes`, not a new table**, following
+`_fmp_cache`. A table means DDL, DDL here means a hand-run migration, and a
+security step that only starts working after someone remembers a manual step is
+not a security step. What is stored is a SHA-256 of the code and the **bcrypt
+hash** of the waiting password, so the row holds nothing replayable and no
+plaintext ever sits between the two steps. Ten minutes, one active code, five
+wrong guesses, constant-time compare. The email carries no link and no button,
+because a link that changes a password is the shape of a phishing message.
+
+### An editor role
+
+The line drawn is **deletion, not editing**. An editor can change any page and
+hide any part of it, which reaches the same end as deleting without the part
+that cannot be undone. They are also kept out of Site Settings, Header Settings,
+Footer Links, Users and the Audit Log.
+
+Enforced in the middleware, repeated in the layout in case the matcher changes,
+and checked again in every route, **which is the only one of the three that
+counts**. The trap this leaves behind is written into the file: `getAdminSession`
+now means *any* signed-in staff member, so a route that should be admin-only and
+calls it is open to editors and would pass any test that only signs in as an
+admin. `requireOwner` is the admin-only gate.
+
+Two things the verification found rather than the design:
+
+- **Deleting a user was impossible.** `audit_log.admin_id` is a foreign key onto
+  `admin_users`, so anyone who had ever done anything could not be removed. The
+  events have to survive, so the attribution moves instead: their entries go to
+  `admin_id = null` and the deletion record names them.
+- **Six admin-only routes answered 401 to a signed-in editor**, because
+  `getOwnerSession` returned null for both "not signed in" and "not allowed".
+
+### Page metadata
+
+`meta_title` and `meta_description` have been columns since migration 002, are
+read by every public route through `buildPageMetadata`, and could only ever be
+set by writing a migration. They are a collapsible panel in the page builder now,
+with its own Save so a title change cannot flush a half-finished section edit.
+Cleared fields store null, so the route's own fallback returns rather than an
+empty title publishing.
+
+### Client testimonials
+
+FMP was read first, and the honest answer is that most of this has no FMP
+counterpart: its form is a fixed page posting four fields, with no consent, no
+photo, no spam handling, no notification and no private links. What was copied is
+the status flow, the `source` column, and **`normalizeExternalUrl`**, ported
+wholesale because the bug it prevents is one FMP shipped: a bare
+"www.linkedin.com/in/name" in an href is a relative path, so their live profiles
+linked to `learn.financialmodelerpro.com/www.linkedin.com/...`.
+
+PMBC's form is a **section rather than a page**, so it can sit at the foot of
+something a client is already reading. Private links are a token on any page
+carrying it. Consent is an unticked box the form cannot be submitted without,
+recorded in a column, because `/confidentiality` commits the firm to not
+publishing a client's involvement without agreement and a promise nobody can
+check a year later is not a record.
+
+Then a second pass folded it together: Testimonial Links became a panel on the
+Testimonials screen rather than a second sidebar entry for a sub-feature, and a
+single switch controls whether the form is public. **A token beats the switch**,
+which is the whole point of sending a client a link.
+
+### Operational, from the user
+
+DNS moved to Vercel's current records and the sitemap was submitted to Google
+Search Console with ownership verified. **Brevo moved to its own account**,
+separate from FMP's, so a key rotation on one property cannot take out the
+other's mail, which also closes the Brevo key rotation that had been outstanding.
+The content pass finished across every page.
+
+### State at close
+
+**Development is complete.** `main` clean and pushed, typecheck and build clean,
+`verify-page-rhythm` 205 of 205, `verify-contact-and-legal` 104 of 104, 73
+migrations applied including 072 and 073, both run from the SQL editor during the
+session so the full testimonial path was verified rather than only its degraded
+form.
+
+What remains is review, and it is listed in the `CLAUDE.md` launch checklist:
+read the deployed site end to end on a phone as well as a laptop, send one real
+contact submission and read both emails, check the OG cards through the LinkedIn
+and Twitter debuggers, refresh the Supabase Security Advisor, and answer the
+2026-06-21 enquiry that is still sitting unanswered.

@@ -17,7 +17,7 @@ The patterns below mirror Financial Modeler Pro (FMP) where they make sense, but
 | Vercel project | pmbc |
 | Hosting | Vercel |
 | Database | Supabase (new project, separate from FMP) |
-| Email | Brevo (transactional, sender domain `pacemakersglobal.com`). Migrated from Resend 2026-08-10. |
+| Email | Brevo (transactional, sender domain `pacemakersglobal.com`). Migrated from Resend 2026-08-10. **On its own Brevo account since 2026-08-16**, separate from FMP's, so a key rotation on one property cannot take out the other's mail. |
 | Tagline | Advisory from Structure to Exit |
 | Positioning | Boutique corporate finance and transaction advisory firm serving KSA, GCC, and worldwide mandates |
 | Primary audience | Family offices, investment offices, real estate developers, corporates running M&A or valuation mandates |
@@ -69,7 +69,11 @@ When you find an em dash in *existing* content while doing other work, fix it as
 
 ## Current Status
 
-**All 48 phases are complete except Phase 9, and everything remaining in Phase 9 is operational rather than code**: content population, counsel review, DNS, production environment variables. The public site renders on sixteen routes, the admin console is complete and at parity with FMP, and 63 migrations are applied.
+**Development is complete.** Every phase is done bar Phase 9, and what remains
+in Phase 9 is review rather than code: read the deployed site end to end, send one
+real contact submission, check the OG cards, clear the Supabase advisor. The
+public site renders on nineteen routes, every page's copy is editable in the page
+builder, and 73 migrations are applied.
 
 **The per-phase summary index moved to [`PHASE_HISTORY.md`](./PHASE_HISTORY.md) on 2026-08-16**,
 along with the detailed rows that were already there. This file states where the
@@ -92,151 +96,115 @@ The verification scripts (`smoke-admin`, `smoke-builder`, `verify-parity8`) read
 
 ## Remaining Before Launch
 
-Updated 2026-08-16. **No code work is blocking launch.** Every phase is complete
-bar Phase 9, the public site renders on nineteen routes with every page's copy
-editable in the page builder, and the admin console is at parity with FMP.
-Everything below is operational, content, review or asset work, and most of it
-lives outside this repository.
+Updated 2026-08-16 at close of session. **Development is complete. What is left
+is review.**
+
+Every phase is done bar Phase 9, and Phase 9 no longer contains code. The public
+site renders on nineteen routes, every page's copy is editable in the page
+builder, the admin console is at parity with FMP and past it in three places
+(roles, page metadata, testimonial collection), and 73 migrations are applied.
 
 Ordered by what stops a launch, not by when it was added.
 
-### Blocking
+### Closed today
 
+Recorded here rather than deleted, because "was this done" is a question that
+gets asked again a week later.
 
-1. **Production environment variables on Vercel.** `BREVO_API_KEY`,
-   `EMAIL_FROM_DEFAULT`, `EMAIL_FROM_NAME`, `EMAIL_TO_ADMIN`,
-   `HCAPTCHA_SECRET_KEY`, `NEXT_PUBLIC_HCAPTCHA_SITE_KEY`, `NEXTAUTH_SECRET`,
-   `NEXTAUTH_URL`, `NEXT_PUBLIC_SITE_URL`, `FMP_API_URL`, `FMP_API_KEY` and the
-   Supabase keys. `EMAIL_FROM_CONTACT` is optional. Until Brevo is configured the
-   contact form still saves to the inbox and sends nothing, which the send
-   wrapper does deliberately rather than throwing. [user, Vercel dashboard]
+- ~~**DNS and SSL.**~~ Records moved to Vercel's current set, apex and `www`.
+- ~~**Google Search Console.**~~ Sitemap submitted and ownership verified.
+- ~~**Brevo.**~~ Moved to its own account, separate from FMP's, so a key rotation
+  on one property cannot take out the other's mail. The key is fresh rather than
+  one that has been through a chat transcript, which closes that rotation too.
+- ~~**hCaptcha.**~~ Replaced by a honeypot and a timing floor, so
+  `HCAPTCHA_SECRET_KEY` and `NEXT_PUBLIC_HCAPTCHA_SITE_KEY` are **no longer
+  needed on Vercel**. The hCaptcha path is still wired and dormant: setting both
+  keys turns it back on with no code change.
+- ~~**Counsel review of the three legal statements.**~~ Badge removed, all three
+  dated 16 August 2026, governing law and forum stated plainly.
+- ~~**Content pass over the whole site.**~~ Every page read end to end and
+  corrected.
+- ~~**Carousel images, the `/fmp` platform rows, migrations 072 and 073.**~~
 
-2. **DNS and SSL** for `pacemakersglobal.com`, apex and `www`. **The records were
-   updated to Vercel's current set on 2026-08-16**, so what remains is
-   confirmation rather than configuration: check that both apex and `www` resolve
-   to Vercel, that SSL has provisioned for each, and that one redirects to the
-   other rather than both serving. Vercel's records have changed more than once,
-   so if a check fails, read them off the project's Domains tab rather than from
-   memory or from an older note. [user]
+### Review, which is all that is left
 
-3. ~~**Counsel review of `/confidentiality`, `/privacy` and `/terms`.**~~ **Closed
-   2026-08-16 on the user's instruction.** The "Subject to legal review" badge is
-   off all three, all three are dated 16 August 2026, and the two clauses that
-   deferred to counsel (privacy section 11, terms section 11) now state the
-   position plainly: governed by the laws of the Islamic Republic of Pakistan,
-   where the LLP is constituted, with the courts of Lahore holding exclusive
-   jurisdiction. `verify-contact-and-legal` asserts the badge's **absence** now,
-   because putting it back would disclaim the whole page.
+1. **Read the site as a visitor on the deployed build**, on a phone as well as a
+   laptop. Everything below the surface has been measured; what has not been done
+   is one person reading the whole thing in order, on the real domain, with fresh
+   eyes.
 
-   **One open question was raised and not resolved by this change.** Pakistani
-   law and an exclusive Lahore forum are the natural choice for a Pakistani LLP,
-   and for `/terms` they are also the low-stakes choice, since section 4 says the
-   engagement letter governs a mandate and section 11 now says in terms that the
-   clause covers the Website only. The exposure is elsewhere: **if an engagement
-   letter carries the same clause**, a Saudi family office is unlikely to accept
-   exclusive Lahore jurisdiction, and a Pakistani judgment is not readily
-   enforceable in KSA. The usual answer for a firm in this position is
-   arbitration seated in a neutral, enforceable venue (DIFC or ADGM, both New
-   York Convention), and that belongs in the engagement letter rather than here.
-   [user decides; nothing on this website blocks launch]
+2. **Send one real contact submission and read both emails.** The templates, the
+   shell and the send wrapper are each verified separately, but the assembled
+   HTML has never been sent, because sending it writes a row into the live
+   enquiry list and mails the advisory inbox. Worth doing once now that Brevo is
+   its own account. [user]
 
-4. ~~**Content pass over the whole site.**~~ **Closed 2026-08-16 on the user's
-   read-through.** Every page has now been read end to end and its copy corrected:
-   home (migrations 061 and 062), `/fmp` (063), `/contact` (065), `/services` and
-   the nine detail pages (068, 069 and the closing-block fix), and the three legal
-   statements. **The correction that recurred most was the same one**: copy that
-   said a thing the reader had already been told, either on the page above it or
-   on the page it links to. Worth watching for in anything written next.
+3. **Verify the OG cards** through the LinkedIn and Twitter debuggers, now the
+   domain resolves. [user]
+
+4. **Refresh the Supabase Security Advisor** and confirm the 10 RLS errors from
+   migration 013 are cleared. [user, Supabase dashboard]
 
 5. **The 2026-06-21 enquiry still has no reply recorded.** Leslie Merricroft,
    Al-Mashrea Law Firm, in `/admin/contact-submissions`. Opened but not marked
    responded, now roughly eight weeks on. The other submission, 2026-07-02, is
-   spam. Read is not answered, and this is the most overdue item here. [user]
+   spam. Read is not answered, and this is the oldest thing on this page. [user]
+
+### Content that can arrive whenever
+
+None of this blocks a launch, and each degrades gracefully today.
+
+6. **Case Studies and Insights have no rows**, so both are out of the sitemap and
+   their footer links are hidden. **Both reverse themselves as content arrives,
+   but not the same way.** The sitemap is derived from the row count, so the
+   first entry puts a page back with no code change. The footer link is a switch
+   in **Footer Links**. The routes are untouched and still return 200. `/team`
+   is the pattern to copy if either is turned on: one line each in
+   `fetchSuppressedNavHrefs`, and the footer link can then ship visible.
+
+7. **Testimonials has no rows either**, but it is now the collection most likely
+   to fill on its own: the submission form is placed on `/contact` and home and
+   needs only the switch under Testimonials turned on, or a private link sent to
+   a specific client. Both section placements ship hidden as well, so turning the
+   switch on is two steps rather than one.
+
+8. **`/team` is live but thin**, holding the founding partner alone. Adding the
+   analytical bench is content work, not code.
+
+9. **Partner logos** on `/network`. The page degrades without them. A new image
+   host needs a line in `next.config.ts` `images.remotePatterns`; Supabase and
+   Cloudinary are already allowed. [user provides; assistant wires]
 
 ### Credential rotations
 
-6. Three, in rough order of exposure. None is technically blocking; all three are
-   worth doing before the site is public.
-   - **FMP API key.** Pasted into a chat transcript on 2026-08-11, live in
-     `.env.local`, and needed on Vercel. Read-only content feed, so the blast
-     radius is small. Rotate on FMP, update both places.
-   - **Brevo API key.** Not yet on Vercel. Generate it fresh at that point rather
-     than reusing anything already transcribed.
-   - **Admin password.** Rotated 2026-08-02 at bcrypt cost 12 and verified dead
-     against the old value, but the replacement was typed into a chat transcript.
-     `npm run rotate-admin-password` sets one that has never been transcribed.
-
-### Assets, all of which degrade gracefully today
-
-7. ~~**Carousel card images**~~ and ~~**the `/fmp` two-platform rows**~~ are both
-   **done**: all ten carousel slots and both platform rows carry their own image,
-   verified rendering. The monogram fallback still covers a slot added later.
-
-8. **Partner logos** on `/network` are the one asset still missing, and the page
-   degrades gracefully without them. The PMBC logo and the Ahmad portrait are both
-   set. Any new image host needs a line in `next.config.ts` `images.remotePatterns`;
-   Supabase and Cloudinary are already allowed. [user provides; assistant wires]
-
-### Collections, which are empty rather than broken
-
-10. **Case Studies, Insights and Testimonials have no rows.** `/case-studies`
-    and `/insights` are out of the site's structure: their footer links were
-    hidden on 2026-08-13 and the same day they left the sitemap. **Both halves
-    reverse themselves as content arrives, but not the same way.** The sitemap is
-    derived from the row count, so the first entry puts a page back with no code
-    change and no decision. The footer link is an operator switch in **Footer
-    Links**. The routes are untouched and still return 200. [user populates]
-
-    > **Team is no longer one of them.** Phase 44 wired `/team` up: it carries
-    > the founding partner's card, a nav row and a visible footer link, and both
-    > links are gated on the row count rather than left as a switch someone has
-    > to remember. It holds one member, so **the page is live but thin.** Adding
-    > the analytical bench is content work, not code. Note that the seeded card
-    > deliberately keeps a short experience paragraph, since it links through to
-    > the full profile.
-    >
-    > That gate is now the pattern to copy if Case Studies or Insights are ever
-    > turned on: one line each in `fetchSuppressedNavHrefs`, and their footer
-    > links can then ship visible like Team's.
-
-    > Testimonials was not empty only because nobody had written any: **the form
-    > could not save one.** `testimonials` is the only collection table without
-    > an `updated_at` column, while `createCollectionApi` stamps one by default,
-    > so every create and update returned a 400. That dated to the Phase 10 build
-    > in June and was found and fixed on 2026-08-01. It is genuinely writable now.
+10. Two left, neither blocking. The Brevo key closed itself when the account
+    moved.
+    - **FMP API key.** Pasted into a chat transcript on 2026-08-11, live in
+      `.env.local`, and needed on Vercel. Read-only content feed, so the blast
+      radius is small. Rotate on FMP, update both places.
+    - **Admin password.** Rotated 2026-08-02 and verified dead against the old
+      value, but the replacement was typed into a chat transcript. The console now
+      has a **Change Password** screen with an emailed code, so this no longer
+      needs `npm run rotate-admin-password` or a terminal at all.
 
 ### Decisions, not gaps
 
 11. **Two nav rows are hidden.** `site_pages` carries **Approach** and **Founder**
-    with `visible = false`. `/approach` is unreferenced everywhere (migration
-    052, plus the footer, sitemap and fallback-nav removals), so it renders only
-    for someone holding the URL: it should either be restored to the navigation
-    or retired properly. `/about/ahmad-din` is different, since the home founder
-    card still links to it, which is a content link rather than navigation.
-    Restoring either is one switch in Pages & Nav plus one line in `sitemap.ts`.
+    with `visible = false`. `/approach` is unreferenced everywhere, so it renders
+    only for someone holding the URL: it should either be restored to the
+    navigation or retired properly. `/about/ahmad-din` is different, since the
+    home founder card still links to it, which is a content link rather than
+    navigation. Restoring either is one switch in Pages & Nav plus one line in
+    `sitemap.ts`.
 
 12. **LinkedIn on the home founder card.** The URL is live on the
     `/about/ahmad-din` hero and the company URL is in the footer. The home card's
-    secondary slot held "Connect on LinkedIn" with an empty href until Phase 21.5
-    repurposed it for "Book a Meeting". Decide whether it should carry LinkedIn
-    as well as, or instead of, booking. One line either way.
-
-### Post-deploy verification
-
-13. Submit `https://pacemakersglobal.com/sitemap.xml` to Google Search Console
-    and verify ownership by DNS TXT.
-14. Refresh the **Supabase Security Advisor** and confirm the 10 RLS errors from
-    migration 013 are cleared. [user, Supabase dashboard]
-15. **Verify OG cards** through the LinkedIn and Twitter card debuggers once the
-    domain resolves.
-16. **Send one real contact submission** and read both emails. The templates and
-    the shell are verified separately but the assembled HTML has never been sent,
-    because sending it writes a row into the live enquiry list and mails the
-    advisory inbox. Worth doing once, alongside the Brevo key rotation above.
+    secondary slot carries "Book a Meeting". Decide whether it should carry
+    LinkedIn as well as, or instead of, booking. One line either way.
 
 ### Not ours
 
-17. **FMP edge caching.** FMP's public feed sets `Cache-Control: public,
+13. **FMP edge caching.** FMP's public feed sets `Cache-Control: public,
     max-age=60` on an authenticated endpoint, and Vercel's edge cache key does
     not vary on `x-api-key`. For up to 60 seconds after any legitimate fetch,
     that URL is served from the edge to anyone, with no key or a wrong one.
@@ -1091,7 +1059,10 @@ EMAIL_FROM_CONTACT=
 FMP_API_URL=https://app.financialmodelerpro.com
 FMP_API_KEY=
 
-# hCaptcha
+# hCaptcha. NOT REQUIRED since 2026-08-16: the contact and testimonial forms use
+# a honeypot and a timing floor instead. The hCaptcha path is still wired and
+# dormant, so setting both of these turns it back on with no code change. Unset,
+# verifyHcaptcha passes everything through.
 HCAPTCHA_SECRET_KEY=
 NEXT_PUBLIC_HCAPTCHA_SITE_KEY=
 
