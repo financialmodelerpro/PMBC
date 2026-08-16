@@ -19,7 +19,9 @@ export type SectionType =
   | 'media'
   | 'prose_checklist'
   | 'feature_cards'
-  | 'audience_carousel';
+  | 'audience_carousel'
+  | 'contact_body'
+  | 'booking_body';
 
 export type SectionTypeMeta = {
   type: SectionType;
@@ -268,6 +270,50 @@ export const SECTION_TYPES: SectionTypeMeta[] = [
       eyebrow: '',
       heading: '',
       width: 'full',
+    },
+  },
+  {
+    type: 'contact_body',
+    label: 'Contact body',
+    description:
+      'The /contact enquiry form and the direct-contact column beside it. One section, because the two columns are one grid.',
+    implemented: true,
+    // The wording migration 066 carried over from cms_content. A hand-added
+    // section starts from the same copy the page already shows.
+    defaultContent: {
+      form_eyebrow: 'Enquiry',
+      form_heading: 'Tell us about the mandate',
+      form_response_note: '',
+      booking_prompt: 'Prefer to talk?',
+      booking_body: 'Book a 60 minute advisory meeting directly with Ahmad.',
+      booking_cta_label: 'Book a Meeting',
+      direct_eyebrow: 'Direct',
+      direct_heading: 'Other ways to reach us',
+      direct_intro: 'For urgent matters or referrals, you can reach the firm directly.',
+      founder_name: 'Ahmad Din',
+      founder_heading: 'Speak directly with the founder',
+      founder_body:
+        'Every mandate at PaceMakers is partner-led. If you would rather discuss your situation before writing it down, book a call.',
+      founder_cta_label: 'Book a Meeting',
+    },
+  },
+  {
+    type: 'booking_body',
+    label: 'Booking body',
+    description:
+      'The /book calendar band and the direct routes under it. The calendar URL itself is a site setting, not copy.',
+    implemented: true,
+    defaultContent: {
+      calendar_eyebrow: 'Select a time',
+      fallback_prompt: 'Trouble viewing the calendar?',
+      fallback_link_label: 'Open Calendly directly',
+      empty_heading: 'The calendar is being set up',
+      empty_body:
+        'Self-service booking is not live yet. Reach us directly and we will find a time.',
+      alternatives_label: 'Other ways to reach us',
+      alternatives_text:
+        'You can also write to us directly, or send the mandate details through the contact form.',
+      contact_form_label: 'Send a message',
     },
   },
   {

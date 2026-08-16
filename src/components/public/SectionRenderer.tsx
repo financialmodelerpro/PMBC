@@ -25,7 +25,10 @@ import { MediaSection } from './sections/MediaSection';
 import { ProseChecklist } from './sections/ProseChecklist';
 import { FeatureCards } from './sections/FeatureCards';
 import { AudienceCarousel } from './sections/AudienceCarousel';
+import { ContactBody } from './sections/ContactBody';
+import { BookingBody } from './sections/BookingBody';
 import { SectionPlaceholder } from './sections/Placeholder';
+import type { SectionContext } from '@/lib/public/sectionContext';
 
 type SectionRow = {
   id: string;
@@ -52,6 +55,12 @@ type RendererProps = {
    * simply ignore the prop.
    */
   media?: SectionMediaValue | null;
+  /**
+   * Per-request data no section row can hold: published contact routes, the
+   * booking URL, the founder portrait, the `?service=` pre-fill. Supplied by
+   * the route. Renderers that do not need it ignore the prop.
+   */
+  context?: SectionContext;
 };
 
 const REGISTRY: Record<
@@ -77,6 +86,8 @@ const REGISTRY: Record<
   prose_checklist: ProseChecklist,
   feature_cards: FeatureCards,
   audience_carousel: AudienceCarousel,
+  contact_body: ContactBody,
+  booking_body: BookingBody,
 };
 
 /**
@@ -108,6 +119,11 @@ const DEFAULT_VARIANT: Record<string, PmbcVariant> = {
   prose_checklist: 'white',
   feature_cards: 'cream',
   audience_carousel: 'cream',
+  // Both follow a hero on their own page, so the alternation puts them on cream
+  // anyway. Stated here for the case of one rendered outside a sequence, and
+  // because cream is the surface the hardcoded markup carried before the move.
+  contact_body: 'cream',
+  booking_body: 'cream',
 };
 
 function readVariant(
@@ -186,9 +202,11 @@ function resolveVariantSequence(
 export function SectionRenderer({
   section,
   variant,
+  context,
 }: {
   section: SectionRow;
   variant?: PmbcVariant;
+  context?: SectionContext;
 }) {
   const content = asObject(section.content);
   const styles = asObject(section.styles);
@@ -204,7 +222,13 @@ export function SectionRenderer({
     ? readSectionMedia(content)
     : null;
   return (
-    <Component content={content} styles={styles} variant={resolved} media={media} />
+    <Component
+      content={content}
+      styles={styles}
+      variant={resolved}
+      media={media}
+      context={context}
+    />
   );
 }
 
@@ -212,12 +236,23 @@ export function SectionRenderer({
  * Render a list of sections with sequence-aware variant resolution. Use this
  * for home/firm pages where rhythm matters.
  */
-export function SectionList({ sections }: { sections: SectionRow[] }) {
+export function SectionList({
+  sections,
+  context,
+}: {
+  sections: SectionRow[];
+  context?: SectionContext;
+}) {
   const variants = resolveVariantSequence(sections);
   return (
     <>
       {sections.map((s) => (
-        <SectionRenderer key={s.id} section={s} variant={variants.get(s.id)} />
+        <SectionRenderer
+          key={s.id}
+          section={s}
+          variant={variants.get(s.id)}
+          context={context}
+        />
       ))}
     </>
   );

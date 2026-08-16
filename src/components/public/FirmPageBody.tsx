@@ -2,6 +2,7 @@ import type { Tables } from '@/types/database';
 
 import { SectionList } from './SectionRenderer';
 import { PageHeroFallback } from './PageHeroFallback';
+import type { SectionContext } from '@/lib/public/sectionContext';
 
 type Section = Tables<'page_sections'>;
 
@@ -19,16 +20,19 @@ type Section = Tables<'page_sections'>;
 export function FirmPageBody({
   sections,
   fallbackHero,
+  context,
 }: {
   sections: Section[];
   fallbackHero: { eyebrow: string; headline: string; tagline?: string };
+  /** Per-request data for section types that need it. Only /book passes one. */
+  context?: SectionContext;
 }) {
   const firstIsHero = sections[0]?.section_type === 'hero';
 
   return (
     <>
       {!firstIsHero && <PageHeroFallback {...fallbackHero} />}
-      <SectionList sections={sections} />
+      <SectionList sections={sections} context={context} />
     </>
   );
 }
