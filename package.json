@@ -52,7 +52,8 @@
     "seed-logo-trim": "node scripts/seed-logo-trim.mjs",
     "seed-home-content-pass": "node scripts/seed-home-content-pass.mjs",
     "seed-founder-card-body": "node scripts/seed-founder-card-body.mjs",
-    "seed-fmp-page-pass": "node scripts/seed-fmp-page-pass.mjs"
+    "seed-fmp-page-pass": "node scripts/seed-fmp-page-pass.mjs",
+    "seed-contact-page-copy": "node scripts/seed-contact-page-copy.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

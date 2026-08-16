@@ -96,6 +96,7 @@ When you find an em dash in *existing* content while doing other work, fix it as
 | 46 | 2026-08-15 | Home content pass: the count that did not match its list, the founder proof points labelled as career rather than firm figures, the four generic verbs replaced with how the work is actually run, one call to action per section, and one label for the booking action. |
 | 47 | 2026-08-15 | The home founder card rewritten to say who Ahmad is and what he brings, rather than restating the delivery model the firm introduction had already given the reader two screens earlier. |
 | 48 | 2026-08-15 | `/fmp` content pass: the launching-soon contradiction corrected against the card, the four-paragraph intro cut to two that answer why a firm carries a platform, "What you get" restored to six, one CTA per section, and the certification section folded into the Training Hub card it repeated. |
+| 49 | 2026-08-16 | `/contact` copy became content. Six strings moved out of the route file, and the booking callout's three keys moved from the `booking` group to `contact`, where the rest of the page's copy already was. No wording changed. |
 
 **Full detail for every phase, including the reasoning and the things that went wrong, is in [`PHASE_HISTORY.md`](./PHASE_HISTORY.md).** It was split out of this file on 2026-08-13 for the reason stated at the top of it: this file is loaded into context at the start of every session, and that table had grown to 75KB.
 
@@ -720,6 +721,7 @@ Three flags matter when rebuilding:
 061  home_content_pass         the count that did not match its list, the founder proof points labelled, the engagement model rewritten, one CTA per section
 062  home_founder_card_body    the founder card stops restating the firm introduction's delivery model
 063  fmp_page_pass             the intro cut and corrected, the checklist restored to six, one CTA per section, the certification section folded into the card
+064  contact_page_copy         the /contact body copy becomes content: six strings out of the route file, and the booking callout's three keys moved from `booking` to `contact`
 ```
 
 After running migrations, manually insert one admin_users row via SQL with a bcrypt hash for the password.

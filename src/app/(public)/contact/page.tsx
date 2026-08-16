@@ -40,16 +40,19 @@ export default async function ContactPage(props: {
   const defaultServiceTitle =
     SERVICES.find((s) => s.slug === serviceSlug)?.title ?? undefined;
 
-  const [sections, settings, bookingCopy, contactCopy, founderPhotoUrl] =
-    await Promise.all([
-      fetchPageSections('contact', { onlyVisible: !isPreview }),
-      safe(fetchSiteSettings(), {}),
-      safe(fetchContentBySection('booking'), {} as Record<string, string>),
-      safe(fetchContentBySection('contact'), {} as Record<string, string>),
-      // Read from the founder_hero section rather than hardcoded: uploading a
-      // new portrait in the page builder updates this card too.
-      safe(fetchFounderPhotoUrl(), null),
-    ]);
+  // Every string on this page below the hero lives in cms_content under the
+  // `contact` section, including the booking callout, whose three keys moved
+  // out of `booking` in migration 064 because nothing else read them. The
+  // literals below are fallbacks only, so a database missing that migration
+  // renders the same page.
+  const [sections, settings, contactCopy, founderPhotoUrl] = await Promise.all([
+    fetchPageSections('contact', { onlyVisible: !isPreview }),
+    safe(fetchSiteSettings(), {}),
+    safe(fetchContentBySection('contact'), {} as Record<string, string>),
+    // Read from the founder_hero section rather than hardcoded: uploading a
+    // new portrait in the page builder updates this card too.
+    safe(fetchFounderPhotoUrl(), null),
+  ]);
 
   const hcaptchaSiteKey = process.env.NEXT_PUBLIC_HCAPTCHA_SITE_KEY || null;
 
@@ -66,18 +69,17 @@ export default async function ContactPage(props: {
             <div className="lg:col-span-7">
               <div className="rounded-lg border border-[color:var(--pmbc-border)] bg-white p-8 shadow-[0_1px_3px_rgba(15,37,64,0.04)] sm:p-10">
                 <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-[color:var(--pmbc-primary)]">
-                  Start a conversation
+                  {contactCopy.form_eyebrow || 'Start a conversation'}
                 </p>
                 <h2 className="mt-3 font-serif text-2xl font-semibold tracking-tight text-[color:var(--pmbc-text)] sm:text-3xl">
-                  Tell us about the mandate
+                  {contactCopy.form_heading || 'Tell us about the mandate'}
                 </h2>
                 <p className="mt-3 text-[14px] leading-relaxed text-[color:var(--pmbc-muted)]">
-                  We respond to every credible enquiry within one to two business days.
+                  {contactCopy.form_response_note ||
+                    'We respond to every credible enquiry within one to two business days.'}
                 </p>
 
-                {/* Booking callout. Copy lives in cms_content under the
-                    `booking` section, with fallbacks here so the callout still
-                    reads correctly on a database missing migration 039. */}
+                {/* Booking callout. */}
                 <div className="mt-7 flex flex-col gap-5 border-l-[3px] border-[color:var(--pmbc-accent)] bg-[color:var(--pmbc-surface-cream)] p-6 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
                   <div className="flex items-start gap-4">
                     <CalendarDays
@@ -88,10 +90,10 @@ export default async function ContactPage(props: {
                     />
                     <div>
                       <p className="font-serif text-[18px] font-semibold text-[color:var(--pmbc-primary)]">
-                        {bookingCopy.contact_prompt || 'Prefer to talk?'}
+                        {contactCopy.booking_prompt || 'Prefer to talk?'}
                       </p>
                       <p className="mt-1.5 text-[14px] leading-relaxed text-[color:var(--pmbc-muted)]">
-                        {bookingCopy.contact_callout_body ||
+                        {contactCopy.booking_body ||
                           'Book a 60 minute advisory meeting directly with Ahmad.'}
                       </p>
                     </div>
@@ -101,7 +103,7 @@ export default async function ContactPage(props: {
                     className="inline-flex shrink-0 items-center justify-center border border-[color:var(--pmbc-primary)] bg-[color:var(--pmbc-primary)] px-6 py-3 text-[12px] font-semibold uppercase text-[color:var(--pmbc-text-on-dark)] transition duration-200 hover:border-[color:var(--pmbc-accent)] hover:bg-[color:var(--pmbc-accent)] hover:text-[color:var(--pmbc-primary-deep)]"
                     style={{ letterSpacing: '0.12em' }}
                   >
-                    {bookingCopy.contact_callout_cta || 'Book a Meeting'}
+                    {contactCopy.booking_cta_label || 'Book a Meeting'}
                   </Link>
                 </div>
 
@@ -118,13 +120,14 @@ export default async function ContactPage(props: {
             {/* Contact info column */}
             <div className="lg:col-span-5">
               <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-[color:var(--pmbc-primary)]">
-                Direct
+                {contactCopy.direct_eyebrow || 'Direct'}
               </p>
               <h3 className="mt-3 font-serif text-2xl font-semibold tracking-tight text-[color:var(--pmbc-text)]">
-                Other ways to reach us
+                {contactCopy.direct_heading || 'Other ways to reach us'}
               </h3>
               <p className="mt-3 text-[14px] leading-relaxed text-[color:var(--pmbc-muted)]">
-                For urgent matters or referrals, you can reach the firm directly.
+                {contactCopy.direct_intro ||
+                  'For urgent matters or referrals, you can reach the firm directly.'}
               </p>
 
               <ul className="mt-8 space-y-5">
