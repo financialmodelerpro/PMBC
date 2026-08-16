@@ -1,3 +1,44 @@
+## Phase summary index
+
+One line per phase, moved out of `CLAUDE.md` on 2026-08-16 so that file carries
+current state rather than a log. The detailed rows are below this index.
+| Phases | Date | What they left behind |
+|--------|------|-----------------------|
+| 1 to 8 | 2026-04-30 to 05-03 | Scaffold, Supabase, auth, admin shell, CMS foundations, page builder, all 13 section types, the bespoke public routes, SEO and OG. |
+| 9 | ongoing | Content population and launch. **The only phase still open, and everything left in it is operational rather than code.** See the launch checklist below. |
+| 9.5 | 2026-05-06 | The visual system: design tokens, `SectionContainer` / `SectionIntro`, three background variants, all 13 renderers redesigned around them. |
+| 10 | 2026-06-10 | Advisory collections: Services, Case Studies, Team, Insights, Testimonials as tables plus a shared `CollectionManager`. Migrations 021 to 026. |
+| 11 | 2026-07-30 | FMP-parity admin structure, `site_pages` as the navbar source of truth, and the palette retune to navy `#1B3A5F` / gold `#C69C3E`. |
+| 12 to 19 | 2026-08-01 to 08-02 | The eight-part FMP admin-parity programme, now closed: header consolidation, green save semantics, per-section save, page create and delete, StyleEditor, rich-text upgrades, output sanitising, audit log viewer, testimonials moderation. |
+| 20 | 2026-08-02 | Founder profile at `/about/ahmad-din`. Reverses the original "no duplicate founder content" rule; the reasoning is recorded in Critical Reminder 4. |
+| 21, 21.5 | 2026-08-10 | Booking page `/book` with a Calendly embed reading `site_settings.booking_url`, then the CTA prominence pass that repointed the navbar button at it. |
+| 22, 33 | 2026-08-10, 08-11 | Media: `MediaField` everywhere, video and GIF support, then direct-to-storage uploads by signed URL after a body-size limit killed a video upload. |
+| 23 to 26 | 2026-08-10 | Footer logo sizing, favicon wired to the CMS (it was still the create-next-app default), container alignment and hero refinements, Brevo replacing Resend. |
+| 27, 31, 37 | 2026-08-10 to 08-12 | Optional media on every section type, then the two-column split and standalone `media` section, then the maximum-height control. |
+| 28 to 30 | 2026-08-10 to 08-11 | Firm prominence: the founder's career figures separated from the firm's own, partner-led framing, `/about` merged into home, then the home founder card restored. |
+| 32 | 2026-08-11 | Service 06 renamed to Real Estate Financial Modeling at `/services/refm`. The slug is a join key in four places; migration 047 moves all four. |
+| 34 to 36 | 2026-08-11 | The FMP platform arm: three sub-pages fed live from FMP's public API, then the parent page rebuilt at `/fmp`, then its capability tags folded into the hero. |
+| 38 to 40 | 2026-08-12 | Structural passes: hero parity at 630px across all fifteen routes, one cream and white alternation with navy reserved for heroes, home resequenced and cut, services dropdown, footer shortened. |
+| 41 | 2026-08-13 | Footer links became content with per-link visibility, the nine service links became one, Book a Meeting moved to Contact, dropdown rows evened, `/fmp` certification band replaced, empty collections dropped from the sitemap by row count. |
+| 42 | 2026-08-13 | Contact form country controls, the two transactional emails rebuilt on FMP's shell structure in PMBC's palette, and the new `/confidentiality` statement. |
+| 43 | 2026-08-13 | The phone country control became a searchable ARIA combobox, and `/fmp`'s two platforms became full-width stacked rows with media slots. |
+| 44 | 2026-08-15 | `/team` wired up: the founding partner's card seeded from the founder profile rather than retyped, the admin editor cut to the seven fields a card renders, and the navbar and footer links gated on the row count the way the sitemap already was. |
+| 45 | 2026-08-15 | The navbar container measured rather than assumed (it was correct), the nav given room after Team filled the row, then the two logo files trimmed of the transparent margins that were the real cause of the indent, with all five dependent heights retuned. |
+| 46 | 2026-08-15 | Home content pass: the count that did not match its list, the founder proof points labelled as career rather than firm figures, the four generic verbs replaced with how the work is actually run, one call to action per section, and one label for the booking action. |
+| 47 | 2026-08-15 | The home founder card rewritten to say who Ahmad is and what he brings, rather than restating the delivery model the firm introduction had already given the reader two screens earlier. |
+| 48 | 2026-08-15 | `/fmp` content pass: the launching-soon contradiction corrected against the card, the four-paragraph intro cut to two that answer why a firm carries a platform, "What you get" restored to six, one CTA per section, and the certification section folded into the Training Hub card it repeated. |
+| 49 | 2026-08-16 | `/contact` copy became content. Six strings moved out of the route file, and the booking callout's three keys moved from the `booking` group to `contact`, where the rest of the page's copy already was. No wording changed. |
+| 50 | 2026-08-16 | Three copy corrections on `/contact`: the form eyebrow stopped repeating the hero headline, the response-time line was cleared as a repeat of the hero, and the founder card moved from naming one person to the partner-led wording the rest of the site uses. Clearing a field was also made to mean something: an empty value now renders nothing rather than falling back to the shipped default. |
+| 51 | 2026-08-16 | Page copy left the key-value store. `/contact` and `/book` are edited entirely in the page builder through two new section types, `contact_body` and `booking_body`, and the 21 `cms_content` rows behind them are gone. `/admin/content` is back to global keys. Settings that are not copy (the three addresses, WhatsApp, the office line, the Calendly URL) deliberately stayed in Site Settings. |
+| 57 | 2026-08-16 | The three legal statements came off review: the "Subject to legal review" badge is off `/privacy`, `/terms` and `/confidentiality`, all three are dated 16 August 2026, and the two clauses that deferred to counsel now state Pakistani governing law with the courts of Lahore holding exclusive jurisdiction. The terms clause is explicitly scoped to the Website, since section 4 already gives mandates to the engagement letter. |
+| 56 | 2026-08-16 | `/team`, `/case-studies` and `/insights` got a `cms_pages` row and a `hero` section each, so their opening copy is edited in the builder like every other page. None of the three had a page row before, so none appeared in the page list. `FirmPageBody` keeps the shipped copy as a code fallback, and the collections still feed the cards. Two alignments went in with it: the team hero says partner-led, and Ahmad's card says Saudi Arabia, the GCC, and Pakistan. |
+| 55 | 2026-08-16 | The closing block on all nine service detail pages: eyebrow "Engage PMBC" to "Engage PaceMakers", two CTAs cut to one relabelled "Send an Enquiry" (keeping the `?service=` pre-fill), the response-time sentence removed as a repeat of the contact page, and the heading fixed. It had lowercased the service title and guessed the article, producing "Discuss a m&a advisory mandate". Casing is preserved and the article comes from `indefiniteArticle` in `src/lib/public/grammar.ts`, which resolves initialisms by the spoken name of the first letter, so M&A takes "an" and CFO takes "a". |
+| 54 | 2026-08-16 | `/services` gained "How an engagement runs" between the nine cards and the closing CTA: a `paragraphs` section at order 27 saying who scopes the mandate, how the model is built, where the documents come from, and what happens to the model after delivery. `paragraphs` gained an optional eyebrow to carry it, on the same contract as the optional heading before it. |
+| 53 | 2026-08-16 | Three fixes. The `/services` card grid became a `service_grid` section, so a `cta_block` dragged below it now renders below it (it had been written into the route file and rendered last regardless). Clearing a field in the page builder now clears it: every string in `contact_body` and `booking_body` was read with `||`, so an empty value fell back to the shipped default and looked like a save that failed. And `/book` offers `advisory@` rather than `info@`, chosen in the renderer so the footer and the `/contact` general row keep publishing `info@`. |
+| 52 | 2026-08-16 | The nine service pages followed: each `service_<slug>` namespace became one `service_detail` section on its own page, so a Builder button that opened onto an empty page now opens onto the copy that renders. 81 rows became 9. `show_header` moved from a route prop into the section row, `deliverables` became a real JSONB array, and the number, title and summary stayed in `config/services.ts` because six other surfaces read them. Also: `founder_block` gained a `photo_alt` field, defaulting to empty, so the portrait stops repeating the name a screen reader already gets from the heading beside it. |
+
+---
+
 # PMBC Phase History
 
 Every phase of the build, in the order the rows were written, with the reasoning
@@ -91,3 +132,70 @@ of a working session, including what was tried and abandoned, read
 | Phase 56 : the three collection pages get CMS heroes | Complete (2026-08-16) | `/team`, `/case-studies` and `/insights` were the last routes whose opening copy lived only in a `.tsx` file. Each rendered `PageHeroFallback` with three hardcoded strings, and **none had a `cms_pages` row at all**, so they did not appear in the page list: there was no builder to open onto them, and changing an eyebrow meant a deploy. Each now has a page row and one `hero` section carrying the eyebrow, headline and subtitle it already showed. **No new section type was needed**, because `hero` is visually identical to `PageHeroFallback` given the same three strings: same 70vh frame, same gold hairline, same type scale, same scroll chevron. That was read from both components rather than assumed, and it is what makes this a move rather than a redesign. Each route now renders through `FirmPageBody`, which is the existing pattern from the five firm pages: the CMS sections when they exist, the shipped copy when they do not, so **a database without migration 070 renders the same page it rendered before**. The routes also gained `?preview=1`, so the builder's preview pane works on them for the first time, and their `generateMetadata` now reads the `cms_pages` row, which makes the title and description editable too. **The collections are untouched**: team cards still come from `team_members`, case studies from `case_studies`, articles from `articles`. Two wording fixes went in with it, both alignments rather than rewrites: the team hero said "Every mandate is led directly by a partner" where the rest of the site says partner-led (Critical Reminder 3b), and Ahmad's card said "across KSA and Pakistan" where his bio on home says "across Saudi Arabia, the GCC, and Pakistan" (Critical Reminder 5 leads with KSA and GCC). **Migration 070 was applied from the SQL editor rather than through its seed script**, which was visible in the data: every row carried one identical transaction timestamp, where the script's separate calls would have produced three. The script was then run in apply mode anyway, reported seven skips, and its read-back verification confirmed the applied state matched the intended one field by field. Verified against a running build: all nine strings render verbatim, each page shows exactly one hero band, editing the row moves the page, hiding the section falls back to the shipped copy with still exactly one band, `?preview=1` shows the hidden section, the collection cards survive, and all three take their title tag from their page row. `verify-page-rhythm` passes 205 of 205. **One thing left alone and worth noting**: the team page's meta description still reads "Senior practitioners who lead every mandate directly", the same claim in the same shape as the hero line that was corrected. It was carried across unchanged because the instruction was to carry the wording, and it is now editable in the admin. |
 
 | Phase 57 : the three legal statements come off review | Complete (2026-08-16) | `/privacy`, `/terms` and `/confidentiality` each carried a gold badge reading "Subject to legal review. To be finalised by counsel before launch." It is off all three, all three are dated 16 August 2026, and the two clauses that deferred to counsel in the body are replaced by plain statements. Privacy section 11 and terms section 11 now say the documents are governed by the laws of the Islamic Republic of Pakistan, where PaceMakers Business Consultants LLP is constituted, with the courts of Lahore holding exclusive jurisdiction. **`verify-contact-and-legal` had three assertions requiring the badge to be present.** They were inverted rather than deleted, and the reason is written beside them: the notice disclaims the whole page it sits on, so restoring it by accident would be a regression rather than a neutral edit. Six further assertions were added: nothing on any of the three defers to counsel, both of privacy and terms state the governing law and name the forum, and the terms clause carries its scope sentence. 104 of 104 passing. **The terms clause gained a sentence the instruction did not ask for**, and it is the substantive part of this change: "This clause governs use of the Website only. As set out in section 4, the terms of any mandate, including the law governing it, are those of the signed engagement letter." Without it, a reader arriving at a governing-law heading on a page titled Terms could reasonably read exclusive Lahore jurisdiction as covering their mandate, which is exactly what section 4 says it does not. **The question the user asked was answered rather than deflected.** For website terms of use the clause is unremarkable and correct: the operator is a Pakistani LLP, and this document governs browsing a website, not a transaction. The exposure is if the same clause is carried into an engagement letter, where a Saudi family office is unlikely to accept exclusive Lahore jurisdiction and a Pakistani judgment is not readily enforceable in KSA. The standard answer for a firm in this position is arbitration seated in a neutral New York Convention venue, DIFC or ADGM, and that belongs in the engagement letter rather than on this website. Also closed the corresponding launch-checklist item and removed privacy and terms from the known-em-dash list, both measured at zero while the files were open. |
+
+---
+
+## The original build sequence
+
+The plan phases 1 to 9 were written against, moved out of `CLAUDE.md` on
+2026-08-16. Every phase here is complete except 9, whose remaining items are
+operational and tracked in the launch checklist in `CLAUDE.md`. It is kept
+because it records what each phase was scoped to deliver, which is not
+recoverable from the code.
+
+
+Follow this order. Don't skip ahead. Each phase is testable on its own.
+
+### Phase 1: Scaffold and Database (Day 1): ✅ Complete (2026-04-30)
+1. `npx create-next-app@latest` with TypeScript, Tailwind, App Router, src/ directory, Turbopack
+2. Install dependencies (see Section 2)
+3. Set up Supabase project, get keys, populate `.env.local`
+4. Run migrations 001-008
+5. Insert one admin user via SQL with bcrypt hash
+6. Verify Supabase connection from a server component
+
+### Phase 2: Auth and Admin Shell (Day 1-2): ✅ Complete (2026-05-02)
+1. NextAuth config with credentials provider hitting admin_users
+2. Middleware protecting `/admin/*`
+3. Admin login page
+4. Admin layout (sidebar nav, header with logout)
+5. Empty admin dashboard
+
+### Phase 3: CMS Foundations (Day 2-3): ✅ Complete (2026-05-02)
+1. cms_content key-value editor at `/admin/content`
+2. Branding admin at `/admin/branding`
+3. Site settings at `/admin/settings`
+4. Email branding and templates admin
+
+### Phase 4: Page Builder (Day 3-5): ✅ Complete (2026-05-02)
+1. `/admin/pages` listing
+2. `/admin/page-builder/[slug]` three-pane layout
+3. Section editors for: hero, paragraphs, stats_block, service_cards (start with these four)
+4. Drag-and-drop reorder
+5. Save and visibility toggle
+
+### Phase 5: Public Pages: Core (Day 5-7)
+1. Root layout with Navbar + Footer (CMS-driven)
+2. Section renderer with the four section types built so far
+3. Home page rendering from page_sections
+4. Services overview page
+5. Contact page with form, contact API route, email templates wired up
+
+### Phase 6: Remaining Section Types (Day 7-9): ✅ Complete (2026-05-03)
+Editors + public renderers shipped for the 9 outstanding types: `sector_grid`, `process_steps`, `network_partners`, `founder_block`, `text_image`, `cta_block`, `quote`, `fmp_intro`, `service_detail`. All marked `implemented: true` in `SECTION_TYPES`; `SectionRenderer` and `SectionEditorPanel` registries cover all 13 types. Shared 21-icon lucide registry at `src/lib/cms/sectorIcons.tsx` powers both the sector-grid editor dropdown and the public renderer.
+
+### Phase 7: Remaining Pages (Day 9-11): ✅ Complete (2026-05-03)
+Bespoke routes shipped at `src/app/(public)/{about,sectors,approach,network,financial-modeler-pro}/page.tsx`, plus `src/app/(public)/services/[slug]/page.tsx` for the 9 service detail pages. The catch-all `(public)/[slug]/page.tsx` was deleted: all CMS-managed pages now have explicit routes; missing pages 404 explicitly rather than silently rendering an unconfigured slug. Service-detail content lives in `cms_content` under namespace `service_<slug>` (migration 010); the route renderer parses `deliverables` robustly (JSON first, newline-split fallback). `src/app/sitemap.ts` and `src/app/robots.ts` shipped alongside.
+
+### Phase 8: SEO and Polish (Day 11-13): ✅ Complete (2026-05-03)
+Dynamic OG image route at `/api/og` (`next/og` ImageResponse, 1200×630, navy + gold, branding-driven). Shared `src/lib/seo/metadata.ts` `buildPageMetadata()` helper drives unique title / canonical / OG / twitter on every public page, auto-routing OG images to `/api/og?…` when no override is set. Schema.org `@graph` (FinancialService + Organization + WebSite) mounted in the public layout via `OrganizationJsonLd`; per-service `Service` schema on `/services/[slug]` linked back via `@id`. Branded 404 in both `(public)/not-found.tsx` (in-group `notFound()`) and root `not-found.tsx` (unmatched URLs); root `error.tsx` client boundary logs digest and offers retry. Privacy + Terms fleshed out with named processors (Vercel, Supabase, Resend, hCaptcha, Google Fonts) and "Subject to legal review" badge. `next.config.ts` adds Supabase + Cloudinary `remotePatterns` and `poweredByHeader: false`. `/admin/og-preview` admin tool with live previews + per-page override-URL save (writes to `cms_pages.og_image_url`). Sitemap and robots already shipped in Phase 7.
+
+### Phase 9: Content Population and Launch (Day 13-15)
+1. Populate all cms_content rows with real copy
+2. Populate page_sections for all pages with real content
+3. Configure DNS at Vercel
+4. SSL provisioning verification
+5. Final QA pass on all pages
+6. Submit sitemap to Google Search Console
+
+---

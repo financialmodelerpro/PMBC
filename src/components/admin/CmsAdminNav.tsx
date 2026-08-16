@@ -648,26 +648,3 @@ const mobileToggleStyle: CSSProperties = {
   borderRadius: 8,
   cursor: 'pointer',
 };
-
-// Re-export legacy props on a small badge component if any future call sites
-// need to render an external link button inline.
-export function ExternalLinkButton({ href, label }: { href: string; label: string }) {
-  return (
-    <a
-      href={href}
-      target="_blank"
-      rel="noopener noreferrer"
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 4,
-        fontSize: 12,
-        color: '#1B3A5F',
-        textDecoration: 'none',
-      }}
-    >
-      {label}
-      <ArrowUpRight size={12} />
-    </a>
-  );
-}

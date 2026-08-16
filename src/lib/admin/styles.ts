@@ -2,7 +2,7 @@
  * Shared admin design tokens + inline style presets.
  *
  * Admin pages intentionally use inline styles instead of Tailwind utility
- * classes — this isolates the admin console from any future public-site
+ * classes. This isolates the admin console from any future public-site
  * theming changes. PMBC's admin palette is anchored on the deeper navy
  * (#0F2540) used in the sidebar plus the gold accent (#C69C3E) reserved for
  * activation/highlight states.
@@ -12,9 +12,9 @@ import type { CSSProperties } from 'react';
 export const ADMIN_COLORS = {
   // Brand
   primary: '#1B3A5F', // primary action, link, page heading accent
-  primaryDeep: '#0F2540', // deep navy — body headings, sidebar bg
+  primaryDeep: '#0F2540', // deep navy: body headings, sidebar bg
   sidebar: '#0F2540', // sidebar background
-  accent: '#C69C3E', // gold — active border, premium signal
+  accent: '#C69C3E', // gold: active border, premium signal
 
   /**
    * Save semantics, adopted from FMP CMS_REFERENCE.md section 7.3 in parity
@@ -77,13 +77,6 @@ export const adminCard: CSSProperties = {
   border: `1px solid ${ADMIN_COLORS.border}`,
   borderRadius: ADMIN_LAYOUT.cardRadius,
   padding: ADMIN_LAYOUT.cardPadding,
-};
-
-export const adminCardCompact: CSSProperties = {
-  background: ADMIN_COLORS.cardBg,
-  border: `1px solid ${ADMIN_COLORS.border}`,
-  borderRadius: ADMIN_LAYOUT.cardRadius,
-  padding: 16,
 };
 
 export const adminInput: CSSProperties = {

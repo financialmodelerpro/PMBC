@@ -27,11 +27,3 @@ export function sectionCopy(
   const value = content[key];
   return (typeof value === 'string' ? value : shipped).trim();
 }
-
-/** True when every one of `keys` resolves to empty, so a block can be dropped whole. */
-export function allCopyEmpty(
-  content: Record<string, unknown>,
-  keys: readonly { key: string; shipped: string }[],
-): boolean {
-  return keys.every(({ key, shipped }) => sectionCopy(content, key, shipped) === '');
-}

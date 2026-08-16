@@ -99,10 +99,6 @@ export function isTemplateId(value: string): value is TemplateId {
   return BY_ID.has(value as TemplateId);
 }
 
-export function getTemplate(id: TemplateId): PageTemplate | null {
-  return BY_ID.get(id) ?? null;
-}
-
 /**
  * Expand a template into rows ready for insert into `page_sections`.
  * Returns an empty array for `blank`, which is a valid outcome, not a failure.

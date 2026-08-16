@@ -1690,3 +1690,110 @@ A long session across seven shipped phases. Each has a full row in the `CLAUDE.m
 - Both contact submissions have now been opened, correcting the standing note in `CLAUDE.md` that nobody had opened the inbox. Neither is marked responded. The 2026-06-21 one (Leslie Merricroft, Al-Mashrea Law Firm) still looks genuine.
 
 **Open items are consolidated in the `CLAUDE.md` launch checklist**, updated this session with the credential rotations, the FMP edge-caching issue and the content pass.
+
+---
+
+## 2026-08-16: page copy leaves the key-value store, and the site comes off review
+
+**Nine commits.** The through-line is one idea: **every string a reader sees should
+be editable by the person who wrote it.** The site started the day with page copy
+spread across three places (the page builder, a key-value store, and `.tsx` files)
+and ended it with all of it in the page builder.
+
+Note that `SESSION_LOG.md` has no entries for 2026-08-12 to 08-15. Those sessions
+are recorded in `PHASE_HISTORY.md` (phases 38 to 51) but not narratively here.
+
+### What moved
+
+**`/contact` and `/book`** (migrations 064 to 066). The contact page carried one
+CMS section, a hero, and thirteen `cms_content` rows; `/book` carried eight. Both
+became one section each, `contact_body` and `booking_body`. **One section per page
+body, not one per visual block**, because the contact body's two columns are a
+single grid: split into a section each they would have rendered as stacked bands,
+which is a layout rewrite rather than a move.
+
+**The nine service detail pages** (067). Each had a `cms_pages` row and a Builder
+button that opened onto an empty page, while the copy that rendered sat in
+`cms_content` under `service_<slug>`. 81 rows became 9 `service_detail` sections.
+`show_header` had to move from a React prop into the section row, because the
+section registry passes nothing beyond the row.
+
+**The `/services` card grid** (068). It was written into the route file and
+rendered after `<SectionList>`, so it came last on the page whatever the builder
+showed: a `cta_block` dragged below it came out above it. It is a `service_grid`
+section now.
+
+**The three collection page heroes** (070). `/team`, `/case-studies` and
+`/insights` had no `cms_pages` row at all, so they did not appear in the page list.
+Each now has a page row and a hero section, with `FirmPageBody` keeping the
+shipped copy as a code fallback.
+
+**What deliberately did not move**: the three published addresses, the WhatsApp
+number, the office line and the Calendly URL stay in Site Settings, because they
+are the firm's rather than any one page's. The nine service numbers, titles and
+summaries stay in `config/services.ts`, because six other surfaces read them.
+
+### Two bugs found by moving it
+
+**Clearing a field did nothing.** Every string in the new sections was read with
+`||`, so an empty value fell through to the shipped default and the page
+re-rendered the old copy on every request. From the operator's side that is
+indistinguishable from a save that failed, and it is exactly what happened when
+the booking callout was cleared and saved. The rule now lives in one place,
+`sectionCopy`: **absent means the shipped wording, empty means the operator
+removed it.**
+
+**A smoke-test row from May was doing nothing.** `service-business-valuation`
+carried a `service_detail` section left by a Phase 6 test, at `display_order` 1000
+with `styles = {"smoke":"phase6"}`. It had never rendered, because the route read
+`cms_content`. Migration 067 adopts it rather than adding a second.
+
+### Content and correctness
+
+The closing block on all nine service pages was rebuilt: "Engage PMBC" became
+"Engage PaceMakers" (the abbreviation names this repository, not the firm), two
+CTAs became one labelled "Send an Enquiry", and a response-time promise that the
+contact page repeats on arrival was cut.
+
+**The heading was ungrammatical on three of the nine.** It was
+`Discuss a {title.toLowerCase()} mandate`, giving "Discuss a m&a advisory
+mandate". Casing is preserved now, and the article comes from
+`indefiniteArticle` in `src/lib/public/grammar.ts`. **A vowel-letter test does not
+settle this**: M&A and CFO both start with consonant letters and take different
+articles, because M is said "em" and C is said "see". The helper resolves an
+initialism by the spoken name of its first letter.
+
+`/services` also gained "How an engagement runs" between the cards and the closing
+CTA, and `paragraphs` gained an optional eyebrow to carry it.
+
+### Legal and operational
+
+The three legal statements came off review: the "Subject to legal review" badge is
+off all three, all are dated 16 August 2026, and the two clauses that deferred to
+counsel now state Pakistani governing law with the courts of Lahore holding
+exclusive jurisdiction. `verify-contact-and-legal` asserts the badge's **absence**
+now, because restoring it would disclaim the whole page.
+
+**One question was raised and left with the user.** For website terms the clause
+is unremarkable, and section 11 now says in terms that it covers the Website only.
+The exposure is if the same clause reaches an engagement letter, where a Saudi
+family office is unlikely to accept exclusive Lahore jurisdiction and a Pakistani
+judgment is not readily enforceable in KSA. Arbitration seated in DIFC or ADGM is
+the usual answer, and it belongs in the engagement letter.
+
+**DNS was updated to Vercel's current records.** What remains is confirmation:
+apex and `www` resolving, SSL provisioned on both, one redirecting to the other.
+
+### Documentation and cleanup
+
+`CLAUDE.md` was cut from 104KB to roughly 85KB. The per-phase summary index and
+the original nine-phase build plan moved to `PHASE_HISTORY.md`, and the duplicated
+`CREATE TABLE` statements were replaced by an index pointing at the migrations and
+the generated types, which were the authoritative copies all along.
+
+Six unused exports were removed from `src/`. The rest of the audit was reported
+rather than acted on, since it needed a decision: see the session's closing report
+for `TestimonialsBlock`, the FMP test seams, and the overlapping verify scripts.
+
+**State at close.** `main` clean and pushed. Typecheck and build clean.
+`verify-page-rhythm` 205 of 205, `verify-contact-and-legal` 104 of 104.

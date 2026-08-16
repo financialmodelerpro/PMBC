@@ -40,10 +40,6 @@ export type FmpPagePayload = {
 export const FMP_SLUGS = ['modeling-hub', 'refm', 'training-hub'] as const;
 export type FmpSlug = (typeof FMP_SLUGS)[number];
 
-export function isFmpSlug(value: string): value is FmpSlug {
-  return (FMP_SLUGS as readonly string[]).includes(value);
-}
-
 /** Where a rendered payload came from, so a page can say so if it needs to. */
 export type FmpSource = 'live' | 'cache';
 

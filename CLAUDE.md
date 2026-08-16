@@ -71,40 +71,10 @@ When you find an em dash in *existing* content while doing other work, fix it as
 
 **All 48 phases are complete except Phase 9, and everything remaining in Phase 9 is operational rather than code**: content population, counsel review, DNS, production environment variables. The public site renders on sixteen routes, the admin console is complete and at parity with FMP, and 63 migrations are applied.
 
-| Phases | Date | What they left behind |
-|--------|------|-----------------------|
-| 1 to 8 | 2026-04-30 to 05-03 | Scaffold, Supabase, auth, admin shell, CMS foundations, page builder, all 13 section types, the bespoke public routes, SEO and OG. |
-| 9 | ongoing | Content population and launch. **The only phase still open, and everything left in it is operational rather than code.** See the launch checklist below. |
-| 9.5 | 2026-05-06 | The visual system: design tokens, `SectionContainer` / `SectionIntro`, three background variants, all 13 renderers redesigned around them. |
-| 10 | 2026-06-10 | Advisory collections: Services, Case Studies, Team, Insights, Testimonials as tables plus a shared `CollectionManager`. Migrations 021 to 026. |
-| 11 | 2026-07-30 | FMP-parity admin structure, `site_pages` as the navbar source of truth, and the palette retune to navy `#1B3A5F` / gold `#C69C3E`. |
-| 12 to 19 | 2026-08-01 to 08-02 | The eight-part FMP admin-parity programme, now closed: header consolidation, green save semantics, per-section save, page create and delete, StyleEditor, rich-text upgrades, output sanitising, audit log viewer, testimonials moderation. |
-| 20 | 2026-08-02 | Founder profile at `/about/ahmad-din`. Reverses the original "no duplicate founder content" rule; the reasoning is recorded in Critical Reminder 4. |
-| 21, 21.5 | 2026-08-10 | Booking page `/book` with a Calendly embed reading `site_settings.booking_url`, then the CTA prominence pass that repointed the navbar button at it. |
-| 22, 33 | 2026-08-10, 08-11 | Media: `MediaField` everywhere, video and GIF support, then direct-to-storage uploads by signed URL after a body-size limit killed a video upload. |
-| 23 to 26 | 2026-08-10 | Footer logo sizing, favicon wired to the CMS (it was still the create-next-app default), container alignment and hero refinements, Brevo replacing Resend. |
-| 27, 31, 37 | 2026-08-10 to 08-12 | Optional media on every section type, then the two-column split and standalone `media` section, then the maximum-height control. |
-| 28 to 30 | 2026-08-10 to 08-11 | Firm prominence: the founder's career figures separated from the firm's own, partner-led framing, `/about` merged into home, then the home founder card restored. |
-| 32 | 2026-08-11 | Service 06 renamed to Real Estate Financial Modeling at `/services/refm`. The slug is a join key in four places; migration 047 moves all four. |
-| 34 to 36 | 2026-08-11 | The FMP platform arm: three sub-pages fed live from FMP's public API, then the parent page rebuilt at `/fmp`, then its capability tags folded into the hero. |
-| 38 to 40 | 2026-08-12 | Structural passes: hero parity at 630px across all fifteen routes, one cream and white alternation with navy reserved for heroes, home resequenced and cut, services dropdown, footer shortened. |
-| 41 | 2026-08-13 | Footer links became content with per-link visibility, the nine service links became one, Book a Meeting moved to Contact, dropdown rows evened, `/fmp` certification band replaced, empty collections dropped from the sitemap by row count. |
-| 42 | 2026-08-13 | Contact form country controls, the two transactional emails rebuilt on FMP's shell structure in PMBC's palette, and the new `/confidentiality` statement. |
-| 43 | 2026-08-13 | The phone country control became a searchable ARIA combobox, and `/fmp`'s two platforms became full-width stacked rows with media slots. |
-| 44 | 2026-08-15 | `/team` wired up: the founding partner's card seeded from the founder profile rather than retyped, the admin editor cut to the seven fields a card renders, and the navbar and footer links gated on the row count the way the sitemap already was. |
-| 45 | 2026-08-15 | The navbar container measured rather than assumed (it was correct), the nav given room after Team filled the row, then the two logo files trimmed of the transparent margins that were the real cause of the indent, with all five dependent heights retuned. |
-| 46 | 2026-08-15 | Home content pass: the count that did not match its list, the founder proof points labelled as career rather than firm figures, the four generic verbs replaced with how the work is actually run, one call to action per section, and one label for the booking action. |
-| 47 | 2026-08-15 | The home founder card rewritten to say who Ahmad is and what he brings, rather than restating the delivery model the firm introduction had already given the reader two screens earlier. |
-| 48 | 2026-08-15 | `/fmp` content pass: the launching-soon contradiction corrected against the card, the four-paragraph intro cut to two that answer why a firm carries a platform, "What you get" restored to six, one CTA per section, and the certification section folded into the Training Hub card it repeated. |
-| 49 | 2026-08-16 | `/contact` copy became content. Six strings moved out of the route file, and the booking callout's three keys moved from the `booking` group to `contact`, where the rest of the page's copy already was. No wording changed. |
-| 50 | 2026-08-16 | Three copy corrections on `/contact`: the form eyebrow stopped repeating the hero headline, the response-time line was cleared as a repeat of the hero, and the founder card moved from naming one person to the partner-led wording the rest of the site uses. Clearing a field was also made to mean something: an empty value now renders nothing rather than falling back to the shipped default. |
-| 51 | 2026-08-16 | Page copy left the key-value store. `/contact` and `/book` are edited entirely in the page builder through two new section types, `contact_body` and `booking_body`, and the 21 `cms_content` rows behind them are gone. `/admin/content` is back to global keys. Settings that are not copy (the three addresses, WhatsApp, the office line, the Calendly URL) deliberately stayed in Site Settings. |
-| 57 | 2026-08-16 | The three legal statements came off review: the "Subject to legal review" badge is off `/privacy`, `/terms` and `/confidentiality`, all three are dated 16 August 2026, and the two clauses that deferred to counsel now state Pakistani governing law with the courts of Lahore holding exclusive jurisdiction. The terms clause is explicitly scoped to the Website, since section 4 already gives mandates to the engagement letter. |
-| 56 | 2026-08-16 | `/team`, `/case-studies` and `/insights` got a `cms_pages` row and a `hero` section each, so their opening copy is edited in the builder like every other page. None of the three had a page row before, so none appeared in the page list. `FirmPageBody` keeps the shipped copy as a code fallback, and the collections still feed the cards. Two alignments went in with it: the team hero says partner-led, and Ahmad's card says Saudi Arabia, the GCC, and Pakistan. |
-| 55 | 2026-08-16 | The closing block on all nine service detail pages: eyebrow "Engage PMBC" to "Engage PaceMakers", two CTAs cut to one relabelled "Send an Enquiry" (keeping the `?service=` pre-fill), the response-time sentence removed as a repeat of the contact page, and the heading fixed. It had lowercased the service title and guessed the article, producing "Discuss a m&a advisory mandate". Casing is preserved and the article comes from `indefiniteArticle` in `src/lib/public/grammar.ts`, which resolves initialisms by the spoken name of the first letter, so M&A takes "an" and CFO takes "a". |
-| 54 | 2026-08-16 | `/services` gained "How an engagement runs" between the nine cards and the closing CTA: a `paragraphs` section at order 27 saying who scopes the mandate, how the model is built, where the documents come from, and what happens to the model after delivery. `paragraphs` gained an optional eyebrow to carry it, on the same contract as the optional heading before it. |
-| 53 | 2026-08-16 | Three fixes. The `/services` card grid became a `service_grid` section, so a `cta_block` dragged below it now renders below it (it had been written into the route file and rendered last regardless). Clearing a field in the page builder now clears it: every string in `contact_body` and `booking_body` was read with `||`, so an empty value fell back to the shipped default and looked like a save that failed. And `/book` offers `advisory@` rather than `info@`, chosen in the renderer so the footer and the `/contact` general row keep publishing `info@`. |
-| 52 | 2026-08-16 | The nine service pages followed: each `service_<slug>` namespace became one `service_detail` section on its own page, so a Builder button that opened onto an empty page now opens onto the copy that renders. 81 rows became 9. `show_header` moved from a route prop into the section row, `deliverables` became a real JSONB array, and the number, title and summary stayed in `config/services.ts` because six other surfaces read them. Also: `founder_block` gained a `photo_alt` field, defaulting to empty, so the portrait stops repeating the name a screen reader already gets from the heading beside it. |
+**The per-phase summary index moved to [`PHASE_HISTORY.md`](./PHASE_HISTORY.md) on 2026-08-16**,
+along with the detailed rows that were already there. This file states where the
+project is, not how it got here. Read the history when you need to know **why**
+something is the way it is before changing it.
 
 **Full detail for every phase, including the reasoning and the things that went wrong, is in [`PHASE_HISTORY.md`](./PHASE_HISTORY.md).** It was split out of this file on 2026-08-13 for the reason stated at the top of it: this file is loaded into context at the start of every session, and that table had grown to 75KB.
 
@@ -120,10 +90,11 @@ The verification scripts (`smoke-admin`, `smoke-builder`, `verify-parity8`) read
 
 ## Remaining Before Launch
 
-Updated 2026-08-13. **No code work is blocking launch.** All 43 phases are
-complete bar Phase 9, the public site renders on fifteen routes, and the admin
-console is at parity with FMP. Everything below is operational, content, review
-or asset work, and most of it lives outside this repository.
+Updated 2026-08-16. **No code work is blocking launch.** Every phase is complete
+bar Phase 9, the public site renders on nineteen routes with every page's copy
+editable in the page builder, and the admin console is at parity with FMP.
+Everything below is operational, content, review or asset work, and most of it
+lives outside this repository.
 
 Ordered by what stops a launch, not by when it was added.
 
@@ -137,8 +108,13 @@ Ordered by what stops a launch, not by when it was added.
    contact form still saves to the inbox and sends nothing, which the send
    wrapper does deliberately rather than throwing. [user, Vercel dashboard]
 
-2. **DNS and SSL** for `pacemakersglobal.com`, apex and `www`, then verify SSL
-   provisioning. [user]
+2. **DNS and SSL** for `pacemakersglobal.com`, apex and `www`. **The records were
+   updated to Vercel's current set on 2026-08-16**, so what remains is
+   confirmation rather than configuration: check that both apex and `www` resolve
+   to Vercel, that SSL has provisioned for each, and that one redirects to the
+   other rather than both serving. Vercel's records have changed more than once,
+   so if a check fails, read them off the project's Domains tab rather than from
+   memory or from an older note. [user]
 
 3. ~~**Counsel review of `/confidentiality`, `/privacy` and `/terms`.**~~ **Closed
    2026-08-16 on the user's instruction.** The "Subject to legal review" badge is
@@ -161,33 +137,13 @@ Ordered by what stops a launch, not by when it was added.
    York Convention), and that belongs in the engagement letter rather than here.
    [user decides; nothing on this website blocks launch]
 
-4. **Content pass over the whole site on a deployed build.** Thirteen phases of
-   copy shipped between 2026-08-10 and 2026-08-13 (migrations 044 to 057) and
-   none of it has been read end to end anywhere but locally.
-
-   **Home has now had one** (migration 061, 2026-08-15): a count that did not
-   match the list under it, the founder proof points labelled as the partner's
-   career record rather than the firm's, the four generic process verbs replaced
-   with how the work is actually run, and the page's eight calls to action cut to
-   five, one per section with two kept only in the hero. **The other pages have
-   not**, and the three items below still stand:
-   - **Home is materially different.** What-we-do moved below the firm track
-     record and lost its six service cards, firm credentials was deleted as a
-     duplicate of the stats block above it, who-we-serve became a carousel, and
-     the network block became three sentences. 10.2 screens down to 7.3.
-   - ~~**The `/fmp` "What you get" checklist.**~~ **Fixed** by migration 063,
-     along with the rest of that page: it is back to six items, and the export
-     title is "Formula-linked Excel and investor PDF export" again, which is
-     also what the Modeling Hub card's own note claims. The intro no longer says
-     the Modeling Hub is launching soon while the card says it is live.
-   - ~~**Home says the same thing twice.**~~ **Fixed** by migration 062. The
-     firm introduction keeps the delivery model, since it is the firm's own
-     paragraph and reaches the reader first, and the founder card was rewritten
-     to say who Ahmad is and what he brings to a mandate. The card's heading and
-     eyebrow moved with the body: "Every mandate is partner-led" over
-     "PARTNER-LED DELIVERY" was the same claim a third time, in the largest type
-     on the card, so cutting it from the paragraph alone would have fixed the
-     prose and kept the repetition.
+4. ~~**Content pass over the whole site.**~~ **Closed 2026-08-16 on the user's
+   read-through.** Every page has now been read end to end and its copy corrected:
+   home (migrations 061 and 062), `/fmp` (063), `/contact` (065), `/services` and
+   the nine detail pages (068, 069 and the closing-block fix), and the three legal
+   statements. **The correction that recurred most was the same one**: copy that
+   said a thing the reader had already been told, either on the page above it or
+   on the page it links to. Worth watching for in anything written next.
 
 5. **The 2026-06-21 enquiry still has no reply recorded.** Leslie Merricroft,
    Al-Mashrea Law Firm, in `/admin/contact-submissions`. Opened but not marked
@@ -209,26 +165,14 @@ Ordered by what stops a launch, not by when it was added.
 
 ### Assets, all of which degrade gracefully today
 
-7. ~~**Carousel card images.**~~ **Done.** All ten slots are filled: the four on
-   the home "Who we serve" carousel and the six on `/fmp` "Who it is for", each
-   verified rendering its own image as the carousel advances. The monogram
-   fallback still exists for a slot added later. Checked 2026-08-15, which is
-   also when the alt text stopped falling back to the card title: with every
-   `image_alt` blank, a screen reader was announcing each audience twice, once
-   for the picture and once for the heading it sits beside.
+7. ~~**Carousel card images**~~ and ~~**the `/fmp` two-platform rows**~~ are both
+   **done**: all ten carousel slots and both platform rows carry their own image,
+   verified rendering. The monogram fallback still covers a slot added later.
 
-8. ~~**The `/fmp` two-platform rows.**~~ **Done.** Both carry their media
-   (`modeling-hub-2.png` and `training-hub.png`), letterboxed under the 560px
-   ceiling and alternating sides. Note for whoever changes them: filling those
-   two slots quietly broke three assertions in `verify-page-rhythm`, which
-   located the frame by the inline `aspect-ratio` only a **blank** slot carries.
-   Fixed 2026-08-15; the layout had been correct the whole time.
-
-9. **Partner logos** on `/network`. The PMBC logo is set and was trimmed of its
-   transparent margins by migration 060, and the Ahmad portrait is set and is
-   copied onto the home founder card by migration 037. Any new image host
-   needs a line in `next.config.ts` `images.remotePatterns`; Supabase and
-   Cloudinary are already allowed. [user provides; assistant wires]
+8. **Partner logos** on `/network` are the one asset still missing, and the page
+   degrades gracefully without them. The PMBC logo and the Ahmad portrait are both
+   set. Any new image host needs a line in `next.config.ts` `images.remotePatterns`;
+   Supabase and Cloudinary are already allowed. [user provides; assistant wires]
 
 ### Collections, which are empty rather than broken
 
@@ -474,94 +418,31 @@ Match FMP's pattern: three-digit prefix (`001_initial_schema.sql`, `002_admin_us
 
 ### Tables
 
-#### Admin and Auth
+**The full `CREATE TABLE` statements are in `supabase/migrations/001` to `004`, and
+the generated TypeScript shapes in `src/types/database.ts`.** They were duplicated
+here until 2026-08-16, which meant three copies of every column and no way to tell
+which was authoritative. This is the index; read the migration for the columns.
 
-**admin_users**
-```sql
-CREATE TABLE admin_users (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  email TEXT NOT NULL UNIQUE,
-  password_hash TEXT NOT NULL,
-  name TEXT NOT NULL,
-  role TEXT NOT NULL DEFAULT 'admin',
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  last_login_at TIMESTAMPTZ
-);
-```
+| Table | Shape | What it holds |
+|-------|-------|---------------|
+| `admin_users` | one row per admin, one in practice | Email, bcrypt hash, name, role, `last_login_at`. Only `admin` is implemented; the column exists for later. |
+| `audit_log` | append only | Who changed what: `action`, `entity_type`, `entity_id`, `metadata`, plus `before_value` / `after_value` / `reason` from migration 032. |
+| `cms_content` | key-value, unique on `(section, key)` | Global content only since migration 067: header, footer, contact details, SEO defaults. Page copy lives in `page_sections`. |
+| `cms_pages` | one row per page | Slug, title, meta title and description, OG override, `status`, and `is_system` (migration 031) which blocks deletion of a real route. |
+| `page_sections` | one row per block | `page_slug`, `section_type`, `content` JSONB, `styles` JSONB, `display_order`, `visible`. The page builder writes this table and nothing else. |
+| `branding_config` | single row, `CHECK (id = 1)` | Logos, favicon, brand name, tagline, the three palette colours. |
+| `site_settings` | single row, `CHECK (id = 1)` | One JSONB blob, deliberately: contact addresses, WhatsApp, booking URL, socials, analytics. A blob avoids a migration per setting. |
+| `contact_submissions` | append only | The enquiry inbox. `status` is `new` / `read` / `responded` / `archived`, and `notes` is admin-only. |
+| `email_branding` | single row, `CHECK (id = 1)` | Email logo, primary colour, signature and footer HTML. |
+| `email_templates` | one row per `template_key` | Two keys in v1: `contact_notification` and `contact_acknowledgement`. |
+| Collections | one row per item | `services`, `case_studies`, `team_members`, `articles`, `testimonials`, added in migrations 021 to 026 and edited through the shared `CollectionManager`. **`testimonials` is the one without `updated_at`**, which broke every write until 2026-08-01. |
 
-Single admin user for v1 (Ahmad). The role column exists for future use (editor, viewer) but only `admin` is implemented. Seed one row manually via SQL after running migrations.
+**Two things about this schema are worth knowing before you change it.** The
+single-row tables use `CHECK (id = 1)` rather than convention, so a second row is
+impossible rather than merely unexpected. And `site_settings` is one JSONB column
+on purpose: settings arrive faster than migrations, and a blob costs nothing to
+extend.
 
-**audit_log**
-```sql
-CREATE TABLE audit_log (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  admin_id UUID REFERENCES admin_users(id),
-  action TEXT NOT NULL,
-  entity_type TEXT NOT NULL,
-  entity_id TEXT,
-  metadata JSONB,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE INDEX idx_audit_log_admin_id ON audit_log(admin_id);
-CREATE INDEX idx_audit_log_created_at ON audit_log(created_at DESC);
-```
-
-#### CMS
-
-**cms_content**
-```sql
-CREATE TABLE cms_content (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  section TEXT NOT NULL,
-  key TEXT NOT NULL,
-  value TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE(section, key)
-);
-
-CREATE INDEX idx_cms_content_section ON cms_content(section);
-```
-
-Key-value store for global content that doesn't belong to a specific page section. Sections include `header_settings`, `footer_settings`, `branding`, `contact_info`, `seo_defaults`. All values are stored as TEXT; JSON is stored as stringified JSON.
-
-**cms_pages**
-```sql
-CREATE TABLE cms_pages (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  slug TEXT NOT NULL UNIQUE,
-  title TEXT NOT NULL,
-  meta_title TEXT,
-  meta_description TEXT,
-  og_image_url TEXT,
-  status TEXT NOT NULL DEFAULT 'published',
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-```
-
-Page metadata. One row per CMS-managed page (home, services, sectors, approach, network, about, contact, financial-modeler-pro). Status values: `draft`, `published`.
-
-**page_sections**
-```sql
-CREATE TABLE page_sections (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  page_slug TEXT NOT NULL,
-  section_type TEXT NOT NULL,
-  content JSONB NOT NULL DEFAULT '{}',
-  styles JSONB DEFAULT '{}',
-  display_order INTEGER NOT NULL DEFAULT 0,
-  visible BOOLEAN NOT NULL DEFAULT true,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE INDEX idx_page_sections_page_slug ON page_sections(page_slug, display_order);
-CREATE INDEX idx_page_sections_visible ON page_sections(page_slug, visible, display_order);
-```
-
-The page builder. One row per section on a page. `section_type` determines which renderer is used. `content` holds the section data as JSONB. `styles` holds optional layout overrides.
 
 **Section types for v1:**
 - `hero`: main page hero with badge, headline, subtitle, CTA
@@ -586,98 +467,20 @@ The page builder. One row per section on a page. `section_type` determines which
 - `booking_body`: the `/book` calendar band and the direct routes under it, from eight `cms_content` rows. The Calendly URL is not part of it and stays in Site Settings, since one URL serves every booking surface. That setting also decides which of the section's two states renders: **the empty state is reached only while the URL is blank**, so it is not a widget-failure fallback and should be worded for a calendar that is switched off rather than one that failed to load
 - `media`: one image, GIF or video standing on its own in the page order, with an optional eyebrow, heading and a `width` of `full` / `wide` / `narrow` (1200 / 960 / 720px). Added 2026-08-11. Distinct from the shared media panel every other section carries: that panel attaches an asset **to** a section, so it moves when that section is reordered, whereas this is an asset that belongs to the **page** and can be dragged between any two sections. Reuses the same `media_url` key set, so it is excluded from the shared panel via `SECTION_TYPES_WITH_OWN_MEDIA`. Blank `media_url` renders nothing at all, not an empty frame. `width` caps the frame; `media_max_height` (added 2026-08-12, shared with the panel) caps the asset inside it, letterboxing rather than cropping
 
-#### Branding and Settings
+#### Branding, settings, forms and email
 
-**branding_config**
-```sql
-CREATE TABLE branding_config (
-  id INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),
-  logo_url TEXT,
-  logo_dark_url TEXT,
-  favicon_url TEXT,
-  brand_name TEXT NOT NULL DEFAULT 'PaceMakers Business Consultants',
-  short_name TEXT NOT NULL DEFAULT 'PaceMakers',
-  tagline TEXT NOT NULL DEFAULT 'Advisory from Structure to Exit',
-  primary_color TEXT NOT NULL DEFAULT '#1B3A5F',
-  secondary_color TEXT NOT NULL DEFAULT '#3FA663',
-  accent_color TEXT NOT NULL DEFAULT '#D4A93A',
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
+Indexed in the table above. Two notes that the SQL does not carry:
 
-INSERT INTO branding_config (id) VALUES (1);
-```
+**`branding_config.accent_color` still defaults to the original 003 value.**
+Migration 028 retunes the live row to `#C69C3E` (see section 9), so a fresh setup
+that runs 003 then 028 lands on the current palette. The column default is left
+alone deliberately: applied migrations are never edited.
 
-Single-row table. The `CHECK (id = 1)` guarantees only one row ever exists. Edit via admin panel.
+**`site_settings` is one JSONB blob rather than a column per setting**, to avoid a
+migration every time a setting is added. `contact_submissions.status` moves
+`new` to `read` to `responded` or `archived`, and `email_templates` carries exactly
+two keys in v1.
 
-The `accent_color` default above is the original 003 value. Migration 028 retunes the live row to `#C69C3E` (see §9), so a fresh setup that runs 003 then 028 ends up on the current palette. The column default is intentionally left alone: applied migrations are never edited.
-
-**site_settings**
-```sql
-CREATE TABLE site_settings (
-  id INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),
-  settings JSONB NOT NULL DEFAULT '{}',
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-
-INSERT INTO site_settings (id, settings) VALUES (1, '{}');
-```
-
-Catch-all for global settings: contact email, WhatsApp number, social URLs, default OG image, GTM/analytics IDs, etc. Stored as a single JSONB blob to avoid migration churn.
-
-#### Forms and Communication
-
-**contact_submissions**
-```sql
-CREATE TABLE contact_submissions (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name TEXT NOT NULL,
-  email TEXT NOT NULL,
-  company TEXT,
-  phone TEXT,
-  country TEXT,
-  service_interest TEXT,
-  message TEXT NOT NULL,
-  source_page TEXT,
-  status TEXT NOT NULL DEFAULT 'new',
-  notes TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  read_at TIMESTAMPTZ,
-  responded_at TIMESTAMPTZ
-);
-
-CREATE INDEX idx_contact_submissions_status ON contact_submissions(status, created_at DESC);
-CREATE INDEX idx_contact_submissions_created_at ON contact_submissions(created_at DESC);
-```
-
-Status values: `new`, `read`, `responded`, `archived`. Notes field is admin-only for tracking follow-ups.
-
-**email_branding**
-```sql
-CREATE TABLE email_branding (
-  id INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),
-  logo_url TEXT,
-  primary_color TEXT NOT NULL DEFAULT '#1B3A5F',
-  signature_html TEXT,
-  footer_html TEXT,
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-
-INSERT INTO email_branding (id) VALUES (1);
-```
-
-**email_templates**
-```sql
-CREATE TABLE email_templates (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  template_key TEXT NOT NULL UNIQUE,
-  subject TEXT NOT NULL,
-  body_html TEXT NOT NULL,
-  enabled BOOLEAN NOT NULL DEFAULT true,
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-```
-
-For v1, only two template_key rows are needed: `contact_notification` (sent to admin when someone submits the contact form) and `contact_acknowledgement` (sent to the person who submitted). Both editable via admin panel.
 
 ### Migration Order
 
@@ -1259,61 +1062,13 @@ NEXT_PUBLIC_GA_ID=
 
 ## 11. Build Sequence
 
-Follow this order. Don't skip ahead. Each phase is testable on its own.
+**Complete.** Phases 1 to 8 shipped between 2026-04-30 and 2026-05-03, and every
+phase since has been an improvement on a working site rather than a step in the
+original plan. Phase 9 is the only one still open, and everything left in it is
+operational: see the launch checklist above.
 
-### Phase 1: Scaffold and Database (Day 1): ✅ Complete (2026-04-30)
-1. `npx create-next-app@latest` with TypeScript, Tailwind, App Router, src/ directory, Turbopack
-2. Install dependencies (see Section 2)
-3. Set up Supabase project, get keys, populate `.env.local`
-4. Run migrations 001-008
-5. Insert one admin user via SQL with bcrypt hash
-6. Verify Supabase connection from a server component
-
-### Phase 2: Auth and Admin Shell (Day 1-2): ✅ Complete (2026-05-02)
-1. NextAuth config with credentials provider hitting admin_users
-2. Middleware protecting `/admin/*`
-3. Admin login page
-4. Admin layout (sidebar nav, header with logout)
-5. Empty admin dashboard
-
-### Phase 3: CMS Foundations (Day 2-3): ✅ Complete (2026-05-02)
-1. cms_content key-value editor at `/admin/content`
-2. Branding admin at `/admin/branding`
-3. Site settings at `/admin/settings`
-4. Email branding and templates admin
-
-### Phase 4: Page Builder (Day 3-5): ✅ Complete (2026-05-02)
-1. `/admin/pages` listing
-2. `/admin/page-builder/[slug]` three-pane layout
-3. Section editors for: hero, paragraphs, stats_block, service_cards (start with these four)
-4. Drag-and-drop reorder
-5. Save and visibility toggle
-
-### Phase 5: Public Pages: Core (Day 5-7)
-1. Root layout with Navbar + Footer (CMS-driven)
-2. Section renderer with the four section types built so far
-3. Home page rendering from page_sections
-4. Services overview page
-5. Contact page with form, contact API route, email templates wired up
-
-### Phase 6: Remaining Section Types (Day 7-9): ✅ Complete (2026-05-03)
-Editors + public renderers shipped for the 9 outstanding types: `sector_grid`, `process_steps`, `network_partners`, `founder_block`, `text_image`, `cta_block`, `quote`, `fmp_intro`, `service_detail`. All marked `implemented: true` in `SECTION_TYPES`; `SectionRenderer` and `SectionEditorPanel` registries cover all 13 types. Shared 21-icon lucide registry at `src/lib/cms/sectorIcons.tsx` powers both the sector-grid editor dropdown and the public renderer.
-
-### Phase 7: Remaining Pages (Day 9-11): ✅ Complete (2026-05-03)
-Bespoke routes shipped at `src/app/(public)/{about,sectors,approach,network,financial-modeler-pro}/page.tsx`, plus `src/app/(public)/services/[slug]/page.tsx` for the 9 service detail pages. The catch-all `(public)/[slug]/page.tsx` was deleted: all CMS-managed pages now have explicit routes; missing pages 404 explicitly rather than silently rendering an unconfigured slug. Service-detail content lives in `cms_content` under namespace `service_<slug>` (migration 010); the route renderer parses `deliverables` robustly (JSON first, newline-split fallback). `src/app/sitemap.ts` and `src/app/robots.ts` shipped alongside.
-
-### Phase 8: SEO and Polish (Day 11-13): ✅ Complete (2026-05-03)
-Dynamic OG image route at `/api/og` (`next/og` ImageResponse, 1200×630, navy + gold, branding-driven). Shared `src/lib/seo/metadata.ts` `buildPageMetadata()` helper drives unique title / canonical / OG / twitter on every public page, auto-routing OG images to `/api/og?…` when no override is set. Schema.org `@graph` (FinancialService + Organization + WebSite) mounted in the public layout via `OrganizationJsonLd`; per-service `Service` schema on `/services/[slug]` linked back via `@id`. Branded 404 in both `(public)/not-found.tsx` (in-group `notFound()`) and root `not-found.tsx` (unmatched URLs); root `error.tsx` client boundary logs digest and offers retry. Privacy + Terms fleshed out with named processors (Vercel, Supabase, Resend, hCaptcha, Google Fonts) and "Subject to legal review" badge. `next.config.ts` adds Supabase + Cloudinary `remotePatterns` and `poweredByHeader: false`. `/admin/og-preview` admin tool with live previews + per-page override-URL save (writes to `cms_pages.og_image_url`). Sitemap and robots already shipped in Phase 7.
-
-### Phase 9: Content Population and Launch (Day 13-15)
-1. Populate all cms_content rows with real copy
-2. Populate page_sections for all pages with real content
-3. Configure DNS at Vercel
-4. SSL provisioning verification
-5. Final QA pass on all pages
-6. Submit sitemap to Google Search Console
-
----
+The original nine-phase plan, including what each phase was scoped to deliver,
+moved to [`PHASE_HISTORY.md`](./PHASE_HISTORY.md) on 2026-08-16.
 
 ## 12. What's NOT in v1 (Phase 2 Backlog)
 

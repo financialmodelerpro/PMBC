@@ -193,17 +193,6 @@ export function panel(inner: string): string {
 </table>`;
 }
 
-export const EMAIL_COLORS = {
-  navy: NAVY,
-  navyDeep: NAVY_DEEP,
-  gold: GOLD,
-  goldMuted: GOLD_MUTED,
-  cream: CREAM,
-  text: TEXT,
-  muted: MUTED,
-  border: BORDER,
-} as const;
-
 async function safe<T>(p: Promise<T>, fallback: T): Promise<T> {
   try {
     return await p;

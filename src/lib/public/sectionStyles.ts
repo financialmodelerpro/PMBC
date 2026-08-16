@@ -106,23 +106,6 @@ export function parseSectionStyles(styles: unknown): SectionStyleOverrides {
   };
 }
 
-/** True when nothing is set, so callers can skip the override work entirely. */
-export function hasAnyOverride(o: SectionStyleOverrides): boolean {
-  return (
-    o.bgColor !== null ||
-    o.bgImageUrl !== null ||
-    o.textColor !== null ||
-    o.paddingTop !== null ||
-    o.paddingRight !== null ||
-    o.paddingBottom !== null ||
-    o.paddingLeft !== null ||
-    o.maxWidth !== null ||
-    o.borderRadius !== null ||
-    o.animation !== 'none' ||
-    o.cssClass !== null
-  );
-}
-
 /**
  * Inline styles for the section's outer element.
  *
