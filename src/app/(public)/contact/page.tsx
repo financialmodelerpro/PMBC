@@ -58,6 +58,14 @@ export default async function ContactPage(props: {
 
   const founderName = contactCopy.founder_name || 'Ahmad Din';
 
+  // Absent and empty are different states for this one. `??` rather than `||`,
+  // so a database without the row still renders the shipped sentence, while
+  // clearing the field in the admin removes the line rather than restoring it.
+  // Migration 065 clears it: the hero says the same thing two lines above.
+  const responseNote =
+    contactCopy.form_response_note ??
+    'We respond to every credible enquiry within one to two business days.';
+
   return (
     <>
       <SectionList sections={sections} />
@@ -69,15 +77,16 @@ export default async function ContactPage(props: {
             <div className="lg:col-span-7">
               <div className="rounded-lg border border-[color:var(--pmbc-border)] bg-white p-8 shadow-[0_1px_3px_rgba(15,37,64,0.04)] sm:p-10">
                 <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-[color:var(--pmbc-primary)]">
-                  {contactCopy.form_eyebrow || 'Start a conversation'}
+                  {contactCopy.form_eyebrow || 'Enquiry'}
                 </p>
                 <h2 className="mt-3 font-serif text-2xl font-semibold tracking-tight text-[color:var(--pmbc-text)] sm:text-3xl">
                   {contactCopy.form_heading || 'Tell us about the mandate'}
                 </h2>
-                <p className="mt-3 text-[14px] leading-relaxed text-[color:var(--pmbc-muted)]">
-                  {contactCopy.form_response_note ||
-                    'We respond to every credible enquiry within one to two business days.'}
-                </p>
+                {responseNote.trim() !== '' ? (
+                  <p className="mt-3 text-[14px] leading-relaxed text-[color:var(--pmbc-muted)]">
+                    {responseNote}
+                  </p>
+                ) : null}
 
                 {/* Booking callout. */}
                 <div className="mt-7 flex flex-col gap-5 border-l-[3px] border-[color:var(--pmbc-accent)] bg-[color:var(--pmbc-surface-cream)] p-6 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
@@ -213,7 +222,7 @@ export default async function ContactPage(props: {
                     </h4>
                     <p className="mt-2.5 text-[14px] leading-relaxed text-[color:var(--pmbc-muted)]">
                       {contactCopy.founder_body ||
-                        'Every mandate at PaceMakers is led personally by Ahmad Din. If you would rather discuss your situation before writing it down, book a call.'}
+                        'Every mandate at PaceMakers is partner-led. If you would rather discuss your situation before writing it down, book a call.'}
                     </p>
                     <Link
                       href="/book"
