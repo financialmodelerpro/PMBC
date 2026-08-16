@@ -13,7 +13,7 @@ export const metadata: Metadata = buildPageMetadata({
   },
 });
 
-const LAST_UPDATED = '3 May 2026';
+const LAST_UPDATED = '16 August 2026';
 
 export default function TermsPage() {
   return (
@@ -26,10 +26,7 @@ export default function TermsPage() {
         tagline="The terms on which PaceMakers Business Consultants provides this website and its advisory services."
       />
       <article className="mx-auto max-w-3xl px-6 py-16 lg:py-20">
-        <p className="inline-flex items-center rounded-md border border-[color:var(--pmbc-accent)]/40 bg-[color:var(--pmbc-accent)]/10 px-3 py-1.5 text-[12px] font-medium text-[color:var(--pmbc-text)]">
-          Subject to legal review. To be finalised by counsel before launch.
-        </p>
-        <p className="mt-3 text-[12px] text-[color:var(--pmbc-muted)]">
+        <p className="text-[12px] text-[color:var(--pmbc-muted)]">
           Last updated: {LAST_UPDATED}
         </p>
 
@@ -140,11 +137,14 @@ export default function TermsPage() {
 
           <h2>11. Governing Law</h2>
           <p>
-            These terms, and any matter arising from your use of the Website,
-            shall be governed by the laws applicable to the jurisdiction in which
-            PMBC is constituted, without regard to conflict-of-law principles. The
-            specific governing law and exclusive forum for disputes are to be
-            confirmed by counsel prior to launch.
+            These terms, and any matter arising from your use of the Website, are
+            governed by the laws of the Islamic Republic of Pakistan, where
+            PaceMakers Business Consultants LLP is constituted, without regard to
+            conflict-of-law principles. The courts of Lahore have exclusive
+            jurisdiction over any dispute arising from these terms. This clause
+            governs use of the Website only. As set out in section 4, the terms of
+            any mandate, including the law governing it, are those of the signed
+            engagement letter.
           </p>
 
           <h2>12. Changes to These Terms</h2>

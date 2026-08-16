@@ -13,7 +13,7 @@ export const metadata: Metadata = buildPageMetadata({
   },
 });
 
-const LAST_UPDATED = '3 May 2026';
+const LAST_UPDATED = '16 August 2026';
 
 export default function PrivacyPage() {
   return (
@@ -26,10 +26,7 @@ export default function PrivacyPage() {
         tagline="How PaceMakers Business Consultants collects, uses, and protects the information you share with us."
       />
       <article className="mx-auto max-w-3xl px-6 py-16 lg:py-20">
-        <p className="inline-flex items-center rounded-md border border-[color:var(--pmbc-accent)]/40 bg-[color:var(--pmbc-accent)]/10 px-3 py-1.5 text-[12px] font-medium text-[color:var(--pmbc-text)]">
-          Subject to legal review. To be finalised by counsel before launch.
-        </p>
-        <p className="mt-3 text-[12px] text-[color:var(--pmbc-muted)]">
+        <p className="text-[12px] text-[color:var(--pmbc-muted)]">
           Last updated: {LAST_UPDATED}
         </p>
 
@@ -195,10 +192,12 @@ export default function PrivacyPage() {
 
           <h2>11. Governing Law and Contact</h2>
           <p>
-            This policy is published by PaceMakers Business Consultants LLP. The
-            jurisdiction governing this website and any privacy-related complaints is
-            to be confirmed by counsel prior to launch. For privacy-related
-            enquiries, please use the contact email listed in the website footer.
+            This policy is published by PaceMakers Business Consultants LLP. It is
+            governed by the laws of the Islamic Republic of Pakistan, where
+            PaceMakers Business Consultants LLP is constituted, and the courts of
+            Lahore have exclusive jurisdiction over any matter arising from it. For
+            privacy-related enquiries, please use the contact email listed in the
+            website footer.
           </p>
         </Prose>
       </article>

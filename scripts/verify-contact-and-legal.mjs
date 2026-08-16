@@ -295,16 +295,36 @@ async function main() {
   for (const [label, re] of SUBJECTS) {
     ok(`it covers ${label}`, re.test(page), 'section heading not found');
   }
-  ok('it carries the subject-to-legal-review notice',
-    page.includes('Subject to legal review'), 'notice missing');
   ok('it matches the legal pages in structure',
     page.includes('pmbc-prose') && page.includes('Last updated'), 'structure differs');
 
   const privacy = await (await fetch(BASE + '/privacy')).text();
   const terms = await (await fetch(BASE + '/terms')).text();
-  ok('privacy and terms are unchanged in structure',
-    privacy.includes('Subject to legal review') && terms.includes('Subject to legal review'),
-    'one of them lost its notice');
+
+  // These three assertions were the opposite way round until 2026-08-16, when
+  // counsel signed the three statements off and the notice came down. Asserting
+  // its absence rather than deleting the check is the point: the notice reads as
+  // a disclaimer of the whole page, so putting it back by accident would be a
+  // regression, not a neutral edit.
+  for (const [label, html] of [['confidentiality', page], ['privacy', privacy], ['terms', terms]]) {
+    ok(`${label}: the subject-to-legal-review notice is gone`,
+      !html.includes('Subject to legal review'), 'the notice is back');
+    ok(`${label}: nothing defers to counsel`,
+      !/confirmed by counsel|finalised by counsel/i.test(html), 'a deferral survives');
+  }
+
+  // The two clauses that replaced the deferrals.
+  for (const [label, html] of [['privacy', privacy], ['terms', terms]]) {
+    ok(`${label}: states the governing law`,
+      html.includes('laws of the Islamic Republic of Pakistan'), 'governing law not stated');
+    ok(`${label}: names the forum`,
+      html.includes('courts of Lahore'), 'forum not named');
+  }
+
+  // Website terms only. Section 4 already says the engagement letter governs a
+  // mandate, and section 11 must not read as if it overrides that.
+  ok('terms: the governing-law clause is scoped to the Website',
+    /governs use of the Website only/i.test(terms), 'scope sentence missing');
 
   // ---- footer and sitemap ---------------------------------------------------
   console.log('\n=== legal row and sitemap');

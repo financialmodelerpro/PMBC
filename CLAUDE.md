@@ -63,7 +63,7 @@ When you find an em dash in *existing* content while doing other work, fix it as
 **Why this matters:** PMBC is intentionally institutional, considered, calm. The em dash reads as energetic and digital-marketing-flavored, which is exactly the tone we are not going for. The substitutions above scan as deliberate and senior. If a sentence feels like it needs an em dash, the sentence is usually doing too much. Split it.
 
 **Known pre-rule content that still contains em dashes.** Fix when next touching, not proactively, since a bulk rewrite would bury real diffs:
-`CMS_REFERENCE.md` (65) and `PACEMAKERS_ADMIN_CMS_SPEC.md` (30) are both inherited reference documents and are exempt. Live content: migrations 005, 008, 010, 011, 014 to 020 (all applied, so never edit them; fix the rendered content instead), `(public)/privacy` and `terms` (fix at counsel review), the three `not-found`/`error` files, and the email templates seeded in migration 008.
+`CMS_REFERENCE.md` (65) and `PACEMAKERS_ADMIN_CMS_SPEC.md` (30) are both inherited reference documents and are exempt. Live content: migrations 005, 008, 010, 011, 014 to 020 (all applied, so never edit them; fix the rendered content instead), the three `not-found`/`error` files, and the email templates seeded in migration 008. **`(public)/privacy` and `terms` are off this list**: both were measured on 2026-08-16 while their counsel-review edits were made, and both return zero, so whatever was there had already gone.
 
 ---
 
@@ -99,6 +99,7 @@ When you find an em dash in *existing* content while doing other work, fix it as
 | 49 | 2026-08-16 | `/contact` copy became content. Six strings moved out of the route file, and the booking callout's three keys moved from the `booking` group to `contact`, where the rest of the page's copy already was. No wording changed. |
 | 50 | 2026-08-16 | Three copy corrections on `/contact`: the form eyebrow stopped repeating the hero headline, the response-time line was cleared as a repeat of the hero, and the founder card moved from naming one person to the partner-led wording the rest of the site uses. Clearing a field was also made to mean something: an empty value now renders nothing rather than falling back to the shipped default. |
 | 51 | 2026-08-16 | Page copy left the key-value store. `/contact` and `/book` are edited entirely in the page builder through two new section types, `contact_body` and `booking_body`, and the 21 `cms_content` rows behind them are gone. `/admin/content` is back to global keys. Settings that are not copy (the three addresses, WhatsApp, the office line, the Calendly URL) deliberately stayed in Site Settings. |
+| 57 | 2026-08-16 | The three legal statements came off review: the "Subject to legal review" badge is off `/privacy`, `/terms` and `/confidentiality`, all three are dated 16 August 2026, and the two clauses that deferred to counsel now state Pakistani governing law with the courts of Lahore holding exclusive jurisdiction. The terms clause is explicitly scoped to the Website, since section 4 already gives mandates to the engagement letter. |
 | 56 | 2026-08-16 | `/team`, `/case-studies` and `/insights` got a `cms_pages` row and a `hero` section each, so their opening copy is edited in the builder like every other page. None of the three had a page row before, so none appeared in the page list. `FirmPageBody` keeps the shipped copy as a code fallback, and the collections still feed the cards. Two alignments went in with it: the team hero says partner-led, and Ahmad's card says Saudi Arabia, the GCC, and Pakistan. |
 | 55 | 2026-08-16 | The closing block on all nine service detail pages: eyebrow "Engage PMBC" to "Engage PaceMakers", two CTAs cut to one relabelled "Send an Enquiry" (keeping the `?service=` pre-fill), the response-time sentence removed as a repeat of the contact page, and the heading fixed. It had lowercased the service title and guessed the article, producing "Discuss a m&a advisory mandate". Casing is preserved and the article comes from `indefiniteArticle` in `src/lib/public/grammar.ts`, which resolves initialisms by the spoken name of the first letter, so M&A takes "an" and CFO takes "a". |
 | 54 | 2026-08-16 | `/services` gained "How an engagement runs" between the nine cards and the closing CTA: a `paragraphs` section at order 27 saying who scopes the mandate, how the model is built, where the documents come from, and what happens to the model after delivery. `paragraphs` gained an optional eyebrow to carry it, on the same contract as the optional heading before it. |
@@ -139,15 +140,26 @@ Ordered by what stops a launch, not by when it was added.
 2. **DNS and SSL** for `pacemakersglobal.com`, apex and `www`, then verify SSL
    provisioning. [user]
 
-3. **Counsel review of `/confidentiality`, `/privacy` and `/terms`.** After
-   sign-off, remove the "Subject to legal review" badge, hardcoded in all three
-   page files. **Send confidentiality first.** It makes specific operational
-   commitments the other two do not (analysts bound by written obligations no
-   less strict than the firm's own; declining rather than relying on information
-   barriers where a mandate would put PMBC on both sides; notice before compelled
-   disclosure where the law permits), and since 2026-08-13 it is linked from
-   every acknowledgement email a prospective client receives.
-   [user reviews; assistant removes badge]
+3. ~~**Counsel review of `/confidentiality`, `/privacy` and `/terms`.**~~ **Closed
+   2026-08-16 on the user's instruction.** The "Subject to legal review" badge is
+   off all three, all three are dated 16 August 2026, and the two clauses that
+   deferred to counsel (privacy section 11, terms section 11) now state the
+   position plainly: governed by the laws of the Islamic Republic of Pakistan,
+   where the LLP is constituted, with the courts of Lahore holding exclusive
+   jurisdiction. `verify-contact-and-legal` asserts the badge's **absence** now,
+   because putting it back would disclaim the whole page.
+
+   **One open question was raised and not resolved by this change.** Pakistani
+   law and an exclusive Lahore forum are the natural choice for a Pakistani LLP,
+   and for `/terms` they are also the low-stakes choice, since section 4 says the
+   engagement letter governs a mandate and section 11 now says in terms that the
+   clause covers the Website only. The exposure is elsewhere: **if an engagement
+   letter carries the same clause**, a Saudi family office is unlikely to accept
+   exclusive Lahore jurisdiction, and a Pakistani judgment is not readily
+   enforceable in KSA. The usual answer for a firm in this position is
+   arbitration seated in a neutral, enforceable venue (DIFC or ADGM, both New
+   York Convention), and that belongs in the engagement letter rather than here.
+   [user decides; nothing on this website blocks launch]
 
 4. **Content pass over the whole site on a deployed build.** Thirteen phases of
    copy shipped between 2026-08-10 and 2026-08-13 (migrations 044 to 057) and

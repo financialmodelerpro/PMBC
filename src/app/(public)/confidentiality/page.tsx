@@ -13,14 +13,14 @@ export const metadata: Metadata = buildPageMetadata({
   },
 });
 
-const LAST_UPDATED = '13 August 2026';
+const LAST_UPDATED = '16 August 2026';
 
 /**
  * Hardcoded rather than CMS-driven, matching /privacy and /terms.
  *
  * Those two are the documented exception to this project's CMS-first rule, and
- * this page belongs with them for the same reason: a statement that will be
- * settled by counsel should not be editable from an admin console afterwards.
+ * this page belongs with them for the same reason: a statement settled by
+ * counsel should not be editable from an admin console afterwards.
  * The confidentiality position is also the one a client is most likely to hold
  * the firm to, so an accidental edit here costs more than the convenience of
  * editing it without a deploy.
@@ -34,10 +34,7 @@ export default function ConfidentialityPage() {
         tagline="How PaceMakers Business Consultants treats the information you share with us, before, during and after an engagement."
       />
       <article className="mx-auto max-w-3xl px-6 py-16 lg:py-20">
-        <p className="inline-flex items-center rounded-md border border-[color:var(--pmbc-accent)]/40 bg-[color:var(--pmbc-accent)]/10 px-3 py-1.5 text-[12px] font-medium text-[color:var(--pmbc-text)]">
-          Subject to legal review. To be finalised by counsel before launch.
-        </p>
-        <p className="mt-3 text-[12px] text-[color:var(--pmbc-muted)]">
+        <p className="text-[12px] text-[color:var(--pmbc-muted)]">
           Last updated: {LAST_UPDATED}
         </p>
 
