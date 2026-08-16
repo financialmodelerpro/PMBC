@@ -41,6 +41,22 @@ export function TestimonialsEditor({ content, onChange }: SectionEditorProps) {
         />
       </Field>
 
+      <Field label="Maximum number to show">
+        <input
+          type="number"
+          min={1}
+          value={s(content.max_items)}
+          onChange={(e) => update({ max_items: e.target.value })}
+          style={adminInput}
+          placeholder="Leave empty for all of them"
+        />
+      </Field>
+      <p style={{ margin: '-8px 0 0', fontSize: 11, color: ADMIN_COLORS.textMuted }}>
+        One or two where this is a proof point inside a longer page. Empty shows
+        every approved quote. The ones shown are the first by display order, so
+        the queue decides which two rather than chance.
+      </p>
+
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <ToggleSwitch
           checked={onlyLanding}

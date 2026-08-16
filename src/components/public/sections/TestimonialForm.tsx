@@ -2,6 +2,8 @@ import { SectionContainer } from '@/components/public/SectionContainer';
 import type { PmbcVariant } from '@/lib/public/tokens';
 import { sectionCopy } from '@/lib/public/sectionCopy';
 import { TestimonialFormFields } from '@/components/public/TestimonialFormFields';
+import type { SectionContext } from '@/lib/public/sectionContext';
+import { TestimonialFormGate } from '@/components/public/TestimonialFormGate';
 
 /**
  * The client testimonial form, placeable on any page from the builder.
@@ -20,11 +22,14 @@ export function TestimonialForm({
   content,
   styles,
   variant = 'cream',
+  context = {},
 }: {
   content: Record<string, unknown>;
   styles?: unknown;
   variant?: PmbcVariant;
+  context?: SectionContext;
 }) {
+  const publicEnabled = context.testimonialFormPublic === true;
   const eyebrow = sectionCopy(content, 'eyebrow', 'In your words');
   const heading = sectionCopy(content, 'heading', 'Share your experience');
   const intro = sectionCopy(
@@ -45,6 +50,7 @@ export function TestimonialForm({
   );
 
   return (
+    <TestimonialFormGate publicEnabled={publicEnabled}>
     <SectionContainer variant={variant} styles={styles}>
       {(eyebrow || heading || intro) && (
         <div className="mx-auto max-w-2xl text-center">
@@ -79,5 +85,6 @@ export function TestimonialForm({
         />
       </div>
     </SectionContainer>
+    </TestimonialFormGate>
   );
 }

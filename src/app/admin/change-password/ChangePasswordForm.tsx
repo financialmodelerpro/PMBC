@@ -31,6 +31,12 @@ export function ChangePasswordForm() {
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
 
+  // Step two. The change is parked server side against a one-time code until
+  // this is filled in, so nothing has happened to the account yet.
+  const [stage, setStage] = useState<'details' | 'verify'>('details');
+  const [sentTo, setSentTo] = useState('');
+  const [code, setCode] = useState('');
+
   const localProblem =
     next.length === 0
       ? null
@@ -56,20 +62,124 @@ export function ChangePasswordForm() {
           confirm_password: confirm,
         }),
       });
-      const json = (await res.json()) as { ok?: boolean; error?: string };
+      const json = (await res.json()) as {
+        ok?: boolean;
+        error?: string;
+        stage?: string;
+        sentTo?: string;
+      };
       if (!res.ok || !json.ok) {
         setError(json.error ?? 'Could not change the password.');
         return;
       }
-      setDone(true);
-      setCurrent('');
-      setNext('');
-      setConfirm('');
+      // Nothing has changed yet: the code has to come back first.
+      setSentTo(json.sentTo ?? 'your email address');
+      setStage('verify');
     } catch {
       setError('Could not reach the server.');
     } finally {
       setSaving(false);
     }
+  }
+
+  async function verify(e: React.FormEvent) {
+    e.preventDefault();
+    if (code.trim().length !== 6 || saving) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/admin/change-password/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: code.trim() }),
+      });
+      const json = (await res.json()) as { ok?: boolean; error?: string; restart?: boolean };
+      if (!res.ok || !json.ok) {
+        setError(json.error ?? 'Could not confirm the code.');
+        // A dead code sends the whole flow back to the start, rather than
+        // leaving someone typing into a box that can no longer work.
+        if (json.restart) {
+          setStage('details');
+          setCode('');
+        }
+        return;
+      }
+      setDone(true);
+      setStage('details');
+      setCurrent('');
+      setNext('');
+      setConfirm('');
+      setCode('');
+    } catch {
+      setError('Could not reach the server.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (stage === 'verify') {
+    return (
+      <form onSubmit={verify} style={{ ...adminCard, maxWidth: 520 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+          <p style={{ margin: 0, fontSize: 14, color: ADMIN_COLORS.textBody }}>
+            A six-digit code has gone to <strong>{sentTo}</strong>. Enter it to
+            finish. <strong>Your password has not changed yet</strong>, and the old
+            one still works until you do.
+          </p>
+
+          <label style={{ display: 'block' }}>
+            <span style={adminLabel}>Confirmation code</span>
+            <input
+              type="text"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              maxLength={6}
+              value={code}
+              onChange={(e) => setCode(e.target.value.replace(/[^0-9]/g, ''))}
+              style={{
+                ...adminInput,
+                fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+                fontSize: 20,
+                letterSpacing: '0.3em',
+              }}
+            />
+            <p style={adminFieldHint}>
+              It expires in ten minutes and can be used once. If it does not arrive,
+              start again to send a new one, which replaces this code.
+            </p>
+          </label>
+
+          {error && (
+            <p style={{ margin: 0, fontSize: 13, color: ADMIN_COLORS.danger }}>{error}</p>
+          )}
+
+          <div style={{ display: 'flex', gap: 10 }}>
+            <SaveButton type="submit" saving={saving} disabled={code.trim().length !== 6 || saving}>
+              {saving ? 'Confirming...' : 'Confirm change'}
+            </SaveButton>
+            <button
+              type="button"
+              onClick={() => {
+                setStage('details');
+                setCode('');
+                setError(null);
+              }}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                padding: '0 6px',
+                fontSize: 13,
+                color: ADMIN_COLORS.textMuted,
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+              }}
+            >
+              Start again
+            </button>
+          </div>
+        </div>
+      </form>
+    );
   }
 
   return (
@@ -124,9 +234,14 @@ export function ChangePasswordForm() {
           </p>
         )}
 
+        <p style={{ margin: 0, fontSize: 12, color: ADMIN_COLORS.textMuted }}>
+          A six-digit code goes to your own email address before the change takes
+          effect, so knowing the current password is not enough on its own.
+        </p>
+
         <div>
           <SaveButton type="submit" saving={saving} disabled={!canSubmit}>
-            {saving ? 'Changing...' : 'Change password'}
+            {saving ? 'Sending code...' : 'Continue'}
           </SaveButton>
         </div>
       </div>

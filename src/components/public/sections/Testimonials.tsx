@@ -35,7 +35,26 @@ export function Testimonials({
 }) {
   const all = context.testimonials ?? [];
   const onlyLanding = content.only_landing === true;
-  const testimonials = onlyLanding ? all.filter((t) => t.show_on_landing) : all;
+  const filtered = onlyLanding ? all.filter((t) => t.show_on_landing) : all;
+
+  /**
+   * Optional cap. Absent means every approved quote, which is what this section
+   * did before the key existed, so no existing placement changes. Set to one or
+   * two where the block is a proof point inside a longer page rather than the
+   * page's own subject, which is the difference between home and a dedicated
+   * testimonials page.
+   *
+   * Ordering is the queue's, by `display_order`, so a cap of two takes the two
+   * an operator put at the top rather than two at random.
+   */
+  const rawMax = content.max_items;
+  const max =
+    typeof rawMax === 'number' && Number.isFinite(rawMax) && rawMax > 0
+      ? Math.floor(rawMax)
+      : typeof rawMax === 'string' && rawMax.trim() !== '' && Number(rawMax) > 0
+        ? Math.floor(Number(rawMax))
+        : null;
+  const testimonials = max === null ? filtered : filtered.slice(0, max);
 
   if (testimonials.length === 0) return null;
 

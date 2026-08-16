@@ -3,6 +3,7 @@
 import { AdminPageHeader } from '@/components/admin/AdminPageHeader';
 import type { FieldDef } from '@/components/admin/CollectionManager';
 import { TestimonialsManager } from '@/components/admin/TestimonialsManager';
+import { SubmissionPanel } from './SubmissionPanel';
 import { adminPageMain } from '@/lib/admin/styles';
 
 /**
@@ -48,6 +49,7 @@ export default function AdminTestimonialsPage() {
           title="Testimonials"
           description="Approve and curate client testimonials. Only approved quotes render on the public pages, and only those flagged for the homepage appear there."
         />
+        <SubmissionPanel />
         <TestimonialsManager fields={FIELDS} />
       </div>
     </div>

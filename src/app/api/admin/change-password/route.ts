@@ -6,6 +6,9 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { getAdminSession } from '@/lib/auth/requireAdmin';
 import { writeAudit } from '@/lib/audit';
 import { MIN_PASSWORD_LENGTH, passwordProblem } from '@/lib/auth/password';
+import { generateCode, storePendingChange, CODE_TTL_MS } from '@/lib/auth/passwordCodes';
+import { sendEmail } from '@/lib/email/send';
+import { passwordCodeHtml } from '@/lib/email/templates/passwordCode';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,8 +24,17 @@ const schema = z.object({
   confirm_password: z.string().min(1),
 });
 
+/** "a****d@example.com". Enough to recognise the inbox, not enough to publish it. */
+function maskEmail(email: string): string {
+  const [local, domain] = email.split('@');
+  if (!domain) return email;
+  const head = local.slice(0, 1);
+  const tail = local.length > 1 ? local.slice(-1) : '';
+  return `${head}${'*'.repeat(Math.max(1, local.length - 2))}${tail}@${domain}`;
+}
+
 /**
- * Change the signed-in user's own password.
+ * Step one of changing the signed-in user's own password.
  *
  * Deliberately not part of the users API. This route acts on
  * `session.user.id` and never on an id from the request, so it cannot be
@@ -90,38 +102,45 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Your current password is not correct.' }, { status: 400 });
   }
 
+  // The change is NOT applied here. It is hashed, parked against a one-time
+  // code, and applied by /verify once the code comes back from the account's own
+  // inbox. Knowing the current password is no longer enough on its own: an
+  // attacker at an unlocked screen, or holding a password from somewhere else,
+  // also has to reach the mailbox.
   const hash = await bcrypt.hash(new_password, BCRYPT_COST);
-  const { error: updateError } = await supabase
-    .from('admin_users')
-    .update({ password_hash: hash })
-    .eq('id', session.user.id);
+  const code = generateCode();
+  await storePendingChange(session.user.id, code, hash);
 
-  if (updateError) {
-    return NextResponse.json({ error: 'Could not save the new password.' }, { status: 500 });
-  }
+  const sent = await sendEmail({
+    to: row.email,
+    subject: 'Your PaceMakers password confirmation code',
+    html: await passwordCodeHtml({
+      code,
+      name: session.user.name || row.email,
+      minutes: Math.round(CODE_TTL_MS / 60000),
+    }),
+  });
 
-  // Verify the stored hash actually matches what was set, the way the rotation
-  // script does. A silent write failure here locks the account on next login.
-  const { data: check } = await supabase
-    .from('admin_users')
-    .select('password_hash')
-    .eq('id', session.user.id)
-    .maybeSingle();
-  if (!check || !(await bcrypt.compare(new_password, check.password_hash))) {
+  await writeAudit(supabase, {
+    adminId: session.user.id,
+    action: 'password_change_requested',
+    entityType: 'admin_users',
+    entityId: session.user.id,
+    // The email it went to, never the code and never the password.
+    metadata: { email: row.email, delivered: sent.ok },
+  });
+
+  if (!sent.ok) {
+    // The code exists but nobody can read it, which would strand the user on a
+    // screen asking for something they will never receive. Clearer to say so.
     return NextResponse.json(
-      { error: 'The new password did not store correctly. Your old password still works.' },
+      {
+        error:
+          'Could not send the confirmation code. Your password has not changed. Check that email is configured, then try again.',
+      },
       { status: 500 },
     );
   }
 
-  await writeAudit(supabase, {
-    adminId: session.user.id,
-    action: 'password_change',
-    entityType: 'admin_users',
-    entityId: session.user.id,
-    // No before/after: a password diff is the one diff that must never exist.
-    metadata: { email: row.email },
-  });
-
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, stage: 'verify', sentTo: maskEmail(row.email) });
 }

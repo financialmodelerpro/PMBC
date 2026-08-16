@@ -22,6 +22,14 @@ const settingsSchema = z.object({
   social_twitter: z.string().optional(),
   default_og_image_url: z.string().optional(),
   google_analytics_id: z.string().optional(),
+  /**
+   * Whether the client testimonial submission form is offered publicly.
+   *
+   * A boolean rather than a string, and it lives here rather than on each
+   * section, because the question is one answer for the whole site. Absent
+   * means off, which is what `isTestimonialFormPublic` reads.
+   */
+  testimonial_form_public: z.boolean().optional(),
 });
 
 async function handleMutation(req: Request) {
@@ -81,6 +89,33 @@ async function handleMutation(req: Request) {
   });
 
   return NextResponse.json({ ok: true });
+}
+
+/**
+ * Read the settings blob.
+ *
+ * Admin only, like the mutations: these are the site-wide values, and the
+ * blob carries published addresses and analytics ids. An editor calling this
+ * gets a 403, which the Testimonials screen treats as "do not offer the
+ * switch" rather than as an error.
+ */
+export async function GET() {
+  const gate = await requireOwner();
+  if (gate instanceof NextResponse) return gate;
+
+  const supabase = createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from('site_settings')
+    .select('settings')
+    .eq('id', 1)
+    .maybeSingle();
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  const settings =
+    data?.settings && typeof data.settings === 'object' && !Array.isArray(data.settings)
+      ? data.settings
+      : {};
+  return NextResponse.json({ settings });
 }
 
 export const PATCH = handleMutation;

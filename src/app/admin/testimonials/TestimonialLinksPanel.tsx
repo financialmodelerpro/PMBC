@@ -11,7 +11,6 @@ import {
   adminBadge,
   adminButtonGhost,
   adminButtonIcon,
-  adminCard,
   adminFieldHint,
   adminInput,
   adminLabel,
@@ -46,7 +45,7 @@ function fmt(iso: string | null): string {
  */
 const DEFAULT_TARGET = '/contact';
 
-export function TestimonialLinksManager() {
+export function TestimonialLinksPanel() {
   const canDelete = useCanDelete();
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
@@ -148,7 +147,7 @@ export function TestimonialLinksManager() {
         </p>
       )}
 
-      <div style={adminCard}>
+      <div>
         <label style={{ display: 'block', maxWidth: 420, marginBottom: 18 }}>
           <span style={adminLabel}>Link points at</span>
           <input
@@ -316,7 +315,7 @@ function CreateLink({
   }
 
   return (
-    <form onSubmit={submit} style={{ ...adminCard, maxWidth: 520 }}>
+    <form onSubmit={submit} style={{ maxWidth: 520 }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         <label style={{ display: 'block' }}>
           <span style={adminLabel}>Who is this for</span>

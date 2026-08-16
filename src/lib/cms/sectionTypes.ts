@@ -317,6 +317,9 @@ export const SECTION_TYPES: SectionTypeMeta[] = [
       // Every approved quote by default. The homepage flag is a narrowing an
       // operator opts into, not the starting state.
       only_landing: false,
+      // Blank means every approved quote, which is how this section behaved
+      // before the cap existed.
+      max_items: '',
     },
   },
   {

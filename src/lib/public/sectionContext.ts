@@ -51,6 +51,15 @@ export type SectionContext = {
    * block silently rendering nothing on whichever route was forgotten.
    */
   testimonials?: TestimonialRow[];
+  /**
+   * Whether the testimonial submission form is offered to the public.
+   *
+   * Fetched by `SectionList` alongside the quotes, and only when the page
+   * carries a form, for the same reason: the form can be placed anywhere, so a
+   * route that forgot to pass this would render it in whichever state the
+   * default happened to be.
+   */
+  testimonialFormPublic?: boolean;
 };
 
 export type ServiceCard = {

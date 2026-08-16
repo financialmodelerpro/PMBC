@@ -24,7 +24,6 @@ import {
   Inbox,
   KeyRound,
   LayoutDashboard,
-  Link2 as LinkIcon,
   LayoutTemplate,
   LogOut,
   Mail,
@@ -85,8 +84,15 @@ const NAV: NavEntry[] = [
   { kind: 'item', label: 'Pages & Nav', href: '/admin/pages', icon: FileText },
   { kind: 'item', label: 'Footer Links', href: '/admin/footer-links', icon: PanelBottom, role: 'admin' },
   { kind: 'item', label: 'Insights', href: '/admin/articles', icon: Newspaper },
-  { kind: 'item', label: 'Testimonials', href: '/admin/testimonials', icon: MessageSquareQuote },
-  { kind: 'item', label: 'Testimonial Links', href: '/admin/testimonial-links', icon: LinkIcon },
+  {
+    kind: 'item',
+    label: 'Testimonials',
+    href: '/admin/testimonials',
+    icon: MessageSquareQuote,
+    // The links panel used to be its own screen. Anyone holding that bookmark
+    // lands on the queue, which is where it lives now.
+    matchPaths: ['/admin/testimonial-links'],
+  },
   { kind: 'item', label: 'Media Library', href: '/admin/media', icon: ImageIcon },
   { kind: 'item', label: 'OG Previews', href: '/admin/og-preview', icon: Share2 },
   { kind: 'divider', label: 'Collections' },

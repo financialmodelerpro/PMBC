@@ -33,6 +33,7 @@ import { TestimonialForm } from './sections/TestimonialForm';
 import { SectionPlaceholder } from './sections/Placeholder';
 import type { SectionContext } from '@/lib/public/sectionContext';
 import { fetchApprovedTestimonials } from '@/lib/cms/collections';
+import { isTestimonialFormPublic } from '@/lib/cms/testimonialSettings';
 
 type SectionRow = {
   id: string;
@@ -267,9 +268,15 @@ export async function SectionList({
   // nothing for it. `fetchApprovedTestimonials` already returns [] rather than
   // throwing when the table is missing.
   const needsTestimonials = sections.some((s) => s.section_type === 'testimonials');
-  const resolved: SectionContext | undefined = needsTestimonials
-    ? { ...context, testimonials: await fetchApprovedTestimonials() }
-    : context;
+  const needsFormSwitch = sections.some((s) => s.section_type === 'testimonial_form');
+
+  let resolved: SectionContext | undefined = context;
+  if (needsTestimonials) {
+    resolved = { ...resolved, testimonials: await fetchApprovedTestimonials() };
+  }
+  if (needsFormSwitch) {
+    resolved = { ...resolved, testimonialFormPublic: await isTestimonialFormPublic() };
+  }
   return (
     <>
       {sections.map((s) => (
