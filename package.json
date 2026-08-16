@@ -57,7 +57,8 @@
     "seed-contact-copy-fixes": "node scripts/seed-contact-copy-fixes.mjs",
     "seed-page-owned-copy": "node scripts/seed-page-owned-copy.mjs",
     "seed-service-pages-own-copy": "node scripts/seed-service-pages-own-copy.mjs",
-    "seed-services-grid-section": "node scripts/seed-services-grid-section.mjs"
+    "seed-services-grid-section": "node scripts/seed-services-grid-section.mjs",
+    "seed-services-engagement-block": "node scripts/seed-services-engagement-block.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

@@ -57,11 +57,13 @@ export const SECTION_TYPES: SectionTypeMeta[] = [
   {
     type: 'paragraphs',
     label: 'Paragraphs',
-    description: 'Rich-text body content, with an optional heading and alignment.',
+    description:
+      'Rich-text body content, with an optional eyebrow, heading and alignment.',
     implemented: true,
     // `align` defaults to 'left', matching how every section authored before
-    // the field existed already renders.
-    defaultContent: { heading: '', html: '<p></p>', align: 'left' },
+    // the field existed already renders. `eyebrow` is blank for the same
+    // reason: the label above the heading is opt-in.
+    defaultContent: { eyebrow: '', heading: '', html: '<p></p>', align: 'left' },
   },
   {
     type: 'stats_block',

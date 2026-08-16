@@ -20,6 +20,10 @@ export function Paragraphs({
   // PaceMakers / Market Focus / Personal blocks. Existing paragraphs sections
   // carry no heading key, so they render exactly as before.
   const heading = typeof content?.heading === 'string' ? content.heading : '';
+  // Optional eyebrow, added 2026-08-16 for the /services engagement block.
+  // Same contract as the heading above it: a section without the key renders
+  // exactly as it did, and `SectionIntro` has always accepted one.
+  const eyebrow = typeof content?.eyebrow === 'string' ? content.eyebrow.trim() : '';
   const align = readProseAlign(content?.align);
   // `isBlankHtml` rather than a falsy check: an emptied rich text field
   // serialises to "<p></p>", which is truthy but renders as nothing once the
@@ -35,9 +39,14 @@ export function Paragraphs({
           this text column narrows, so long-form copy holds a readable measure
           rather than running the full 1200px. */}
       <div className="mx-auto" style={{ maxWidth: PROSE_MEASURE }}>
-        {heading && (
+        {(eyebrow || heading) && (
           <div className="mb-9">
-            <SectionIntro headline={heading} variant={variant} align="left" />
+            <SectionIntro
+              eyebrow={eyebrow}
+              headline={heading}
+              variant={variant}
+              align="left"
+            />
           </div>
         )}
         <div

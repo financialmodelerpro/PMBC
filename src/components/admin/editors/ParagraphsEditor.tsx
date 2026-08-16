@@ -9,10 +9,26 @@ import type { SectionEditorProps } from './types';
 export function ParagraphsEditor({ content, onChange }: SectionEditorProps) {
   const html = typeof content.html === 'string' ? content.html : '';
   const heading = typeof content.heading === 'string' ? content.heading : '';
+  const eyebrow = typeof content.eyebrow === 'string' ? content.eyebrow : '';
   const align = readProseAlign(content.align);
 
   return (
     <div style={{ display: 'grid', gap: 18 }}>
+      <div>
+        <label style={adminLabel}>Eyebrow (optional)</label>
+        <input
+          type="text"
+          value={eyebrow}
+          placeholder="Leave empty for a block with no label above the heading"
+          onChange={(e) => onChange({ ...content, eyebrow: e.target.value })}
+          style={adminInput}
+        />
+        <p style={adminFieldHint}>
+          The small tracked label above the heading. Rendered in capitals by the
+          stylesheet, so type it however reads best here.
+        </p>
+      </div>
+
       <div>
         <label style={adminLabel}>Heading (optional)</label>
         <input
