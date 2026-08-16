@@ -4,14 +4,23 @@ import { ArrowUpRight } from 'lucide-react';
 
 import { fetchPublishedCaseStudies } from '@/lib/cms/collections';
 import { buildPageMetadata } from '@/lib/seo/metadata';
-import { PageHeroFallback } from '@/components/public/PageHeroFallback';
+import { fetchPage, fetchPageSections } from '@/lib/cms/pages';
+import { FirmPageBody } from '@/components/public/FirmPageBody';
 
 export const dynamic = 'force-dynamic';
+
+/** The hero copy this page ships with, and its fallback when no section exists. */
+const FALLBACK_HERO = {
+  eyebrow: 'Case Studies',
+  headline: 'Proof of work, discreetly told',
+  tagline:
+    'Selected engagements across the sectors we serve. Some are anonymized where client confidentiality requires.',
+};
 
 export async function generateMetadata(): Promise<Metadata> {
   return buildPageMetadata({
     path: '/case-studies',
-    cmsPage: null,
+    cmsPage: await fetchPage('case-studies'),
     fallback: {
       title: 'Case Studies | PaceMakers Business Consultants',
       description:
@@ -21,20 +30,24 @@ export async function generateMetadata(): Promise<Metadata> {
   });
 }
 
-export default async function CaseStudiesPage() {
-  const studies = await fetchPublishedCaseStudies();
+export default async function CaseStudiesPage(props: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const search = await props.searchParams;
+  const isPreview = search.preview === '1';
+
+  const [studies, sections] = await Promise.all([
+    fetchPublishedCaseStudies(),
+    fetchPageSections('case-studies', { onlyVisible: !isPreview }),
+  ]);
 
   return (
     <main>
-      {/* Hero */}
-      {/* The shared hero, not a fourth hand-rolled copy. This band was
-          `pt-28 pb-16` with no min-height and rendered 380px against every
-          other page's 630px, which is what made the openings uneven. */}
-      <PageHeroFallback
-        eyebrow="Case Studies"
-        headline="Proof of work, discreetly told"
-        tagline="Selected engagements across the sectors we serve. Some are anonymized where client confidentiality requires."
-      />
+      {/* The hero is a CMS section since migration 070, so its three strings are
+          edited in the page builder like every other page's, with the shipped
+          copy kept as a fallback for a database without that section. The cards
+          below come from the `case_studies` collection. */}
+      <FirmPageBody sections={sections} fallbackHero={FALLBACK_HERO} />
 
       {/* Grid */}
       <section className="bg-[color:var(--pmbc-surface-cream)] px-6 py-20 lg:py-28">

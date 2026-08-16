@@ -3,14 +3,23 @@ import Link from 'next/link';
 
 import { fetchPublishedArticles } from '@/lib/cms/collections';
 import { buildPageMetadata } from '@/lib/seo/metadata';
-import { PageHeroFallback } from '@/components/public/PageHeroFallback';
+import { fetchPage, fetchPageSections } from '@/lib/cms/pages';
+import { FirmPageBody } from '@/components/public/FirmPageBody';
 
 export const dynamic = 'force-dynamic';
+
+/** The hero copy this page ships with, and its fallback when no section exists. */
+const FALLBACK_HERO = {
+  eyebrow: 'Insights',
+  headline: 'Perspectives on the work',
+  tagline:
+    'Notes on valuation, transactions, and corporate finance from the people doing the modelling.',
+};
 
 export async function generateMetadata(): Promise<Metadata> {
   return buildPageMetadata({
     path: '/insights',
-    cmsPage: null,
+    cmsPage: await fetchPage('insights'),
     fallback: {
       title: 'Insights | PaceMakers Business Consultants',
       description:
@@ -27,20 +36,25 @@ function fmtDate(iso: string | null): string {
   return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
 }
 
-export default async function InsightsPage() {
-  const articles = await fetchPublishedArticles();
+export default async function InsightsPage(props: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const search = await props.searchParams;
+  const isPreview = search.preview === '1';
+
+  const [articles, sections] = await Promise.all([
+    fetchPublishedArticles(),
+    fetchPageSections('insights', { onlyVisible: !isPreview }),
+  ]);
   const [lead, ...rest] = articles;
 
   return (
     <main>
-      {/* The shared hero, not a fourth hand-rolled copy. This band was
-          `pt-28 pb-16` with no min-height and rendered 380px against every
-          other page's 630px, which is what made the openings uneven. */}
-      <PageHeroFallback
-        eyebrow="Insights"
-        headline="Perspectives on the work"
-        tagline="Notes on valuation, transactions, and corporate finance from the people doing the modelling."
-      />
+      {/* The hero is a CMS section since migration 070, so its three strings are
+          edited in the page builder like every other page's, with the shipped
+          copy kept as a fallback for a database without that section. The
+          articles below come from the `articles` collection. */}
+      <FirmPageBody sections={sections} fallbackHero={FALLBACK_HERO} />
 
       <section className="bg-[color:var(--pmbc-surface-cream)] px-6 py-20 lg:py-28">
         {/* See the note on /team: the count is for the sitemap verification. */}
