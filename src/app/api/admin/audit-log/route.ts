@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-import { getAdminSession } from '@/lib/auth/requireAdmin';
+import { requireOwner } from '@/lib/auth/requireAdmin';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 
 /**
@@ -68,10 +68,9 @@ function applyFilters(query: any, f: Filters): any {
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
 export async function GET(req: Request) {
-  const session = await getAdminSession();
-  if (!session) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const gate = await requireOwner();
+  if (gate instanceof NextResponse) return gate;
+  const session = gate;
 
   const url = new URL(req.url);
   const limit = clampInt(url.searchParams.get('limit'), DEFAULT_LIMIT, 1, MAX_LIMIT);
@@ -125,10 +124,9 @@ export async function GET(req: Request) {
 
 /** Distinct admins and actions, so the viewer can populate its filter dropdowns. */
 export async function POST() {
-  const session = await getAdminSession();
-  if (!session) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const gate = await requireOwner();
+  if (gate instanceof NextResponse) return gate;
+  const session = gate;
 
   const supabase = createSupabaseServerClient();
 

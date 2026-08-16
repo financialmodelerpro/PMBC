@@ -19,7 +19,40 @@ const ContactSchema = z.object({
   message: z.string().trim().min(10, 'Please share a bit more context').max(4000),
   source_page: z.string().trim().max(200).optional().or(z.literal('')),
   hcaptcha_token: z.string().optional(),
+  /**
+   * The honeypot field. Named as an ordinary form field so a bot's filler
+   * recognises it; a person never sees it, so anything in it is a bot.
+   */
+  website: z.string().optional(),
+  /** Milliseconds between the form appearing and the submit. */
+  elapsed_ms: z.number().optional(),
 });
+
+/**
+ * The floor a real submission cannot go under.
+ *
+ * Three seconds is well below a person reading a five-field form, filling in a
+ * name, an email and at least ten characters of message, and well above what a
+ * script needs. It is a heuristic, not a proof: a patient bot waits, and a
+ * visitor who pastes everything from a clipboard in two seconds is refused
+ * wrongly. Both are accepted because the alternative on the table was nothing
+ * at all.
+ */
+const MIN_FILL_MS = 3000;
+
+/**
+ * Silence, dressed as success.
+ *
+ * A bot that is told it was blocked knows to change something and try again. A
+ * bot that is told it succeeded stops. So a rejected submission gets the same
+ * 200 and the same shape a real one gets, with an id that belongs to nothing.
+ * Logged server side, since a spike here is the only way anyone would find out
+ * the filter is doing something.
+ */
+function silentlyAccepted(reason: string): NextResponse {
+  console.warn('[contact] discarded a submission: ' + reason);
+  return NextResponse.json({ ok: true, id: null });
+}
 
 async function verifyHcaptcha(token: string | undefined): Promise<boolean> {
   const secret = process.env.HCAPTCHA_SECRET_KEY;
@@ -63,6 +96,18 @@ export async function POST(req: Request) {
   }
 
   const data = parsed.data;
+
+  // Spam filtering, before anything is written or sent.
+  //
+  // hCaptcha stays wired below and dormant: with no HCAPTCHA_SECRET_KEY set it
+  // passes everything through, so switching it back on is the two env vars and
+  // no code change. These two checks are what stands in for it meanwhile.
+  if ((data.website ?? '').trim() !== '') {
+    return silentlyAccepted('honeypot filled');
+  }
+  if (typeof data.elapsed_ms === 'number' && data.elapsed_ms < MIN_FILL_MS) {
+    return silentlyAccepted(`submitted after ${data.elapsed_ms}ms, under the ${MIN_FILL_MS}ms floor`);
+  }
 
   const captchaOk = await verifyHcaptcha(data.hcaptcha_token);
   if (!captchaOk) {

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
-import { getAdminSession } from '@/lib/auth/requireAdmin';
+import { canDelete, forbidden, getAdminSession } from '@/lib/auth/requireAdmin';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { forDiff, writeAudit } from '@/lib/audit';
 import type { Json } from '@/types/database';
@@ -70,7 +70,32 @@ const visibilitySchema = z.object({
   visible: z.boolean(),
 });
 
-const patchSchema = z.discriminatedUnion('action', [reorderSchema, visibilitySchema]);
+/**
+ * The page's own row: title, and the two metadata fields that drive the
+ * <title> and description of the public page.
+ *
+ * These have been columns on `cms_pages` since migration 002 and were seeded by
+ * migrations ever since, with no way to edit either from the console. Every
+ * public route reads them through `buildPageMetadata`, so until now changing a
+ * page's search-result wording meant writing a migration.
+ *
+ * Empty is allowed and meaningful: `buildPageMetadata` falls back to the
+ * route's own default when a field is blank, so clearing one restores the
+ * shipped wording rather than publishing an empty title.
+ */
+const updatePageSchema = z.object({
+  action: z.literal('update_page'),
+  slug: z.string().trim().min(1),
+  title: z.string().trim().min(1).max(200),
+  meta_title: z.string().trim().max(200),
+  meta_description: z.string().trim().max(400),
+});
+
+const patchSchema = z.discriminatedUnion('action', [
+  reorderSchema,
+  visibilitySchema,
+  updatePageSchema,
+]);
 
 export async function PATCH(req: Request) {
   const session = await getAdminSession();
@@ -95,6 +120,49 @@ export async function PATCH(req: Request) {
 
   const supabase = createSupabaseServerClient();
   const nowIso = new Date().toISOString();
+
+  if (parsed.data.action === 'update_page') {
+    const { slug, title, meta_title, meta_description } = parsed.data;
+    const supabaseMeta = createSupabaseServerClient();
+
+    const { data: before } = await supabaseMeta
+      .from('cms_pages')
+      .select('slug, title, meta_title, meta_description')
+      .eq('slug', slug)
+      .maybeSingle();
+    if (!before) {
+      return NextResponse.json({ error: 'No such page' }, { status: 404 });
+    }
+
+    const { data: after, error: metaError } = await supabaseMeta
+      .from('cms_pages')
+      .update({
+        title,
+        // Stored as null rather than '' when cleared, so the fallback path in
+        // buildPageMetadata sees an absent value and not an empty string.
+        meta_title: meta_title === '' ? null : meta_title,
+        meta_description: meta_description === '' ? null : meta_description,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('slug', slug)
+      .select('slug, title, meta_title, meta_description')
+      .single();
+
+    if (metaError) {
+      return NextResponse.json({ error: metaError.message }, { status: 500 });
+    }
+
+    await writeAudit(supabaseMeta, {
+      adminId: session.user.id,
+      action: 'update',
+      entityType: 'cms_pages',
+      entityId: slug,
+      beforeValue: before,
+      afterValue: after,
+    });
+
+    return NextResponse.json({ page: after });
+  }
 
   if (parsed.data.action === 'reorder') {
     for (const item of parsed.data.items) {
@@ -358,6 +426,9 @@ export async function DELETE(req: Request) {
   const session = await getAdminSession();
   if (!session) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  if (!canDelete(session)) {
+    return forbidden('Editors cannot delete a section. Hide it instead, which takes it off the page and can be undone.');
   }
 
   let json: unknown;

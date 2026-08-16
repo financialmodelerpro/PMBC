@@ -22,6 +22,7 @@ import {
   History,
   Image as ImageIcon,
   Inbox,
+  KeyRound,
   LayoutDashboard,
   LayoutTemplate,
   LogOut,
@@ -34,6 +35,7 @@ import {
   Settings,
   Share2,
   Type,
+  UserCog,
   Users,
   X,
 } from 'lucide-react';
@@ -46,6 +48,8 @@ type NavItem = {
   icon: typeof LayoutDashboard;
   matchExact?: boolean;
   matchPaths?: string[];
+  /** Omitted means every role sees it. 'admin' hides it from editors. */
+  role?: 'admin';
 };
 
 type NavDivider = { kind: 'divider'; label?: string };
@@ -72,12 +76,13 @@ const NAV: NavEntry[] = [
     kind: 'item',
     label: 'Header Settings',
     href: '/admin/header-settings',
+    role: 'admin',
     icon: PanelTop,
     matchPaths: ['/admin/branding'],
   },
   { kind: 'item', label: 'Page Content', href: '/admin/content', icon: Type },
   { kind: 'item', label: 'Pages & Nav', href: '/admin/pages', icon: FileText },
-  { kind: 'item', label: 'Footer Links', href: '/admin/footer-links', icon: PanelBottom },
+  { kind: 'item', label: 'Footer Links', href: '/admin/footer-links', icon: PanelBottom, role: 'admin' },
   { kind: 'item', label: 'Insights', href: '/admin/articles', icon: Newspaper },
   { kind: 'item', label: 'Testimonials', href: '/admin/testimonials', icon: MessageSquareQuote },
   { kind: 'item', label: 'Media Library', href: '/admin/media', icon: ImageIcon },
@@ -98,8 +103,10 @@ const NAV: NavEntry[] = [
   { kind: 'item', label: 'Email Branding', href: '/admin/email-branding', icon: Mail },
   { kind: 'item', label: 'Email Templates', href: '/admin/email-templates', icon: FileCode2 },
   { kind: 'divider', label: 'System' },
-  { kind: 'item', label: 'Site Settings', href: '/admin/settings', icon: Settings },
-  { kind: 'item', label: 'Audit Log', href: '/admin/audit', icon: History },
+  { kind: 'item', label: 'Site Settings', href: '/admin/settings', icon: Settings, role: 'admin' },
+  { kind: 'item', label: 'Users', href: '/admin/users', icon: UserCog, role: 'admin' },
+  { kind: 'item', label: 'Change Password', href: '/admin/change-password', icon: KeyRound },
+  { kind: 'item', label: 'Audit Log', href: '/admin/audit', icon: History, role: 'admin' },
 ];
 
 const EXTERNAL_LINKS: Array<{ label: string; href: string }> = [
@@ -137,9 +144,11 @@ function isActive(pathname: string, item: NavItem): boolean {
 export function CmsAdminNav({
   adminEmail,
   adminName,
+  role = 'admin',
 }: {
   adminEmail?: string;
   adminName?: string;
+  role?: 'admin' | 'editor';
 }) {
   const pathname = usePathname() ?? '';
 
@@ -204,13 +213,23 @@ export function CmsAdminNav({
     };
   }, [drawerOpen]);
 
+  // Role filter, applied once rather than per render branch. A divider whose
+  // whole group is admin-only would otherwise leave an orphan heading over
+  // nothing, which reads as a broken sidebar rather than a smaller one.
+  const visibleNav = NAV.filter((e) => e.kind !== 'item' || !e.role || e.role === role);
+  const entries = visibleNav.filter((e, i) => {
+    if (e.kind !== 'divider') return true;
+    const next = visibleNav[i + 1];
+    return Boolean(next && next.kind === 'item');
+  });
+
   const width = collapsed ? 64 : 240;
   const showLabels = !collapsed || isMobile;
 
   const renderEntries = (effectiveCollapsed: boolean) => (
     <>
       <ul style={{ listStyle: 'none', margin: 0, padding: '8px 0' }}>
-        {NAV.map((entry, idx) => {
+        {entries.map((entry, idx) => {
           if (entry.kind === 'divider') {
             if (effectiveCollapsed) {
               return (

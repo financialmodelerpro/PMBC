@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
-import { getAdminSession } from '@/lib/auth/requireAdmin';
+import { requireOwner } from '@/lib/auth/requireAdmin';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { writeAudit } from '@/lib/audit';
 import {
@@ -28,10 +28,9 @@ const KEY = 'links';
 const bodySchema = z.object({ links: footerLinksSchema });
 
 export async function GET() {
-  const session = await getAdminSession();
-  if (!session) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const gate = await requireOwner();
+  if (gate instanceof NextResponse) return gate;
+  const session = gate;
 
   const supabase = createSupabaseServerClient();
   const { data, error } = await supabase
@@ -52,10 +51,9 @@ export async function GET() {
 }
 
 async function handleMutation(req: Request) {
-  const session = await getAdminSession();
-  if (!session) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const gate = await requireOwner();
+  if (gate instanceof NextResponse) return gate;
+  const session = gate;
 
   let json: unknown;
   try {

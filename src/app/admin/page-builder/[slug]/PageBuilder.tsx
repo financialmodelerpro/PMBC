@@ -39,6 +39,7 @@ import { sectionFromRow, type LocalSection } from '@/lib/cms/serializers';
 import type { Tables } from '@/types/database';
 
 import { SectionEditorPanel } from './SectionEditorPanel';
+import { PageDetails } from './PageDetails';
 import { SectionPickerDialog } from './SectionPickerDialog';
 
 /**
@@ -52,6 +53,8 @@ type Props = {
   pageSlug: string;
   pageTitle: string;
   pageStatus: string;
+  pageMetaTitle: string;
+  pageMetaDescription: string;
   initialSections: LocalSection[];
 };
 
@@ -77,6 +80,8 @@ export function PageBuilder({
   pageSlug,
   pageTitle,
   pageStatus,
+  pageMetaTitle,
+  pageMetaDescription,
   initialSections,
 }: Props) {
   const router = useRouter();
@@ -464,6 +469,13 @@ export function PageBuilder({
           </Link>
         </div>
       </div>
+
+      <PageDetails
+        pageSlug={pageSlug}
+        initialTitle={pageTitle}
+        initialMetaTitle={pageMetaTitle}
+        initialMetaDescription={pageMetaDescription}
+      />
 
       <div
         style={{

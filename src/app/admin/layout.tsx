@@ -3,7 +3,10 @@ import { redirect } from 'next/navigation';
 import { getServerSession } from 'next-auth';
 
 import { authOptions } from '@/lib/auth/config';
+import { isAdminRole } from '@/lib/auth/requireAdmin';
+import { roleMayOpen } from '@/lib/auth/adminAccess';
 import { CmsAdminNav } from '@/components/admin/CmsAdminNav';
+import { AdminRoleProvider } from '@/components/admin/AdminRoleProvider';
 
 export const dynamic = 'force-dynamic';
 
@@ -31,8 +34,16 @@ export default async function AdminLayout({
   }
 
   const session = await getServerSession(authOptions);
-  if (!session || session.user.role !== 'admin') {
+  if (!session || !isAdminRole(session.user.role)) {
     redirect('/admin/login');
+  }
+  const role = session.user.role;
+
+  // Belt to the middleware's braces. The middleware already redirects an editor
+  // away from an admin-only URL, but it runs on the edge and this runs on the
+  // server, so a change to the matcher cannot quietly open a screen.
+  if (!roleMayOpen(role, pathname)) {
+    redirect('/admin');
   }
 
   const adminName = session.user.name || session.user.email || 'Admin';
@@ -49,7 +60,7 @@ export default async function AdminLayout({
           "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif",
       }}
     >
-      <CmsAdminNav adminName={adminName} adminEmail={adminEmail} />
+      <CmsAdminNav adminName={adminName} adminEmail={adminEmail} role={role} />
       <main
         style={{
           flex: 1,
@@ -58,7 +69,7 @@ export default async function AdminLayout({
           flexDirection: 'column',
         }}
       >
-        {children}
+        <AdminRoleProvider role={role}>{children}</AdminRoleProvider>
       </main>
     </div>
   );

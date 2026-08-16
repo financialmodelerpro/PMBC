@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { z } from 'zod';
 
-import { getAdminSession } from '@/lib/auth/requireAdmin';
+import { canDelete, forbidden, getAdminSession } from '@/lib/auth/requireAdmin';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import type { Database, Json } from '@/types/database';
 import { forDiff, snapshotRow, writeAudit } from '@/lib/audit';
@@ -238,6 +238,12 @@ export function createCollectionApi(config: CollectionConfig) {
   async function DELETE(req: Request) {
     const session = await getAdminSession();
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Editors write and hide; they do not remove. Enforced here rather than in
+    // each collection screen, so a row cannot be deleted by curling the route
+    // that the UI stopped offering a button for.
+    if (!canDelete(session)) {
+      return forbidden('Editors cannot delete. Hide the item instead, which has the same effect and can be undone.');
+    }
 
     const id = new URL(req.url).searchParams.get('id');
     if (!id) return NextResponse.json({ error: 'id is required' }, { status: 400 });

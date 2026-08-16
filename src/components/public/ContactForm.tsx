@@ -48,6 +48,25 @@ export function ContactForm({
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const captchaRef = useRef<HCaptcha | null>(null);
 
+  /**
+   * When this form appeared, used by the server to reject a submission that
+   * arrived impossibly fast. A ref rather than state: it must not change on
+   * re-render, and nothing renders from it.
+   *
+   * Set in an effect rather than at module scope so it is the moment the form
+   * mounted for this visitor, not the moment the bundle was evaluated.
+   */
+  const loadedAt = useRef<number>(0);
+  useEffect(() => {
+    loadedAt.current = Date.now();
+  }, []);
+
+  /**
+   * The honeypot. A real field name a bot's form filler recognises, hidden from
+   * people by CSS rather than by `type="hidden"`, which a bot skips.
+   */
+  const [honeypot, setHoneypot] = useState('');
+
   const {
     register,
     handleSubmit,
@@ -96,6 +115,10 @@ export function ContactForm({
           phone: composePhone(phone_country ?? DEFAULT_DIAL_COUNTRY, phone ?? ''),
           source_page: pathname,
           hcaptcha_token: captchaToken ?? undefined,
+          // Spam signals. Both are advisory: the server decides, and a bot that
+          // forges them is no worse off than one that ignores them.
+          website: honeypot,
+          elapsed_ms: loadedAt.current ? Date.now() - loadedAt.current : undefined,
         }),
       });
       const json = (await res.json()) as { error?: string; ok?: boolean };
@@ -119,6 +142,43 @@ export function ContactForm({
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-5">
+      {/* The honeypot.
+
+          Hidden by position rather than by `display: none` or `type="hidden"`:
+          the well-written bots skip both of those, and skipping it is the one
+          thing that defeats the trick. Off-screen and zero-opacity leaves it in
+          the DOM as an ordinary text input that a form filler will happily
+          complete.
+
+          `tabIndex={-1}` and `aria-hidden` keep it away from anyone using a
+          keyboard or a screen reader, who would otherwise land on a field with
+          no purpose and no way to know it should be left empty. The label is
+          there for the same reason a bot expects one, and is hidden with the
+          field. `autoComplete="off"` stops a browser filling it on a visitor's
+          behalf, which would fail a real person. */}
+      <div
+        aria-hidden
+        style={{
+          position: 'absolute',
+          left: '-9999px',
+          width: 1,
+          height: 1,
+          overflow: 'hidden',
+          opacity: 0,
+        }}
+      >
+        <label htmlFor="website">Website</label>
+        <input
+          id="website"
+          name="website"
+          type="text"
+          tabIndex={-1}
+          autoComplete="off"
+          value={honeypot}
+          onChange={(e) => setHoneypot(e.target.value)}
+        />
+      </div>
+
       <div className="grid gap-5 sm:grid-cols-2">
         <Field label="Full name" error={errors.name?.message} required>
           <input

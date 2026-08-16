@@ -44,6 +44,8 @@ export default async function PageBuilderPage(props: { params: Promise<Params> }
         pageSlug={page.slug}
         pageTitle={page.title}
         pageStatus={page.status}
+        pageMetaTitle={page.meta_title ?? ''}
+        pageMetaDescription={page.meta_description ?? ''}
         initialSections={initial}
       />
     </div>

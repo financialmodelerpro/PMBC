@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-import { getAdminSession } from '@/lib/auth/requireAdmin';
+import { canDelete, forbidden, getAdminSession } from '@/lib/auth/requireAdmin';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { writeAudit } from '@/lib/audit';
 import { ALLOWED_UPLOAD_MIME, humanBytes, maxBytesForMime } from '@/lib/media';
@@ -197,6 +197,11 @@ export async function POST(req: Request) {
 export async function DELETE(req: Request) {
   const session = await getAdminSession();
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  // An uploaded file can be referenced from any number of sections, so removing
+  // one is the least reversible thing in the media library.
+  if (!canDelete(session)) {
+    return forbidden('Editors cannot delete media. Upload a replacement and repoint the section instead.');
+  }
 
   let body: { bucket?: string; name?: string };
   try {

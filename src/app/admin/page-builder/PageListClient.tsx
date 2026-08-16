@@ -18,6 +18,7 @@ import {
   adminTh,
   adminThead,
 } from '@/lib/admin/styles';
+import { useCanDelete } from '@/components/admin/AdminRoleProvider';
 import {
   PAGE_TEMPLATES,
   SLUG_RX,
@@ -49,6 +50,7 @@ function formatDate(iso: string | null): string {
 }
 
 export function PageListClient({ pages }: { pages: PageRow[] }) {
+  const canDelete = useCanDelete();
   const router = useRouter();
   const [creating, setCreating] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<PageRow | null>(null);
@@ -192,7 +194,7 @@ export function PageListClient({ pages }: { pages: PageRow[] }) {
                       >
                         <Lock size={14} />
                       </span>
-                    ) : (
+                    ) : !canDelete ? null : (
                       <button
                         type="button"
                         onClick={() => setPendingDelete(p)}

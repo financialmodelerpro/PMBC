@@ -556,6 +556,7 @@ Three flags matter when rebuilding:
 068  services_grid_section     the /services card grid becomes a `service_grid` section at order 25, so the builder order is the page order
 069  services_engagement_block "How an engagement runs" on /services at order 27, a `paragraphs` section between the cards and the closing CTA
 070  collection_page_heroes  /team, /case-studies and /insights get a cms_pages row and a hero section. The last routes whose copy was code only
+071  team_meta_description   the /team meta description stops promising "practitioners who lead every mandate", which is the plural claim the firm does not make
 ```
 
 After running migrations, manually insert one admin_users row via SQL with a bcrypt hash for the password.
@@ -719,6 +720,39 @@ Footer columns, three since 2026-08-13:
 ---
 
 ## 6. Admin Panel
+
+### Roles
+
+Two, in `admin_users.role`, which is plain TEXT with no CHECK, so adding the
+second needed no DDL.
+
+| | `admin` | `editor` |
+|---|---|---|
+| Create and edit content | yes | yes |
+| Hide anything | yes | yes |
+| **Delete anything** | yes | **no** |
+| Site Settings, Header Settings, Footer Links | yes | no |
+| Users, Audit Log | yes | no |
+| Pages and Nav, Page Builder, collections, media, email | yes | yes |
+| Change their own password | yes | yes |
+
+**The line is deletion, not editing.** An editor can change any page and hide any
+part of it, which reaches the same end as deleting without the part that cannot
+be undone.
+
+**Enforced in three places, and only the third one counts.** The middleware
+redirects an editor away from an admin-only URL, the admin layout repeats that
+check server side in case the matcher changes, and every route checks for
+itself. `ADMIN_ONLY_PREFIXES` in `src/lib/auth/adminAccess.ts` is the one list
+the first two read. On the API side: `getAdminSession` means **any** signed-in
+staff member, which is the trap to watch, since a route that should be admin-only
+and calls it is open to editors and will pass any test that only signs in as an
+admin. `requireOwner` is the admin-only gate and returns a 403 rather than a 401,
+because an editor is signed in perfectly well and telling them to log in again is
+wrong advice. `canDelete` gates the delete paths.
+
+The UI hides what a role cannot use, through `AdminRoleProvider`. That is a
+courtesy so nobody is offered an action that would fail, not a control.
 
 ### Auth
 

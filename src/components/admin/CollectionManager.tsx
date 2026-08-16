@@ -20,6 +20,7 @@ import {
   adminLabel,
   adminTextarea,
 } from '@/lib/admin/styles';
+import { useCanDelete } from '@/components/admin/AdminRoleProvider';
 import { RichTextEditor } from '@/components/admin/RichTextEditor';
 import { MediaPickerButton, type MediaBucket } from '@/components/admin/MediaPicker';
 
@@ -315,6 +316,7 @@ export function CollectionEditorDrawer({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const canDelete = useCanDelete();
   const [form, setForm] = useState<Record<string, unknown>>(row);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -426,7 +428,9 @@ export function CollectionEditorDrawer({
           }}
         >
           <div>
-            {!isNew && (
+            {/* Editors write and hide; deleting is an admin action, and the API
+                refuses it whether or not this button is rendered. */}
+            {!isNew && canDelete && (
               <button
                 type="button"
                 onClick={remove}
