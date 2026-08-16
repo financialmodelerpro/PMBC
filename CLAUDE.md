@@ -99,6 +99,7 @@ When you find an em dash in *existing* content while doing other work, fix it as
 | 49 | 2026-08-16 | `/contact` copy became content. Six strings moved out of the route file, and the booking callout's three keys moved from the `booking` group to `contact`, where the rest of the page's copy already was. No wording changed. |
 | 50 | 2026-08-16 | Three copy corrections on `/contact`: the form eyebrow stopped repeating the hero headline, the response-time line was cleared as a repeat of the hero, and the founder card moved from naming one person to the partner-led wording the rest of the site uses. Clearing a field was also made to mean something: an empty value now renders nothing rather than falling back to the shipped default. |
 | 51 | 2026-08-16 | Page copy left the key-value store. `/contact` and `/book` are edited entirely in the page builder through two new section types, `contact_body` and `booking_body`, and the 21 `cms_content` rows behind them are gone. `/admin/content` is back to global keys. Settings that are not copy (the three addresses, WhatsApp, the office line, the Calendly URL) deliberately stayed in Site Settings. |
+| 52 | 2026-08-16 | The nine service pages followed: each `service_<slug>` namespace became one `service_detail` section on its own page, so a Builder button that opened onto an empty page now opens onto the copy that renders. 81 rows became 9. `show_header` moved from a route prop into the section row, `deliverables` became a real JSONB array, and the number, title and summary stayed in `config/services.ts` because six other surfaces read them. Also: `founder_block` gained a `photo_alt` field, defaulting to empty, so the portrait stops repeating the name a screen reader already gets from the heading beside it. |
 
 **Full detail for every phase, including the reasoning and the things that went wrong, is in [`PHASE_HISTORY.md`](./PHASE_HISTORY.md).** It was split out of this file on 2026-08-13 for the reason stated at the top of it: this file is loaded into context at the start of every session, and that table had grown to 75KB.
 
@@ -550,7 +551,7 @@ The page builder. One row per section on a page. `section_type` determines which
 - `hero`: main page hero with badge, headline, subtitle, CTA
 - `stats_block`: large number callouts (100+, SAR 20B+, etc.)
 - `service_cards`: grid of service cards with number, title, description, link
-- `service_detail`: full detail block for a single service (used on /services/[slug])
+- `service_detail`: full detail block for a single service (used on /services/[slug]). Carries `show_header`, which is **false on all nine service pages** because the hero above already prints the number, title and summary, and true anywhere else so a detail block dropped onto another page still says which service it describes. It began as a route prop and moved into the row in migration 067, when these pages started rendering through the section registry, which passes nothing beyond the row
 - `sector_grid`: sector coverage grid
 - `process_steps`: numbered methodology steps
 - `network_partners`: Sky Gulf and Lynkers blocks
@@ -728,6 +729,7 @@ Three flags matter when rebuilding:
 064  contact_page_copy         the /contact body copy becomes content: six strings out of the route file, and the booking callout's three keys moved from `booking` to `contact`
 065  contact_copy_fixes        the eyebrow stops repeating the hero, the response-time line is cleared, and the founder card says partner-led rather than naming one person
 066  page_owned_copy           /contact and /book copy moves out of cms_content into `contact_body` and `booking_body` sections. 21 rows become 2 section rows
+067  service_pages_own_copy    the nine service_<slug> namespaces become one service_detail section per service page. 81 rows become 9 section rows
 ```
 
 After running migrations, manually insert one admin_users row via SQL with a bcrypt hash for the password.
@@ -842,7 +844,7 @@ Editors should:
 |-----|-----------|---------|
 | `/` | home | The firm in full: hero, firm introduction, firm track record, what we do (a short statement linking to /services, not a card grid), who we serve (an `audience_carousel`), delivery approach, founder card, a three sentence network mention linking to /network, quote, CTA. Resequenced by migration 051, network block cut by 053. **/about was merged into this page and now 301s here** (migration 045). The founder card is the full `founder_block` treatment (portrait, credentials line, bio, proof points, both CTAs), restored by migration 046 after 045 had briefly reduced it to a one-line mention. |
 | `/services` | services | Overview of all 9 services with cards linking to detail pages |
-| `/services/[slug]` | service-{slug} | Detail page for one service. Slugs from config/services.ts |
+| `/services/[slug]` | service-{slug} | Detail page for one service. Slugs from config/services.ts. **Body content is a `service_detail` section on the `service-{slug}` page since migration 067**, edited in the page builder like every other page, and sections added after it render after it. The number, title and summary still come from `config/services.ts`, since the same three drive the /services grid, the related-services cards, the contact form dropdown, `generateStaticParams`, the sitemap and the JSON-LD. |
 | `/sectors` | sectors | Sector coverage grid with descriptions |
 | `/approach` | approach | Engagement methodology (Understand, Analyse, Model, Advise). **Unreferenced since 2026-08-12**: the nav item was hidden in Pages & Nav, and migration 052 removed the five remaining internal links (home firm introduction, home delivery approach CTA, /network and /sectors CTAs, /services secondary hero CTA), along with the footer link and the sitemap entry. The page, its route and its content are untouched and it still returns 200; restoring the nav item and the sitemap line brings it back. |
 | `/network` | network | Sky Gulf and Lynkers detail. Why the network matters. |

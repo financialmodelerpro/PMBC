@@ -21,6 +21,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { GripVertical, Plus, Trash2 } from 'lucide-react';
 
 import { RichTextEditor } from '@/components/admin/RichTextEditor';
+import { ToggleSwitch } from '@/components/admin/ToggleSwitch';
 import {
   ADMIN_COLORS,
   adminButtonGhost,
@@ -55,6 +56,10 @@ export function ServiceDetailEditor({ content, onChange }: SectionEditorProps) {
   const timeline_text = s(content.timeline_text);
   const target_audience_text = s(content.target_audience_text);
   const deliverables = pickDeliverables(content);
+  // Absent means true, matching the renderer, so a section authored before this
+  // key existed keeps showing its header.
+  const show_header =
+    typeof content.show_header === 'boolean' ? content.show_header : true;
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
@@ -198,6 +203,24 @@ export function ServiceDetailEditor({ content, onChange }: SectionEditorProps) {
           style={adminTextarea}
         />
       </Field>
+
+      {/* Off on the nine service pages, which open with a hero carrying the same
+          number, title and summary. On elsewhere, so a detail block dropped onto
+          another page still says which service it describes. */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <ToggleSwitch
+          checked={show_header}
+          onChange={(next) => onChange({ ...content, show_header: next })}
+          label="Show the number, title and summary at the top of this block"
+        />
+        <span style={{ fontSize: 12, color: ADMIN_COLORS.textBody }}>
+          Show the number, title and summary
+        </span>
+      </div>
+      <p style={{ margin: 0, fontSize: 11, color: ADMIN_COLORS.textMuted }}>
+        Leave this off on a service page. The hero above already carries all three,
+        and turning it on prints the service title twice.
+      </p>
     </div>
   );
 }

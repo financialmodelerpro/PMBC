@@ -48,14 +48,21 @@ export function ServiceDetail({
   /**
    * The number, title and summary at the top of the block.
    *
-   * False on `/services/[slug]`, which now opens with the shared hero and would
+   * False on `/services/[slug]`, which opens with the shared hero and would
    * otherwise print the same `h1` twice, once in the navy band and again in the
    * white one below it. Defaults true, so the section type is unchanged
    * anywhere it is rendered from the CMS registry.
+   *
+   * `content.show_header` outranks this prop when it is set. That is what lets
+   * the nine service pages render through the section registry like every other
+   * page (migration 067): the registry passes no props beyond the row, so a
+   * setting the page needs has to be part of the row.
    */
   showHeader?: boolean;
 }) {
   const c = pick(content ?? {});
+  const headerVisible =
+    typeof content?.show_header === 'boolean' ? content.show_header : showHeader;
   const service = SERVICES.find((sv) => sv.slug === c.service_slug);
   const number = service?.number ?? '';
   const title = service?.title ?? '';
@@ -72,7 +79,7 @@ export function ServiceDetail({
   return (
     <SectionContainer variant={variant} styles={styles} media={media}>
       <div className="mx-auto max-w-[1000px]">
-        {showHeader && (
+        {headerVisible && (
           <>
         <div
           aria-hidden

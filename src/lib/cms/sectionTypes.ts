@@ -127,6 +127,9 @@ export const SECTION_TYPES: SectionTypeMeta[] = [
     implemented: true,
     defaultContent: {
       photo_url: '',
+      // Empty on purpose: the name renders beside the portrait, so alt text
+      // repeating it announces the person twice.
+      photo_alt: '',
       name: '',
       credentials_line: '',
       bio_html: '<p></p>',
@@ -327,6 +330,9 @@ export const SECTION_TYPES: SectionTypeMeta[] = [
       deliverables: [],
       timeline_text: '',
       target_audience_text: '',
+      // True everywhere except the nine service pages, whose hero already
+      // carries the number, title and summary. Migration 067 sets those false.
+      show_header: true,
     },
   },
 ];

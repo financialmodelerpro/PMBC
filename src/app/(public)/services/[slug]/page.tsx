@@ -3,10 +3,11 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 
-import { fetchPage } from '@/lib/cms/pages';
+import { fetchPage, fetchPageSections } from '@/lib/cms/pages';
 import { fetchServiceDetailFields, findService } from '@/lib/cms/serviceContent';
 import { SERVICES } from '@/config/services';
 import { ServiceDetail } from '@/components/public/sections/ServiceDetail';
+import { SectionList } from '@/components/public/SectionRenderer';
 import { PageHeroFallback } from '@/components/public/PageHeroFallback';
 import { PAGE_GUTTER, SECTION_PADDING } from '@/lib/public/layout';
 import { buildPageMetadata, siteUrl } from '@/lib/seo/metadata';
@@ -44,12 +45,27 @@ export async function generateMetadata(props: {
 
 export default async function ServiceDetailPage(props: {
   params: Promise<Params>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { slug } = await props.params;
+  const search = await props.searchParams;
+  const isPreview = search.preview === '1';
   const service = findService(slug);
   if (!service) notFound();
 
-  const fields = await fetchServiceDetailFields(slug);
+  // Since migration 067 the body of each service page is a `service_detail`
+  // section on its own `service-<slug>` page, edited in the page builder and
+  // rendered in the order set there. Sections added after it render after it.
+  const sections = await fetchPageSections(`service-${slug}`, {
+    onlyVisible: !isPreview,
+  });
+
+  // A database that has not run 067 still has the copy in cms_content under
+  // `service_<slug>`. Read it only in that case, so the page never goes blank
+  // mid-migration, and so this file keeps working against an older snapshot.
+  const legacyFields =
+    sections.length === 0 ? await fetchServiceDetailFields(slug) : null;
+
   const canonical = `${siteUrl()}/services/${slug}`;
 
   return (
@@ -68,19 +84,23 @@ export default async function ServiceDetailPage(props: {
         headline={service.title}
         tagline={service.summary}
       />
-      <ServiceDetail
-        showHeader={false}
-        content={{
-          service_slug: service.slug,
-          full_description_html: fields.full_description_html,
-          deliverables: fields.deliverables,
-          timeline_text: fields.timeline_text,
-          target_audience_text: fields.target_audience_text,
-        }}
-        styles={{}}
-        variant="cream"
-        media={fields.media}
-      />
+      {legacyFields ? (
+        <ServiceDetail
+          showHeader={false}
+          content={{
+            service_slug: service.slug,
+            full_description_html: legacyFields.full_description_html,
+            deliverables: legacyFields.deliverables,
+            timeline_text: legacyFields.timeline_text,
+            target_audience_text: legacyFields.target_audience_text,
+          }}
+          styles={{}}
+          variant="cream"
+          media={legacyFields.media}
+        />
+      ) : (
+        <SectionList sections={sections} />
+      )}
 
       {/* CTA, linking to /contact with the service pre-selected. */}
       <section className={`bg-white ${PAGE_GUTTER} ${SECTION_PADDING}`}>

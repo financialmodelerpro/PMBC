@@ -16,6 +16,7 @@ function s(v: unknown): string {
 
 export function FounderEditor({ content, onChange }: SectionEditorProps) {
   const photo_url = s(content.photo_url);
+  const photo_alt = s(content.photo_alt);
   const name = s(content.name);
   const credentials_line = s(content.credentials_line) || s(content.title);
   const bio_html = s(content.bio_html) || s(content.bio);
@@ -36,6 +37,7 @@ export function FounderEditor({ content, onChange }: SectionEditorProps) {
     onChange({
       ...rest,
       photo_url,
+      photo_alt,
       name,
       credentials_line,
       bio_html,
@@ -60,6 +62,20 @@ export function FounderEditor({ content, onChange }: SectionEditorProps) {
         bucket="team-photos"
         hint="Drag and drop, upload, or choose from the library"
       />
+
+      {/* Empty is the right default, not an oversight. The name is printed
+          beside the portrait, so alt text that repeats it makes a screen reader
+          announce the person twice. Fill this in only if the picture carries
+          something the surrounding text does not. */}
+      <Field label="Photo alt text">
+        <input
+          type="text"
+          value={photo_alt}
+          onChange={(e) => update({ photo_alt: e.target.value })}
+          placeholder="Leave empty: the name beside the photo already names the person"
+          style={adminInput}
+        />
+      </Field>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
         <Field label="Name">

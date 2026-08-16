@@ -14,6 +14,14 @@ type FounderContent = {
   eyebrow: string;
   section_headline: string;
   photo_url: string;
+  /**
+   * Alt text for the portrait. Empty by default, and empty is the right answer
+   * here: the name is printed beside the picture, so alt text repeating it makes
+   * a screen reader announce the person twice, once for the image and once for
+   * the heading. Before this key existed the renderer fell back to the name and
+   * did exactly that. Same fix as the audience carousel's `image_alt`.
+   */
+  photo_alt: string;
   name: string;
   credentials_line: string;
   bio_html: string;
@@ -49,6 +57,7 @@ function pick(c: Record<string, unknown>): FounderContent {
     eyebrow: s(c.eyebrow),
     section_headline: s(c.headline),
     photo_url: s(c.photo_url),
+    photo_alt: s(c.photo_alt),
     name: s(c.name),
     credentials_line: s(c.credentials_line) || s(c.title),
     bio_html: s(c.bio_html) || s(c.bio),
@@ -125,7 +134,7 @@ export function FounderBlock({
               <div className="relative aspect-[4/5] w-full overflow-hidden bg-neutral-100">
                 <Media
                   src={media.url}
-                  alt={c.name || 'Founder portrait'}
+                  alt={c.photo_alt}
                   mediaType={media.mediaType}
                   posterUrl={media.posterUrl}
                   autoplay={media.autoplay}
