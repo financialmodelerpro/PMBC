@@ -9,7 +9,7 @@
 // a production build prerenders them and a phase that changes only the cache
 // would still be served the previous build. Dev re-renders every request, so
 // cache state takes effect immediately and each phase tests what it says it
-// tests. Production rendering is covered separately by verify-fmp-pages.
+// tests. Production rendering is covered separately by verify-fmp-subpages.
 //
 // It adapts to what the live endpoint actually does:
 //

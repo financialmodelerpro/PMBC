@@ -181,5 +181,16 @@ async function fallback(slug: FmpSlug, detail: string): Promise<FmpFetchResult> 
   return { ok: false, reason: 'unavailable', detail };
 }
 
-/** Exported for the verification script, which exercises the cache directly. */
+/**
+ * The cache internals, exported so the stored-copy path can be exercised
+ * directly rather than by waiting for FMP to go down.
+ *
+ * **No script currently imports this.** The comment here used to claim the
+ * verification script did, which was true of an earlier version of
+ * `verify-fmp-subpages` and stopped being true when that script moved to
+ * driving the live endpoint with a deliberately wrong key instead. It is kept
+ * because the seam is the only way to test a cache read without a real outage,
+ * and because `.mjs` scripts cannot import TypeScript, so any future test of it
+ * will be a unit test that needs exactly this.
+ */
 export const __cache = { readCache, writeCache, CACHE_SECTION };

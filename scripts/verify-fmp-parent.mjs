@@ -1,9 +1,9 @@
-// scripts/verify-fmp-page.mjs
+// scripts/verify-fmp-parent.mjs
 //
 // Verifies the Financial Modeler Pro page at /fmp against a running production
 // server.
 //
-//   npm run verify-fmp-page
+//   npm run verify-fmp-parent
 //
 // WHAT THIS ASSERTS, AND WHAT IT DELIBERATELY DOES NOT
 // This checks what the CODE owns: the URL move and its redirect, navigation,
@@ -90,7 +90,15 @@ async function main() {
   const b = page.body;
   const sections = b.split('<section').slice(1);
   console.log('\n=== structure ===');
-  ok('six content sections render', sections.length === 6, `${sections.length}`);
+  // A floor, not an exact count. This asserted `=== 6` and went stale the day
+  // migration 063 folded the certification block into the Training Hub card it
+  // repeated, leaving five. How many sections a page has is the operator's
+  // call: merging two of them is an edit, not a regression. What the code owns
+  // is that the page did not collapse to a hero and nothing else, which is what
+  // a floor catches. Same lesson as Phase 36, which rewrote this script to stop
+  // asserting seeded copy.
+  ok('the page renders its hero plus content sections', sections.length >= 4,
+    `${sections.length} section(s)`);
 
   const hero = '<section' + sections[0];
   ok('the hero renders a headline', /pmbc-display/.test(hero));
@@ -102,7 +110,22 @@ async function main() {
     'FP&amp;A', 'Capital Structuring', 'Debt Sizing', 'M&amp;A Advisory',
   ];
   const present = TAGS.filter((t) => hero.includes(t));
-  ok('no standalone tags section remains', sections.length === 6);
+  // This said "no standalone tags section remains" and then re-checked the
+  // section count, which is not that. Phase 36 folded the tags into the hero and
+  // deleted the band they had been in, so the thing to assert is that the band
+  // has not come back.
+  //
+  // Counted per section rather than per tag: half of these are also service
+  // names ("Business Valuation", "Project Finance"), so they appear in ordinary
+  // body copy further down the page and asserting that no tag appears outside
+  // the hero fails on prose. A tags band would carry most of the list at once,
+  // so the test is how many of the eight land in any one non-hero section.
+  const worst = Math.max(
+    0,
+    ...sections.slice(1).map((s) => TAGS.filter((t) => s.includes(t)).length),
+  );
+  ok('no standalone tags section remains', worst < 4,
+    `one section carries ${worst} of the ${TAGS.length} tags`);
 
   // The tags are optional content on the hero, so their presence is the
   // operator's call and is reported rather than asserted. What the code owns is
@@ -194,6 +217,6 @@ async function main() {
 }
 
 main().catch((err) => {
-  console.error('verify-fmp-page failed:', err.message);
+  console.error('verify-fmp-parent failed:', err.message);
   process.exitCode = 1;
 });

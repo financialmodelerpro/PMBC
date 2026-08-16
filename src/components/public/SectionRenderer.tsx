@@ -28,8 +28,10 @@ import { AudienceCarousel } from './sections/AudienceCarousel';
 import { ContactBody } from './sections/ContactBody';
 import { BookingBody } from './sections/BookingBody';
 import { ServiceGrid } from './sections/ServiceGrid';
+import { Testimonials } from './sections/Testimonials';
 import { SectionPlaceholder } from './sections/Placeholder';
 import type { SectionContext } from '@/lib/public/sectionContext';
+import { fetchApprovedTestimonials } from '@/lib/cms/collections';
 
 type SectionRow = {
   id: string;
@@ -90,6 +92,7 @@ const REGISTRY: Record<
   contact_body: ContactBody,
   booking_body: BookingBody,
   service_grid: ServiceGrid,
+  testimonials: Testimonials,
 };
 
 /**
@@ -129,6 +132,8 @@ const DEFAULT_VARIANT: Record<string, PmbcVariant> = {
   // White is what the hardcoded grid carried, and what the alternation lands on
   // when it follows the video under the /services hero.
   service_grid: 'white',
+  // The quote cards are cream, so the band behind them is white by default.
+  testimonials: 'white',
 };
 
 function readVariant(
@@ -241,7 +246,7 @@ export function SectionRenderer({
  * Render a list of sections with sequence-aware variant resolution. Use this
  * for home/firm pages where rhythm matters.
  */
-export function SectionList({
+export async function SectionList({
   sections,
   context,
 }: {
@@ -249,6 +254,17 @@ export function SectionList({
   context?: SectionContext;
 }) {
   const variants = resolveVariantSequence(sections);
+
+  // Testimonials are the one thing a section needs that the route cannot
+  // sensibly supply, because the block can be added to any page in the builder
+  // and a route that forgot to pass them would render it as nothing. Fetched
+  // here, and only when the page actually carries one, so every other page pays
+  // nothing for it. `fetchApprovedTestimonials` already returns [] rather than
+  // throwing when the table is missing.
+  const needsTestimonials = sections.some((s) => s.section_type === 'testimonials');
+  const resolved: SectionContext | undefined = needsTestimonials
+    ? { ...context, testimonials: await fetchApprovedTestimonials() }
+    : context;
   return (
     <>
       {sections.map((s) => (
@@ -256,7 +272,7 @@ export function SectionList({
           key={s.id}
           section={s}
           variant={variants.get(s.id)}
-          context={context}
+          context={resolved}
         />
       ))}
     </>

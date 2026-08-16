@@ -22,7 +22,8 @@ export type SectionType =
   | 'audience_carousel'
   | 'contact_body'
   | 'booking_body'
-  | 'service_grid';
+  | 'service_grid'
+  | 'testimonials';
 
 export type SectionTypeMeta = {
   type: SectionType;
@@ -301,6 +302,20 @@ export const SECTION_TYPES: SectionTypeMeta[] = [
       founder_body:
         'Every mandate at PaceMakers is partner-led. If you would rather discuss your situation before writing it down, book a call.',
       founder_cta_label: 'Book a Meeting',
+    },
+  },
+  {
+    type: 'testimonials',
+    label: 'Testimonials',
+    description:
+      'Approved client quotes, under an editable heading. The quotes come from the Testimonials queue, not from this section.',
+    implemented: true,
+    defaultContent: {
+      eyebrow: 'In their words',
+      heading: 'What clients say',
+      // Every approved quote by default. The homepage flag is a narrowing an
+      // operator opts into, not the starting state.
+      only_landing: false,
     },
   },
   {

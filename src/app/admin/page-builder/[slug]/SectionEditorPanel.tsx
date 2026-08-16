@@ -22,6 +22,7 @@ import { AudienceCarouselEditor } from '@/components/admin/editors/AudienceCarou
 import { ContactBodyEditor } from '@/components/admin/editors/ContactBodyEditor';
 import { BookingBodyEditor } from '@/components/admin/editors/BookingBodyEditor';
 import { ServiceGridEditor } from '@/components/admin/editors/ServiceGridEditor';
+import { TestimonialsEditor } from '@/components/admin/editors/TestimonialsEditor';
 import type { SectionEditorProps } from '@/components/admin/editors/types';
 import { SaveButton } from '@/components/admin/SaveButton';
 import { SaveStatus, type SaveState } from '@/components/admin/SaveStatus';
@@ -54,6 +55,7 @@ const EDITORS: Record<string, (props: SectionEditorProps) => React.ReactElement>
   contact_body: ContactBodyEditor,
   booking_body: BookingBodyEditor,
   service_grid: ServiceGridEditor,
+  testimonials: TestimonialsEditor,
 };
 
 /**

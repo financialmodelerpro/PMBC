@@ -1,4 +1,5 @@
 import type { SiteSettings } from '@/lib/cms/settings';
+import type { TestimonialRow } from '@/lib/cms/collections';
 
 /**
  * Per-request data a section renderer cannot fetch from its own content blob.
@@ -40,6 +41,16 @@ export type SectionContext = {
    * them and a second place for them to go stale.
    */
   services?: ServiceCard[];
+  /**
+   * Approved client quotes for a `testimonials` section.
+   *
+   * Unlike every other field here, this one is not supplied by the route.
+   * `SectionList` fetches it, and only when the page actually carries a
+   * testimonials section. A testimonials block can be added to any page in the
+   * builder, so requiring each route to remember to pass it would mean the
+   * block silently rendering nothing on whichever route was forgotten.
+   */
+  testimonials?: TestimonialRow[];
 };
 
 export type ServiceCard = {

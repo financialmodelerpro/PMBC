@@ -1,8 +1,8 @@
-// scripts/verify-fmp-pages.mjs
+// scripts/verify-fmp-subpages.mjs
 //
 // Verifies the three imported Financial Modeler Pro pages end to end.
 //
-//   node scripts/verify-fmp-pages.mjs
+//   node scripts/verify-fmp-subpages.mjs
 //
 // HOW THE LIVE PATH IS EXERCISED WITHOUT FMP'S PRODUCTION KEY
 // FMP's feed fails closed and the key is not in this repo. Rather than skip the
@@ -391,21 +391,47 @@ async function main() {
     // ---- parent page and sitemap ------------------------------------------
     console.log('\n=== parent page and sitemap ===');
     {
-      const parent = await get('/financial-modeler-pro');
-      ok('parent: 200', parent.status === 200, String(parent.status));
-      for (const slug of SLUGS) {
-        ok(`parent: links to /${slug}`, parent.body.includes(`/financial-modeler-pro/${slug}`));
-      }
+      // Rewritten on 2026-08-16. This block asserted pre-Phase-35 behaviour: a
+      // 200 at /financial-modeler-pro and links from it down to the three
+      // sub-pages. Phase 35 moved the parent to /fmp behind a 301 and left the
+      // sub-pages retained but unlinked, so every one of those assertions had
+      // been failing since 2026-08-11 and describing the old design rather than
+      // catching a fault.
+      const oldParent = await get('/financial-modeler-pro');
+      ok('the old parent path 301s', oldParent.status === 301, String(oldParent.status));
+
+      const parent = await get('/fmp');
+      ok('parent: 200 at /fmp', parent.status === 200, String(parent.status));
       ok('parent: CTA out to financialmodelerpro.com',
         parent.body.includes('financialmodelerpro.com'));
       ok('parent: is PMBC-authored, not fetched',
         parent.body.includes('Why it exists') || parent.body.includes('platform arm'));
-
-      const sitemap = await get('/sitemap.xml');
-      for (const slug of ['', '/modeling-hub', '/refm', '/training-hub']) {
-        ok(`sitemap lists /financial-modeler-pro${slug}`,
-          sitemap.body.includes(`/financial-modeler-pro${slug}<`));
+      // Retained but unlinked is the whole arrangement: the pages resolve for
+      // anyone holding the URL and nothing on the site walks a reader into them.
+      for (const slug of SLUGS) {
+        ok(`parent: does not link to /${slug}`,
+          !parent.body.includes(`/financial-modeler-pro/${slug}`),
+          'the parent is advertising a sub-page again');
       }
+
+      // Inverted on 2026-08-16. This asserted that all four paths were in the
+      // sitemap, which stopped being true on 2026-08-11 when Phase 35 moved the
+      // parent to /fmp and retained these three unlinked and deliberately out of
+      // the sitemap: they are fed from another firm's API and carry no PMBC
+      // copy, so asking a crawler to index them is asking it to index FMP's
+      // words on PMBC's domain. The assertion is now that they stay out, and
+      // that the parent's new path is in.
+      const sitemap = await get('/sitemap.xml');
+      for (const slug of ['/modeling-hub', '/refm', '/training-hub']) {
+        ok(`sitemap keeps /financial-modeler-pro${slug} out`,
+          !sitemap.body.includes(`/financial-modeler-pro${slug}<`),
+          'the sub-page is being advertised to crawlers');
+      }
+      ok('sitemap lists the parent at its /fmp path',
+        sitemap.body.includes('/fmp<'), '/fmp missing from the sitemap');
+      ok('sitemap does not list the retired /financial-modeler-pro path',
+        !sitemap.body.includes('/financial-modeler-pro<'),
+        'the 301 source is still in the sitemap');
     }
 
     // ---- source hygiene ----------------------------------------------------
@@ -461,6 +487,6 @@ async function main() {
 }
 
 main().catch((err) => {
-  console.error('verify-fmp-pages failed:', err.message);
+  console.error('verify-fmp-subpages failed:', err.message);
   process.exitCode = 1;
 });

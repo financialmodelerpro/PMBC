@@ -392,5 +392,15 @@ export function mapFmpSections(sections: FmpSection[], slug: string): MapResult 
   return { sections: out, skipped };
 }
 
-/** Exported for the verification script and for tests of the flag semantics. */
+/**
+ * The mapper table and the two predicates that decide what survives an import,
+ * exported so the flag semantics can be tested without a live FMP payload.
+ *
+ * **No script currently imports this.** The comment here used to say the
+ * verification script did; `verify-fmp-subpages` asserts the same behaviour
+ * through the rendered page instead, which is the better test of the two but
+ * cannot isolate a single predicate. Kept for the case where one of these needs
+ * pinning down on its own, which is a unit test rather than an `.mjs` script,
+ * since those cannot import TypeScript.
+ */
 export const __internal = { cmsVisible, isDynamic, MAPPERS };
