@@ -36,6 +36,10 @@ import { encode } from 'next-auth/jwt';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(__dirname, '..');
 const BASE = process.env.VERIFY_BASE || 'http://localhost:3999';
+
+// Never against production: see scripts/lib/productionGuard.mjs.
+const { refuseWritesAgainstProduction } = await import('./lib/productionGuard.mjs');
+refuseWritesAgainstProduction(BASE, 'verify-media-upload');
 const BUCKET = 'cms-assets';
 
 const MB = 1024 * 1024;

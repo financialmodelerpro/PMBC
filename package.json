@@ -70,7 +70,8 @@
     "verify-tools-visibility": "node scripts/verify-tools-visibility.mjs",
     "verify-tool-lead-api": "node scripts/verify-tool-lead-api.mjs",
     "verify-tool-email-pdf": "node scripts/verify-tool-email-pdf.mjs",
-    "verify-brevo-webhook": "node scripts/verify-brevo-webhook.mjs"
+    "verify-brevo-webhook": "node scripts/verify-brevo-webhook.mjs",
+    "verify-production-guard": "node scripts/verify-production-guard.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
