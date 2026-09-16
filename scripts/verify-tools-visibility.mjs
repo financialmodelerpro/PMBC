@@ -2,8 +2,12 @@
 //
 // Proves the one-switch rule for the free tools: a tool's visibility at
 // /admin/tools decides its page, the hub, the sitemap, its structured data, the
-// footer Free Tools link and its service page CTA, and every failure mode means
-// Hidden.
+// footer Free Tools link, the navbar Tools item and its service page CTA, and
+// every failure mode means Hidden. Signed-in staff also see Tools in the navbar
+// while nothing is Live, badged Hidden; the public never does.
+//
+// Also proves TOOLS_VISIBILITY_OVERRIDE, the local verification switch, is
+// ignored whenever VERCEL is set, so it cannot change a deployment.
 //
 // PART 1, ALWAYS: the rules, run against `src/lib/tools/visibility.ts` with
 // hand-built database answers (table missing, read error, no rows, live, a draft
@@ -85,6 +89,73 @@ console.log('Rules');
   }
 }
 
+console.log('Navbar Tools item');
+{
+  const NAV = [
+    { label: 'Services', href: '/services' },
+    { label: 'Financial Modeler Pro', href: '/fmp' },
+    { label: 'Tools', href: '/tools/' },
+    { label: 'Contact', href: '/contact' },
+  ];
+  const hidden = vis.resolveVisibility({ ok: true, rows: [] });
+  const failed = vis.resolveVisibility({ ok: false, reason: 'error' });
+  const live = vis.resolveVisibility({ ok: true, rows: [row(READY.slug, 'live')] });
+  const tools = (items) => items.filter((i) => i.href.replace(/\/+$/, '') === '/tools');
+
+  for (const [label, snap] of [['all Hidden', hidden], ['read failed', failed]]) {
+    const pub = vis.applyToolsNavItem(NAV, snap, false);
+    check(`${label}, public: no Tools item, stored row removed`, tools(pub).length === 0, JSON.stringify(pub));
+    const staff = vis.applyToolsNavItem(NAV, snap, true);
+    check(`${label}, staff: exactly one Tools item`, tools(staff).length === 1);
+    check(`${label}, staff: badged Hidden`, tools(staff)[0]?.badge === 'Hidden');
+    check(`${label}, staff: after Financial Modeler Pro`, staff.findIndex((i) => i.href === '/tools') === staff.findIndex((i) => i.href === '/fmp') + 1);
+  }
+  const pubLive = vis.applyToolsNavItem(NAV, live, false);
+  check('Live, public: exactly one Tools item, no badge', tools(pubLive).length === 1 && tools(pubLive)[0].badge === undefined);
+  check('Live, public: after Financial Modeler Pro', pubLive.findIndex((i) => i.href === '/tools') === pubLive.findIndex((i) => i.href === '/fmp') + 1);
+  const staffLive = vis.applyToolsNavItem(NAV, live, true);
+  check('Live, staff: no badge', tools(staffLive).length === 1 && tools(staffLive)[0].badge === undefined);
+  const noFmp = vis.applyToolsNavItem(NAV.filter((i) => i.href !== '/fmp'), live, false);
+  check('without FMP: placed before Contact', noFmp.findIndex((i) => i.href === '/tools') === noFmp.findIndex((i) => i.href === '/contact') - 1);
+  const neither = vis.applyToolsNavItem([{ label: 'Services', href: '/services' }], live, false);
+  check('without FMP or Contact: placed last', neither.at(-1).href === '/tools');
+  check('other items untouched and in order', JSON.stringify(pubLive.filter((i) => i.href !== '/tools').map((i) => i.href)) === JSON.stringify(['/services', '/fmp', '/contact']));
+  check('input list not mutated', NAV.length === 4 && NAV[2].href === '/tools/');
+}
+
+console.log('Local override');
+{
+  // No database credentials, so a real read fails closed instead of reaching the shared database.
+  const saved = Object.fromEntries(['VERCEL', 'TOOLS_VISIBILITY_OVERRIDE', 'SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY'].map((k) => [k, process.env[k]]));
+  delete process.env.SUPABASE_URL;
+  delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+  try {
+    delete process.env.VERCEL;
+    process.env.TOOLS_VISIBILITY_OVERRIDE = 'live';
+    const localLive = vis.resolveVisibility(await vis.readVisibilityRows());
+    check('local, override live: every ready tool Live', reg.readyTools().every((t) => vis.findToolIn(localLive, t.slug)?.live));
+    if (DRAFT) check('local, override live: a draft stays Hidden', vis.findToolIn(localLive, DRAFT.slug)?.live === false);
+    process.env.TOOLS_VISIBILITY_OVERRIDE = 'hidden';
+    const localHidden = vis.resolveVisibility(await vis.readVisibilityRows());
+    check('local, override hidden: every tool Hidden, clean read', localHidden.tools.every((t) => !t.live) && localHidden.problem === null);
+    process.env.TOOLS_VISIBILITY_OVERRIDE = 'yes';
+    const junk = await vis.readVisibilityRows();
+    check('local, unknown override value: ignored, real read attempted', junk.ok === false);
+
+    process.env.VERCEL = '1';
+    process.env.TOOLS_VISIBILITY_OVERRIDE = 'live';
+    const onVercel = await vis.readVisibilityRows();
+    check('on Vercel, override live: ignored, real read attempted', onVercel.ok === false, JSON.stringify(onVercel));
+    check('on Vercel, override live: nothing Live', vis.resolveVisibility(onVercel).tools.every((t) => !t.live));
+  } finally {
+    for (const [k, v] of Object.entries(saved)) {
+      if (v === undefined) delete process.env[k];
+      else process.env[k] = v;
+    }
+  }
+  check('override is read only in visibility.ts', !/TOOLS_VISIBILITY_OVERRIDE/.test(src('src/components/layout/NavbarServer.tsx')) && /if \(process\.env\.VERCEL\) return null;/.test(src('src/lib/tools/visibility.ts')));
+}
+
 console.log('Surfaces ask visibility.ts and nothing else');
 {
   const route = src('src/app/(public)/tools/[slug]/page.tsx');
@@ -102,6 +173,11 @@ console.log('Surfaces ask visibility.ts and nothing else');
   const sitemap = src('src/app/sitemap.ts');
   check('sitemap uses toolSitemapPaths', /toolSitemapPaths\(tools\)/.test(sitemap) && !/'\/tools'/.test(sitemap));
   check('sitemap is rendered per request', /export const dynamic = 'force-dynamic'/.test(sitemap));
+
+  const navbar = src('src/components/layout/NavbarServer.tsx');
+  check('navbar applies applyToolsNavItem', /applyToolsNavItem\(filtered, tools, staff\)/.test(navbar));
+  check('navbar checks the session only while nothing is Live', /liveToolsFrom\(tools\)\.length === 0 \? Boolean\(await getAdminSession\(\)/.test(navbar));
+  check('navbar renders the badge on desktop and mobile', (src('src/components/layout/Navbar.tsx').match(/item\.badge && <NavBadge/g) ?? []).length === 2);
 
   const footer = src('src/components/layout/FooterServer.tsx');
   check('footer applies applyToolsFooterLink', /applyToolsFooterLink\(/.test(footer));
@@ -159,7 +235,8 @@ if (BASE) {
     check(`sitemap ${expectLive.has(t.slug) ? 'lists' : 'omits'} /tools/${t.slug}`, sitemap.text.includes(`/tools/${t.slug}</loc>`) === expectLive.has(t.slug));
   }
   const home = await get('/');
-  check(`home footer ${anyLive ? 'has' : 'has no'} Free Tools link`, /href="\/tools"/.test(home.text) === anyLive);
+  check(`home ${anyLive ? 'links' : 'does not link'} to /tools (navbar and footer)`, /href="\/tools"/.test(home.text) === anyLive);
+  check('no Hidden badge served to the public', !/>Hidden</.test(home.text));
   const service = await get(`/services/${READY.serviceCta.serviceSlug}`);
   check('service page is 200', service.status === 200, String(service.status));
   check(

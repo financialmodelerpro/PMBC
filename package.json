@@ -65,6 +65,8 @@
     "seed-testimonial-sections": "node scripts/seed-testimonial-sections.mjs",
     "seed-tools-pages": "node scripts/seed-tools-pages.mjs",
     "verify-valuation-engine": "node scripts/verify-valuation-engine.mjs",
+    "verify-valuation-v2": "node scripts/verify-valuation-v2.mjs",
+    "render-valuation-examples": "node scripts/render-valuation-examples.mjs",
     "verify-tools-visibility": "node scripts/verify-tools-visibility.mjs",
     "verify-tool-lead-api": "node scripts/verify-tool-lead-api.mjs",
     "verify-tool-email-pdf": "node scripts/verify-tool-email-pdf.mjs",

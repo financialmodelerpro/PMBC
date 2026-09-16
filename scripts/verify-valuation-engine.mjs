@@ -19,9 +19,16 @@
 //      tolerance 1e-9, which is float noise, not rounding.
 //   3. Every rendered figure: headline, KPIs, football field values and scale,
 //      FCF, sensitivity and bridge tables, currency labels, deal size bands.
-//   4. The two deliberate changes, asserted as changes:
-//      exit multiple follows the peer median, and negative equity floors the
-//      midpoint too.
+//   4. The three deliberate changes, asserted as changes: exit multiple
+//      follows the peer median; negative equity floors the midpoint too; the
+//      private company discount defaults to 20% once two or more peers are in
+//      use and applies to the exit multiple as well as the comparables. For
+//      the last, the reference is given the same discount and the discounted
+//      exit multiple, so the rest of the run still compares exactly.
+//   5. Every version 2 input (normalisation, bridge items, stake, scenarios,
+//      invested capital, WACC adjustment) left at its neutral default, which
+//      is what keeps these figures identical to the reference. The version 2
+//      features themselves are proved by verify-valuation-v2.
 //
 // CASES
 //   A. The reference's own example: Healthcare Support Services, Saudi Arabia,
@@ -255,6 +262,8 @@ const CASES = [
       return s;
     },
     expectFloor: 'all',
+    // One peer is not enough to use peer multiples, so no automatic discount.
+    expectAutoDiscount: 0,
   },
 ];
 
