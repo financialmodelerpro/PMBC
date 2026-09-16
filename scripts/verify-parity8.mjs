@@ -11,6 +11,10 @@
 //   node scripts/verify-parity8.mjs           (expects a dev server on :3001)
 
 const BASE = process.env.SMOKE_BASE || 'http://localhost:3001';
+
+// Never against production: see scripts/lib/productionGuard.mjs.
+const { refuseWritesAgainstProduction } = await import('./lib/productionGuard.mjs');
+refuseWritesAgainstProduction(BASE, 'verify-parity8');
 const EMAIL = 'meetahmadch@gmail.com';
 // See the note in smoke-admin.mjs: env first, debug default as a fallback.
 const PASSWORD = process.env.ADMIN_PASSWORD || 'Admin@2026';

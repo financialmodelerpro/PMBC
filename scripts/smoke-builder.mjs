@@ -3,6 +3,10 @@
 // routes and reports HTTP status. Used to verify Phase 4 fix end-to-end.
 
 const BASE = 'http://localhost:3000';
+
+// Never against production: see scripts/lib/productionGuard.mjs.
+const { refuseWritesAgainstProduction } = await import('./lib/productionGuard.mjs');
+refuseWritesAgainstProduction(BASE, 'smoke-builder');
 const EMAIL = 'meetahmadch@gmail.com';
 // See the note in smoke-admin.mjs: env first, debug default as a fallback.
 const PASSWORD = process.env.ADMIN_PASSWORD || 'Admin@2026';

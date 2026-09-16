@@ -279,7 +279,13 @@ async function main() {
 
   let liveOk = null;
   const base = process.env.SMOKE_BASE || 'http://localhost:3001';
-  if (await reachable(base)) {
+  // The end-to-end login is a POST, so it is never sent to production
+  // (scripts/lib/productionGuard.mjs). The rotation itself has already been
+  // written by this point, so this skips the check rather than exiting.
+  const { isProductionUrl } = await import('./lib/productionGuard.mjs');
+  if (isProductionUrl(base)) {
+    console.log(`  SKIP  end-to-end login: ${base} is production, and the login check sends a POST`);
+  } else if (await reachable(base)) {
     const live = await verifyLiveLogin(base, email, password);
     liveOk = live.ok;
     console.log(`  ${live.ok ? 'PASS' : 'FAIL'}  end-to-end login at ${base} (${live.detail})`);

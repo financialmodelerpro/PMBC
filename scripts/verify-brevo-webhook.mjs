@@ -28,7 +28,8 @@
 //
 //   npm run verify-brevo-webhook
 //
-// With VERIFY_BASE set, also checks over HTTP that the endpoint refuses a
+// Refuses to run at all when VERIFY_BASE is production (its HTTP checks POST).
+// With VERIFY_BASE set to a local build, also checks over HTTP that the endpoint refuses a
 // request with no token and one with a wrong token (nothing is written).
 
 import path from 'node:path';
@@ -36,6 +37,10 @@ import { fileURLToPath } from 'node:url';
 import { createJiti } from 'jiti';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+
+// Never against production: see scripts/lib/productionGuard.mjs.
+const { refuseWritesAgainstProduction } = await import('./lib/productionGuard.mjs');
+refuseWritesAgainstProduction(process.env.VERIFY_BASE, 'verify-brevo-webhook');
 const jiti = createJiti(import.meta.url, { alias: { '@': path.join(root, 'src') } });
 const wh = await jiti.import(path.join(root, 'src/lib/tools/webhook.ts'));
 const eng = await jiti.import(path.join(root, 'src/lib/tools/engagement.ts'));

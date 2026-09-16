@@ -3,6 +3,10 @@
 // refactored sidebar. Reports HTTP status for each.
 
 const BASE = process.env.SMOKE_BASE || 'http://localhost:3001';
+
+// Never against production: see scripts/lib/productionGuard.mjs.
+const { refuseWritesAgainstProduction } = await import('./lib/productionGuard.mjs');
+refuseWritesAgainstProduction(BASE, 'smoke-admin');
 const EMAIL = 'meetahmadch@gmail.com';
 // Read from the environment so rotating the admin credential does not break the
 // verification tooling. The fallback is the documented pre-rotation debug

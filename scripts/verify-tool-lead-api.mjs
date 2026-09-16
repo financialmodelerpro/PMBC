@@ -29,7 +29,8 @@
 //
 //   npm run verify-tool-lead-api
 //
-// With VERIFY_BASE set, also checks over HTTP that a logged-out submission to a
+// Refuses to run at all when VERIFY_BASE is production (its HTTP checks POST).
+// With VERIFY_BASE set to a local build, also checks over HTTP that a logged-out submission to a
 // Hidden tool is refused with 404, and that the version and PDF endpoints
 // refuse an unknown token with 404. None of those requests writes anything.
 
@@ -40,6 +41,10 @@ import { createJiti } from 'jiti';
 import { fullFeatureCase } from './lib/valuationCases.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+
+// Never against production: see scripts/lib/productionGuard.mjs.
+const { refuseWritesAgainstProduction } = await import('./lib/productionGuard.mjs');
+refuseWritesAgainstProduction(process.env.VERIFY_BASE, 'verify-tool-lead-api');
 const jiti = createJiti(import.meta.url, { alias: { '@': path.join(root, 'src') } });
 const leads = await jiti.import(path.join(root, 'src/lib/tools/leads/valuation.ts'));
 const version = await jiti.import(path.join(root, 'src/lib/tools/leads/version.ts'));
