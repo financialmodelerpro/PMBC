@@ -24,6 +24,9 @@
 -- in Pages & Nav like every other page. Each tool page still follows its own
 -- Live or Hidden status.
 --
+-- Touches only label, href, display_order, visible and can_toggle: the live
+-- site_pages table has no updated_at column, whatever 027 declared.
+--
 -- Idempotent: does nothing when a /tools row (with or without a trailing
 -- slash, any case) already exists, so re-running cannot duplicate or reorder.
 
@@ -41,7 +44,7 @@ anchor AS (
 ),
 shifted AS (
   UPDATE site_pages
-  SET display_order = display_order + 1, updated_at = NOW()
+  SET display_order = display_order + 1
   WHERE NOT EXISTS (SELECT 1 FROM existing)
     AND display_order > (SELECT after_order FROM anchor)
   RETURNING id
