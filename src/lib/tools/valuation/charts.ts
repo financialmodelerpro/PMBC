@@ -163,7 +163,23 @@ function yearLabels(r: ValuationResult): string[] {
 }
 
 export function revenueMarginChart(r: ValuationResult, width = 760, height = 250): Chart {
-  const labels = yearLabels(r);
+  return revenueMarginSeriesChart(yearLabels(r), r.revenue, r.ebitda, width, height);
+}
+
+/**
+ * The same chart from plain series, for the financials step, where the figures
+ * exist before any valuation has run. Eight years: three actual (navy) then
+ * forecast (gold). Callers draw it only once every year has revenue above zero
+ * and a number for EBITDA, so a half-typed table never draws a misleading chart.
+ */
+export function revenueMarginSeriesChart(
+  labels: string[],
+  revenue: number[],
+  ebitda: number[],
+  width = 760,
+  height = 250,
+): Chart {
+  const r = { revenue, ebitda };
   const padL = 10, padR = 44, padTop = 22, padBottom = 30;
   const plotW = width - padL - padR, plotH = height - padTop - padBottom;
   const colW = plotW / labels.length;

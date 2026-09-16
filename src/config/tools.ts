@@ -31,6 +31,8 @@ export type ToolEntry = {
   /** Roughly how long it takes, shown on the hub card. */
   duration: string;
   build: ToolBuild;
+  /** Short statements shown as chips under the hero promise, most important first. */
+  chips?: string[];
   /** Hero copy used when the tool's CMS page has no hero section yet. */
   hero: { eyebrow: string; headline: string; tagline: string };
   /**
@@ -58,11 +60,11 @@ export const TOOLS: ToolEntry[] = [
     eyebrow: 'DCF and comparables',
     duration: 'About 10 minutes',
     build: 'ready',
+    chips: ['DCF and comparables', 'Damodaran market data', 'Free PDF report'],
     hero: {
       eyebrow: 'Free tool',
       headline: 'Value your business with a DCF and comparables',
-      tagline:
-        'Enter three years of history and a five year forecast. The tool builds free cash flow, a cost of capital from Damodaran market data, and a comparables check, then shows where your value lands.',
+      tagline: 'An indicative equity value range for your business in about ten minutes, with a report you can keep.',
     },
     serviceCta: {
       serviceSlug: 'business-valuation',

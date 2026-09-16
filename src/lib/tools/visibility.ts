@@ -65,7 +65,26 @@ export function resolveVisibility(read: VisibilityRead, registry: ToolEntry[] = 
   };
 }
 
+/**
+ * LOCAL VERIFICATION ONLY. `TOOLS_VISIBILITY_OVERRIDE=hidden` or `=live` makes a
+ * local build behave as if every tool were Hidden or Live, without writing to
+ * the shared database that local builds read. Ignored whenever `VERCEL` is set,
+ * which Vercel sets on every preview and production deployment, so it can never
+ * change what the public sees.
+ */
+function localOverride(): VisibilityRead | null {
+  if (process.env.VERCEL) return null;
+  const v = process.env.TOOLS_VISIBILITY_OVERRIDE;
+  if (v === 'hidden') return { ok: true, rows: [] };
+  if (v === 'live') {
+    return { ok: true, rows: TOOLS.map((t) => ({ slug: t.slug, status: 'live' as const, updated_at: null, updated_by: null })) };
+  }
+  return null;
+}
+
 export async function readVisibilityRows(): Promise<VisibilityRead> {
+  const override = localOverride();
+  if (override) return override;
   try {
     const { data, error } = await toolsDb().from('tool_visibility').select('slug, status, updated_at, updated_by');
     if (error) {
@@ -115,6 +134,32 @@ export function applyToolsFooterLink<L extends { id: string; href: string; label
   const entry = { id: toolsLink.id, label: toolsLink.label, href: toolsLink.href, column: 'firm', visible: true } as L;
   const out = [...withoutStored];
   out.splice(at === -1 ? out.length : at + 1, 0, entry);
+  return out;
+}
+
+/**
+ * The navbar with Tools applied. Shown to everyone while at least one tool is
+ * Live. While none is, signed-in staff still see it, badged Hidden, so the
+ * preview is one click away; the public sees nothing. Any `/tools` row an
+ * operator added in Pages & Nav is removed first, so there is never a second
+ * switch and never two Tools items. Placed after Financial Modeler Pro, or
+ * before Contact, or last.
+ */
+export function applyToolsNavItem<I extends { label: string; href: string; badge?: string }>(
+  items: I[],
+  snapshot: VisibilitySnapshot,
+  isStaff: boolean,
+): I[] {
+  const norm = (h: string) => h.trim().replace(/\/+$/, '').toLowerCase();
+  const without = items.filter((i) => norm(i.href) !== '/tools');
+  const anyLive = liveToolsFrom(snapshot).length > 0;
+  if (!anyLive && !isStaff) return without;
+  const entry = { label: 'Tools', href: '/tools', ...(anyLive ? {} : { badge: 'Hidden' }) } as I;
+  const out = [...without];
+  const afterFmp = out.findIndex((i) => norm(i.href) === '/fmp');
+  const beforeContact = out.findIndex((i) => norm(i.href) === '/contact');
+  const at = afterFmp !== -1 ? afterFmp + 1 : beforeContact !== -1 ? beforeContact : out.length;
+  out.splice(at, 0, entry);
   return out;
 }
 

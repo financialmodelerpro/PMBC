@@ -3,6 +3,8 @@ import { fetchHeaderConfig, DEFAULT_HEADER_CONFIG } from '@/lib/cms/headerSettin
 import { fetchPublishedServices } from '@/lib/cms/collections';
 import { fetchSuppressedNavHrefs, isSuppressed } from '@/lib/public/collectionGates';
 import { SERVICES } from '@/config/services';
+import { getAdminSession } from '@/lib/auth/requireAdmin';
+import { applyToolsNavItem, fetchToolVisibility, liveToolsFrom } from '@/lib/tools/visibility';
 import { Navbar, type NavbarDropdowns } from './Navbar';
 
 /**
@@ -49,11 +51,13 @@ async function servicesDropdown(): Promise<NavbarDropdowns> {
 }
 
 export async function NavbarServer() {
-  const [brandingRow, header, dropdowns, suppressed] = await Promise.all([
+  const [brandingRow, header, dropdowns, suppressed, tools] = await Promise.all([
     safeFetchBranding(),
     safeFetchHeader(),
     servicesDropdown(),
     fetchSuppressedNavHrefs(),
+    // Never rejects: a failed read resolves to every tool Hidden.
+    fetchToolVisibility(),
   ]);
 
   /*
@@ -64,7 +68,11 @@ export async function NavbarServer() {
    * This subtracts from the operator's list and never adds to it: a row hidden
    * in Pages & Nav was already gone before this ran.
    */
-  const navItems = header.nav_items.filter((item) => !isSuppressed(item.href, suppressed));
+  const filtered = header.nav_items.filter((item) => !isSuppressed(item.href, suppressed));
+  // Tools follows the visibility switch at /admin/tools. The session is only
+  // read when no tool is Live, which is the one case where it changes the menu.
+  const staff = liveToolsFrom(tools).length === 0 ? Boolean(await getAdminSession().catch(() => null)) : false;
+  const navItems = applyToolsNavItem(filtered, tools, staff);
 
   return (
     <Navbar

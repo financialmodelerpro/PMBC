@@ -86,7 +86,7 @@ export default async function ToolPage(props: {
           manageHref={`/admin/tools/${slug}`}
         />
       )}
-      <ToolHero sections={sections} fallback={registered.hero} />
+      <ToolHero sections={sections} fallback={registered.hero} chips={registered.chips} />
       <section className={`bg-[color:var(--pmbc-surface-cream)] ${PAGE_GUTTER} py-10 sm:py-14 lg:py-16`}>
         <Component bookingUrl={(settings.booking_url ?? '').trim()} preview={preview} />
         <p className="mx-auto mt-10 max-w-[900px] border-t border-[color:var(--pmbc-border-warm)] pt-6 text-[13px] leading-[1.6] text-[color:var(--pmbc-muted)]">

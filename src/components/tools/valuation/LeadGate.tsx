@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { CONSENT_TEXT, FOLLOW_UP_TEXT } from '@/lib/tools/consent';
 import { DEAL_BAND_UNSURE, PURPOSES } from '@/lib/tools/valuation/data';
 
-import { Field, NavRow, Panel, PanelTitle, Select, TRACKING, buttonGhost, buttonPrimary, inputClass } from './ui';
+import { Field, Panel, PanelTitle, Select, StepNav, inputClass } from './ui';
 
 export type GateValues = {
   name: string;
@@ -62,7 +62,7 @@ export function LeadGate({
   onSubmit: () => void;
 }) {
   return (
-    <Panel>
+    <Panel eyebrow="Your results are ready">
       <form
         noValidate
         onSubmit={(e) => {
@@ -209,14 +209,13 @@ export function LeadGate({
           </label>
         </div>
 
-        <NavRow>
-          <button type="button" onClick={onBack} className={buttonGhost} style={TRACKING}>
-            Edit inputs
-          </button>
-          <button type="submit" disabled={submitting} className={buttonPrimary} style={TRACKING}>
-            {submitting ? 'Preparing your results' : 'Show my valuation'}
-          </button>
-        </NavRow>
+        <StepNav
+          onBack={onBack}
+          backLabel="Back to inputs"
+          nextType="submit"
+          nextLabel={submitting ? 'Preparing your results' : 'Show my valuation'}
+          nextDisabled={submitting}
+        />
       </form>
     </Panel>
   );
