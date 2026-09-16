@@ -77,7 +77,7 @@ export function FinancialsStep({
       {/* Every year fits at 1280px and wider. Narrower, the table scrolls with
           the line names pinned and a thin gold scrollbar. */}
       <div
-        className="pmbc-scroll-thin overflow-x-auto rounded-[2px] border border-[color:var(--pmbc-border-warm)]"
+        className="pmbc-scroll-thin relative overflow-x-auto rounded-[2px] border border-[color:var(--pmbc-border-warm)]"
         tabIndex={0}
         role="region"
         aria-label="Financials table. Scrolls horizontally on smaller screens."
@@ -144,9 +144,7 @@ export function FinancialsStep({
           <span className="font-semibold text-[color:var(--pmbc-text)]">Revenue and EBITDA margin</span>
           <span className="flex flex-wrap items-center gap-3">
             <span className="flex items-center gap-1.5"><i className="inline-block h-2.5 w-2.5 rounded-[1px] bg-[#1B3A5F]" />Actual</span>
-            <span className="flex items-center gap-1.5"><i className="inline-block h-2.5 w-2.5 rounded-[1px] bg-[#C69C3E]" />Forecast</span>
-            <span className="flex items-center gap-1.5"><i className="inline-block h-[3px] w-3 bg-[#3FA663]" />EBITDA margin</span>
-          </span>
+            <span className="flex items-center gap-1.5"><i className="inline-block h-2.5 w-2.5 rounded-[1px] bg-[#C69C3E]" />Forecast</span>          </span>
         </p>
         {chart ? (
           <ChartSvg chart={chart} />

@@ -180,20 +180,32 @@ export function revenueMarginSeriesChart(
   height = 250,
 ): Chart {
   const r = { revenue, ebitda };
-  const padL = 10, padR = 44, padTop = 22, padBottom = 30;
+  // Two bands that never overlap: the margin line on top, with headroom for its
+  // labels, then the revenue bars, with a gap above the tallest bar for its
+  // value. Drawn on one shared scale, the line crossed the bar labels.
+  const padL = 10, padR = 10, padTop = 14, padBottom = 30;
   const plotW = width - padL - padR, plotH = height - padTop - padBottom;
   const colW = plotW / labels.length;
-  const maxRev = Math.max(...r.revenue) * 1.1;
+  const bandH = Math.round(plotH * 0.3), headroom = 14, gap = 20;
+  const barsTop = padTop + bandH + gap, barsH = plotH - bandH - gap;
+  const maxRev = Math.max(...r.revenue);
   const margins = r.revenue.map((rev, i) => r.ebitda[i] / rev);
-  const mLo = Math.min(0, ...margins), mHi = Math.max(0.05, ...margins) * 1.15;
-  const yRev = (v: number) => padTop + plotH - (v / maxRev) * plotH;
-  const yM = (v: number) => padTop + plotH - ((v - mLo) / (mHi - mLo)) * plotH;
-  const prims: Prim[] = [{ t: 'line', x1: padL, y1: padTop + plotH, x2: width - padR, y2: padTop + plotH, stroke: C.border, width: 1 }];
+  let mLo = Math.min(...margins), mHi = Math.max(...margins);
+  if (mHi - mLo < 0.02) {
+    mLo -= 0.01;
+    mHi += 0.01;
+  }
+  const yRev = (v: number) => barsTop + barsH - (v / maxRev) * barsH;
+  const yM = (v: number) => padTop + headroom + (1 - (v - mLo) / (mHi - mLo)) * (bandH - headroom);
+  const prims: Prim[] = [
+    { t: 'line', x1: padL, y1: barsTop + barsH, x2: width - padR, y2: barsTop + barsH, stroke: C.border, width: 1 },
+    { t: 'text', x: padL, y: padTop - 3, text: 'EBITDA margin', size: 10, fill: C.green, anchor: 'start', weight: 600 },
+  ];
   labels.forEach((l, i) => {
     const x = padL + i * colW;
     const rv = r.revenue[i];
-    prims.push({ t: 'rect', x: round(x + colW * 0.2), y: round(yRev(rv)), w: round(colW * 0.6), h: round(padTop + plotH - yRev(rv)), fill: i < 3 ? C.navy : C.gold, rx: 2, hint: `${l} revenue ${fmtMillions(rv)}, EBITDA margin ${fmtPct(margins[i], 1)}` });
-    prims.push({ t: 'text', x: round(x + colW / 2), y: round(yRev(rv) - 6), text: String(Math.round(rv)), size: 10.5, fill: C.text, anchor: 'middle' });
+    prims.push({ t: 'rect', x: round(x + colW * 0.2), y: round(yRev(rv)), w: round(colW * 0.6), h: round(barsTop + barsH - yRev(rv)), fill: i < 3 ? C.navy : C.gold, rx: 2, hint: `${l} revenue ${fmtMillions(rv)}, EBITDA margin ${fmtPct(margins[i], 1)}` });
+    prims.push({ t: 'text', x: round(x + colW / 2), y: round(yRev(rv) - 5), text: String(Math.round(rv)), size: 10.5, fill: C.text, anchor: 'middle' });
     prims.push({ t: 'text', x: round(x + colW / 2), y: height - 10, text: l, size: 11, fill: C.muted, anchor: 'middle' });
   });
   const pts = margins.map((m, i) => [round(padL + i * colW + colW / 2), round(yM(m))] as const);
@@ -201,10 +213,9 @@ export function revenueMarginSeriesChart(
   pts.forEach((p, i) => {
     prims.push({ t: 'circle', cx: p[0], cy: p[1], r: 3.2, fill: C.white, stroke: C.green, strokeWidth: 2 });
     if (i === 2 || i === pts.length - 1) {
-      prims.push({ t: 'text', x: p[0], y: round(p[1] - 8), text: fmtPct(margins[i], 1), size: 10, fill: C.green, anchor: 'middle', weight: 600 });
+      prims.push({ t: 'text', x: p[0], y: round(p[1] - 7), text: fmtPct(margins[i], 1), size: 10, fill: C.green, anchor: 'middle', weight: 600 });
     }
   });
-  prims.push({ t: 'text', x: width - 2, y: padTop - 8, text: 'EBITDA margin', size: 10, fill: C.green, anchor: 'end' });
   return {
     width,
     height,

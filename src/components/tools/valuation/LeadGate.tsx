@@ -182,7 +182,7 @@ export function LeadGate({
                 onChange={(e) => onChange({ consent: e.target.checked })}
                 aria-invalid={Boolean(errors.consent)}
                 aria-describedby={errors.consent ? 'tool-consent-err' : undefined}
-                className="mt-1 h-4 w-4 shrink-0 accent-[#1B3A5F]"
+                className="mt-0.5 h-5 w-5 shrink-0 cursor-pointer accent-[#1B3A5F]"
               />
               <span>
                 {CONSENT_TEXT.replace(/privacy policy.$/, '')}
@@ -203,7 +203,7 @@ export function LeadGate({
               type="checkbox"
               checked={values.followUp}
               onChange={(e) => onChange({ followUp: e.target.checked })}
-              className="mt-1 h-4 w-4 shrink-0 accent-[#1B3A5F]"
+              className="mt-0.5 h-5 w-5 shrink-0 cursor-pointer accent-[#1B3A5F]"
             />
             <span>{FOLLOW_UP_TEXT}</span>
           </label>

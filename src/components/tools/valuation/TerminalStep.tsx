@@ -107,7 +107,7 @@ export function TerminalStep({
         sub={preset ? `Preset indicative private company multiples for ${state.industry}. Used unless you add your own peers.` : undefined}
       >
         {preset && (
-          <div className="mb-5 overflow-x-auto rounded-[2px] border border-[color:var(--pmbc-border-warm)]">
+          <div className="relative mb-5 overflow-x-auto rounded-[2px] border border-[color:var(--pmbc-border-warm)]">
             <table className="w-full border-collapse text-[14px] tabular-nums">
               <caption className="sr-only">Preset multiples</caption>
               <thead>
@@ -143,7 +143,7 @@ export function TerminalStep({
         <div className="mb-2.5">
           <Hint>Add at least two peers to replace the preset. The tool uses the lowest, median and highest of your peers.</Hint>
         </div>
-        <div className="pmbc-scroll-thin overflow-x-auto rounded-[2px] border border-[color:var(--pmbc-border-warm)]">
+        <div className="pmbc-scroll-thin relative overflow-x-auto rounded-[2px] border border-[color:var(--pmbc-border-warm)]">
           <table className="w-full min-w-[460px] border-collapse">
             <caption className="sr-only">Your peer companies</caption>
             <thead>

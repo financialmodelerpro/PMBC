@@ -29,7 +29,7 @@ export function DataTable({ table, axis, caption }: { table: Table; axis?: boole
   const axisBg = axis ? 'bg-[#F6F1E6]' : '';
   const centre = Math.floor(table.rows.length / 2);
   return (
-    <div className="pmbc-scroll-thin overflow-x-auto rounded-[2px] border border-[color:var(--pmbc-border-warm)]" tabIndex={0} role="region" aria-label={caption}>
+    <div className="pmbc-scroll-thin relative overflow-x-auto rounded-[2px] border border-[color:var(--pmbc-border-warm)]" tabIndex={0} role="region" aria-label={caption}>
       <table className="w-full border-collapse text-[14px] tabular-nums">
         <caption className="sr-only">{caption}</caption>
         <thead>
