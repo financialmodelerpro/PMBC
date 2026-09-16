@@ -24,7 +24,7 @@
 import { z } from 'zod';
 
 import { BELOW_MINIMUM_BAND, DEAL_BANDS_SAR, DEAL_BAND_UNSURE, PURPOSES, VALUATION_DATA_VERSION } from '../valuation/data';
-import { runValuation, TOTAL_YEARS, type ValuationInputs, type ValuationResult } from '../valuation/engine';
+import { INPUT_SCHEMA_VERSION, runValuation, TOTAL_YEARS, type ValuationInputs, type ValuationResult } from '../valuation/engine';
 import { serializeResult } from '../valuation/serialize';
 import { CONSENT_TEXT, FOLLOW_UP_TEXT } from '../consent';
 
@@ -57,7 +57,52 @@ const inputsSchema = z.object({
     .max(25),
   privateDiscount: cell,
   dcfWeight: cell,
+  // Version 2. Every block is optional: a version 1 body is still valid, and
+  // the engine fills anything absent with its neutral default.
+  schemaVersion: z.number().int().min(1).max(99).optional(),
+  normalisation: z.object({ oneOff: cell, ownerCosts: cell, carryOwnerCosts: z.boolean() }).optional(),
+  bridge: z.object({ eosb: cell, leases: cell, minorityInterest: cell, surplusAssets: cell }).optional(),
+  stake: z
+    .object({
+      percent: cell,
+      adjustment: z.enum(['none', 'control_premium', 'minority_discount']),
+      controlPremium: cell,
+      minorityDiscount: cell,
+    })
+    .optional(),
+  scenarios: z
+    .object({
+      upsideGrowth: cell, upsideMargin: cell, downsideGrowth: cell, downsideMargin: cell,
+      weightDownside: cell, weightBase: cell, weightUpside: cell,
+    })
+    .optional(),
+  investedCapital: cell.optional(),
+  waccAdjustment: z.number().finite().gte(-10).lte(10).nullable().optional(),
 });
+
+export type SubmittedInputs = z.infer<typeof inputsSchema>;
+
+/** Validates and recomputes inputs alone. Shared by the lead, version and PDF endpoints. */
+export function recomputeInputs(
+  raw: unknown,
+): { ok: true; inputs: SubmittedInputs; result: ValuationResult } | { ok: false; issues: { path: string; message: string }[] } {
+  const parsed = inputsSchema.safeParse(raw);
+  if (!parsed.success) {
+    return { ok: false, issues: parsed.error.issues.map((i) => ({ path: `inputs.${i.path.join('.')}`, message: i.message })) };
+  }
+  const outcome = runValuation(parsed.data as ValuationInputs);
+  if (!outcome.ok) {
+    const errors = outcome.errors;
+    return {
+      ok: false,
+      issues:
+        typeof errors === 'string'
+          ? [{ path: `step${outcome.step + 1}`, message: errors }]
+          : Object.entries(errors).map(([path, message]) => ({ path: `inputs.${path}`, message })),
+    };
+  }
+  return { ok: true, inputs: { ...parsed.data, schemaVersion: INPUT_SCHEMA_VERSION }, result: outcome.result };
+}
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const dealValues: [string, ...string[]] = [DEAL_BAND_UNSURE, ...DEAL_BANDS_SAR.map((b) => b.value as string)];
@@ -211,7 +256,7 @@ export async function processValuationSubmission(
     country: data.inputs.country,
     currency: result.currency.code,
     industry: data.inputs.industry,
-    inputs: data.inputs,
+    inputs: { ...data.inputs, schemaVersion: INPUT_SCHEMA_VERSION },
     results: serialized,
     equity_low: result.equityDisplay[0],
     equity_mid: result.equityDisplay[1],
