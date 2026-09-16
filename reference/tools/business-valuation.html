@@ -1,0 +1,926 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Business Valuation: DCF and Comparables | PaceMakers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Spectral:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --navy:#1B3A5F; --deep:#14304F; --gold:#C69C3E; --gold-m:#A88530; --cream-n:#E8DDC4;
+  --bg:#FAF7F2; --surface:#FFFFFF; --ink:#14304F; --muted:#5B6B7E; --line:#E4DCCB;
+  --field:#FFFFFF; --hover:#F3ECDD; --barfill:#1B3A5F; --inputtxt:#0000FF; --tint:#F6F1E6;
+  --serif:"Spectral", Georgia, "Times New Roman", serif;
+  --sans:"IBM Plex Sans", -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0F2640; --surface:#14304F; --ink:#F4EEE2; --muted:#B7C0CC; --line:#2A4A6E;
+    --field:#10284A; --hover:#1B3A5F; --barfill:#E8DDC4; --inputtxt:#9DB8FF; --tint:#173659;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0F2640; --surface:#14304F; --ink:#F4EEE2; --muted:#B7C0CC; --line:#2A4A6E;
+  --field:#10284A; --hover:#1B3A5F; --barfill:#E8DDC4; --inputtxt:#9DB8FF; --tint:#173659;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.55;-webkit-font-smoothing:antialiased}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--gold);outline-offset:3px}
+.wrap{max-width:1120px;margin:0 auto;padding:0 24px}
+.hidden{display:none !important}
+
+.top{background:var(--deep);color:#F4EEE2}
+.top .wrap{display:flex;align-items:center;justify-content:space-between;height:64px}
+.brand{font-family:var(--serif);font-size:21px;font-weight:600}
+.brand span{color:var(--gold)}
+.top small{color:var(--cream-n);font-size:13px}
+
+.hero{background:var(--navy);color:#F4EEE2;padding:56px 0 64px;position:relative;overflow:hidden}
+.hero::after{content:"";position:absolute;right:-120px;top:-120px;width:420px;height:420px;border:1px solid rgba(198,156,62,.35);border-radius:50%}
+.hero::before{content:"";position:absolute;right:-40px;top:-40px;width:260px;height:260px;border:1px solid rgba(198,156,62,.2);border-radius:50%}
+.hero .inner{position:relative;z-index:1}
+.hero h1{font-family:var(--serif);font-weight:600;font-size:clamp(30px,4.6vw,50px);line-height:1.08;max-width:18ch}
+.hero p{margin-top:16px;max-width:60ch;color:var(--cream-n);font-size:17px}
+
+.steps{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;max-width:900px;margin:36px auto 20px}
+.step{border-top:3px solid var(--line);padding-top:10px;font-size:14px;color:var(--muted);background:none;border-left:0;border-right:0;border-bottom:0;text-align:left;cursor:pointer}
+.step b{display:block;font-weight:600;color:var(--ink);font-size:15px}
+.step.active{border-top-color:var(--gold)}
+.step.done{border-top-color:var(--navy)}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .step.done{border-top-color:var(--cream-n)}}
+.step:disabled{cursor:default}
+
+.stage{padding:0 0 80px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:6px;max-width:900px;margin:0 auto;padding:36px}
+.panel h2{font-family:var(--serif);font-size:28px;font-weight:600;line-height:1.2}
+.lead{color:var(--muted);margin:8px 0 24px;max-width:62ch}
+.group{padding:22px 0;border-top:1px solid var(--line)}
+.group:first-of-type{border-top:0;padding-top:0}
+.group h3{font-family:var(--serif);font-size:19px;font-weight:600;margin-bottom:4px}
+.group .sub{color:var(--muted);font-size:14px;margin-bottom:14px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 18px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:0 18px}
+.field{margin-bottom:14px}
+.field label{display:block;font-size:14px;font-weight:500;margin-bottom:6px}
+.hint{font-size:12.5px;color:var(--muted);margin-top:4px;line-height:1.4}
+input,select{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:4px;background:var(--field)}
+input[type=number],input.num{color:var(--inputtxt);font-variant-numeric:tabular-nums}
+input:focus,select:focus{border-color:var(--gold);outline:none;box-shadow:0 0 0 3px rgba(198,156,62,.25)}
+.err{color:#B3412F;font-size:13px;margin-top:5px;min-height:1em}
+.suffix{position:relative}
+.suffix input{padding-right:44px}
+.suffix span{position:absolute;right:12px;top:50%;transform:translateY(-50%);font-size:13px;color:var(--muted)}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:0;cursor:pointer;border-radius:4px;padding:13px 22px;font-weight:600;font-size:15px;text-decoration:none;transition:background .15s}
+.btn-gold{background:var(--gold);color:#14304F}
+.btn-gold:hover{background:var(--gold-m);color:#fff}
+.btn-ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+.btn-ghost:hover{background:var(--hover)}
+.btn-sm{padding:8px 14px;font-size:14px}
+.nav{display:flex;justify-content:space-between;align-items:center;margin-top:26px;gap:12px;flex-wrap:wrap}
+
+/* Financials table */
+.tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:4px}
+table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
+.fin th,.fin td{padding:6px;border-bottom:1px solid var(--line);white-space:nowrap}
+.fin th{font-size:13px;font-weight:600;color:var(--muted);text-align:center;background:var(--tint)}
+.fin th.fc{color:var(--gold-m)}
+.fin td:first-child,.fin th:first-child{position:sticky;left:0;background:var(--surface);text-align:left;font-size:14px;font-weight:500;min-width:150px;z-index:1}
+.fin th:first-child{background:var(--tint)}
+.fin td input{width:92px;padding:7px 8px;text-align:right;font-size:14px}
+.fin td.sep,.fin th.sep{border-left:2px solid var(--gold)}
+.fin tr:last-child td{border-bottom:0}
+.fin td small{display:block;font-weight:400;color:var(--muted);font-size:12px}
+
+.fill{background:var(--tint);border-radius:4px;padding:18px;margin-top:18px}
+.fill .grid5{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-top:10px}
+.fill label{font-size:13px}
+
+/* WACC */
+.wacc-out{background:var(--navy);color:#F4EEE2;border-radius:6px;padding:22px;margin-top:8px}
+.wacc-out .rows{display:grid;grid-template-columns:1fr 1fr;gap:6px 28px;font-size:14.5px}
+.wacc-out .rows div{display:flex;justify-content:space-between;border-bottom:1px solid rgba(232,221,196,.18);padding:6px 0}
+.wacc-out .total{display:flex;justify-content:space-between;align-items:baseline;margin-top:14px}
+.wacc-out .total b{font-family:var(--serif);font-size:36px;color:var(--gold)}
+.src{font-size:12.5px;color:var(--muted);margin-top:14px;line-height:1.5}
+
+/* Peers */
+.peers td{padding:6px;border-bottom:1px solid var(--line)}
+.peers th{padding:8px 6px;font-size:13px;color:var(--muted);text-align:left;background:var(--tint)}
+.peers input{padding:8px}
+.peers .rm{background:none;border:0;color:var(--muted);cursor:pointer;font-size:20px;line-height:1;padding:4px 8px}
+.preset{width:100%;font-size:14.5px}
+.preset th,.preset td{padding:8px;border-bottom:1px solid var(--line);text-align:right}
+.preset th:first-child,.preset td:first-child{text-align:left}
+.preset th{color:var(--muted);font-weight:600;font-size:13px}
+
+/* Result */
+.headline{padding-bottom:26px;border-bottom:1px solid var(--line)}
+.headline .label{color:var(--muted);font-size:15px}
+.headline .range{font-family:var(--serif);font-weight:600;font-size:clamp(30px,5.4vw,50px);line-height:1.1;margin:6px 0 8px}
+.headline .mid b{color:var(--gold-m)}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:0;margin-top:22px;border:1px solid var(--line);border-radius:4px}
+.kpis div{padding:12px 14px;border-right:1px solid var(--line)}
+.kpis div:last-child{border-right:0}
+.kpis small{display:block;color:var(--muted);font-size:13px}
+.kpis b{font-size:19px;font-variant-numeric:tabular-nums}
+.section{padding:26px 0;border-bottom:1px solid var(--line)}
+.section:last-of-type{border-bottom:0}
+.section h3{font-family:var(--serif);font-size:20px;font-weight:600;margin-bottom:4px}
+.section .sub{color:var(--muted);font-size:14px;margin-bottom:16px}
+
+.ff-row{display:grid;grid-template-columns:190px 1fr 150px;gap:14px;align-items:center;padding:10px 0}
+.ff-name{font-size:15px;font-weight:500}
+.ff-name small{display:block;color:var(--muted);font-weight:400;font-size:12.5px}
+.ff-track{position:relative;height:30px;background:repeating-linear-gradient(90deg,transparent 0,transparent calc(25% - 1px),var(--line) calc(25% - 1px),var(--line) 25%)}
+.ff-bar{position:absolute;top:5px;height:20px;background:var(--barfill);border-radius:2px;transition:left .9s cubic-bezier(.2,.7,.2,1),width .9s cubic-bezier(.2,.7,.2,1)}
+.ff-bar.blend{background:var(--gold)}
+.ff-mid{position:absolute;top:0;width:2px;height:30px;background:var(--gold-m)}
+.ff-bar.blend + .ff-mid{background:var(--ink)}
+.ff-val{font-size:13px;color:var(--muted);text-align:right;font-variant-numeric:tabular-nums}
+.ff-na{font-size:13px;color:var(--muted);line-height:30px}
+.ff-scale{display:grid;grid-template-columns:190px 1fr 150px;gap:14px;font-size:12px;color:var(--muted)}
+.ff-scale div{display:flex;justify-content:space-between;font-variant-numeric:tabular-nums}
+
+.data{font-size:14px}
+.data th,.data td{padding:8px 10px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+.data th:first-child,.data td:first-child{text-align:left;position:sticky;left:0;background:var(--surface)}
+.data th{color:var(--muted);font-weight:600;font-size:13px}
+.data tr.strong td{font-weight:600;border-top:2px solid var(--ink)}
+.data tr.muted td{color:var(--muted)}
+.sens td.base{background:var(--gold);color:#14304F;font-weight:600}
+.sens th.axis{background:var(--tint)}
+
+.chart svg{width:100%;height:auto;display:block}
+.legend{display:flex;gap:18px;font-size:13px;color:var(--muted);margin-top:8px;flex-wrap:wrap}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+
+.note{font-size:13.5px;color:var(--muted);margin-top:12px}
+.cta{margin-top:30px;background:var(--navy);color:#F4EEE2;border-radius:6px;padding:28px;display:flex;justify-content:space-between;align-items:center;gap:24px}
+.cta h4{font-family:var(--serif);font-size:22px;font-weight:600;margin-bottom:4px}
+.cta p{color:var(--cream-n);font-size:15px;max-width:44ch}
+.linkbtn{background:none;border:0;color:var(--muted);text-decoration:underline;cursor:pointer;font-size:14px}
+.consent{font-size:13px;color:var(--muted);margin:4px 0 16px}
+footer{border-top:1px solid var(--line);padding:24px 0;color:var(--muted);font-size:13px}
+
+@media (max-width:820px){
+  .hero{padding:40px 0 48px}
+  .panel{padding:22px 16px}
+  .grid2,.grid3{grid-template-columns:1fr}
+  .fill .grid5{grid-template-columns:1fr 1fr}
+  .steps{grid-template-columns:repeat(4,1fr);padding:0 4px}
+  .step{font-size:12px}.step b{font-size:13px}
+  .wacc-out .rows{grid-template-columns:1fr}
+  .kpis{grid-template-columns:1fr 1fr}
+  .kpis div:nth-child(2){border-right:0}
+  .kpis div:nth-child(-n+2){border-bottom:1px solid var(--line)}
+  .ff-row,.ff-scale{grid-template-columns:1fr}
+  .ff-scale span:first-child,.ff-scale span:last-child{display:none}
+  .ff-val{text-align:left}
+  .cta{flex-direction:column;align-items:flex-start}
+  .top small{display:none}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none !important}}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <div class="brand">PaceMakers<span>.</span></div>
+    <small>Corporate finance and transaction advisory</small>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="wrap inner">
+    <h1>Value your business with a DCF and comparables</h1>
+    <p>Enter three years of history and a five year forecast. The tool builds free cash flow, a cost of capital from Damodaran market data, and a comparables check, then shows where your value lands.</p>
+  </div>
+</section>
+
+<div class="wrap">
+  <nav class="steps" id="steps" aria-label="Steps">
+    <button class="step active" data-s="0">Step 1<b>Company</b></button>
+    <button class="step" data-s="1" disabled>Step 2<b>Financials</b></button>
+    <button class="step" data-s="2" disabled>Step 3<b>Cost of capital</b></button>
+    <button class="step" data-s="3" disabled>Step 4<b>Terminal and comps</b></button>
+  </nav>
+</div>
+
+<main class="stage wrap" id="stage">
+
+<!-- STEP 1 -->
+<section class="panel" id="p0">
+  <h2>Company profile</h2>
+  <p class="lead">Amounts are entered in millions of the local currency of the country you select. GCC currencies are pegged to the US dollar, so the Damodaran cost of capital applies directly. For Pakistan, the tool converts the US dollar cost of capital into rupee terms using expected inflation.</p>
+  <div class="grid2">
+    <div class="field">
+      <label for="sector">Industry</label>
+      <select id="sector"></select>
+      <div class="hint">Damodaran global industry classification. Sets beta, debt ratio and preset multiples.</div>
+      <div class="err" id="eSector"></div>
+    </div>
+    <div class="field">
+      <label for="country">Country of operations</label>
+      <select id="country"></select>
+      <div class="hint">Sets country risk premium, default spread and tax rate.</div>
+      <div class="err" id="eCountry"></div>
+    </div>
+  </div>
+  <div class="grid2">
+    <div class="field">
+      <label for="fy">Last completed financial year</label>
+      <input id="fy" type="number" min="2015" max="2035" value="2025">
+      <div class="hint">Valuation date is taken as the end of this year.</div>
+      <div class="err" id="eFy"></div>
+    </div>
+    <div class="field">
+      <label for="netdebt">Net debt at valuation date</label>
+      <div class="suffix"><input id="netdebt" type="number" step="0.1" placeholder="0"><span class="curm">SAR m</span></div>
+      <div class="hint">Borrowings and leases less cash. Negative if cash is higher.</div>
+      <div class="err" id="eDebt"></div>
+    </div>
+  </div>
+  <div class="nav">
+    <button class="linkbtn" id="exampleBtn">Load an example company</button>
+    <button class="btn btn-gold" data-next="1">Continue to financials</button>
+  </div>
+</section>
+
+<!-- STEP 2 -->
+<section class="panel hidden" id="p1">
+  <h2>Historical and forecast financials</h2>
+  <p class="lead">Enter actuals for the last three years and your forecast for the next five. You can type every figure, or fill the forecast from simple assumptions and then edit.</p>
+  <div class="tablewrap"><table class="fin" id="finTable"></table></div>
+  <div class="err" id="eFin" style="margin-top:8px"></div>
+
+  <div class="fill">
+    <strong>Fill the forecast from assumptions</strong>
+    <div class="hint">Applied to every forecast year. Overwrites the forecast columns only.</div>
+    <div class="grid5">
+      <div><label for="aG">Revenue growth</label><div class="suffix"><input id="aG" type="number" step="0.5" value="10"><span>%</span></div></div>
+      <div><label for="aM">EBITDA margin</label><div class="suffix"><input id="aM" type="number" step="0.5" value="18"><span>%</span></div></div>
+      <div><label for="aD">D&amp;A of revenue</label><div class="suffix"><input id="aD" type="number" step="0.5" value="3"><span>%</span></div></div>
+      <div><label for="aC">Capex of revenue</label><div class="suffix"><input id="aC" type="number" step="0.5" value="4"><span>%</span></div></div>
+      <div><label for="aW">Working capital of revenue</label><div class="suffix"><input id="aW" type="number" step="0.5" value="15"><span>%</span></div></div>
+    </div>
+    <div style="margin-top:12px"><button class="btn btn-ghost btn-sm" id="fillBtn">Fill forecast</button></div>
+  </div>
+
+  <div class="nav">
+    <button class="btn btn-ghost" data-next="0">Back</button>
+    <button class="btn btn-gold" data-next="2">Continue to cost of capital</button>
+  </div>
+</section>
+
+<!-- STEP 3 -->
+<section class="panel hidden" id="p2">
+  <h2>Cost of capital</h2>
+  <p class="lead">Prefilled from Damodaran data for your industry and country. Every input can be changed. WACC updates as you type.</p>
+
+  <div class="group">
+    <h3>Cost of equity</h3>
+    <div class="grid3">
+      <div class="field"><label for="rf">Risk-free rate</label><div class="suffix"><input id="rf" type="number" step="0.01"><span>%</span></div><div class="hint">US 10-year Treasury less US default spread</div></div>
+      <div class="field"><label for="erp">Mature market equity risk premium</label><div class="suffix"><input id="erp" type="number" step="0.01"><span>%</span></div><div class="hint">Damodaran implied premium</div></div>
+      <div class="field"><label for="crp">Country risk premium</label><div class="suffix"><input id="crp" type="number" step="0.01"><span>%</span></div><div class="hint" id="crpHint"></div></div>
+      <div class="field"><label for="bu">Unlevered beta</label><input id="bu" type="number" step="0.01"><div class="hint" id="buHint"></div></div>
+      <div class="field"><label for="de">Target debt to equity</label><div class="suffix"><input id="de" type="number" step="1"><span>%</span></div><div class="hint">Industry average market D/E</div></div>
+      <div class="field"><label for="sp">Size and company premium</label><div class="suffix"><input id="sp" type="number" step="0.1"><span>%</span></div><div class="hint">For private company and size risk. Set by revenue, adjust for your view.</div></div>
+    </div>
+  </div>
+
+  <div class="group">
+    <h3>Cost of debt and tax</h3>
+    <div class="grid3">
+      <div class="field"><label for="ds">Country default spread</label><div class="suffix"><input id="ds" type="number" step="0.01"><span>%</span></div><div class="hint">From sovereign rating</div></div>
+      <div class="field"><label for="cs">Company credit spread</label><div class="suffix"><input id="cs" type="number" step="0.1"><span>%</span></div><div class="hint">Your borrowing margin over the base rate</div></div>
+      <div class="field"><label for="tax">Tax rate</label><div class="suffix"><input id="tax" type="number" step="0.5"><span>%</span></div><div class="hint">Marginal corporate rate. KSA companies paying zakat may use 2.5%.</div></div>
+    </div>
+  </div>
+
+  <div class="group hidden" id="inflGroup">
+    <h3>Currency conversion</h3>
+    <p class="sub" id="inflSub"></p>
+    <div class="grid3">
+      <div class="field"><label for="infL">Expected local inflation</label><div class="suffix"><input id="infL" type="number" step="0.1"><span>%</span></div><div class="hint">Long-term expectation, not the current rate</div></div>
+      <div class="field"><label for="infU">Expected US inflation</label><div class="suffix"><input id="infU" type="number" step="0.1"><span>%</span></div><div class="hint">Long-term expectation</div></div>
+      <div class="field"><label>Method</label><div class="hint" style="margin-top:10px">Local WACC = (1 + USD WACC) x (1 + local inflation) / (1 + US inflation) less 1</div></div>
+    </div>
+  </div>
+
+  <div class="wacc-out" aria-live="polite">
+    <div class="rows">
+      <div><span>Levered beta</span><span id="oBl"></span></div>
+      <div><span>Cost of equity</span><span id="oKe"></span></div>
+      <div><span>Pre-tax cost of debt</span><span id="oKd"></span></div>
+      <div><span>After-tax cost of debt</span><span id="oKdt"></span></div>
+      <div><span>Equity weight</span><span id="oWe"></span></div>
+      <div><span>Debt weight</span><span id="oWd"></span></div>
+    </div>
+    <div class="rows hidden" id="usdRow" style="margin-top:6px"><div><span>WACC in US dollars</span><span id="oWaccUsd"></span></div></div>
+    <div class="total"><span>Weighted average cost of capital, <span class="curcode">SAR</span></span><b id="oWacc"></b></div>
+  </div>
+  <p class="src">Sources: country risk premiums, default spreads, tax rates and mature market premium from Aswath Damodaran, January 2026 update. Unlevered betas (corrected for cash) and D/E from Damodaran global industry data, January 2026. Risk-free rate uses the US 10-year Treasury at about 5.0% in mid September 2026, less the 0.23% US default spread per Damodaran's method.</p>
+  <div class="nav">
+    <button class="btn btn-ghost" data-next="1">Back</button>
+    <div style="display:flex;gap:12px;flex-wrap:wrap">
+      <button class="btn btn-ghost" id="resetWacc">Reset to Damodaran defaults</button>
+      <button class="btn btn-gold" data-next="3">Continue to terminal and comps</button>
+    </div>
+  </div>
+</section>
+
+<!-- STEP 4 -->
+<section class="panel hidden" id="p3">
+  <h2>Terminal value and comparables</h2>
+  <p class="lead">Set how value beyond the forecast is captured, then choose the multiples for the comparables method.</p>
+
+  <div class="group">
+    <h3>Terminal value</h3>
+    <div class="grid3">
+      <div class="field"><label for="g">Long-term growth rate</label><div class="suffix"><input id="g" type="number" step="0.1" value="2.5"><span>%</span></div><div class="hint">Perpetuity growth after year 5. Usually close to long-run inflation.</div></div>
+      <div class="field"><label for="xm">Exit EV / EBITDA multiple</label><div class="suffix"><input id="xm" type="number" step="0.1"><span>x</span></div><div class="hint">Defaults to the comparables median.</div></div>
+      <div class="field"><label for="midyr">Discounting</label>
+        <select id="midyr"><option value="1">Mid-year convention</option><option value="0">End of year</option></select>
+        <div class="hint">Mid-year assumes cash arrives evenly through each year.</div></div>
+    </div>
+  </div>
+
+  <div class="group">
+    <h3>Comparables</h3>
+    <p class="sub" id="presetSub"></p>
+    <div class="tablewrap" style="margin-bottom:18px"><table class="preset" id="presetTable"></table></div>
+
+    <strong style="font-size:15px">Your own peer companies (optional)</strong>
+    <div class="hint" style="margin-bottom:10px">Add at least two peers to replace the preset. The tool uses the lowest, median and highest of your peers.</div>
+    <div class="tablewrap">
+      <table class="peers" id="peerTable">
+        <thead><tr><th>Company</th><th>EV / EBITDA (x)</th><th>EV / Revenue (x)</th><th></th></tr></thead>
+        <tbody id="peerBody"></tbody>
+      </table>
+    </div>
+    <div style="margin-top:10px"><button class="btn btn-ghost btn-sm" id="addPeer">Add peer</button></div>
+
+    <div class="grid2" style="margin-top:18px">
+      <div class="field"><label for="dlom">Private company discount on comps</label><div class="suffix"><input id="dlom" type="number" step="1" value="0"><span>%</span></div><div class="hint">Preset multiples already reflect private deals. Consider 15% to 30% when using listed peers.</div></div>
+      <div class="field"><label for="wDcf">Weight on DCF in blended value</label><div class="suffix"><input id="wDcf" type="number" step="5" value="60" min="0" max="100"><span>%</span></div><div class="hint">Comparables receive the rest.</div></div>
+    </div>
+  </div>
+  <div class="err" id="eStep4"></div>
+  <div class="nav">
+    <button class="btn btn-ghost" data-next="2">Back</button>
+    <button class="btn btn-gold" id="runBtn">Run valuation</button>
+  </div>
+</section>
+
+<!-- GATE -->
+<section class="panel hidden" id="gate">
+  <h2>Your valuation is ready</h2>
+  <p class="lead">Tell us where to send your results. You will see the full DCF, comparables and sensitivity on the next screen.</p>
+  <div class="grid2">
+    <div class="field"><label for="fName">Full name</label><input id="fName" type="text" autocomplete="name"><div class="err" id="eName"></div></div>
+    <div class="field"><label for="fEmail">Work email</label><input id="fEmail" type="email" autocomplete="email"><div class="err" id="eEmail"></div></div>
+  </div>
+  <div class="grid2">
+    <div class="field"><label for="fCompany">Company (optional)</label><input id="fCompany" type="text" autocomplete="organization"></div>
+    <div class="field"><label for="fPurpose">What is the valuation for?</label>
+      <select id="fPurpose"><option value="">Select a purpose</option><option value="raise">Raising equity</option><option value="debt">Raising debt</option><option value="sale">Selling the business or a stake</option><option value="acquire">Acquiring a business</option><option value="internal">Internal planning or shareholders</option></select>
+      <div class="err" id="ePurpose"></div></div>
+  </div>
+  <div class="field"><label for="fDeal">Planned transaction size</label>
+    <select id="fDeal"></select>
+    <div class="err" id="eDeal"></div></div>
+  <p class="consent">By continuing you agree that PaceMakers may contact you about your results. We do not share your details.</p>
+  <div class="nav">
+    <button class="btn btn-ghost" id="gateBack">Edit inputs</button>
+    <button class="btn btn-gold" id="showBtn">Show my valuation</button>
+  </div>
+</section>
+
+<!-- RESULT -->
+<section class="panel hidden" id="result">
+  <div class="headline">
+    <div class="label">Indicative equity value, blended</div>
+    <div class="range" id="rRange"></div>
+    <div class="mid">Midpoint <b id="rMid"></b> as at end of <span id="rFy"></span>. Enterprise value <span id="rEv"></span>.</div>
+    <div class="kpis">
+      <div><small>WACC</small><b id="kW"></b></div>
+      <div><small>Terminal value share of DCF</small><b id="kTv"></b></div>
+      <div><small>Implied exit multiple</small><b id="kIm"></b></div>
+      <div><small>Implied EV / LTM EBITDA</small><b id="kLtm"></b></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h3>Valuation summary</h3>
+    <p class="sub">Enterprise value by method, <span class="curmil">SAR millions</span>. Line marks the midpoint. DCF ranges flex WACC by 1% and growth by 0.5% or the exit multiple by 1x.</p>
+    <div id="ff"></div>
+    <div class="ff-scale"><span></span><div id="ffScale"></div><span></span></div>
+  </div>
+
+  <div class="section">
+    <h3>Revenue and EBITDA</h3>
+    <p class="sub">Actuals and forecast, <span class="curmil">SAR millions</span>.</p>
+    <div class="chart" id="chart"></div>
+    <div class="legend"><span><i style="background:var(--barfill)"></i>Revenue, actual</span><span><i style="background:var(--gold)"></i>Revenue, forecast</span><span><i style="background:#2E7D52"></i>EBITDA</span></div>
+  </div>
+
+  <div class="section">
+    <h3>Free cash flow and DCF</h3>
+    <p class="sub">Base case, <span class="curmil">SAR millions</span>.</p>
+    <div class="tablewrap"><table class="data" id="fcfTable"></table></div>
+  </div>
+
+  <div class="section">
+    <h3>Sensitivity</h3>
+    <p class="sub">Equity value from the perpetuity growth DCF, <span class="curmil">SAR millions</span>.</p>
+    <div class="tablewrap"><table class="data sens" id="sensTable"></table></div>
+  </div>
+
+  <div class="section">
+    <h3>Enterprise to equity value</h3>
+    <div class="tablewrap"><table class="data" id="bridgeTable"></table></div>
+    <p class="note">Indicative only. A formal valuation would test the forecast, normalise earnings, review working capital and debt-like items, and select comparable companies and transactions in detail.</p>
+  </div>
+
+  <div class="cta">
+    <div>
+      <h4>Get a valuation you can defend</h4>
+      <p>Book a free 30 minute call to review your model, assumptions and what an independent valuation would cover.</p>
+    </div>
+    <a class="btn btn-gold" id="bookBtn" target="_blank" rel="noopener">Book a free call</a>
+  </div>
+  <div class="nav"><button class="linkbtn" id="editBtn">Change inputs and rerun</button></div>
+</section>
+</main>
+
+<footer><div class="wrap">This tool gives an indicative range only and is not a valuation opinion, financial or investment advice. PaceMakers Business Consultants LLP.</div></footer>
+
+<script>
+/* ===== Settings: update these when moving to pacemakersglobal.com ===== */
+const CONFIG = {
+  CALENDLY_URL: "https://calendly.com/your-pacemakers-link",
+  LEAD_ENDPOINT: null,
+  US_TBOND: 5.00,         // US 10-year Treasury, update periodically
+  US_DEFAULT_SPREAD: 0.23, // Damodaran, Jan 2026
+  MATURE_ERP: 4.23         // Damodaran implied ERP, Jan 2026
+};
+
+/* Damodaran Jan 2026: crp, ds (default spread), tax. Currency: code, peg to USD, sarPerUnit (for deal size bands), inflation defaults for non-pegged, default terminal growth. */
+const COUNTRIES = {
+  "Saudi Arabia":         {crp:0.78, ds:0.51, tax:20, code:"SAR", pegged:true,  sarPerUnit:1,       g:2.5},
+  "United Arab Emirates": {crp:0.64, ds:0.42, tax:9,  code:"AED", pegged:true,  sarPerUnit:1.0211,  g:2.5},
+  "Qatar":                {crp:0.64, ds:0.42, tax:10, code:"QAR", pegged:true,  sarPerUnit:1.0302,  g:2.5},
+  "Kuwait":               {crp:0.91, ds:0.60, tax:15, code:"KWD", pegged:true,  sarPerUnit:12.20,   g:2.5},
+  "Oman":                 {crp:2.85, ds:1.87, tax:15, code:"OMR", pegged:true,  sarPerUnit:9.753,   g:2.5},
+  "Bahrain":              {crp:7.12, ds:4.67, tax:0,  code:"BHD", pegged:true,  sarPerUnit:9.973,   g:2.5},
+  "Pakistan":             {crp:9.71, ds:6.37, tax:29, code:"PKR", pegged:false, sarPerUnit:0.01333, g:6.0, infL:7.0, infU:2.5}
+};
+
+/* Damodaran global Jan 2026: [unlevered beta corrected for cash, D/E %]; preset private multiples [EBITDA low, mid, high, Revenue low, mid, high] (indicative, review) */
+const INDUSTRIES = {
+  "Real Estate (Development)":          [0.45,191.18, 6,8,10, 1.0,1.5,2.0],
+  "Real Estate (Operations & Services)":[0.51,82.50, 8,11,14, 2.0,3.5,5.0],
+  "R.E.I.T.":                           [0.36,80.07, 12,15,18, 6.0,8.0,10.0],
+  "Engineering/Construction":           [0.76,76.55, 4,5.5,7, 0.3,0.5,0.7],
+  "Building Materials":                 [0.90,22.78, 6,7.5,9, 0.8,1.2,1.6],
+  "Machinery":                          [1.33,13.56, 6,8,10, 0.8,1.2,1.6],
+  "Chemical (Basic)":                   [1.00,50.48, 6,7.5,9, 0.8,1.1,1.5],
+  "Hospitals/Healthcare Facilities":    [0.58,46.58, 10,12.5,15, 1.5,2.2,3.0],
+  "Healthcare Support Services":        [0.78,38.13, 8,10,12, 1.0,1.5,2.0],
+  "Education":                          [0.74,28.61, 9,11,13, 1.5,2.2,3.0],
+  "Retail (General)":                   [0.94,13.04, 6,8,10, 0.5,0.8,1.2],
+  "Retail (Grocery and Food)":          [0.69,45.96, 6,8,10, 0.3,0.5,0.8],
+  "Food Processing":                    [0.56,37.10, 7,9,11, 0.8,1.3,1.8],
+  "Restaurant/Dining":                  [0.66,26.01, 7,9,11, 0.8,1.2,1.8],
+  "Hotel/Gaming":                       [0.66,40.24, 8,10,12, 1.5,2.2,3.0],
+  "Transportation":                     [0.75,53.47, 6,7.5,9, 0.6,0.9,1.2],
+  "Software (System & Application)":    [1.33,5.84, 12,16,20, 2.0,3.5,5.0],
+  "Computer Services":                  [1.07,15.01, 8,10,12, 0.8,1.2,1.8],
+  "Oilfield Svcs/Equip.":               [0.80,39.66, 5,6.5,8, 0.8,1.1,1.5],
+  "Power":                              [0.46,85.87, 8,10,12, 2.0,3.0,4.0],
+  "Green & Renewable Energy":           [0.57,71.43, 9,11,13, 3.0,4.5,6.0],
+  "Telecom. Services":                  [0.50,73.18, 5,6.5,8, 1.5,2.0,2.5],
+  "Environmental & Waste Services":     [0.91,35.70, 7,9,11, 1.0,1.5,2.0],
+  "Business & Consumer Services":       [0.91,20.61, 6,8,10, 0.8,1.2,1.6]
+};
+
+const LINES = [
+  {k:"rev", n:"Revenue"},
+  {k:"ebitda", n:"EBITDA", s:"Can be negative"},
+  {k:"da", n:"Depreciation and amortisation"},
+  {k:"capex", n:"Capital expenditure", s:"Enter as a positive number"},
+  {k:"nwc", n:"Net working capital", s:"Balance at year end"}
+];
+const NH=3, NF=5;
+const $ = id => document.getElementById(id);
+const val = id => parseFloat($(id).value);
+let current = 0, maxReached = 0, calc = null, spTouched = false;
+
+/* ---------- Currency ---------- */
+let CUR = {code:"SAR", pegged:true, sarPerUnit:1};
+const DEAL_BANDS_SAR = [["lt50",null,50],["50-200",50,200],["200-1000",200,1000],["gt1000",1000,null]];
+function bandText(lo,hi){
+  const f = v => { const x=v/CUR.sarPerUnit; return x>=1000 ? `${+(x/1000).toPrecision(3)} billion` : `${+x.toPrecision(3)} million`; };
+  const c = CUR.code;
+  if(lo===null) return `Under ${c} ${f(hi)}`;
+  if(hi===null) return `Over ${c} ${f(lo)}`;
+  return `${c} ${f(lo)} to ${f(hi)}`;
+}
+function setCurrency(){
+  const c = COUNTRIES[$("country").value];
+  CUR = c ? {code:c.code, pegged:c.pegged, sarPerUnit:c.sarPerUnit} : {code:"SAR", pegged:true, sarPerUnit:1};
+  document.querySelectorAll(".curm").forEach(e=>e.textContent = CUR.code+" m");
+  document.querySelectorAll(".curmil").forEach(e=>e.textContent = CUR.code+" millions");
+  document.querySelectorAll(".curcode").forEach(e=>e.textContent = CUR.code);
+  const sel=$("fDeal"), prev=sel.value;
+  sel.innerHTML = `<option value="">Select a range</option>` + DEAL_BANDS_SAR.map(b=>`<option value="${b[0]}">${bandText(b[1],b[2])}</option>`).join("") + `<option value="unsure">Not decided yet</option>`;
+  sel.value = prev;
+  $("inflGroup").classList.toggle("hidden", CUR.pegged);
+  $("usdRow").classList.toggle("hidden", CUR.pegged);
+  $("inflSub").textContent = `${CUR.code} is not pegged to the US dollar. The Damodaran inputs give a US dollar WACC, which is converted to ${CUR.code} using the expected inflation gap. Enter forecasts and growth in nominal ${CUR.code}.`;
+  if($("finTable").innerHTML) buildFinTable(true);
+}
+
+/* ---------- Setup ---------- */
+$("sector").innerHTML = `<option value="">Select an industry</option>` + Object.keys(INDUSTRIES).map(s=>`<option>${s}</option>`).join("");
+$("country").innerHTML = `<option value="">Select a country</option>` + Object.keys(COUNTRIES).map(s=>`<option>${s}</option>`).join("");
+
+function years(){ const fy = parseInt($("fy").value)||2025; return {h:[fy-2,fy-1,fy], f:[1,2,3,4,5].map(i=>fy+i)}; }
+
+function buildFinTable(keep){
+  const saved = keep ? readFin(true) : null;
+  const y = years();
+  let h = `<thead><tr><th>${CUR.code} millions</th>${y.h.map(v=>`<th>FY${v} A</th>`).join("")}${y.f.map((v,i)=>`<th class="fc ${i===0?"sep":""}">FY${v} F</th>`).join("")}</tr></thead><tbody>`;
+  LINES.forEach(L=>{
+    h += `<tr><td>${L.n}${L.s?`<small>${L.s}</small>`:""}</td>`;
+    for(let i=0;i<NH+NF;i++) h += `<td class="${i===NH?"sep":""}"><input type="number" step="0.1" data-k="${L.k}" data-i="${i}" aria-label="${L.n} ${i<NH?"FY"+y.h[i]+" actual":"FY"+y.f[i-NH]+" forecast"}"></td>`;
+    h += `</tr>`;
+  });
+  $("finTable").innerHTML = h + `</tbody>`;
+  if(saved) writeFin(saved);
+}
+function readFin(raw){
+  const d = {}; LINES.forEach(L=>d[L.k]=new Array(NH+NF).fill(raw?"":0));
+  document.querySelectorAll("#finTable input").forEach(inp=>{
+    const v = inp.value;
+    d[inp.dataset.k][+inp.dataset.i] = raw ? v : (v===""?NaN:parseFloat(v));
+  });
+  return d;
+}
+function writeFin(d){
+  document.querySelectorAll("#finTable input").forEach(inp=>{
+    const v = d[inp.dataset.k][+inp.dataset.i];
+    inp.value = (v===""||v===null||v===undefined||Number.isNaN(v)) ? "" : (typeof v==="number" ? +v.toFixed(1) : v);
+  });
+}
+buildFinTable(false);
+setCurrency();
+$("fy").addEventListener("change", ()=>buildFinTable(true));
+
+$("fillBtn").onclick = ()=>{
+  const d = readFin(true);
+  const lastRev = parseFloat(d.rev[NH-1]);
+  if(!(lastRev>0)){ $("eFin").textContent = "Enter revenue for the last actual year before filling the forecast."; return; }
+  $("eFin").textContent = "";
+  const g=val("aG")/100, m=val("aM")/100, da=val("aD")/100, cx=val("aC")/100, w=val("aW")/100;
+  let r = lastRev;
+  for(let i=NH;i<NH+NF;i++){
+    r = r*(1+g);
+    d.rev[i]=+r.toFixed(1); d.ebitda[i]=+(r*m).toFixed(1); d.da[i]=+(r*da).toFixed(1);
+    d.capex[i]=+(r*cx).toFixed(1); d.nwc[i]=+(r*w).toFixed(1);
+  }
+  writeFin(d);
+};
+
+/* ---------- WACC ---------- */
+function defaultSize(){
+  const d = readFin(false), r = d.rev[NH-1];
+  if(!(r>0)) return 3.0;
+  const rs = r*CUR.sarPerUnit;
+  return rs < 100 ? 3.0 : rs < 500 ? 2.0 : 1.0; /* thresholds in SAR m */
+}
+function applyCountryDefaults(){
+  const c = COUNTRIES[$("country").value]; if(!c) return;
+  $("crp").value=c.crp; $("ds").value=c.ds; $("tax").value=c.tax;
+  if(!c.pegged){ $("infL").value=c.infL; $("infU").value=c.infU; }
+  $("g").value=c.g;
+  $("crpHint").textContent = `Damodaran, ${$("country").value}`;
+}
+function applySectorDefaults(){
+  const s = INDUSTRIES[$("sector").value]; if(!s) return;
+  $("bu").value=s[0]; $("de").value=s[1];
+  $("buHint").textContent = `Damodaran global, ${$("sector").value}`;
+  $("xm").value = s[3];
+  renderPreset();
+}
+function resetWacc(){
+  $("rf").value = +(CONFIG.US_TBOND - CONFIG.US_DEFAULT_SPREAD).toFixed(2);
+  $("erp").value = CONFIG.MATURE_ERP;
+  $("cs").value = 2.0;
+  applyCountryDefaults(); applySectorDefaults();
+  $("sp").value = defaultSize(); spTouched=false;
+  computeWacc();
+}
+$("country").addEventListener("change", ()=>{setCurrency();applyCountryDefaults();computeWacc();});
+["infL","infU"].forEach(id=>$(id).addEventListener("input", computeWacc));
+$("sector").addEventListener("change", ()=>{applySectorDefaults();computeWacc();});
+$("resetWacc").onclick = resetWacc;
+$("sp").addEventListener("input", ()=>spTouched=true);
+["rf","erp","crp","bu","de","sp","ds","cs","tax"].forEach(id=>$(id).addEventListener("input", computeWacc));
+
+function waccParts(){
+  const rf=val("rf")/100, erp=val("erp")/100, crp=val("crp")/100, bu=val("bu"), de=val("de")/100,
+        sp=val("sp")/100, ds=val("ds")/100, cs=val("cs")/100, t=val("tax")/100;
+  const bl = bu*(1+(1-t)*de);
+  const ke = rf + bl*erp + crp + sp;
+  const kd = rf + ds + cs, kdt = kd*(1-t);
+  const wd = de/(1+de), we = 1-wd;
+  const waccUsd = we*ke + wd*kdt;
+  const conv = CUR.pegged ? 1 : (1+val("infL")/100)/(1+val("infU")/100);
+  return {rf,erp,crp,bu,de,sp,ds,cs,t,bl,ke,kd,kdt,we,wd,waccUsd, wacc:(1+waccUsd)*conv-1};
+}
+const P = (v,d=2)=> Number.isFinite(v) ? (v*100).toFixed(d)+"%" : "n/a";
+function computeWacc(){
+  const w = waccParts();
+  $("oBl").textContent = Number.isFinite(w.bl)?w.bl.toFixed(2):"n/a";
+  $("oKe").textContent = P(w.ke); $("oKd").textContent = P(w.kd); $("oKdt").textContent = P(w.kdt);
+  $("oWe").textContent = P(w.we,1); $("oWd").textContent = P(w.wd,1); $("oWacc").textContent = P(w.wacc); $("oWaccUsd").textContent = P(w.waccUsd);
+  return w;
+}
+
+/* ---------- Comps ---------- */
+function renderPreset(){
+  const s = INDUSTRIES[$("sector").value]; if(!s) return;
+  $("presetSub").textContent = `Preset indicative private company multiples for ${$("sector").value}. Used unless you add your own peers.`;
+  $("presetTable").innerHTML = `<thead><tr><th>Multiple</th><th>Low</th><th>Median</th><th>High</th></tr></thead>
+    <tbody><tr><td>EV / EBITDA</td><td>${s[2]}x</td><td>${s[3]}x</td><td>${s[4]}x</td></tr>
+    <tr><td>EV / Revenue</td><td>${s[5]}x</td><td>${s[6]}x</td><td>${s[7]}x</td></tr></tbody>`;
+}
+function addPeer(n="",e="",r=""){
+  const tr = document.createElement("tr");
+  tr.innerHTML = `<td><input type="text" placeholder="Company name" value="${n}"></td><td><input type="number" step="0.1" value="${e}"></td><td><input type="number" step="0.1" value="${r}"></td><td><button class="rm" aria-label="Remove peer">&times;</button></td>`;
+  tr.querySelector(".rm").onclick = ()=>tr.remove();
+  $("peerBody").appendChild(tr);
+}
+$("addPeer").onclick = ()=>addPeer();
+addPeer(); addPeer();
+
+function stats(arr){
+  const a = arr.filter(Number.isFinite).sort((x,y)=>x-y);
+  if(a.length<2) return null;
+  const m = a.length%2 ? a[(a.length-1)/2] : (a[a.length/2-1]+a[a.length/2])/2;
+  return [a[0], m, a[a.length-1]];
+}
+function compsMultiples(){
+  const rows = [...$("peerBody").querySelectorAll("tr")].map(tr=>{
+    const i = tr.querySelectorAll("input"); return {n:i[0].value.trim(), e:parseFloat(i[1].value), r:parseFloat(i[2].value)};
+  });
+  const se = stats(rows.map(r=>r.e)), sr = stats(rows.map(r=>r.r));
+  const s = INDUSTRIES[$("sector").value];
+  return {
+    ebitda: se || [s[2],s[3],s[4]], revenue: sr || [s[5],s[6],s[7]],
+    srcE: se ? `Your ${rows.filter(r=>Number.isFinite(r.e)).length} peers` : "Preset",
+    srcR: sr ? `Your ${rows.filter(r=>Number.isFinite(r.r)).length} peers` : "Preset",
+    peers: rows.filter(r=>r.n||Number.isFinite(r.e)||Number.isFinite(r.r))
+  };
+}
+
+/* ---------- Navigation ---------- */
+function go(n){
+  ["p0","p1","p2","p3","gate","result"].forEach(p=>$(p).classList.add("hidden"));
+  const id = typeof n==="number" ? "p"+n : n;
+  $(id).classList.remove("hidden");
+  if(typeof n==="number"){ current=n; maxReached=Math.max(maxReached,n); }
+  document.querySelectorAll(".step").forEach(b=>{
+    const s=+b.dataset.s; b.classList.toggle("active", typeof n==="number" && s===n);
+    b.classList.toggle("done", s<maxReached && s!==n || (typeof n!=="number" && s<=maxReached));
+    b.disabled = s>maxReached;
+  });
+  $("steps").scrollIntoView({behavior:"smooth",block:"start"});
+}
+document.querySelectorAll(".step").forEach(b=>b.onclick=()=>go(+b.dataset.s));
+document.querySelectorAll("[data-next]").forEach(b=>b.onclick=()=>{
+  const to=+b.dataset.next;
+  if(to>current && !validate(current)) return;
+  if(to===2 && !spTouched){ $("sp").value = defaultSize(); computeWacc(); }
+  go(to);
+});
+
+function validate(step){
+  if(step===0){
+    const ok1=!!$("sector").value, ok2=!!$("country").value, fy=parseInt($("fy").value), nd=$("netdebt").value;
+    $("eSector").textContent = ok1?"":"Select an industry.";
+    $("eCountry").textContent = ok2?"":"Select a country.";
+    $("eFy").textContent = (fy>=2015&&fy<=2035)?"":"Enter a year between 2015 and 2035.";
+    $("eDebt").textContent = nd===""?"Enter net debt. Use 0 if none.":"";
+    if(ok1&&ok2&&fy>=2015&&fy<=2035&&nd!==""){ if(!$("rf").value) resetWacc(); return true; }
+    return false;
+  }
+  if(step===1){
+    const d = readFin(false);
+    for(let i=0;i<NH+NF;i++){
+      if(!(d.rev[i]>0)){ $("eFin").textContent="Enter revenue above zero for every year."; return false; }
+      if(!Number.isFinite(d.ebitda[i])){ $("eFin").textContent="Enter EBITDA for every year. Use a negative figure for a loss."; return false; }
+    }
+    if(!Number.isFinite(d.nwc[NH-1])){ $("eFin").textContent="Enter net working capital for the last actual year, even if zero."; return false; }
+    $("eFin").textContent=""; return true;
+  }
+  if(step===2){ return Number.isFinite(computeWacc().wacc); }
+  return true;
+}
+
+/* ---------- Valuation engine ---------- */
+function projections(t){
+  const d = readFin(false); const z = v=>Number.isFinite(v)?v:0;
+  const rows = [];
+  for(let i=NH;i<NH+NF;i++){
+    const ebitda=d.ebitda[i], da=z(d.da[i]), capex=z(d.capex[i]);
+    const nwcPrev = i===NH ? z(d.nwc[NH-1]) : z(d.nwc[i-1]);
+    const dnwc = z(d.nwc[i]) - nwcPrev;
+    const ebit = ebitda - da;
+    const tax = Math.max(0, ebit)*t;
+    rows.push({rev:d.rev[i], ebitda, da, ebit, tax, capex, dnwc, fcf: ebit - tax + da - capex - dnwc});
+  }
+  return {d, rows};
+}
+function dcf(rows, wacc, g, mult, mid){
+  let pv=0; const dfs=[];
+  rows.forEach((r,k)=>{ const df = 1/Math.pow(1+wacc, (k+1)-(mid?0.5:0)); dfs.push(df); pv += r.fcf*df; });
+  const last = rows[rows.length-1], dfN = 1/Math.pow(1+wacc, rows.length);
+  const tvG = wacc>g ? last.fcf*(1+g)/(wacc-g) : NaN;
+  const tvX = last.ebitda>0 ? last.ebitda*mult : NaN;
+  return {pv, dfs, dfN, tvG, tvX, evG: pv + tvG*dfN, evX: pv + tvX*dfN};
+}
+
+$("runBtn").onclick = ()=>{
+  const g=val("g")/100, xm=val("xm"), w=waccParts(), wD=val("wDcf");
+  if(!Number.isFinite(g)||!Number.isFinite(xm)||!Number.isFinite(wD)||wD<0||wD>100){ $("eStep4").textContent="Enter growth, exit multiple and a DCF weight between 0% and 100%."; return; }
+  if(g >= w.wacc - 0.01){ $("eStep4").textContent=`Long-term growth must be at least 1% below WACC (${P(w.wacc)}).`; return; }
+  $("eStep4").textContent="";
+  const mid = $("midyr").value==="1", nd=val("netdebt"), disc=(val("dlom")||0)/100;
+  const {d, rows} = projections(w.t);
+  const base = dcf(rows, w.wacc, g, xm, mid);
+  const loG = dcf(rows, w.wacc+0.01, g-0.005, xm, mid).evG, hiG = dcf(rows, w.wacc-0.01, g+0.005, xm, mid).evG;
+  const loX = dcf(rows, w.wacc+0.01, g, xm-1, mid).evX,  hiX = dcf(rows, w.wacc-0.01, g, xm+1, mid).evX;
+
+  const cm = compsMultiples();
+  const ltmE = d.ebitda[NH-1], ltmR = d.rev[NH-1];
+  const cE = ltmE>0 ? cm.ebitda.map(m=>ltmE*m*(1-disc)) : null;
+  const cR = cm.revenue.map(m=>ltmR*m*(1-disc));
+
+  const dcfRange = [0,1,2].map(i=>{
+    const G=[loG,base.evG,hiG][i], X=[loX,base.evX,hiX][i];
+    return Number.isFinite(X) ? (G+X)/2 : G;
+  });
+  const compRange = cE || cR;
+  const ev = [0,1,2].map(i=> wD/100*dcfRange[i] + (1-wD/100)*compRange[i]);
+  calc = {w,g,xm,mid,nd,disc,d,rows,base,loG,hiG,loX,hiX,cm,cE,cR,dcfRange,compRange,ev,wD,ltmE};
+  go("gate"); $("fName").focus({preventScroll:true});
+};
+
+/* ---------- Gate ---------- */
+function validEmail(e){return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(e);}
+$("gateBack").onclick = ()=>go(3);
+$("showBtn").onclick = async ()=>{
+  const name=$("fName").value.trim(), email=$("fEmail").value.trim(), purpose=$("fPurpose").value, deal=$("fDeal").value;
+  $("eName").textContent = name.length<2?"Enter your full name.":"";
+  $("eEmail").textContent = !validEmail(email)?"Enter a valid email address, for example name@company.com.":"";
+  $("ePurpose").textContent = purpose?"":"Select what the valuation is for.";
+  $("eDeal").textContent = deal?"":"Select a transaction size range.";
+  if(name.length<2||!validEmail(email)||!purpose||!deal) return;
+  const eq = calc.ev.map(v=>v-calc.nd);
+  const lead = {source:"dcf-comps-valuation", name, email, company:$("fCompany").value.trim(), purpose, dealSize:deal,
+    belowMinimum: deal==="lt50", currency:CUR.code, industry:$("sector").value, country:$("country").value,
+    ltmRevenue: calc.d.rev[NH-1], ltmEbitda: calc.ltmE, wacc:+(calc.w.wacc*100).toFixed(2), waccUsd:+(calc.w.waccUsd*100).toFixed(2),
+    evRange: calc.ev.map(v=>+v.toFixed(1)), equityRange: eq.map(v=>+v.toFixed(1)), submittedAt:new Date().toISOString()};
+  if(CONFIG.LEAD_ENDPOINT){ try{ await fetch(CONFIG.LEAD_ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(lead)}); }catch(e){ console.error(e);} }
+  renderResult(name,email);
+};
+$("editBtn").onclick = ()=>go(3);
+
+/* ---------- Results ---------- */
+const N1 = v => Number.isFinite(v) ? (v<0?"("+Math.abs(v).toLocaleString("en-US",{minimumFractionDigits:1,maximumFractionDigits:1})+")":v.toLocaleString("en-US",{minimumFractionDigits:1,maximumFractionDigits:1})) : "n/a";
+function big(v){
+  if(!Number.isFinite(v)) return "n/a";
+  const a=Math.abs(v), s=v<0?"negative ":"";
+  return a>=1000 ? `${s}${CUR.code} ${(a/1000).toFixed(2)} billion` : `${s}${CUR.code} ${a.toFixed(a>=100?0:1)} million`;
+}
+
+function renderResult(name,email){
+  const c = calc; go("result");
+  const eq = c.ev.map(v=>v-c.nd);
+  $("rRange").textContent = `${big(Math.max(0,eq[0]))} to ${big(Math.max(0,eq[2]))}`;
+  $("rMid").textContent = big(eq[1]);
+  $("rFy").textContent = "FY" + years().h[2];
+  $("rEv").textContent = `${big(c.ev[0])} to ${big(c.ev[2])}`;
+  $("kW").textContent = P(c.w.wacc) + (CUR.pegged?"":" "+CUR.code);
+  const tvShare = c.base.tvG*c.base.dfN / c.base.evG;
+  $("kTv").textContent = Number.isFinite(tvShare)?P(tvShare,0):"n/a";
+  const last = c.rows[c.rows.length-1];
+  $("kIm").textContent = last.ebitda>0 ? (c.base.tvG/last.ebitda).toFixed(1)+"x" : "n/a";
+  $("kLtm").textContent = c.ltmE>0 ? (c.ev[1]/c.ltmE).toFixed(1)+"x" : "n/a";
+
+  // Football field
+  const rowsFF = [
+    {n:"DCF, perpetuity growth", s:`WACC ${P(c.w.wacc,1)}, g ${P(c.g,1)}`, r:[c.loG,c.base.evG,c.hiG]},
+    {n:"DCF, exit multiple", s:`${c.xm.toFixed(1)}x terminal EBITDA`, r:Number.isFinite(c.base.evX)?[c.loX,c.base.evX,c.hiX]:null},
+    {n:"Comps, EV / EBITDA", s:`${c.cm.srcE}, LTM`, r:c.cE},
+    {n:"Comps, EV / Revenue", s:`${c.cm.srcR}, LTM`, r:c.cR},
+    {n:"Blended", s:`${c.wD}% DCF, ${100-c.wD}% comps`, r:c.ev, blend:true}
+  ];
+  const all = rowsFF.flatMap(r=>r.r?[r.r[0],r.r[2]]:[]).filter(Number.isFinite);
+  const maxV = Math.max(...all)*1.08, minV = Math.min(0, Math.min(...all));
+  const span = maxV-minV, pos = v => (v-minV)/span*100;
+  $("ff").innerHTML = rowsFF.map(r=>{
+    const inner = r.r ? `<div class="ff-bar ${r.blend?"blend":""}" style="left:${pos(r.r[0])}%;width:0" data-w="${Math.max(0.5,pos(r.r[2])-pos(r.r[0]))}"></div><div class="ff-mid" style="left:${pos(r.r[1])}%"></div>`
+                      : `<div class="ff-na">Not meaningful with negative EBITDA</div>`;
+    return `<div class="ff-row"><div class="ff-name">${r.n}<small>${r.s}</small></div>
+      <div class="ff-track" role="img" aria-label="${r.n}: ${r.r?N1(r.r[0])+" to "+N1(r.r[2]):"not available"}">${inner}</div>
+      <div class="ff-val">${r.r?N1(r.r[0])+" to "+N1(r.r[2]):""}</div></div>`;
+  }).join("");
+  $("ffScale").innerHTML = [0,.25,.5,.75,1].map(p=>`<span>${Math.round(minV+span*p).toLocaleString("en-US")}</span>`).join("");
+  requestAnimationFrame(()=>requestAnimationFrame(()=>document.querySelectorAll(".ff-bar").forEach(b=>b.style.width=b.dataset.w+"%")));
+
+  // Chart
+  const y = years(), labels=[...y.h,...y.f].map(v=>"FY"+String(v).slice(2));
+  const revs=c.d.rev, ebs=c.d.ebitda, W=800, H=250, pad=34, bw=(W-pad*2)/8;
+  const top = Math.max(...revs)*1.1, low = Math.min(0,...ebs), sc = v => H-28 - (v-low)/(top-low)*(H-50);
+  let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Revenue and EBITDA by year">`;
+  svg += `<line x1="${pad}" x2="${W-pad}" y1="${sc(0)}" y2="${sc(0)}" stroke="var(--line)"/>`;
+  labels.forEach((l,i)=>{
+    const x = pad + i*bw, rv=revs[i], eb=ebs[i];
+    svg += `<rect x="${x+bw*0.14}" y="${sc(rv)}" width="${bw*0.42}" height="${sc(0)-sc(rv)}" fill="${i<NH?"var(--barfill)":"var(--gold)"}" rx="2"/>`;
+    const ey = eb>=0?sc(eb):sc(0), eh = Math.abs(sc(0)-sc(eb));
+    svg += `<rect x="${x+bw*0.58}" y="${ey}" width="${bw*0.26}" height="${eh}" fill="#2E7D52" rx="2"/>`;
+    svg += `<text x="${x+bw*0.5}" y="${H-8}" font-size="13" text-anchor="middle" fill="var(--muted)" font-family="IBM Plex Sans, Arial">${l}</text>`;
+    svg += `<text x="${x+bw*0.35}" y="${sc(rv)-6}" font-size="11.5" text-anchor="middle" fill="var(--ink)" font-family="IBM Plex Sans, Arial">${Math.round(rv)}</text>`;
+  });
+  $("chart").innerHTML = svg + `</svg>`;
+
+  // FCF table
+  const fh = y.f.map(v=>`<th>FY${v} F</th>`).join("");
+  const R = (label,arr,cls="") => `<tr class="${cls}"><td>${label}</td>${arr.map(v=>`<td>${N1(v)}</td>`).join("")}</tr>`;
+  $("fcfTable").innerHTML = `<thead><tr><th>${CUR.code} millions</th>${fh}</tr></thead><tbody>
+    ${R("Revenue", c.rows.map(r=>r.rev))}
+    ${R("EBITDA", c.rows.map(r=>r.ebitda))}
+    ${R("Less depreciation and amortisation", c.rows.map(r=>-r.da),"muted")}
+    ${R("EBIT", c.rows.map(r=>r.ebit))}
+    ${R(`Less tax at ${P(c.w.t,1)}`, c.rows.map(r=>-r.tax),"muted")}
+    ${R("Add back depreciation and amortisation", c.rows.map(r=>r.da),"muted")}
+    ${R("Less capital expenditure", c.rows.map(r=>-r.capex),"muted")}
+    ${R("Less increase in working capital", c.rows.map(r=>-r.dnwc),"muted")}
+    ${R("Free cash flow to firm", c.rows.map(r=>r.fcf),"strong")}
+    <tr class="muted"><td>Discount factor</td>${c.base.dfs.map(v=>`<td>${v.toFixed(3)}</td>`).join("")}</tr>
+    ${R("Present value", c.rows.map((r,i)=>r.fcf*c.base.dfs[i]))}
+  </tbody>`;
+
+  // Sensitivity
+  const ws=[-0.02,-0.01,0,0.01,0.02], gs=[-0.01,-0.005,0,0.005,0.01];
+  let st = `<thead><tr><th class="axis">WACC \\ growth</th>${gs.map(dg=>`<th class="axis">${P(c.g+dg,1)}</th>`).join("")}</tr></thead><tbody>`;
+  ws.forEach(dw=>{
+    st += `<tr><th class="axis" style="text-align:left">${P(c.w.wacc+dw,1)}</th>`;
+    gs.forEach(dg=>{
+      const W2=c.w.wacc+dw, G2=c.g+dg;
+      const v = W2>G2+0.005 ? dcf(c.rows,W2,G2,c.xm,c.mid).evG - c.nd : NaN;
+      st += `<td class="${dw===0&&dg===0?"base":""}">${N1(v)}</td>`;
+    });
+    st += `</tr>`;
+  });
+  $("sensTable").innerHTML = st + `</tbody>`;
+
+  // Bridge
+  const ndRow = c.nd>=0 ? [-c.nd,-c.nd,-c.nd] : [-c.nd,-c.nd,-c.nd];
+  $("bridgeTable").innerHTML = `<thead><tr><th>${CUR.code} millions</th><th>Low</th><th>Mid</th><th>High</th></tr></thead><tbody>
+    ${R("DCF enterprise value", c.dcfRange)}
+    ${R("Comparables enterprise value", c.compRange)}
+    ${R(`Blended enterprise value (${c.wD}% DCF)`, c.ev)}
+    ${R(c.nd>=0?"Less net debt":"Add net cash", ndRow,"muted")}
+    ${R("Equity value", eq,"strong")}
+  </tbody>`;
+
+  const url = new URL(CONFIG.CALENDLY_URL); url.searchParams.set("name",name); url.searchParams.set("email",email);
+  $("bookBtn").href = url.toString();
+}
+
+/* ---------- Example ---------- */
+$("exampleBtn").onclick = ()=>{
+  $("sector").value="Healthcare Support Services"; $("country").value="Saudi Arabia"; $("fy").value=2025; $("netdebt").value=45;
+  setCurrency();
+  buildFinTable(false);
+  const d = {rev:[180,205,232], ebitda:[29,34,40], da:[6,7,8], capex:[9,11,12], nwc:[30,33,37]};
+  LINES.forEach(L=>{ for(let i=NH;i<NH+NF;i++) d[L.k][i]=""; });
+  writeFin(d);
+  $("aG").value=12; $("aM").value=18; $("aD").value=3.5; $("aC").value=5; $("aW").value=16;
+  $("fillBtn").click();
+  resetWacc();
+  addPeer("Listed peer A","11.5","1.9"); addPeer("Listed peer B","9.8","1.4");
+};
+</script>
+</body>
+</html>

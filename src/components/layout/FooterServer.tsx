@@ -4,14 +4,18 @@ import { fetchSiteSettings, type SiteSettings } from '@/lib/cms/settings';
 import { parseFooterConfig } from '@/lib/cms/footerSettings';
 import { parseFooterLinks } from '@/lib/cms/footerLinks';
 import { fetchSuppressedNavHrefs, isSuppressed } from '@/lib/public/collectionGates';
+import { TOOLS_FOOTER_LINK } from '@/config/tools';
+import { applyToolsFooterLink, fetchToolVisibility } from '@/lib/tools/visibility';
 import { Footer } from './Footer';
 
 export async function FooterServer() {
-  const [branding, footerContent, settings, suppressed] = await Promise.all([
+  const [branding, footerContent, settings, suppressed, tools] = await Promise.all([
     safe(fetchBranding(), null),
     safe(fetchContentBySection('footer_settings'), {} as Record<string, string>),
     safe(fetchSiteSettings(), {} as SiteSettings),
     safe(fetchSuppressedNavHrefs(), new Set<string>()),
+    // Never rejects: a failed read already resolves to every tool Hidden.
+    fetchToolVisibility(),
   ]);
 
   /*
@@ -20,9 +24,13 @@ export async function FooterServer() {
    * The Firm column already hides itself when it has no visible links, so an
    * empty result here degrades correctly rather than leaving a bare heading.
    */
-  const links = parseFooterLinks(footerContent.links).filter(
-    (link) => !isSuppressed(link.href, suppressed),
-  );
+  const links = applyToolsFooterLink(
+    parseFooterLinks(footerContent.links),
+    // "Free Tools" is not an operator switch in Footer Links. It follows the
+    // tool visibility switch at /admin/tools, shown while any tool is Live.
+    tools,
+    TOOLS_FOOTER_LINK,
+  ).filter((link) => !isSuppressed(link.href, suppressed));
 
   return (
     <Footer

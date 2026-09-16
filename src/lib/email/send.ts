@@ -22,6 +22,15 @@ export type SendEmailArgs = {
   /** Overrides EMAIL_FROM_DEFAULT. Accepts "someone@example.com" or "Name <someone@example.com>". */
   from?: string;
   replyTo?: string;
+  /** Files to attach. `content` is base64. Brevo accepts PDF among other types. */
+  attachments?: { name: string; content: string }[];
+  /** Brevo tags, echoed back on every webhook event for this message. */
+  tags?: string[];
+  /**
+   * Extra headers. `X-Mailin-custom` is the one Brevo echoes back on webhook
+   * events, which is how an event is tied to the record that sent it.
+   */
+  headers?: Record<string, string>;
 };
 
 export type SendEmailResult =
@@ -36,6 +45,9 @@ type BrevoPayload = {
   subject: string;
   htmlContent: string;
   replyTo?: BrevoContact;
+  attachment?: { name: string; content: string }[];
+  tags?: string[];
+  headers?: Record<string, string>;
 };
 
 /**
@@ -110,6 +122,9 @@ export async function sendEmail(args: SendEmailArgs): Promise<SendEmailResult> {
 
   const replyTo = args.replyTo ? parseAddress(args.replyTo) : null;
   if (replyTo) payload.replyTo = replyTo;
+  if (args.attachments?.length) payload.attachment = args.attachments;
+  if (args.tags?.length) payload.tags = args.tags;
+  if (args.headers && Object.keys(args.headers).length) payload.headers = args.headers;
 
   try {
     const res = await fetch(BREVO_ENDPOINT, {
@@ -123,7 +138,7 @@ export async function sendEmail(args: SendEmailArgs): Promise<SendEmailResult> {
       // Never let a hung provider hold a contact-form request open. The
       // submission is already saved by this point, so failing fast is strictly
       // better than making the visitor wait.
-      signal: AbortSignal.timeout(15_000),
+      signal: AbortSignal.timeout(args.attachments?.length ? 30_000 : 15_000),
     });
 
     const bodyText = await res.text();

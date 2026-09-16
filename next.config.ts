@@ -47,6 +47,16 @@ remotePatterns.push({
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  // @react-pdf/renderer is loaded from node_modules at runtime rather than
+  // bundled: it pulls in fontkit and yoga, which do not survive bundling.
+  serverExternalPackages: ['@react-pdf/renderer'],
+  // The PDF report reads its fonts from disk. A Vercel function only contains
+  // files it is traced to, so the routes that render a report name them here.
+  outputFileTracingIncludes: {
+    '/api/tools/[slug]/lead': ['./src/lib/tools/pdf/fonts/**'],
+    '/api/admin/tool-leads/[id]/resend': ['./src/lib/tools/pdf/fonts/**'],
+    '/api/admin/tool-leads/[id]/pdf': ['./src/lib/tools/pdf/fonts/**'],
+  },
   images: {
     remotePatterns,
   },

@@ -13,6 +13,8 @@ import { PAGE_GUTTER, SECTION_PADDING } from '@/lib/public/layout';
 import { withIndefiniteArticle } from '@/lib/public/grammar';
 import { buildPageMetadata, siteUrl } from '@/lib/seo/metadata';
 import { ServiceJsonLd } from '@/components/seo/ServiceJsonLd';
+import { ToolServiceCta, withoutToolLinkSections } from '@/components/tools/ToolServiceCta';
+import { fetchToolVisibility, serviceCtasFor } from '@/lib/tools/visibility';
 
 export const dynamic = 'force-dynamic';
 
@@ -57,9 +59,13 @@ export default async function ServiceDetailPage(props: {
   // Since migration 067 the body of each service page is a `service_detail`
   // section on its own `service-<slug>` page, edited in the page builder and
   // rendered in the order set there. Sections added after it render after it.
-  const sections = await fetchPageSections(`service-${slug}`, {
-    onlyVisible: !isPreview,
-  });
+  const [rawSections, tools] = await Promise.all([
+    fetchPageSections(`service-${slug}`, { onlyVisible: !isPreview }),
+    fetchToolVisibility(),
+  ]);
+  const sections = withoutToolLinkSections(rawSections);
+  // Free tools that promote themselves here, while they are Live.
+  const toolCtas = serviceCtasFor(tools, slug);
 
   // A database that has not run 067 still has the copy in cms_content under
   // `service_<slug>`. Read it only in that case, so the page never goes blank
@@ -102,6 +108,10 @@ export default async function ServiceDetailPage(props: {
       ) : (
         <SectionList sections={sections} />
       )}
+
+      {toolCtas.map((t) => (
+        <ToolServiceCta key={t.slug} tool={t} />
+      ))}
 
       {/* CTA, linking to /contact with the service pre-selected. */}
       <section className={`bg-white ${PAGE_GUTTER} ${SECTION_PADDING}`}>
