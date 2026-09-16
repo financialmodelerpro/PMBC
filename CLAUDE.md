@@ -73,7 +73,7 @@ When you find an em dash in *existing* content while doing other work, fix it as
 in Phase 9 is review rather than code: read the deployed site end to end, send one
 real contact submission, check the OG cards, clear the Supabase advisor. The
 public site renders on nineteen routes, every page's copy is editable in the page
-builder, and 79 migrations are applied (080 is written and waiting). Free tools (section 7b) were added on 2026-09-16 and ship Hidden; version 2 of the valuation tool followed the same day on `feat/tools-v2`.
+builder, and migrations to 081 are applied. **Free tools are live since 2026-09-16**: Business Valuation (version 2) is Live and Tools is in the navbar; see "Go-live record" in section 7b.
 
 **The per-phase summary index moved to [`PHASE_HISTORY.md`](./PHASE_HISTORY.md) on 2026-08-16**,
 along with the detailed rows that were already there. This file states where the
@@ -102,7 +102,7 @@ is review.**
 Every phase is done bar Phase 9, and Phase 9 no longer contains code. The public
 site renders on nineteen routes, every page's copy is editable in the page
 builder, the admin console is at parity with FMP and past it in three places
-(roles, page metadata, testimonial collection), and 79 migrations are applied.
+(roles, page metadata, testimonial collection), and migrations to 081 are applied.
 
 Ordered by what stops a launch, not by when it was added.
 
@@ -1116,9 +1116,31 @@ founder profile sections) come through `meta.branding`, fetched and resized by
 `verify-valuation-v2` (199), `verify-tool-lead-api` (116),
 `verify-tool-email-pdf` (235, pdfjs text and operator list, so a ligature glyph is
 caught even though extracted text maps it back to letters),
-`verify-tools-visibility` (78) and `verify-brevo-webhook` (132). Each was
+`verify-tools-visibility` (89), `verify-brevo-webhook` (168) and
+`verify-production-guard` (34). Each was
 break-tested. `npm run render-valuation-examples -- <dir>` renders the minimal and
 full-feature reports for review, reading the logo and partner read-only.
+
+### Go-live record
+
+**2026-09-16.** Business Valuation version 2 and the Tools nav item went live.
+
+| Item | State at go-live |
+|---|---|
+| Code | `feat/tools-v2` merged to main as `f7bf9ce`, then `fix/verifier-prod-guard` as `4e1e03a`; `/api/health` matched HEAD each time |
+| Business Valuation | Live, switched by the owner at /admin/tools (13:55 UTC) |
+| Tools nav item | `site_pages` row "Tools", `/tools`, order 25 after Financial Modeler Pro, visible; Contact moved to 26 |
+| Migrations | 080 applied. **081 did not reach this database**: both runs went to another Supabase project (the first failed on an `updated_at` column this table has, the second changed nothing here). The row it describes was written directly, with the owner's approval, to the same effect. Check the Financial Modeler Pro project's `site_pages` for a stray hidden Tools row |
+| Leads | All 7 tool leads and their 46 events deleted with approval: every one was testing, including one created by a verifier posting to production after the tool went Live. `contact_submissions` untouched (7) |
+| Logged-out checks | Navbar and phone menu show Tools; footer shows Free Tools; /tools lists Business Valuation; the tool page loads on desktop and phone with no console errors; service page CTA; sitemap lists /tools and /tools/business-valuation; WebApplication JSON-LD present; webhook refuses a missing or wrong token (401); visibility verifier over HTTP 103 of 103 |
+
+**Scripts that write never run against production.** Every script that sends
+POST, PUT, PATCH or DELETE calls `refuseWritesAgainstProduction`
+(`scripts/lib/productionGuard.mjs`) and exits 2 against pacemakersglobal.com or a
+`*.vercel.app` deployment, which shares the production database. There is no
+override. `npm run verify-production-guard` proves it without sending a request.
+Production checks are GET only: `VERIFY_BASE=https://www.pacemakersglobal.com
+EXPECT_LIVE=business-valuation EXPECT_TOOLS_NAV=on npm run verify-tools-visibility`.
 
 ### Privacy
 
