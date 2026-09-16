@@ -6,6 +6,7 @@ import { AdminPreviewBanner } from '@/components/tools/AdminPreviewBanner';
 import { ToolHero } from '@/components/tools/ToolHero';
 import { ToolJsonLd } from '@/components/seo/ToolJsonLd';
 import { TOOL_COMPONENTS } from '@/components/tools/toolComponents';
+import { fetchPartnerCard } from '@/lib/tools/brand/fetch';
 import { getAdminSession } from '@/lib/auth/requireAdmin';
 import { fetchPage, fetchPageSections } from '@/lib/cms/pages';
 import { fetchSiteSettings } from '@/lib/cms/settings';
@@ -66,9 +67,10 @@ export default async function ToolPage(props: {
   if (!live && !staff) notFound();
   const preview = !live;
 
-  const [sections, settings] = await Promise.all([
+  const [sections, settings, partner] = await Promise.all([
     fetchPageSections(toolPageSlug(slug), { onlyVisible: search.preview !== '1' }),
     fetchSiteSettings().catch(() => ({ booking_url: '' })),
+    fetchPartnerCard(),
   ]);
 
   return (
@@ -88,7 +90,7 @@ export default async function ToolPage(props: {
       )}
       <ToolHero sections={sections} fallback={registered.hero} chips={registered.chips} />
       <section className={`bg-[color:var(--pmbc-surface-cream)] ${PAGE_GUTTER} py-10 sm:py-14 lg:py-16`}>
-        <Component bookingUrl={(settings.booking_url ?? '').trim()} preview={preview} />
+        <Component bookingUrl={(settings.booking_url ?? '').trim()} preview={preview} partner={partner} />
         <p className="mx-auto mt-10 max-w-[900px] border-t border-[color:var(--pmbc-border-warm)] pt-6 text-[13px] leading-[1.6] text-[color:var(--pmbc-muted)]">
           {TOOL_DISCLAIMER}
         </p>

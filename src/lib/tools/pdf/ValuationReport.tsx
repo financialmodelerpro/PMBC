@@ -11,7 +11,13 @@
  *   7  What would increase your value
  *   8  Assumptions
  *   9  Methodology and sources
- *   10 Working with PaceMakers, with the booking link and a QR code
+ *   10 Working with PaceMakers: the partner, the services, the booking link and a QR code
+ *
+ * BRAND MATERIAL (`meta.branding`, from `src/lib/tools/brand/fetch.ts`): the
+ * logo from Header Settings on the cover and the closing page, and the partner
+ * card from the founder profile on the closing page. Every piece is optional.
+ * Without a logo the cover sets the name in type; without a partner card the
+ * block is left out and the services list takes the room.
  * A section with nothing to report says so rather than disappearing, so the page
  * count and the page order never depend on the inputs. Each block is kept whole
  * (`wrap={false}`) and each page is sized to hold its longest case.
@@ -21,9 +27,11 @@
  */
 
 import type { ReactNode } from 'react';
-import { Document, Link, Page, Text, View, renderToBuffer } from '@react-pdf/renderer';
+import { Document, Image, Link, Page, Text, View, renderToBuffer } from '@react-pdf/renderer';
 
 import { SERVICES } from '@/config/services';
+
+import { PARTNER_RECORD_NOTE, type PartnerCard } from '../brand/partner';
 
 import { PURPOSES, SOURCE_NOTES, dataVersionLabel } from '../valuation/data';
 import type { ValuationResult } from '../valuation/engine';
@@ -69,7 +77,22 @@ export type ReportMeta = {
   dataVersion: string;
   /** Tracked booking link, which lands on the site's /book page. Also encoded in the QR code. */
   bookingHref: string;
+  /** Logos and the partner card. Optional: every piece has a fallback. */
+  branding?: ReportBranding | null;
 };
+
+export type ReportBranding = {
+  /** The logo for the navy cover, already resized. PNG. */
+  logoOnDark: Buffer | null;
+  /** The logo for white pages. PNG. */
+  logoOnLight: Buffer | null;
+  partner: PartnerCard | null;
+  /** The partner portrait, resized to 360 by 450. JPEG. */
+  partnerPhoto: Buffer | null;
+};
+
+/** Logo files are trimmed and about 5.2 to 1. Height is set, width follows. */
+const LOGO_RATIO = 6113 / 1176;
 
 export const REPORT_PAGE_TITLES = [
   'Indicative business valuation',
@@ -207,6 +230,8 @@ export function ValuationReport({ result, meta }: { result: ValuationResult; met
   const b = r.bridge;
   const bridgeItemsUsed = Boolean(b && (b.eosb || b.leases || b.minorityInterest || b.surplusAssets));
   const W = PAGE.contentWidth;
+  const brand = meta.branding ?? null;
+  const partner = brand?.partner ?? null;
 
   return (
     <Document title={`Indicative valuation, ${who}`} author="PaceMakers Business Consultants" subject="Indicative business valuation">
@@ -214,8 +239,13 @@ export function ValuationReport({ result, meta }: { result: ValuationResult; met
       <Page size="A4" style={{ fontFamily: 'Inter', fontFeatureSettings: NO_LIGATURES, backgroundColor: C.deep, color: C.white }}>
         <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 6, backgroundColor: C.gold }} />
         <View style={{ paddingHorizontal: 56, paddingTop: 64, flex: 1 }}>
-          <Text style={{ fontFamily: 'SourceSerif', fontFeatureSettings: NO_LIGATURES, fontWeight: 600, fontSize: 14 }}>PaceMakers Business Consultants</Text>
-          <Text style={{ fontSize: 7.5, color: C.gold, letterSpacing: 1.6, textTransform: 'uppercase', marginTop: 4 }}>Advisory from Structure to Exit</Text>
+          {brand?.logoOnDark ? (
+            // eslint-disable-next-line jsx-a11y/alt-text
+            <Image src={{ data: brand.logoOnDark, format: 'png' }} style={{ height: 34, width: 34 * LOGO_RATIO }} />
+          ) : (
+            <Text style={{ fontFamily: 'SourceSerif', fontFeatureSettings: NO_LIGATURES, fontWeight: 600, fontSize: 14 }}>PaceMakers Business Consultants</Text>
+          )}
+          <Text style={{ fontSize: 7.5, color: C.gold, letterSpacing: 1.6, textTransform: 'uppercase', marginTop: brand?.logoOnDark ? 10 : 4 }}>Advisory from Structure to Exit</Text>
 
           <View style={{ marginTop: 170 }}>
             <View style={{ height: 1.5, width: 64, backgroundColor: C.gold, marginBottom: 18 }} />
@@ -314,7 +344,7 @@ export function ValuationReport({ result, meta }: { result: ValuationResult; met
         <Section title="Revenue and EBITDA margin" sub={`Three actual years and five forecast years, ${unit}.`}>
           <PdfChart chart={revenueMarginChart(r, 760, 230)} width={W} />
         </Section>
-        <Section title="Cash conversion" sub="EBITDA and free cash flow by forecast year. The percentage is free cash flow over EBITDA.">
+        <Section title="Cash conversion" sub="Navy is EBITDA, green is free cash flow (red when negative). The percentage above each year is free cash flow over EBITDA.">
           <PdfChart chart={cashConversionChart(r, 760, 200)} width={W} />
         </Section>
         <Section title="Key ratios">
@@ -474,18 +504,55 @@ export function ValuationReport({ result, meta }: { result: ValuationResult; met
 
       {/* 10. Working with PaceMakers */}
       <ContentPage title={REPORT_PAGE_TITLES[9]} meta={meta}>
-        <Text style={[s.body, { marginBottom: 14 }]}>
-          PaceMakers is a corporate finance and transaction advisory firm serving family offices, investment offices and corporates across Saudi
-          Arabia, the GCC and worldwide. Every mandate is partner-led.
-        </Text>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 16 }} wrap={false}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }} wrap={false}>
+          <Text style={[s.body, { flex: 1, paddingRight: 16 }]}>
+            PaceMakers is a corporate finance and transaction advisory firm serving family offices, investment offices and corporates across Saudi
+            Arabia, the GCC and worldwide. Every mandate is partner-led.
+          </Text>
+          {brand?.logoOnLight && (
+            // eslint-disable-next-line jsx-a11y/alt-text
+            <Image src={{ data: brand.logoOnLight, format: 'png' }} style={{ height: 26, width: 26 * LOGO_RATIO }} />
+          )}
+        </View>
+
+        {partner && (
+          <View style={{ borderWidth: 0.75, borderColor: C.border, padding: 14, marginBottom: 14, flexDirection: 'row' }} wrap={false}>
+            {brand?.partnerPhoto && (
+              // eslint-disable-next-line jsx-a11y/alt-text
+              <Image src={{ data: brand.partnerPhoto, format: 'jpg' }} style={{ width: 76, height: 95, marginRight: 14, objectFit: 'cover' }} />
+            )}
+            <View style={{ flex: 1 }}>
+              <Text style={s.eyebrow}>Who you will work with</Text>
+              <Text style={{ fontFamily: 'SourceSerif', fontFeatureSettings: NO_LIGATURES, fontWeight: 600, fontSize: 14, marginTop: 3 }}>{partner.name}</Text>
+              <Text style={{ fontSize: 8.5, color: C.text, marginTop: 1 }}>
+                {[partner.role, partner.title].filter(Boolean).join(', ')}
+              </Text>
+              {partner.credentialsLine ? <Text style={{ fontSize: 8, color: C.goldMuted, fontWeight: 600, marginTop: 3 }}>{partner.credentialsLine}</Text> : null}
+              {partner.intro ? <Text style={{ fontSize: 8.5, color: C.text, lineHeight: 1.5, marginTop: 6 }}>{partner.intro}</Text> : null}
+              {partner.highlights.length > 0 && (
+                <View style={{ marginTop: 6 }}>
+                  {partner.highlights.map((hl) => (
+                    <View key={hl} style={{ flexDirection: 'row', marginTop: 2 }}>
+                      <View style={{ width: 3.5, height: 3.5, backgroundColor: C.gold, marginTop: 3.6, marginRight: 5.5 }} />
+                      <Text style={{ fontSize: 8, color: C.text, flex: 1, lineHeight: 1.4 }}>{hl}</Text>
+                    </View>
+                  ))}
+                  <Text style={{ fontSize: 7, color: C.muted, marginTop: 3 }}>{PARTNER_RECORD_NOTE}</Text>
+                </View>
+              )}
+            </View>
+          </View>
+        )}
+
+        <Text style={[s.eyebrow, { marginBottom: 6 }]}>Services</Text>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 14 }} wrap={false}>
           {SERVICES.map((svc) => (
-            <View key={svc.slug} style={{ width: '50%', paddingRight: 12, marginBottom: 9 }}>
-              <Text style={{ fontSize: 9.5, fontWeight: 600 }}>
+            <View key={svc.slug} style={{ width: partner ? '33.33%' : '50%', paddingRight: 10, marginBottom: partner ? 5 : 9 }}>
+              <Text style={{ fontSize: partner ? 8.5 : 9.5, fontWeight: 600 }}>
                 <Text style={{ color: C.goldMuted }}>{svc.number}  </Text>
                 {svc.title}
               </Text>
-              <Text style={{ fontSize: 8, color: C.muted, lineHeight: 1.4, marginTop: 1 }}>{svc.summary}</Text>
+              {!partner && <Text style={{ fontSize: 8, color: C.muted, lineHeight: 1.4, marginTop: 1 }}>{svc.summary}</Text>}
             </View>
           ))}
         </View>
@@ -494,7 +561,8 @@ export function ValuationReport({ result, meta }: { result: ValuationResult; met
             <Text style={{ fontFamily: 'SourceSerif', fontFeatureSettings: NO_LIGATURES, fontWeight: 600, fontSize: 15, color: C.white }}>
               Get a valuation you can defend
             </Text>
-            <Text style={{ color: CREAM_ON_NAVY, marginTop: 5, lineHeight: 1.5 }}>
+            {/* A unitless line height needs the font size set on the same element: react-pdf resolves it against its 18pt default otherwise. */}
+            <Text style={{ color: CREAM_ON_NAVY, marginTop: 5, fontSize: 10.5, lineHeight: 1.5 }}>
               Book a free 30 minute call to review your model, your assumptions and what an independent valuation would cover.
             </Text>
             <Link src={meta.bookingHref} style={{ marginTop: 10, textDecoration: 'none' }}>

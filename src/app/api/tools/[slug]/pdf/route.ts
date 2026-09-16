@@ -5,6 +5,7 @@ import { getAdminSession } from '@/lib/auth/requireAdmin';
 import { bookingRedirectUrl } from '@/lib/tools/leads/deliver';
 import { getLeadByToken } from '@/lib/tools/leads/store';
 import { recomputeInputs } from '@/lib/tools/leads/valuation';
+import { fetchReportBranding } from '@/lib/tools/brand/fetch';
 import { renderValuationReport, reportFileName } from '@/lib/tools/pdf/ValuationReport';
 import { VALUATION_DATA_VERSION } from '@/lib/tools/valuation/data';
 import { fetchToolVisibility, findToolIn } from '@/lib/tools/visibility';
@@ -50,6 +51,7 @@ export async function POST(req: Request, props: { params: Promise<{ slug: string
     generatedAt: now,
     dataVersion: VALUATION_DATA_VERSION,
     bookingHref: bookingRedirectUrl(lead.access_token, 'pdf'),
+    branding: await fetchReportBranding(),
   });
   return new NextResponse(new Uint8Array(pdf), {
     headers: {

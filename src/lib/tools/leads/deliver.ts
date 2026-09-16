@@ -25,6 +25,7 @@ import {
   buildResultsEmail,
   type EmailTemplate,
 } from '../email/templates';
+import { fetchReportBranding } from '../brand/fetch';
 import { renderValuationReport, reportFileName } from '../pdf/ValuationReport';
 import { DEAL_BAND_UNSURE, DEAL_BANDS_SAR } from '../valuation/data';
 import { dealBandLabel, currencyFor, type ValuationResult } from '../valuation/engine';
@@ -115,6 +116,7 @@ export async function sendResultsEmail(
       generatedAt: now,
       dataVersion: lead.data_version,
       bookingHref: bookingRedirectUrl(lead.access_token, 'pdf'),
+      branding: await fetchReportBranding(),
     });
     attachments = [{ name: reportFileName(lead.company, lead.name, now), content: pdf.toString('base64') }];
   } catch (err) {

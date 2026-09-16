@@ -56,6 +56,8 @@ const base = await jiti.import(path.join(root, 'src/lib/email/templates/_base.ts
 const booking = await jiti.import(path.join(root, 'src/lib/tools/booking.ts'));
 const data = await jiti.import(path.join(root, 'src/lib/tools/valuation/data.ts'));
 const qr = await jiti.import(path.join(root, 'src/lib/tools/pdf/QrCode.tsx'));
+const partnerModule = await jiti.import(path.join(root, 'src/lib/tools/brand/partner.ts'));
+const founderProfileSrc = fs.readFileSync(path.join(root, 'src/lib/cms/founderProfile.ts'), 'utf8');
 const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
 
 let checks = 0, failures = 0;
@@ -323,6 +325,54 @@ console.log('Email shell and parts');
   const consentCell = (body) => body.match(/Follow-up email consent<\/td>\s*<td[^>]*>([^<]*)</)?.[1];
   check('alert: follow-up ticked shows Yes', consentCell(alertFor(true)) === 'Yes', String(consentCell(alertFor(true))));
   check('alert: follow-up unticked shows No', consentCell(alertFor(false)) === 'No', String(consentCell(alertFor(false))));
+}
+
+console.log('Report branding and partner');
+{
+  // The mapping from the two founder sections, as stored.
+  const hero = {
+    name: ' Test Partner ', eyebrow: 'Founding Partner', title_primary: 'Corporate Finance Specialist', credentials_line: 'ACCA | FMVA',
+    intro: 'An introduction   over two lines.', photo_url: 'https://example.supabase.co/storage/v1/object/public/team-photos/p.png',
+    cta_primary_href: 'https://www.linkedin.com/in/example/',
+  };
+  const block = { name: 'Other', credentials: ['One', ' Two ', '', 'Three', 'Four', 'Five', 'Six'], photo_url: 'https://example.com/b.png' };
+  const card = partnerModule.partnerFromSections(hero, block);
+  check('partner: name trimmed from the hero', card?.name === 'Test Partner');
+  check('partner: intro whitespace collapsed', card?.intro === 'An introduction over two lines.');
+  check('partner: highlights from the home card, blanks dropped, at most five', JSON.stringify(card?.highlights) === JSON.stringify(['One', 'Two', 'Three', 'Four', 'Five']));
+  check('partner: photo and LinkedIn from the hero', card?.photoUrl === hero.photo_url && card?.linkedinUrl === hero.cta_primary_href);
+  check('partner: profile path is the founder page', card?.profilePath === '/about/ahmad-din', card?.profilePath);
+  check('partner: a non-LinkedIn primary link is not offered as LinkedIn', partnerModule.partnerFromSections({ ...hero, cta_primary_href: '/book' }, block)?.linkedinUrl === null);
+  check('partner: a non-https photo is dropped', partnerModule.partnerFromSections({ ...hero, photo_url: 'javascript:alert(1)' }, { ...block, photo_url: '' })?.photoUrl === null);
+  check('partner: no name anywhere means no card', partnerModule.partnerFromSections({ intro: 'x' }, { credentials: ['a'] }) === null);
+  check('partner: slug matches founderProfile.ts', founderProfileSrc.includes(`FOUNDER_PAGE_SLUG = '${partnerModule.PARTNER_PAGE_SLUG}'`));
+
+  // Real images from the repository stand in for the CMS files.
+  const logo = fs.readFileSync(path.join(root, 'public/email/pacemakers-logo-on-navy.png'));
+  const sharp = (await import('sharp')).default;
+  const portrait = await sharp({ create: { width: 360, height: 450, channels: 3, background: '#1B3A5F' } }).jpeg().toBuffer();
+  const branding = { logoOnDark: logo, logoOnLight: logo, partner: card, partnerPhoto: portrait };
+  const render = (b) => pdfModule.renderValuationReport(full, { ...REPORT_META, company: 'Example Co', industry: 'Industry', country: 'Country', bookingHref: BOOK, branding: b });
+  const withBrand = await render(branding);
+  const raw = withBrand.toString('latin1');
+  const t = await pageTexts(withBrand);
+  check('branded: still ten pages', t.length === 10, String(t.length));
+  check('branded: logo and portrait embedded as images', (raw.match(/\/Subtype\s*\/Image/g) ?? []).length >= 2);
+  check('branded: cover uses the logo, not the typeset name', !t[0].includes('PaceMakers Business Consultants ADVISORY') && !/^PaceMakers Business Consultants/.test(t[0]));
+  const last = t[9];
+  check('branded: closing page names the partner and role', last.includes('Test Partner') && last.includes('Founding Partner, Corporate Finance Specialist'));
+  check('branded: closing page carries credentials, intro and every highlight', last.includes('ACCA | FMVA') && last.includes('An introduction over two lines.') && card.highlights.every((h) => last.includes(h)));
+  check('branded: highlights attributed to the partner, not the firm', last.includes(partnerModule.PARTNER_RECORD_NOTE));
+  check('branded: services and booking still on the closing page', last.includes('CFO Advisory') && /bookafreecall/i.test(last.replace(/\s+/g, '')));
+
+  const bare = await render(null);
+  const tb = await pageTexts(bare);
+  check('no branding: still ten pages', tb.length === 10);
+  check('no branding: cover sets the name in type', tb[0].startsWith('PaceMakers Business Consultants'));
+  check('no branding: no partner block, full service summaries', !tb[9].includes('Who you will work with') && tb[9].includes('Institutional-grade'));
+  check('no branding: no images embedded', !/\/Subtype\s*\/Image/.test(bare.toString('latin1')));
+  const noPhoto = await pageTexts(await render({ ...branding, partnerPhoto: null, logoOnDark: null }));
+  check('partner without photo or logo: ten pages, block kept', noPhoto.length === 10 && noPhoto[9].includes('Test Partner'));
 }
 
 console.log('Booking links');

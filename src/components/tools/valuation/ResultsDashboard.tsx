@@ -50,9 +50,11 @@ import {
   type Table,
 } from '@/lib/tools/valuation/format';
 import { reviveResult } from '@/lib/tools/valuation/serialize';
+import type { PartnerCard as PartnerCardData } from '@/lib/tools/brand/partner';
 import { bookingPageLink } from '@/lib/tools/booking';
 
 import { ChartSvg } from '../charts/ChartSvg';
+import { PartnerCard } from '../PartnerCard';
 import { DataTable, KeyValueList } from './tables';
 import { TRACKING, buttonGhost, buttonGold, buttonPrimary } from './ui';
 import { useCountUp } from './useCountUp';
@@ -139,6 +141,7 @@ export function ResultsDashboard({
   baseResult,
   lead,
   preview,
+  partner = null,
   onEdit,
   onVersionSaved,
 }: {
@@ -146,6 +149,7 @@ export function ResultsDashboard({
   baseResult: ValuationResult;
   lead: { name: string; email: string; token: string | null };
   preview: boolean;
+  partner?: PartnerCardData | null;
   onEdit: () => void;
   onVersionSaved: (inputs: ValuationInputs, result: ValuationResult) => void;
 }) {
@@ -272,7 +276,12 @@ export function ResultsDashboard({
       {/* Headline -------------------------------------------------------- */}
       <section aria-labelledby="valuation-headline" className="relative overflow-hidden rounded-[2px] bg-[#14304F] p-5 text-white sm:p-8">
         <span aria-hidden className="absolute top-0 left-0 h-[3px] w-24 bg-[#C69C3E]" />
-        <div className="flex flex-wrap items-start justify-between gap-6">
+        {/* The actions sit on their own row, and the status line below them is
+            always mounted with its height reserved. Beside the headline, the
+            buttons wrapped or not as the figures changed width, and a status
+            line mounted on arrival pushed the page down: both were layout
+            shifts after the visitor's click had finished. */}
+        <div>
           <div className="min-w-0">
             <p id="valuation-headline" className="text-[11px] font-semibold uppercase text-[#C69C3E]" style={{ letterSpacing: '0.16em' }}>
               Indicative equity value, blended{explored ? ', exploration' : ''}
@@ -288,7 +297,7 @@ export function ResultsDashboard({
             </p>
             {h.floorNote && <p className="mt-3 max-w-[70ch] border-l-2 border-[#C69C3E] pl-3 text-[13.5px] text-[#E8DDC4]">{h.floorNote}</p>}
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="mt-5 flex flex-wrap gap-2">
             <button type="button" onClick={onDownload} disabled={!canSave || busy !== null} className={buttonGold} style={TRACKING}>
               <Download aria-hidden size={14} />
               {busy === 'pdf' ? 'Preparing' : 'Download PDF'}
@@ -305,11 +314,9 @@ export function ResultsDashboard({
             </button>
           </div>
         </div>
-        {(notice || !canSave) && (
-          <p role="status" className={`mt-4 text-[13.5px] ${notice?.tone === 'error' ? 'text-[#F3B5A8]' : 'text-[#E8DDC4]'}`}>
-            {notice ? notice.text : 'Download and email are available once your details have been saved. Your results below are complete.'}
-          </p>
-        )}
+        <p role="status" className={`mt-3 min-h-[3em] text-[13.5px] leading-[1.5] ${notice?.tone === 'error' ? 'text-[#F3B5A8]' : 'text-[#E8DDC4]'}`}>
+          {notice ? notice.text : !canSave ? 'Download and email are available once your details have been saved. Your results below are complete.' : ''}
+        </p>
       </section>
 
       {/* Tiles ----------------------------------------------------------- */}
@@ -355,7 +362,7 @@ export function ResultsDashboard({
 
       {/* Tabs ------------------------------------------------------------ */}
       <div>
-        <div role="tablist" aria-label="Result details" className="pmbc-scroll-thin flex overflow-x-auto border-b border-[color:var(--pmbc-border-warm)]">
+        <div role="tablist" aria-label="Result details" className="pmbc-scroll-thin relative flex overflow-x-auto border-b border-[color:var(--pmbc-border-warm)]">
           {TABS.map((t, i) => (
             <button
               key={t.id}
@@ -423,7 +430,7 @@ export function ResultsDashboard({
                 <Card title="Revenue and EBITDA margin" sub={`Actual and forecast, ${unit}.`}>
                   <ChartSvg chart={revenueMarginChart(r)} />
                 </Card>
-                <Card title="Cash conversion" sub="EBITDA and free cash flow by forecast year, with free cash flow as a share of EBITDA.">
+                <Card title="Cash conversion" sub="Navy is EBITDA, green is free cash flow (red when negative). The percentage above each year is free cash flow over EBITDA.">
                   <ChartSvg chart={cashConversionChart(r)} />
                 </Card>
               </div>
@@ -526,6 +533,8 @@ export function ResultsDashboard({
           )}
         </div>
       </div>
+
+      <PartnerCard partner={partner} />
 
       {/* Closing actions --------------------------------------------------- */}
       <section className="flex flex-col items-start justify-between gap-6 rounded-[2px] bg-[#1B3A5F] p-6 sm:p-8 md:flex-row md:items-center">

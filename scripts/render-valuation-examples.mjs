@@ -5,6 +5,12 @@
 //   valuation-example-full.pdf      Pakistan with every version 2 feature in use
 //
 //   npm run render-valuation-examples -- <output directory>
+//
+// The logo and the partner card are read from the CMS exactly as the live report
+// reads them, which is read only. The Supabase URL and key come from .env.local
+// when it exists; without them both reports render with the fallbacks (the name
+// set in type, no partner block), which is also a state worth reviewing.
+// BRANDING=none forces the fallbacks.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -22,13 +28,27 @@ const state = await jiti.import(path.join(root, 'src/components/tools/valuation/
 const engine = await jiti.import(path.join(root, 'src/lib/tools/valuation/engine.ts'));
 const pdf = await jiti.import(path.join(root, 'src/lib/tools/pdf/ValuationReport.tsx'));
 
+const envFile = path.join(root, '.env.local');
+if (fs.existsSync(envFile)) {
+  for (const line of fs.readFileSync(envFile, 'utf8').split(/\r?\n/)) {
+    const m = line.match(/^(SUPABASE_URL|SUPABASE_SERVICE_ROLE_KEY)=(.*)$/);
+    if (m && !process.env[m[1]]) process.env[m[1]] = m[2].replace(/^["']|["']$/g, '');
+  }
+}
+let branding = null;
+if (process.env.BRANDING !== 'none' && process.env.SUPABASE_URL) {
+  const brand = await jiti.import(path.join(root, 'src/lib/tools/brand/fetch.ts'));
+  branding = await brand.fetchReportBranding();
+}
+console.log(`branding: logo ${branding?.logoOnDark ? 'yes' : 'no'}, partner ${branding?.partner?.name ?? 'none'}, photo ${branding?.partnerPhoto ? 'yes' : 'no'}`);
+
 for (const [name, build, meta] of [
   ['minimal', minimalCase, { company: 'Example Healthcare Co', industry: 'Healthcare Support Services', country: 'Saudi Arabia' }],
   ['full', fullFeatureCase, { company: 'Example Foods Pakistan', industry: 'Food Processing', country: 'Pakistan' }],
 ]) {
   const outcome = engine.runValuation(state.toInputs(build(state)));
   if (!outcome.ok) throw new Error(`${name} did not run: ${JSON.stringify(outcome.errors)}`);
-  const buf = await pdf.renderValuationReport(outcome.result, { ...REPORT_META, ...meta });
+  const buf = await pdf.renderValuationReport(outcome.result, { ...REPORT_META, ...meta, branding });
   const file = path.join(out, `valuation-example-${name}.pdf`);
   fs.writeFileSync(file, buf);
   console.log(`${file}  ${(buf.length / 1024).toFixed(0)} KB, warnings: ${outcome.result.warnings.map((w) => w.code).join(', ') || 'none'}`);

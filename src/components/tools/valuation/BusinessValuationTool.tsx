@@ -68,7 +68,7 @@ type View = 0 | 1 | 2 | 3 | 'gate' | 'result';
 
 const STEP_LABELS = ['Company', 'Financials', 'Cost of capital', 'Terminal and comps'];
 
-export function BusinessValuationTool({ preview }: ToolComponentProps) {
+export function BusinessValuationTool({ preview, partner }: ToolComponentProps) {
   const [s, setS] = useState<FormState>(initialState);
   const [view, setView] = useState<View>(0);
   const [current, setCurrent] = useState(0);
@@ -201,7 +201,9 @@ export function BusinessValuationTool({ preview }: ToolComponentProps) {
   });
 
   /* Summary -------------------------------------------------------------- */
-  const summaryResult = view === 'result' ? saved?.result : null;
+  // Unlocked once the visitor has passed the gate. The panel shows beside the
+  // inputs, so this is what they see on returning to change something.
+  const summaryResult = saved?.result ?? null;
   const summaryHeadline = summaryResult ? headline(summaryResult) : null;
   const summary = {
     industry: s.industry,
@@ -328,6 +330,7 @@ export function BusinessValuationTool({ preview }: ToolComponentProps) {
             baseResult={saved.result}
             lead={lead}
             preview={preview}
+            partner={partner}
             onEdit={() => go(3)}
             onVersionSaved={(inputs, result) => {
               setSaved({ inputs, result });
