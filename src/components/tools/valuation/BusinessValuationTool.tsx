@@ -8,7 +8,7 @@
  * computes a value itself.
  */
 
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import {
   computeWacc,
@@ -24,6 +24,9 @@ import {
   type ValuationResult,
 } from '@/lib/tools/valuation/engine';
 import { bookingLink } from '@/lib/tools/booking';
+
+import type { ToolComponentProps } from '../toolComponents';
+import { captureAttribution, readAttribution, submitLead } from './submit';
 
 import { CompanyStep } from './CompanyStep';
 import { FinancialsStep } from './FinancialsStep';
@@ -54,7 +57,7 @@ const STEP_LABELS = ['Company', 'Financials', 'Cost of capital', 'Terminal and c
 
 export const TOOL_SLUG = 'business-valuation';
 
-export function BusinessValuationTool({ bookingUrl }: { bookingUrl: string }) {
+export function BusinessValuationTool({ bookingUrl }: ToolComponentProps) {
   const [s, setS] = useState<FormState>(initialState);
   const [view, setView] = useState<View>(0);
   const [current, setCurrent] = useState(0);
@@ -70,9 +73,14 @@ export function BusinessValuationTool({ bookingUrl }: { bookingUrl: string }) {
 
   const [pending, setPending] = useState<ValuationResult | null>(null);
   const [result, setResult] = useState<ValuationResult | null>(null);
-  const [lead, setLead] = useState<{ name: string; email: string } | null>(null);
+  const [lead, setLead] = useState<{ name: string; email: string; token: string | null } | null>(null);
 
   const stepsRef = useRef<HTMLElement>(null);
+  const mountedAt = useRef(Date.now());
+
+  useEffect(() => {
+    captureAttribution();
+  }, []);
 
   const currency = useMemo(() => currencyFor(s.country), [s.country]);
   const years = financialYears(parseInt(s.financialYear, 10) || null);
@@ -157,26 +165,40 @@ export function BusinessValuationTool({ bookingUrl }: { bookingUrl: string }) {
     setGateErrors(errors);
     if (Object.keys(errors).length || !pending) return;
     setSubmitting(true);
+    setLead({ name: gate.name.trim(), email: gate.email.trim(), token: null });
     try {
-      // Unit 2 posts the lead here and renders the server's recomputed result,
-      // falling back to `pending` if the request fails.
-      setLead({ name: gate.name.trim(), email: gate.email.trim() });
-      setResult(pending);
-      go('result');
+      const response = await submitLead({
+        inputs: toInputs(s),
+        gate: {
+          name: gate.name.trim(),
+          email: gate.email.trim(),
+          company: gate.company.trim(),
+          purpose: gate.purpose,
+          dealSize: gate.dealSize,
+          consent: gate.consent,
+          followUp: gate.followUp,
+        },
+        attribution: readAttribution(),
+        website: gate.website,
+        elapsedMs: Date.now() - mountedAt.current,
+      });
+      // The server's recomputation is what was saved and emailed, so it is what
+      // the visitor sees. The browser's own run is the fallback, never the source.
+      setResult(response?.result ?? pending);
+      if (response?.token) setLead((l) => (l ? { ...l, token: response.token } : l));
     } finally {
       setSubmitting(false);
+      go('result');
     }
   }
 
   const peerDefaultActive = peerStats(toInputs(s).peers.map((p) => p.evEbitda)) !== null;
 
-  const bookingHref = bookingLink({
-    bookingUrl,
-    name: lead?.name,
-    email: lead?.email,
-    toolSlug: TOOL_SLUG,
-    placement: 'results',
-  });
+  // Through the tracking redirect when the lead was saved, so the click is
+  // attributed. Straight to the booking page when it was not.
+  const bookingHref = lead?.token
+    ? `/api/tools/book?t=${encodeURIComponent(lead.token)}&src=results`
+    : bookingLink({ bookingUrl, name: lead?.name, email: lead?.email, toolSlug: TOOL_SLUG, placement: 'results' });
 
   return (
     <div className="mx-auto w-full max-w-[1200px]">

@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 
+import { CONSENT_TEXT, FOLLOW_UP_TEXT } from '@/lib/tools/consent';
 import { DEAL_BAND_UNSURE, PURPOSES } from '@/lib/tools/valuation/data';
 
 import { Field, NavRow, Panel, PanelTitle, Select, TRACKING, buttonGhost, buttonPrimary, inputClass } from './ui';
@@ -184,8 +185,7 @@ export function LeadGate({
                 className="mt-1 h-4 w-4 shrink-0 accent-[#1B3A5F]"
               />
               <span>
-                I agree that PaceMakers may store the details and figures I have entered, and email me my results and
-                report, as described in the{' '}
+                {CONSENT_TEXT.replace(/privacy policy.$/, '')}
                 <Link href="/privacy" className="underline underline-offset-2 hover:text-[color:var(--pmbc-primary)]">
                   privacy policy
                 </Link>
@@ -205,7 +205,7 @@ export function LeadGate({
               onChange={(e) => onChange({ followUp: e.target.checked })}
               className="mt-1 h-4 w-4 shrink-0 accent-[#1B3A5F]"
             />
-            <span>Optional: PaceMakers may follow up by email about my results. We do not share your details.</span>
+            <span>{FOLLOW_UP_TEXT}</span>
           </label>
         </div>
 

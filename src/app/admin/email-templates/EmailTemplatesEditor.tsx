@@ -17,6 +17,8 @@ import { TEMPLATE_VARIABLES } from '@/lib/cms/emailTemplates';
 const TEMPLATE_LABELS: Record<string, string> = {
   contact_notification: 'Contact form: admin notification',
   contact_acknowledgement: 'Contact form: sender acknowledgement',
+  tool_valuation_results: 'Valuation tool: results email to the visitor',
+  tool_lead_alert: 'Free tools: new lead alert',
 };
 
 type LocalTemplate = {
