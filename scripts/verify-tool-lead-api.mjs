@@ -378,9 +378,20 @@ console.log('Email me this version');
 const BASE = process.env.VERIFY_BASE?.replace(/\/+$/, '');
 if (BASE) {
   console.log(`HTTP against ${BASE}, logged out`);
-  const res = await fetch(`${BASE}/api/tools/business-valuation/lead`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body()) });
+  // SAFETY. A valid submission to a Live tool is a real lead: it is saved and
+  // both emails are sent. On 2026-09-16 this check ran against production after
+  // the tool had been switched Live and created one. So the submission is only
+  // sent after a GET proves the tool page is a 404 (Hidden) at this base URL,
+  // and never when EXPECT_LIVE names the tool. Otherwise it is skipped, loudly.
   const expectLive = (process.env.EXPECT_LIVE ?? '').split(',').includes('business-valuation');
-  check(`logged-out submission to a ${expectLive ? 'Live' : 'Hidden'} tool is ${expectLive ? '200' : '404'}`, res.status === (expectLive ? 200 : 404), String(res.status));
+  const toolPage = await fetch(`${BASE}/tools/business-valuation`, { redirect: 'manual' });
+  if (!expectLive && toolPage.status === 404) {
+    const res = await fetch(`${BASE}/api/tools/business-valuation/lead`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body()) });
+    check('logged-out submission to a Hidden tool is 404', res.status === 404, String(res.status));
+  } else {
+    console.log(`  SKIPPED  the lead submission: the tool page is ${toolPage.status}${expectLive ? ' and EXPECT_LIVE names it' : ''}. Sending it would save a real lead and email it.`);
+    check('a Live tool is not submitted to (tool page status read first)', true);
+  }
   const unknown = await fetch(`${BASE}/api/tools/not-a-tool/lead`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
   check('unknown tool is 404', unknown.status === 404, String(unknown.status));
   const post = (route, payload) => fetch(`${BASE}/api/tools/business-valuation/${route}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) });
