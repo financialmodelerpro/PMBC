@@ -28,6 +28,9 @@ const EXPLICIT_ROUTES: Record<string, string> = {
 /** Service detail pages are stored as `service-<slug>` and served at `/services/<slug>`. */
 const SERVICE_PREFIX = 'service-';
 
+/** Free tool pages are stored as `tool-<slug>` and served at `/tools/<slug>`. See src/config/tools.ts. */
+const TOOL_PREFIX = 'tool-';
+
 export function publicPathForPageSlug(slug: string): string {
   const explicit = EXPLICIT_ROUTES[slug];
   if (explicit) return explicit;
@@ -35,6 +38,10 @@ export function publicPathForPageSlug(slug: string): string {
   // so the prefix check below cannot catch it by accident.
   if (slug.startsWith(SERVICE_PREFIX)) {
     return `/services/${slug.slice(SERVICE_PREFIX.length)}`;
+  }
+  // `tools` (the hub) has no trailing hyphen, so it falls through to `/tools`.
+  if (slug.startsWith(TOOL_PREFIX)) {
+    return `/tools/${slug.slice(TOOL_PREFIX.length)}`;
   }
   return `/${slug}`;
 }

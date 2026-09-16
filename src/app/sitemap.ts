@@ -1,6 +1,7 @@
 import type { MetadataRoute } from 'next';
 
 import { SERVICES } from '@/config/services';
+import { liveTools, toolPath } from '@/config/tools';
 import {
   fetchPublishedCaseStudies,
   fetchPublishedArticles,
@@ -71,6 +72,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // but nothing links to them and they are not offered to crawlers, so /fmp
     // is the single canonical platform page. Re-adding a line here is all it
     // takes to bring one back.
+    // The free tools hub and every live tool, from the registry, so a tool
+    // enters the sitemap when its entry goes live and not before.
+    '/tools',
+    ...liveTools().map((t) => toolPath(t.slug)),
     '/contact',
     '/book',
     '/privacy',

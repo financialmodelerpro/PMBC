@@ -63,6 +63,9 @@ export const DEFAULT_FOOTER_LINKS: FooterLink[] = [
   { id: 'insights', label: 'Insights', href: '/insights', column: 'firm', visible: false },
   { id: 'team', label: 'Team', href: '/team', column: 'firm', visible: true },
   { id: 'fmp', label: 'Financial Modeler Pro', href: '/fmp', column: 'firm', visible: true },
+  // Hidden until the tools send their results email and report (Unit 3). The
+  // stored row is switched with scripts/set-tools-links-visibility.mjs.
+  { id: 'tools', label: 'Free Tools', href: '/tools', column: 'firm', visible: false },
   { id: 'contact', label: 'Contact', href: '/contact', column: 'firm', visible: true },
   { id: 'book', label: 'Book a Meeting', href: '/book', column: 'contact', visible: true },
 ];
