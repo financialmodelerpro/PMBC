@@ -3,6 +3,9 @@ import { fetchHeaderConfig, DEFAULT_HEADER_CONFIG } from '@/lib/cms/headerSettin
 import { fetchPublishedServices } from '@/lib/cms/collections';
 import { fetchSuppressedNavHrefs, isSuppressed } from '@/lib/public/collectionGates';
 import { SERVICES } from '@/config/services';
+import { getAdminSession } from '@/lib/auth/requireAdmin';
+import { applyToolsNavSetting, toolsNavNeedsSession } from '@/lib/tools/navSetting';
+import { fetchToolVisibility, liveToolsFrom, withLocalToolsNavOverride } from '@/lib/tools/visibility';
 import { Navbar, type NavbarDropdowns } from './Navbar';
 
 /**
@@ -49,11 +52,13 @@ async function servicesDropdown(): Promise<NavbarDropdowns> {
 }
 
 export async function NavbarServer() {
-  const [brandingRow, header, dropdowns, suppressed] = await Promise.all([
+  const [brandingRow, header, dropdowns, suppressed, tools] = await Promise.all([
     safeFetchBranding(),
     safeFetchHeader(),
     servicesDropdown(),
     fetchSuppressedNavHrefs(),
+    // Never rejects: a failed read resolves to every tool Hidden.
+    fetchToolVisibility(),
   ]);
 
   /*
@@ -64,7 +69,13 @@ export async function NavbarServer() {
    * This subtracts from the operator's list and never adds to it: a row hidden
    * in Pages & Nav was already gone before this ran.
    */
-  const navItems = header.nav_items.filter((item) => !isSuppressed(item.href, suppressed));
+  const filtered = withLocalToolsNavOverride(header.nav_items.filter((item) => !isSuppressed(item.href, suppressed)));
+  // Tools is offered only when an operator switched its row on in Pages & Nav.
+  // With nothing Live the public loses it and staff see it badged Hidden, so
+  // the session is read only in that one case (src/lib/tools/navSetting.ts).
+  const live = liveToolsFrom(tools).length;
+  const staff = toolsNavNeedsSession(filtered, live) ? Boolean(await getAdminSession().catch(() => null)) : false;
+  const navItems = applyToolsNavSetting(filtered, live, staff);
 
   return (
     <Navbar

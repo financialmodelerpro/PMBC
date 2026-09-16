@@ -5,12 +5,18 @@
  * inputs were, so a half-typed "1." or a deliberately blank cell survives a
  * re-render. `toInputs` parses with `parseFloat`, which is what the reference's
  * `val()` did, so the same keystrokes produce the same numbers.
+ *
+ * Plain functions of state, with no React, so the verifiers drive exactly the
+ * transitions the page does.
  */
 
-import { ASSUMPTIONS, COUNTRIES, EXAMPLE_COMPANY, MARKET } from '@/lib/tools/valuation/data';
+import { ASSUMPTIONS, COUNTRIES, EXAMPLE_COMPANY, MARKET, V2_DEFAULTS, WARNING_RULES } from '@/lib/tools/valuation/data';
+import { cleanProfile } from '@/lib/tools/valuation/profile';
 import {
+  INPUT_SCHEMA_VERSION,
   currencyFor,
   defaultExitMultiple,
+  defaultPrivateDiscount,
   defaultSizePremium,
   fillForecast,
   industryFor,
@@ -20,6 +26,7 @@ import {
   type Financials,
   type LineKey,
   type Peer,
+  type StakeAdjustment,
   type ValuationInputs,
   type WaccInputs,
 } from '@/lib/tools/valuation/engine';
@@ -31,7 +38,13 @@ export type FillKey = 'growth' | 'ebitdaMargin' | 'daOfRevenue' | 'capexOfRevenu
 
 export type PeerRow = { id: number; name: string; evEbitda: string; evRevenue: string };
 
+export type BridgeKey = 'eosb' | 'leases' | 'minorityInterest' | 'surplusAssets';
+export type ScenarioKey = 'upsideGrowth' | 'upsideMargin' | 'downsideGrowth' | 'downsideMargin' | 'weightDownside' | 'weightBase' | 'weightUpside';
+
 export type FormState = {
+  /** Report only. Never read by the engine. */
+  companyName: string;
+  description: string;
   industry: string;
   country: string;
   financialYear: string;
@@ -46,7 +59,19 @@ export type FormState = {
   midYear: boolean;
   peers: PeerRow[];
   privateDiscount: string;
+  /** True once the visitor types a discount. Until then it follows the peers. */
+  discountTouched: boolean;
   dcfWeight: string;
+  /* Version 2 ---------------------------------------------------------- */
+  norm: { oneOff: string; ownerCosts: string; carryOwnerCosts: boolean };
+  bridge: Record<BridgeKey, string>;
+  investedCapital: string;
+  stake: { percent: string; adjustment: StakeAdjustment; controlPremium: string; minorityDiscount: string };
+  /** True once the visitor picks an adjustment. Until then it follows the stake size. */
+  stakeAdjustmentTouched: boolean;
+  scenarios: Record<ScenarioKey, string>;
+  /** Exploration only: percentage points on WACC from the results slider. */
+  waccAdjustment: string;
 };
 
 let peerSeq = 0;
@@ -58,7 +83,10 @@ export function newPeer(name = '', evEbitda = '', evRevenue = ''): PeerRow {
 export function initialState(): FormState {
   const blankLine = () => new Array<string>(TOTAL_YEARS).fill('');
   const fill = ASSUMPTIONS.forecastFill;
+  const d = V2_DEFAULTS;
   return {
+    companyName: '',
+    description: '',
     industry: '',
     country: '',
     financialYear: String(ASSUMPTIONS.defaultFinancialYear),
@@ -79,7 +107,28 @@ export function initialState(): FormState {
     midYear: ASSUMPTIONS.midYear,
     peers: [newPeer(), newPeer()],
     privateDiscount: String(ASSUMPTIONS.privateDiscount),
+    discountTouched: false,
     dcfWeight: String(ASSUMPTIONS.dcfWeight),
+    norm: { oneOff: '', ownerCosts: '', carryOwnerCosts: false },
+    bridge: { eosb: '', leases: '', minorityInterest: '', surplusAssets: '' },
+    investedCapital: '',
+    stakeAdjustmentTouched: false,
+    stake: {
+      percent: String(d.stake.percent),
+      adjustment: 'none',
+      controlPremium: String(d.stake.controlPremium),
+      minorityDiscount: String(d.stake.minorityDiscount),
+    },
+    scenarios: {
+      upsideGrowth: String(d.scenarios.upsideGrowth),
+      upsideMargin: String(d.scenarios.upsideMargin),
+      downsideGrowth: String(d.scenarios.downsideGrowth),
+      downsideMargin: String(d.scenarios.downsideMargin),
+      weightDownside: String(d.scenarioWeights.downside),
+      weightBase: String(d.scenarioWeights.base),
+      weightUpside: String(d.scenarioWeights.upside),
+    },
+    waccAdjustment: '0',
   };
 }
 
@@ -124,7 +173,9 @@ export function parseWacc(w: FormState['wacc']): WaccInputs {
 
 export function toInputs(s: FormState): ValuationInputs {
   const fy = parseInt(s.financialYear, 10);
+  const sc = s.scenarios;
   return {
+    schemaVersion: INPUT_SCHEMA_VERSION,
     industry: s.industry,
     country: s.country,
     financialYear: Number.isNaN(fy) ? null : fy,
@@ -135,11 +186,34 @@ export function toInputs(s: FormState): ValuationInputs {
     exitMultiple: num(s.exitMultiple),
     midYear: s.midYear,
     // Only rows with something in them travel, as the reference recorded.
-    peers: parsePeers(s.peers).filter(
-      (p) => p.name || p.evEbitda !== null || p.evRevenue !== null,
-    ),
+    peers: parsePeers(s.peers).filter((p) => p.name || p.evEbitda !== null || p.evRevenue !== null),
     privateDiscount: num(s.privateDiscount),
     dcfWeight: num(s.dcfWeight),
+    normalisation: { oneOff: num(s.norm.oneOff), ownerCosts: num(s.norm.ownerCosts), carryOwnerCosts: s.norm.carryOwnerCosts },
+    bridge: {
+      eosb: num(s.bridge.eosb),
+      leases: num(s.bridge.leases),
+      minorityInterest: num(s.bridge.minorityInterest),
+      surplusAssets: num(s.bridge.surplusAssets),
+    },
+    investedCapital: num(s.investedCapital),
+    stake: {
+      percent: num(s.stake.percent),
+      adjustment: s.stake.adjustment,
+      controlPremium: num(s.stake.controlPremium),
+      minorityDiscount: num(s.stake.minorityDiscount),
+    },
+    scenarios: {
+      upsideGrowth: num(sc.upsideGrowth),
+      upsideMargin: num(sc.upsideMargin),
+      downsideGrowth: num(sc.downsideGrowth),
+      downsideMargin: num(sc.downsideMargin),
+      weightDownside: num(sc.weightDownside),
+      weightBase: num(sc.weightBase),
+      weightUpside: num(sc.weightUpside),
+    },
+    waccAdjustment: num(s.waccAdjustment) ?? 0,
+    profile: cleanProfile({ companyName: s.companyName, description: s.description }),
   };
 }
 
@@ -147,8 +221,10 @@ export function toInputs(s: FormState): ValuationInputs {
 /* Defaults, applied as the reference applied them                           */
 /* ------------------------------------------------------------------------ */
 
+type CountryRecord = (typeof COUNTRIES)[keyof typeof COUNTRIES];
+
 export function applyCountryDefaults(s: FormState): FormState {
-  const c = (COUNTRIES as Record<string, (typeof COUNTRIES)[keyof typeof COUNTRIES]>)[s.country];
+  const c = (COUNTRIES as Record<string, CountryRecord>)[s.country];
   if (!c) return s;
   const wacc = { ...s.wacc, crp: str(c.crp), ds: str(c.ds), tax: str(c.tax) };
   if (!c.pegged && 'inflationLocal' in c) {
@@ -171,6 +247,30 @@ export function syncExitMultiple(s: FormState): FormState {
   if (s.xmTouched) return s;
   const xm = defaultExitMultiple(s.industry, parsePeers(s.peers));
   return xm === null ? s : { ...s, exitMultiple: str(xm) };
+}
+
+/** Keeps the private company discount on its default (20% with peers, 0% without) until the visitor types one. */
+/**
+ * The stake adjustment follows the stake until the visitor picks one: a
+ * minority discount at or below the control threshold (50%), none above it.
+ * A control premium chosen for a stake without control is kept and warned
+ * about (`premium_on_minority_stake`), never silently changed.
+ */
+export function syncStakeAdjustment(s: FormState): FormState {
+  if (s.stakeAdjustmentTouched) return s;
+  const p = num(s.stake.percent);
+  const adjustment: StakeAdjustment = p !== null && p > 0 && p <= WARNING_RULES.controlStakeAbovePercent ? 'minority_discount' : 'none';
+  return adjustment === s.stake.adjustment ? s : { ...s, stake: { ...s.stake, adjustment } };
+}
+
+export function syncPrivateDiscount(s: FormState): FormState {
+  if (s.discountTouched) return s;
+  return { ...s, privateDiscount: str(defaultPrivateDiscount(parsePeers(s.peers))) };
+}
+
+/** Both peer-driven defaults, after any change to the peer rows. */
+export function syncPeerDefaults(s: FormState): FormState {
+  return syncPrivateDiscount(syncExitMultiple(s));
 }
 
 export function sizePremiumDefault(s: FormState): string {
@@ -214,7 +314,7 @@ export function exampleState(): FormState {
     fin[k] = next.fin[k].map((_, i) => (i < HISTORY_YEARS ? String(ex.history[k][i]) : ''));
   }
   next = applyFill({ ...next, fin });
-  return resetWacc(next);
+  return syncPrivateDiscount(resetWacc(next));
 }
 
 /** "Fill forecast". Returns the error to show when there is no revenue to grow from. */
@@ -243,4 +343,57 @@ export function resetWacc(s: FormState): FormState {
   next = applyCountryDefaults(next);
   next = applyIndustryDefaults(next);
   return { ...next, wacc: { ...next.wacc, sp: sizePremiumDefault(next) }, spTouched: false };
+}
+
+/** Rebuilds form state from stored engine inputs, for "Change inputs" after a reload and for admin. */
+export function stateFromInputs(i: ValuationInputs): FormState {
+  const base = initialState();
+  const d = (v: number | null | undefined) => str(v ?? null);
+  const fin = {} as FormState['fin'];
+  for (const k of LINE_KEYS) fin[k] = i.financials[k].map((v) => d(v));
+  const wacc = {} as FormState['wacc'];
+  for (const k of WACC_KEYS) wacc[k] = d(i.wacc[k]);
+  return {
+    ...base,
+    companyName: i.profile?.companyName ?? '',
+    description: i.profile?.description ?? '',
+    industry: i.industry,
+    country: i.country,
+    financialYear: d(i.financialYear),
+    netDebt: d(i.netDebt),
+    fin,
+    wacc,
+    spTouched: true,
+    growth: d(i.growth),
+    exitMultiple: d(i.exitMultiple),
+    xmTouched: true,
+    midYear: i.midYear,
+    peers: i.peers.length ? i.peers.map((p) => newPeer(p.name, d(p.evEbitda), d(p.evRevenue))) : base.peers,
+    privateDiscount: d(i.privateDiscount),
+    discountTouched: true,
+    dcfWeight: d(i.dcfWeight),
+    norm: i.normalisation
+      ? { oneOff: d(i.normalisation.oneOff), ownerCosts: d(i.normalisation.ownerCosts), carryOwnerCosts: i.normalisation.carryOwnerCosts }
+      : base.norm,
+    bridge: i.bridge
+      ? { eosb: d(i.bridge.eosb), leases: d(i.bridge.leases), minorityInterest: d(i.bridge.minorityInterest), surplusAssets: d(i.bridge.surplusAssets) }
+      : base.bridge,
+    investedCapital: d(i.investedCapital),
+    stakeAdjustmentTouched: true,
+    stake: i.stake
+      ? { percent: d(i.stake.percent), adjustment: i.stake.adjustment, controlPremium: d(i.stake.controlPremium), minorityDiscount: d(i.stake.minorityDiscount) }
+      : base.stake,
+    scenarios: i.scenarios
+      ? {
+          upsideGrowth: d(i.scenarios.upsideGrowth),
+          upsideMargin: d(i.scenarios.upsideMargin),
+          downsideGrowth: d(i.scenarios.downsideGrowth),
+          downsideMargin: d(i.scenarios.downsideMargin),
+          weightDownside: d(i.scenarios.weightDownside),
+          weightBase: d(i.scenarios.weightBase),
+          weightUpside: d(i.scenarios.weightUpside),
+        }
+      : base.scenarios,
+    waccAdjustment: d(i.waccAdjustment ?? 0),
+  };
 }

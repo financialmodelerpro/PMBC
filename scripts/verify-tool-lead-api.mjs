@@ -15,19 +15,34 @@
 //   7. The stored row: consent text and time, follow-up consent, data version,
 //      below-minimum flag, attribution, IP hash, a fresh access token.
 //   8. Result serialisation round-trips NaN, which JSON cannot carry.
+//   9. Version 2 inputs: every optional block accepted and stored, inputs from
+//      before version 2 still accepted, schemaVersion stamped by the server
+//      whatever the browser claims, and the new validation refused with 400.
+//  11. Company profile: the name and description are cleaned by the schema
+//      itself (control characters, whitespace, two paragraphs, length caps),
+//      stored with the inputs, used as the lead's company when the gate has
+//      none, and never change a figure.
+//  10. Email me this version (src/lib/tools/leads/version.ts): found by token
+//      only, recomputed, the previous version kept before the lead is
+//      overwritten, 5 an hour and 20 a day per lead with staff exempt, the
+//      honeypot, a Hidden tool, and a failed save that still returns results.
 //
 //   npm run verify-tool-lead-api
 //
 // With VERIFY_BASE set, also checks over HTTP that a logged-out submission to a
-// Hidden tool is refused with 404 (nothing is saved by that request).
+// Hidden tool is refused with 404, and that the version and PDF endpoints
+// refuse an unknown token with 404. None of those requests writes anything.
 
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createJiti } from 'jiti';
 
+import { fullFeatureCase } from './lib/valuationCases.mjs';
+
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const jiti = createJiti(import.meta.url, { alias: { '@': path.join(root, 'src') } });
 const leads = await jiti.import(path.join(root, 'src/lib/tools/leads/valuation.ts'));
+const version = await jiti.import(path.join(root, 'src/lib/tools/leads/version.ts'));
 const engine = await jiti.import(path.join(root, 'src/lib/tools/valuation/engine.ts'));
 const state = await jiti.import(path.join(root, 'src/components/tools/valuation/state.ts'));
 const data = await jiti.import(path.join(root, 'src/lib/tools/valuation/data.ts'));
@@ -202,6 +217,164 @@ console.log('Serialisation');
   check('sensitivity grid shape kept', back.sensitivity.grid.length === 5 && back.sensitivity.grid.every((row) => row.length === 5));
 }
 
+console.log('Version 2 inputs');
+{
+  const full = state.toInputs(fullFeatureCase(state));
+  const store = memoryStore();
+  const out = await leads.processValuationSubmission(body({ inputs: full }), ctx(), store);
+  check('full feature inputs: saved', out.kind === 'saved', out.kind);
+  const row = store.inserted[0] ?? { inputs: {} };
+  check('stored inputs keep every version 2 block', ['normalisation', 'bridge', 'stake', 'scenarios', 'investedCapital'].every((k) => row.inputs[k] !== undefined));
+  check('stored bridge as submitted', JSON.stringify(row.inputs.bridge) === JSON.stringify(full.bridge));
+  check('stored stake as submitted', JSON.stringify(row.inputs.stake) === JSON.stringify(full.stake));
+  check('stored inputs carry schemaVersion 2', row.inputs.schemaVersion === 2);
+  const fullResult = engine.runValuation(full).result;
+  check('stored results are the version 2 recomputation', JSON.stringify(row.results) === JSON.stringify(serialize.serializeResult(fullResult)));
+  check('stored results carry scenarios, stake and warnings', row.results.scenarios.length === 3 && row.results.stake.used === true && Array.isArray(row.results.warnings));
+
+  const v1 = exampleInputs();
+  for (const k of ['normalisation', 'bridge', 'stake', 'scenarios', 'investedCapital', 'waccAdjustment', 'schemaVersion']) delete v1[k];
+  const legacyStore = memoryStore();
+  const legacy = await leads.processValuationSubmission(body({ inputs: v1 }), ctx(), legacyStore);
+  check('inputs from before version 2: saved', legacy.kind === 'saved', legacy.kind);
+  check('... with the same result as today', JSON.stringify(legacy.body.result) === expectedJson);
+  check('... stamped schemaVersion 2', legacyStore.inserted[0]?.inputs.schemaVersion === 2);
+
+  const claimed = memoryStore();
+  await leads.processValuationSubmission(body({ inputs: { ...exampleInputs(), schemaVersion: 1 } }), ctx(), claimed);
+  check('a browser claiming schemaVersion 1 is stored as 2', claimed.inserted[0]?.inputs.schemaVersion === 2);
+
+  const refuse = [
+    ['negative lease liability', { ...full, bridge: { ...full.bridge, leases: -5 } }],
+    ['weights totalling 90', { ...full, scenarios: { ...full.scenarios, weightBase: 40 } }],
+    ['stake of 0', { ...full, stake: { ...full.stake, percent: 0 } }],
+    ['stake adjustment not in the list', { ...full, stake: { ...full.stake, adjustment: 'bonus' } }],
+    ['invested capital of zero', { ...full, investedCapital: 0 }],
+    ['add-back as text', { ...full, normalisation: { ...full.normalisation, oneOff: 'ten' } }],
+  ];
+  for (const [label, inputs] of refuse) {
+    const st = memoryStore();
+    const r = await leads.processValuationSubmission(body({ inputs }), ctx(), st);
+    check(`${label}: 400, nothing saved`, r.status === 400 && st.inserted.length === 0, `${r.status} ${r.kind}`);
+  }
+}
+
+console.log('Company profile');
+{
+  const profileInputs = (profile) => ({ ...exampleInputs(), profile });
+  const messy = {
+    companyName: '  Acme\u0007   Foods \n Ltd  ',
+    description: '  First   paragraph\u0000 here.  \r\n\r\n\r\nSecond\tparagraph.\nThird paragraph is dropped.',
+  };
+  const st = memoryStore();
+  const out = await leads.processValuationSubmission(body({ inputs: profileInputs(messy), gate: { ...body().gate, company: '' } }), ctx(), st);
+  const stored = st.inserted[0]?.inputs.profile;
+  check('profile: saved', out.kind === 'saved', out.kind);
+  check('profile: company name cleaned', stored?.companyName === 'Acme Foods Ltd', JSON.stringify(stored?.companyName));
+  check('profile: two paragraphs kept, cleaned, the third dropped', stored?.description === 'First paragraph here.\n\nSecond paragraph.', JSON.stringify(stored?.description));
+  check('profile: the gate had no company, so the lead takes the profile name', st.inserted[0]?.company === 'Acme Foods Ltd');
+  check('profile: figures unchanged', JSON.stringify(out.body.result) === expectedJson);
+
+  const gateWins = memoryStore();
+  await leads.processValuationSubmission(body({ inputs: profileInputs(messy) }), ctx(), gateWins);
+  check('profile: a company typed at the gate wins', gateWins.inserted[0]?.company === 'Example Co');
+
+  const long = memoryStore();
+  await leads.processValuationSubmission(body({ inputs: profileInputs({ companyName: 'N'.repeat(500), description: 'x'.repeat(4000) }) }), ctx(), long);
+  const lp = long.inserted[0]?.inputs.profile;
+  check('profile: name capped at 120 and description at 1,000 characters', lp?.companyName.length === 120 && lp?.description.length === 1000, JSON.stringify([lp?.companyName?.length, lp?.description?.length]));
+
+  const empty = memoryStore();
+  await leads.processValuationSubmission(body({ inputs: profileInputs({ companyName: '   ', description: '\n\n' }) }), ctx(), empty);
+  check('profile: blank fields store no profile', empty.inserted[0] && !('profile' in empty.inserted[0].inputs && empty.inserted[0].inputs.profile));
+
+  const absurd = memoryStore();
+  const refused = await leads.processValuationSubmission(body({ inputs: profileInputs({ companyName: 'x', description: 'y'.repeat(20000) }) }), ctx(), absurd);
+  check('profile: an absurd payload is refused', refused.status === 400 && absurd.inserted.length === 0, refused.status);
+  const wrongType = await leads.processValuationSubmission(body({ inputs: profileInputs({ companyName: 5 }) }), ctx(), memoryStore());
+  check('profile: a non-string name is refused', wrongType.status === 400);
+}
+
+console.log('Email me this version');
+{
+  const TOKEN = 'lead-token-' + 'y'.repeat(40);
+  const original = { inputs: exampleInputs(), results: JSON.parse(expectedJson) };
+  function versionStore({ hour = 0, day = 0, saveFails = false } = {}) {
+    const lead = { id: '00000000-0000-4000-8000-000000000001', tool_slug: 'business-valuation', is_test: false, inputs: original.inputs, results: original.results, data_version: '2026-01-01' };
+    const events = [];
+    const saves = [];
+    return {
+      lead, events, saves,
+      async findByToken(t) { return t === TOKEN ? lead : null; },
+      async countVersionsSince(_id, since) {
+        const ago = Date.parse('2026-09-16T12:00:00Z') - Date.parse(since);
+        return ago <= 3600_000 ? hour : day;
+      },
+      async saveVersion(l, next) {
+        if (saveFails) return false;
+        // As the route does: the previous version is recorded first, then overwritten.
+        events.push({ event_type: 'version_saved', payload: { previous: { inputs: l.inputs, results: l.results, data_version: l.data_version } } });
+        saves.push(next);
+        Object.assign(l, next);
+        return true;
+      },
+    };
+  }
+  const vctx = (over = {}) => ({ now: new Date('2026-09-16T12:00:00Z'), toolLive: true, isStaff: false, ...over });
+  const changed = { ...exampleInputs(), growth: 3, exitMultiple: 9, waccAdjustment: 1 };
+  const changedResult = engine.runValuation(changed).result;
+  const changedJson = JSON.stringify(serialize.serializeResult(changedResult));
+
+  const st = versionStore();
+  const out = await version.processVersionUpdate({ token: TOKEN, inputs: changed, result: { forged: true } }, vctx(), st);
+  check('version: 200 saved', out.status === 200 && out.kind === 'saved', out.kind);
+  check('version: result is the server recomputation', JSON.stringify(out.body.result) === changedJson);
+  check('version: the lead now holds the new inputs and results', st.lead.inputs.growth === 3 && JSON.stringify(st.lead.results) === changedJson);
+  check('version: stamped schemaVersion 2 and the current data version', st.saves[0].inputs.schemaVersion === 2 && st.saves[0].data_version === data.VALUATION_DATA_VERSION);
+  check('version: headline columns updated', st.saves[0].equity_mid === changedResult.equityDisplay[1] && st.saves[0].wacc === changedResult.wacc.wacc);
+  check('version: previous inputs and results kept in the event', st.events.length === 1 && st.events[0].payload.previous.inputs.growth === original.inputs.growth && JSON.stringify(st.events[0].payload.previous.results) === expectedJson);
+  check('version: previous data version kept', st.events[0].payload.previous.data_version === '2026-01-01');
+  check('version: returns the lead for the resend', out.lead?.id === st.lead.id && out.result?.equityDisplay[1] === changedResult.equityDisplay[1]);
+
+  const claimedStore = versionStore();
+  await version.processVersionUpdate({ token: TOKEN, inputs: { ...changed, schemaVersion: 1 } }, vctx(), claimedStore);
+  check('version: inputs claiming schemaVersion 1 stored as 2', claimedStore.saves[0]?.inputs.schemaVersion === 2, String(claimedStore.saves[0]?.inputs.schemaVersion));
+
+  const at = async (hour, day, over = {}) => version.processVersionUpdate({ token: TOKEN, inputs: changed }, vctx(over), versionStore({ hour, day }));
+  const L = version.VERSION_RATE_LIMIT;
+  check('limits are 5 an hour and 20 a day', L.perHour === 5 && L.perDay === 20);
+  check('4 this hour: saved', (await at(4, 4)).kind === 'saved');
+  const limited = await at(5, 5);
+  check('5 this hour: 429', limited.status === 429 && limited.kind === 'rate_limited');
+  check('19 today: saved', (await at(0, 19)).kind === 'saved');
+  check('20 today: 429', (await at(0, 20)).status === 429);
+  const limitedStore = versionStore({ hour: 9, day: 9 });
+  const limited2 = await version.processVersionUpdate({ token: TOKEN, inputs: changed }, vctx(), limitedStore);
+  check('rate limited: nothing saved, no event', limitedStore.saves.length === 0 && limitedStore.events.length === 0 && limited2.lead === null);
+  check('staff exempt from the limit', (await at(99, 99, { isStaff: true })).kind === 'saved');
+
+  const unknown = await version.processVersionUpdate({ token: 'z'.repeat(40), inputs: changed }, vctx(), versionStore());
+  check('unknown token: 404', unknown.status === 404 && unknown.kind === 'not_found');
+  check('short token: 400', (await version.processVersionUpdate({ token: 'abc', inputs: changed }, vctx(), versionStore())).status === 400);
+  check('no token: 400', (await version.processVersionUpdate({ inputs: changed }, vctx(), versionStore())).status === 400);
+  const hiddenStore = versionStore();
+  check('hidden tool, public: 404, nothing saved', (await version.processVersionUpdate({ token: TOKEN, inputs: changed }, vctx({ toolLive: false }), hiddenStore)).status === 404 && hiddenStore.saves.length === 0);
+  check('hidden tool, staff: saved', (await version.processVersionUpdate({ token: TOKEN, inputs: changed }, vctx({ toolLive: false, isStaff: true }), versionStore())).kind === 'saved');
+
+  const badStore = versionStore();
+  const bad = await version.processVersionUpdate({ token: TOKEN, inputs: { ...changed, growth: 15 } }, vctx(), badStore);
+  check('invalid inputs: 400 with the form wording, nothing saved', bad.status === 400 && bad.body.issues?.[0]?.message?.startsWith('Long-term growth') && badStore.saves.length === 0);
+
+  const honeyStore = versionStore();
+  const honey = await version.processVersionUpdate({ token: TOKEN, inputs: changed, website: 'http://spam.example' }, vctx(), honeyStore);
+  check('honeypot: 200 with results, nothing saved', honey.status === 200 && JSON.stringify(honey.body.result) === changedJson && honeyStore.saves.length === 0 && honey.lead === null);
+  check('honeypot: body shape matches a save', JSON.stringify(Object.keys(honey.body)) === JSON.stringify(Object.keys(out.body)));
+
+  const failStore = versionStore({ saveFails: true });
+  const failed = await version.processVersionUpdate({ token: TOKEN, inputs: changed }, vctx(), failStore);
+  check('save failure: 500 that still carries the results', failed.status === 500 && JSON.stringify(failed.body.result) === changedJson && failed.lead === null);
+}
+
 const BASE = process.env.VERIFY_BASE?.replace(/\/+$/, '');
 if (BASE) {
   console.log(`HTTP against ${BASE}, logged out`);
@@ -210,6 +383,12 @@ if (BASE) {
   check(`logged-out submission to a ${expectLive ? 'Live' : 'Hidden'} tool is ${expectLive ? '200' : '404'}`, res.status === (expectLive ? 200 : 404), String(res.status));
   const unknown = await fetch(`${BASE}/api/tools/not-a-tool/lead`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
   check('unknown tool is 404', unknown.status === 404, String(unknown.status));
+  const post = (route, payload) => fetch(`${BASE}/api/tools/business-valuation/${route}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) });
+  const bogus = 'verifier-unknown-token-' + '0'.repeat(30);
+  const v = await post('lead/version', { token: bogus, inputs: exampleInputs() });
+  check('version endpoint, unknown token: 404', v.status === 404, String(v.status));
+  const pdf = await post('pdf', { token: bogus, inputs: exampleInputs() });
+  check('PDF endpoint, unknown token: 404', pdf.status === 404, String(pdf.status));
 }
 
 console.log(`\n${checks - failures} of ${checks} checks passed.`);

@@ -15,7 +15,8 @@
  *   - /tools                404 when no tool is Live; lists Live tools only
  *   - sitemap.xml           /tools and each Live tool
  *   - WebApplication JSON-LD, rendered only on a Live tool's public page
- *   - footer "Free Tools"   shown only while at least one tool is Live
+ *   - navbar "Tools"        Pages & Nav decides; shown to the public only while a tool is Live (navSetting.ts)
+ *   - footer "Free Tools"   follows the Pages & Nav Tools row, and only while a tool is Live
  *   - service page CTA      a tool's `serviceCta`, shown only while it is Live
  *   - the lead API          refuses a Hidden tool unless the caller is staff
  *
@@ -26,6 +27,7 @@
 import { TOOLS, type ToolEntry } from '@/config/tools';
 
 import { isMissingSchema, toolsDb, type ToolVisibilityRow, type ToolVisibilityStatus } from './db';
+import { TOOLS_HUB_HREF, isToolsHubHref, normaliseHref } from './navSetting';
 
 export type VisibilityRead =
   | { ok: true; rows: ToolVisibilityRow[] }
@@ -65,7 +67,26 @@ export function resolveVisibility(read: VisibilityRead, registry: ToolEntry[] = 
   };
 }
 
+/**
+ * LOCAL VERIFICATION ONLY. `TOOLS_VISIBILITY_OVERRIDE=hidden` or `=live` makes a
+ * local build behave as if every tool were Hidden or Live, without writing to
+ * the shared database that local builds read. Ignored whenever `VERCEL` is set,
+ * which Vercel sets on every preview and production deployment, so it can never
+ * change what the public sees.
+ */
+function localOverride(): VisibilityRead | null {
+  if (process.env.VERCEL) return null;
+  const v = process.env.TOOLS_VISIBILITY_OVERRIDE;
+  if (v === 'hidden') return { ok: true, rows: [] };
+  if (v === 'live') {
+    return { ok: true, rows: TOOLS.map((t) => ({ slug: t.slug, status: 'live' as const, updated_at: null, updated_by: null })) };
+  }
+  return null;
+}
+
 export async function readVisibilityRows(): Promise<VisibilityRead> {
+  const override = localOverride();
+  if (override) return override;
   try {
     const { data, error } = await toolsDb().from('tool_visibility').select('slug, status, updated_at, updated_by');
     if (error) {
@@ -99,23 +120,61 @@ export function toolSitemapPaths(snapshot: VisibilitySnapshot): string[] {
 }
 
 /**
- * The footer links with Free Tools applied: any stored `/tools` link is
- * removed, and the registry's link is added after Financial Modeler Pro while
- * at least one tool is Live. The stored row was retired by migration 079; the
- * removal keeps a database that has not run it from showing a second switch.
+ * The footer links with Free Tools applied. Any stored `/tools` link is removed
+ * (Footer Links is not a second switch), and the registry's link is added after
+ * Financial Modeler Pro only while the Pages & Nav Tools row is switched on AND
+ * at least one tool is Live, so the footer never links to a 404.
  */
 export function applyToolsFooterLink<L extends { id: string; href: string; label: string; column: string; visible: boolean }>(
   links: L[],
   snapshot: VisibilitySnapshot,
   toolsLink: { id: string; label: string; href: string },
+  navOn: boolean,
 ): L[] {
-  const withoutStored = links.filter((l) => l.href.trim().replace(/\/+$/, '').toLowerCase() !== toolsLink.href);
-  if (liveToolsFrom(snapshot).length === 0) return withoutStored;
+  const withoutStored = links.filter((l) => normaliseHref(l.href) !== normaliseHref(toolsLink.href));
+  if (!navOn || liveToolsFrom(snapshot).length === 0) return withoutStored;
   const at = withoutStored.findIndex((l) => l.href === '/fmp');
   const entry = { id: toolsLink.id, label: toolsLink.label, href: toolsLink.href, column: 'firm', visible: true } as L;
   const out = [...withoutStored];
   out.splice(at === -1 ? out.length : at + 1, 0, entry);
   return out;
+}
+
+/**
+ * LOCAL VERIFICATION ONLY. `TOOLS_NAV_OVERRIDE=on` or `=off` makes a local build
+ * behave as if the Pages & Nav Tools row were switched on (placed after
+ * Financial Modeler Pro) or off, without writing to the shared database.
+ * Ignored whenever `VERCEL` is set, like `TOOLS_VISIBILITY_OVERRIDE`.
+ */
+export function localToolsNavOverride(): 'on' | 'off' | null {
+  if (process.env.VERCEL) return null;
+  const v = process.env.TOOLS_NAV_OVERRIDE;
+  return v === 'on' || v === 'off' ? v : null;
+}
+
+/** Visible Pages & Nav items with the local override applied. A no-op on Vercel. */
+export function withLocalToolsNavOverride<I extends { label: string; href: string }>(items: I[]): I[] {
+  const o = localToolsNavOverride();
+  if (!o) return items;
+  const without = items.filter((i) => !isToolsHubHref(i.href));
+  if (o === 'off') return without;
+  const at = without.findIndex((i) => normaliseHref(i.href) === '/fmp');
+  const out = [...without];
+  out.splice(at === -1 ? out.length : at + 1, 0, { label: 'Tools', href: TOOLS_HUB_HREF } as I);
+  return out;
+}
+
+/** Whether the Pages & Nav Tools row is switched on. Off when it is absent, hidden or unreadable. */
+export async function fetchToolsNavOn(): Promise<boolean> {
+  const o = localToolsNavOverride();
+  if (o) return o === 'on';
+  try {
+    const { data, error } = await toolsDb().from('site_pages').select('href, visible').eq('visible', true);
+    if (error) return false;
+    return (data ?? []).some((r: { href: string }) => isToolsHubHref(r.href));
+  } catch {
+    return false;
+  }
 }
 
 /** The Live tools that promote themselves on a given service page. */

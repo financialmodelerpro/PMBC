@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { CONSENT_TEXT, FOLLOW_UP_TEXT } from '@/lib/tools/consent';
 import { DEAL_BAND_UNSURE, PURPOSES } from '@/lib/tools/valuation/data';
 
-import { Field, NavRow, Panel, PanelTitle, Select, TRACKING, buttonGhost, buttonPrimary, inputClass } from './ui';
+import { Field, Panel, PanelTitle, Select, StepNav, inputClass } from './ui';
 
 export type GateValues = {
   name: string;
@@ -62,7 +62,7 @@ export function LeadGate({
   onSubmit: () => void;
 }) {
   return (
-    <Panel>
+    <Panel eyebrow="Your results are ready">
       <form
         noValidate
         onSubmit={(e) => {
@@ -182,7 +182,7 @@ export function LeadGate({
                 onChange={(e) => onChange({ consent: e.target.checked })}
                 aria-invalid={Boolean(errors.consent)}
                 aria-describedby={errors.consent ? 'tool-consent-err' : undefined}
-                className="mt-1 h-4 w-4 shrink-0 accent-[#1B3A5F]"
+                className="mt-0.5 h-5 w-5 shrink-0 cursor-pointer accent-[#1B3A5F]"
               />
               <span>
                 {CONSENT_TEXT.replace(/privacy policy.$/, '')}
@@ -203,20 +203,19 @@ export function LeadGate({
               type="checkbox"
               checked={values.followUp}
               onChange={(e) => onChange({ followUp: e.target.checked })}
-              className="mt-1 h-4 w-4 shrink-0 accent-[#1B3A5F]"
+              className="mt-0.5 h-5 w-5 shrink-0 cursor-pointer accent-[#1B3A5F]"
             />
             <span>{FOLLOW_UP_TEXT}</span>
           </label>
         </div>
 
-        <NavRow>
-          <button type="button" onClick={onBack} className={buttonGhost} style={TRACKING}>
-            Edit inputs
-          </button>
-          <button type="submit" disabled={submitting} className={buttonPrimary} style={TRACKING}>
-            {submitting ? 'Preparing your results' : 'Show my valuation'}
-          </button>
-        </NavRow>
+        <StepNav
+          onBack={onBack}
+          backLabel="Back to inputs"
+          nextType="submit"
+          nextLabel={submitting ? 'Preparing your results' : 'Show my valuation'}
+          nextDisabled={submitting}
+        />
       </form>
     </Panel>
   );

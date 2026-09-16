@@ -6,6 +6,7 @@ import { FirmPageBody } from '@/components/public/FirmPageBody';
 import { BookingBody } from '@/components/public/sections/BookingBody';
 import { buildPageMetadata } from '@/lib/seo/metadata';
 import type { SectionContext } from '@/lib/public/sectionContext';
+import { withBookingPrefill } from '@/lib/tools/booking';
 
 export const dynamic = 'force-dynamic';
 
@@ -40,7 +41,9 @@ export default async function BookPage(props: {
   // supported state that leads with the direct contact routes instead.
   const context: SectionContext = {
     settings,
-    bookingUrl: (settings.booking_url ?? '').trim(),
+    // Name, email and UTM tags from a tool's booking link are passed into the
+    // calendar, so its form arrives prefilled. See src/lib/tools/booking.ts.
+    bookingUrl: withBookingPrefill((settings.booking_url ?? '').trim(), search),
   };
 
   // A database that has not run migration 066 has no `booking_body` row. Same

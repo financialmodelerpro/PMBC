@@ -5,7 +5,7 @@
  * applied) and reports it as `missing_table` rather than throwing.
  */
 
-import { isMissingSchema, toolsDb, type ToolLeadEventRow, type ToolLeadRow } from '../db';
+import { isMissingSchema, toolsDb, type EmailStatus, type ToolLeadEventRow, type ToolLeadRow } from '../db';
 import type { LeadStore } from './valuation';
 
 export const supabaseLeadStore: LeadStore = {
@@ -59,6 +59,57 @@ export async function updateLead(id: string, patch: Partial<ToolLeadRow>): Promi
   } catch (err) {
     console.error('[tool-leads] update threw:', err);
     return false;
+  }
+}
+
+/**
+ * Compare-and-set on `email_status`: writes `to` only where the stored status
+ * is one of `onlyFrom`, as a single conditional UPDATE, so two concurrent
+ * writers can never let the weaker status land last. `at`, when given, moves
+ * `email_last_event_at` forward and never back. See CONCURRENCY in
+ * `src/lib/tools/webhook.ts`.
+ */
+export async function setEmailStatusIf(
+  id: string,
+  change: { to: EmailStatus; onlyFrom: EmailStatus[]; at?: string },
+): Promise<void> {
+  if (change.onlyFrom.length > 0) {
+    const { error } = await toolsDb().from('tool_leads').update({ email_status: change.to }).eq('id', id).in('email_status', change.onlyFrom);
+    if (error) throw new Error(`email status update failed: ${error.message}`);
+  }
+  if (change.at) {
+    const { error } = await toolsDb()
+      .from('tool_leads')
+      .update({ email_last_event_at: change.at })
+      .eq('id', id)
+      .or(`email_last_event_at.is.null,email_last_event_at.lt."${change.at}"`);
+    if (error) throw new Error(`email event time update failed: ${error.message}`);
+  }
+}
+
+/**
+ * Delivery evidence for one results email: its `delivered` time and whether a
+ * bounce or block was recorded. Read only. Without a message id, the lead's
+ * results events of any message.
+ */
+export async function resultsMessageTimeline(leadId: string, messageId: string | null): Promise<{ deliveredAt: string | null; bounced: boolean }> {
+  try {
+    let q = toolsDb()
+      .from('tool_lead_events')
+      .select('event_type, occurred_at')
+      .eq('lead_id', leadId)
+      .eq('email_kind', 'results')
+      .in('event_type', ['delivered', 'bounced', 'blocked'])
+      .order('occurred_at', { ascending: true });
+    if (messageId) q = q.eq('message_id', messageId);
+    const { data } = await q;
+    const rows = (data ?? []) as { event_type: string; occurred_at: string }[];
+    return {
+      deliveredAt: rows.find((r) => r.event_type === 'delivered')?.occurred_at ?? null,
+      bounced: rows.some((r) => r.event_type === 'bounced' || r.event_type === 'blocked'),
+    };
+  } catch {
+    return { deliveredAt: null, bounced: false };
   }
 }
 

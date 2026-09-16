@@ -25,10 +25,12 @@ import {
   buildResultsEmail,
   type EmailTemplate,
 } from '../email/templates';
+import { fetchReportBranding } from '../brand/fetch';
 import { renderValuationReport, reportFileName } from '../pdf/ValuationReport';
 import { DEAL_BAND_UNSURE, DEAL_BANDS_SAR } from '../valuation/data';
 import { dealBandLabel, currencyFor, type ValuationResult } from '../valuation/engine';
-import { insertLeadEvent, updateLead } from './store';
+import { ALERT_TAG, RESULTS_TAG } from '../engagement';
+import { insertLeadEvent, setEmailStatusIf, updateLead } from './store';
 
 type LeadForDelivery = Pick<
   ToolLeadRow,
@@ -46,6 +48,7 @@ type LeadForDelivery = Pick<
   | 'industry'
   | 'follow_up_consent'
   | 'access_token'
+  | 'inputs'
 >;
 
 export async function loadToolTemplate(key: string): Promise<EmailTemplate> {
@@ -81,7 +84,7 @@ export function dealSizeLabel(band: string | null, country: string | null): stri
 export async function sendResultsEmail(
   lead: LeadForDelivery,
   result: ValuationResult,
-  opts: { resend?: boolean; adminId?: string } = {},
+  opts: { resend?: boolean; adminId?: string; source?: 'admin' | 'results' } = {},
 ): Promise<SendEmailResult> {
   const now = new Date();
   const template = await loadToolTemplate(RESULTS_TEMPLATE_KEY);
@@ -100,6 +103,10 @@ export async function sendResultsEmail(
     bookingHref: bookingRedirectUrl(lead.access_token, 'email'),
   });
 
+  // A resend is a new message, so its status starts again. Set before the send,
+  // so webhook events for the new message can only move it forward from here.
+  if (opts.resend) await updateLead(lead.id, { email_status: 'pending', email_error: null });
+
   let attachments: { name: string; content: string }[] | undefined;
   try {
     const pdf = await renderValuationReport(result, {
@@ -111,6 +118,8 @@ export async function sendResultsEmail(
       generatedAt: now,
       dataVersion: lead.data_version,
       bookingHref: bookingRedirectUrl(lead.access_token, 'pdf'),
+      branding: await fetchReportBranding(),
+      description: (lead.inputs as { profile?: { description?: string | null } } | null)?.profile?.description ?? null,
     });
     attachments = [{ name: reportFileName(lead.company, lead.name, now), content: pdf.toString('base64') }];
   } catch (err) {
@@ -131,13 +140,15 @@ export async function sendResultsEmail(
     html: await baseLayoutBranded(body),
     from: process.env.EMAIL_FROM_CONTACT || undefined,
     attachments,
-    tags: ['tool-lead', lead.tool_slug, 'results', ...(lead.is_test ? ['test'] : [])],
+    tags: [RESULTS_TAG, lead.tool_slug, 'results', ...(lead.is_test ? ['test'] : [])],
     headers: { 'X-Mailin-custom': `lead:${lead.id}|kind:results` },
   });
 
   const status = statusFrom(sent);
+  // Only from pending: Brevo can report a bounce for this message before this
+  // line runs, and `sent` must not overwrite it.
+  await setEmailStatusIf(lead.id, { to: status, onlyFrom: ['pending'] }).catch((err) => console.error('[tool-leads]', err));
   await updateLead(lead.id, {
-    email_status: status,
     email_message_id: sent.ok ? sent.id : null,
     email_sent_at: sent.ok ? now.toISOString() : null,
     email_error: sent.ok ? null : (sent.message ?? sent.reason),
@@ -145,7 +156,7 @@ export async function sendResultsEmail(
   await insertLeadEvent({
     lead_id: lead.id,
     event_type: sent.ok ? (opts.resend ? 'email_resent' : 'email_sent') : status === 'not_configured' ? 'email_not_configured' : 'email_failed',
-    source: opts.resend ? 'admin' : 'system',
+    source: opts.resend ? (opts.source ?? 'admin') : 'system',
     email_kind: 'results',
     message_id: sent.ok ? sent.id : null,
     detail: sent.ok ? (attachments ? 'with PDF report' : 'without PDF report') : (sent.message ?? sent.reason),
@@ -189,7 +200,9 @@ export async function sendLeadAlert(lead: LeadForDelivery, result: ValuationResu
     subject,
     html: await baseLayoutBranded(body),
     replyTo: lead.email,
-    tags: ['tool-lead', lead.tool_slug, 'alert', ...(lead.is_test ? ['test'] : [])],
+    // Its own first tag, so Brevo reporting and the webhook never mix staff
+    // opening the alert with the visitor's engagement (src/lib/tools/engagement.ts).
+    tags: [ALERT_TAG, lead.tool_slug, 'alert', ...(lead.is_test ? ['test'] : [])],
     headers: { 'X-Mailin-custom': `lead:${lead.id}|kind:alert` },
   });
   await updateLead(lead.id, {

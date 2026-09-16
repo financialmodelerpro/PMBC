@@ -5,7 +5,7 @@ import type { Currency, WaccBreakdown } from '@/lib/tools/valuation/engine';
 import { fmtPct } from '@/lib/tools/valuation/format';
 
 import type { FormState, WaccKey } from './state';
-import { Field, Group, Hint, NavRow, NumberInput, Panel, PanelTitle, TRACKING, buttonGhost, buttonPrimary } from './ui';
+import { Field, Group, Hint, NumberInput, Panel, PanelTitle, StepNav, TRACKING, buttonGhost } from './ui';
 
 type Spec = { k: WaccKey; label: string; hint: string; step: number; suffix?: string };
 
@@ -77,7 +77,7 @@ export function WaccStep({
   ];
 
   return (
-    <Panel>
+    <Panel eyebrow="Step 3 of 4">
       <PanelTitle
         title="Cost of capital"
         lead="Prefilled from Damodaran data for your industry and country. Every input can be changed. WACC updates as you type."
@@ -137,19 +137,16 @@ export function WaccStep({
       </div>
       <p className="mt-3.5 text-[12.5px] leading-[1.5] text-[color:var(--pmbc-muted)]">{WACC_SOURCE_SENTENCE}</p>
 
-      <NavRow>
-        <button type="button" onClick={onBack} className={buttonGhost} style={TRACKING}>
-          Back
-        </button>
-        <div className="flex flex-wrap gap-3">
+      <StepNav
+        onBack={onBack}
+        onNext={onNext}
+        nextLabel="Continue to terminal and comps"
+        extra={
           <button type="button" onClick={onReset} className={buttonGhost} style={TRACKING}>
             Reset to Damodaran defaults
           </button>
-          <button type="button" onClick={onNext} className={buttonPrimary} style={TRACKING}>
-            Continue to terminal and comps
-          </button>
-        </div>
-      </NavRow>
+        }
+      />
     </Panel>
   );
 }

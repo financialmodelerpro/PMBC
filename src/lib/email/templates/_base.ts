@@ -32,6 +32,17 @@ const SANS = "-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://pacemakersglobal.com';
 
+/**
+ * The email header logo in `public/`, and the size it is drawn at (the file is
+ * twice this). Always the `www` host: the apex answers with a redirect, and some
+ * email image proxies do not follow one.
+ */
+export const EMAIL_LOGO = {
+  src: 'https://www.pacemakersglobal.com/email/pacemakers-logo-on-navy.png',
+  width: 114,
+  height: 22,
+} as const;
+
 function escapeHtml(s: string): string {
   return s
     .replace(/&/g, '&amp;')
@@ -74,13 +85,10 @@ const DEFAULT_FOOTER = `
 /**
  * Wraps a fragment of body HTML in the shell.
  *
- * The logo resolves through three sources, in this order: the email-specific
- * one, then the site's dark-background logo, then a serif wordmark. The middle
- * step matters because the header band is navy, and `branding_config.logo_url`
- * is the light-background mark: using it here would put a navy logo on navy.
- * `logo_dark_url` is the version made for exactly this situation and it is
- * already uploaded, so the email carries the real mark without anyone having to
- * upload it a second time.
+ * The logo is `email_branding.logo_url` when an operator has set one, and
+ * otherwise the email-sized PNG in `EMAIL_LOGO`, the white mark on the header
+ * navy. The site's own logo files are not used: they are sized for the web and
+ * broke in Outlook (see the note at `headerInner`).
  */
 export async function baseLayoutBranded(content: string): Promise<string> {
   const [emailBranding, siteBranding] = await Promise.all([
@@ -89,7 +97,7 @@ export async function baseLayoutBranded(content: string): Promise<string> {
   ]);
 
   const accent = emailBranding?.primary_color || NAVY;
-  const logo = emailBranding?.logo_url || siteBranding?.logo_dark_url || null;
+  const customLogo = emailBranding?.logo_url || null;
   const brandName = siteBranding?.brand_name || 'PaceMakers Business Consultants';
   const tagline = siteBranding?.tagline || 'Advisory from Structure to Exit';
   const signature = emailBranding?.signature_html || DEFAULT_SIGNATURE;
@@ -99,19 +107,27 @@ export async function baseLayoutBranded(content: string): Promise<string> {
   );
 
   /*
-   * 22px rather than 42px.
+   * The logo is a PNG made for email, hosted on the site: 229x44, 12 KB,
+   * flattened onto the header navy, drawn at 114x22 so it is sharp on high
+   * density screens.
    *
-   * The brand logo files carried transparent margins until migration 060, and
-   * were only 52.5% ink vertically, so a 42px box drew a 22px mark. Now that
-   * the files are trimmed the box is the mark, and 22px keeps the header band
-   * looking exactly as it does today. Both the attribute and the max-height
-   * move together: Outlook honours the attribute and ignores much of the style,
-   * so leaving one at 42 would render the logo at twice the intended size in
-   * the client least able to cope with it.
+   * It replaced `branding_config.logo_dark_url` on 2026-09-16. That file is
+   * 6113x1176 and 255 KB, and the tag carried only `height="22"`: Outlook
+   * desktop ignores `max-height`, and with no `width` attribute it drew the
+   * image at its native size or not at all, which read as a broken logo. Every
+   * client honours explicit width and height attributes, so both are set, and
+   * the alt text stands in when images are blocked, which Outlook does by
+   * default.
+   *
+   * Flattened rather than transparent so the white mark keeps its navy ground
+   * when a dark mode client repaints the header band.
+   *
+   * `email_branding.logo_url` still wins when an operator sets one. Its size is
+   * unknown here, so only the height is fixed: upload an email-sized file.
    */
-  const headerInner = logo
-    ? `<img src="${escapeHtml(logo)}" alt="${escapeHtml(brandName)}" height="22" style="display:block;margin:0 auto;border:0;outline:none;max-height:22px;" />`
-    : `<div style="font-family:${SERIF};font-size:20px;font-weight:600;color:#ffffff;letter-spacing:0.01em;">${escapeHtml(brandName)}</div>`;
+  const headerInner = customLogo
+    ? `<img src="${escapeHtml(customLogo)}" alt="${escapeHtml(brandName)}" height="22" style="display:block;margin:0 auto;border:0;outline:none;height:22px;max-height:22px;" />`
+    : `<img src="${EMAIL_LOGO.src}" alt="${escapeHtml(brandName)}" width="${EMAIL_LOGO.width}" height="${EMAIL_LOGO.height}" style="display:block;margin:0 auto;border:0;outline:none;width:${EMAIL_LOGO.width}px;height:${EMAIL_LOGO.height}px;color:#ffffff;font-family:${SERIF};font-size:14px;" />`;
 
   return `<!DOCTYPE html>
 <html lang="en">

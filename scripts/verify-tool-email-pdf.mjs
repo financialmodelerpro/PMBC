@@ -11,11 +11,24 @@
 //      subject, and the dashboard link.
 //   3. The defaults in code match the rows seeded by migration 078, so a
 //      database without the rows sends the same email as one with them.
-//   4. PDF: renders for a Saudi, a Pakistan and a distressed case; is a PDF;
-//      has five pages; embeds both site typefaces.
+//   4. PDF: renders for the minimal example, Pakistan with every version 2
+//      feature, and a distressed case; is a PDF; has ten pages; embeds both
+//      site typefaces. The text is extracted with pdfjs and each page is
+//      checked for its section title, the page footer and the market data
+//      label, with no ligature glyph drawn (read from the operator list, since
+//      extracted text maps a ligature back to its letters) and no
+//      em or en dash. The full case shows its stake, weighted value, bridge
+//      items, normalised EBITDA and every warning it raised; the minimal case
+//      shows none of those. The QR code encodes the tracked booking link.
 //   5. Brevo payload: the attachment decodes to that PDF, the tags and the
 //      X-Mailin-custom header are present, and a plain send (the contact form)
 //      carries none of the new fields.
+//   6. Email shell and parts: the hosted logo PNG with width, height and alt,
+//      the file itself at the size those attributes assume, the button padding
+//      on the cell (which Outlook honours) rather than the link, the weighted
+//      and stake rows only when used, and the follow-up consent as submitted.
+//   7. Booking links: always the site's /book page with name, email and UTM
+//      tags, and /book forwarding only known keys onto the calendar URL.
 //
 //   npm run verify-tool-email-pdf
 
@@ -23,6 +36,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createJiti } from 'jiti';
+
+import { REPORT_META, fullFeatureCase, minimalCase } from './lib/valuationCases.mjs';
+
+// The email shell reads branding from Supabase when it can. Without these it
+// uses its built-in defaults, which is what this verifier checks, and it can
+// never read the production database.
+for (const k of ['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'NEXT_PUBLIC_SUPABASE_URL']) delete process.env[k];
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const jiti = createJiti(import.meta.url, { alias: { '@': path.join(root, 'src') }, jsx: { runtime: 'automatic' } });
@@ -32,6 +52,13 @@ const engine = await jiti.import(path.join(root, 'src/lib/tools/valuation/engine
 const format = await jiti.import(path.join(root, 'src/lib/tools/valuation/format.ts'));
 const state = await jiti.import(path.join(root, 'src/components/tools/valuation/state.ts'));
 const send = await jiti.import(path.join(root, 'src/lib/email/send.ts'));
+const base = await jiti.import(path.join(root, 'src/lib/email/templates/_base.ts'));
+const booking = await jiti.import(path.join(root, 'src/lib/tools/booking.ts'));
+const data = await jiti.import(path.join(root, 'src/lib/tools/valuation/data.ts'));
+const qr = await jiti.import(path.join(root, 'src/lib/tools/pdf/QrCode.tsx'));
+const partnerModule = await jiti.import(path.join(root, 'src/lib/tools/brand/partner.ts'));
+const founderProfileSrc = fs.readFileSync(path.join(root, 'src/lib/cms/founderProfile.ts'), 'utf8');
+const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
 
 let checks = 0, failures = 0;
 function check(label, ok, detail = '') {
@@ -52,7 +79,8 @@ function fromState(s) {
 }
 const withFin = (s, fin) => ({ ...s, fin: Object.fromEntries(Object.entries(fin).map(([k, v]) => [k, v.map(String)])) });
 
-const saudi = fromState(state.onEnterWacc(state.onLeaveCompany(state.exampleState())));
+const saudi = fromState(minimalCase(state));
+const full = fromState(fullFeatureCase(state));
 
 let pk = state.initialState();
 pk = state.applyIndustryDefaults({ ...pk, industry: 'Food Processing' });
@@ -127,27 +155,96 @@ console.log('Code defaults match migration 078');
 }
 
 console.log('PDF report');
+async function pageTexts(buf) {
+  const doc = await pdfjs.getDocument({ data: new Uint8Array(buf), useSystemFonts: false, disableFontFace: true, verbosity: 0 }).promise;
+  const out = [];
+  for (let i = 1; i <= doc.numPages; i++) {
+    const content = await (await doc.getPage(i)).getTextContent();
+    out.push(content.items.map((it) => it.str).join(' ').replace(/\s+/g, ' '));
+  }
+  return out;
+}
+
+/**
+ * Glyphs drawn for more than one character, such as the serif "fl" in "Free
+ * cash flow". Extracted text cannot show these: the font maps a ligature glyph
+ * back to its letters, and pdfjs normalises what is left. The operator list is
+ * the glyphs actually drawn.
+ */
+async function ligatureGlyphs(buf) {
+  const doc = await pdfjs.getDocument({ data: new Uint8Array(buf), verbosity: 0 }).promise;
+  const found = new Set();
+  for (let i = 1; i <= doc.numPages; i++) {
+    const ops = await (await doc.getPage(i)).getOperatorList();
+    ops.fnArray.forEach((fn, k) => {
+      if (fn !== pdfjs.OPS.showText) return;
+      for (const g of ops.argsArray[k][0]) {
+        const u = g && typeof g === 'object' ? g.unicode ?? '' : '';
+        if ([...u].length > 1 || /[ﬀ-ﬆ]/.test(u)) found.add(u);
+      }
+    });
+  }
+  return [...found];
+}
+const DATA_LABEL = data.dataVersionLabel('2026-09-16');
+check('market data label', DATA_LABEL === 'Damodaran January 2026, risk-free September 2026', DATA_LABEL);
 const pdfs = {};
-for (const [label, result] of [['Saudi', saudi], ['Pakistan', pakistan], ['distressed', distressed]]) {
+const texts = {};
+for (const [label, result] of [['Saudi', saudi], ['full', full], ['Pakistan', pakistan], ['distressed', distressed]]) {
   const buf = await pdfModule.renderValuationReport(result, {
+    ...REPORT_META,
     preparedFor: 'Test Person',
     company: label === 'distressed' ? null : 'Example Co',
     industry: 'Industry',
     country: 'Country',
-    purpose: 'sale',
-    generatedAt: new Date('2026-09-16T12:00:00Z'),
-    dataVersion: '2026-09-16',
     bookingHref: BOOK,
   });
   pdfs[label] = buf;
   const text = buf.toString('latin1');
   const pages = (text.match(/\/Type\s*\/Page[^s]/g) ?? []).length;
   check(`${label}: is a PDF`, buf.subarray(0, 5).toString() === '%PDF-');
-  check(`${label}: five pages`, pages === 5, String(pages));
+  check(`${label}: ten pages`, pages === 10 && pdfModule.REPORT_PAGE_TITLES.length === 10, String(pages));
+  const t = await pageTexts(buf);
+  texts[label] = t;
+  pdfModule.REPORT_PAGE_TITLES.forEach((title, i) => {
+    // The cover eyebrow is letter-spaced, which pdfjs extracts as spaced letters.
+    const squash = (x) => x.toLowerCase().replace(/\s+/g, '');
+    check(`${label}: page ${i + 1} is "${title}"`, squash(t[i] ?? '').includes(squash(title)), (t[i] ?? '').slice(0, 120));
+  });
+  check(`${label}: page 1 names the market data`, t[0].includes(DATA_LABEL));
+  check(`${label}: pages 2 to 10 carry the footer with page number and market data`, t.slice(1).every((pt, i) => pt.includes(`Page ${i + 2} of 10`) && pt.includes(DATA_LABEL) && pt.includes('Indicative only')));
+  const all = t.join(' ');
+  const ligs = await ligatureGlyphs(buf);
+  check(`${label}: no ligature glyphs drawn`, ligs.length === 0, ligs.join(', '));
+  check(`${label}: "Free cash flow" extracted as typed`, all.includes('Free cash flow'));
+  check(`${label}: no em or en dash`, !/[\u2013\u2014]/.test(all));
+  check(`${label}: no NaN or undefined in the text`, !/NaN|undefined|Infinity/.test(all), (all.match(/.{30}(NaN|undefined|Infinity).{30}/) ?? [''])[0]);
+  check(`${label}: no old "Market data version" label`, !all.includes('Market data version'));
   check(`${label}: embeds Inter and Source Serif 4`, /Inter/.test(text) && /SourceSerif/.test(text));
   check(`${label}: reasonable size`, buf.length > 20_000 && buf.length < 2_000_000, String(buf.length));
   check(`${label}: carries the booking link`, text.includes(BOOK));
   if (process.env.PDF_OUT) fs.writeFileSync(path.join(process.env.PDF_OUT, `report-${label}.pdf`), buf);
+}
+{
+  const f = texts.full.join(' ');
+  const m = texts.Saudi.join(' ');
+  const hf = format.headline(full);
+  check('full: stake value and label on the report', f.includes(hf.stakeLabel) && f.includes(hf.stakeRange));
+  check('full: weighted value on the report', f.includes('Probability-weighted') && f.includes(hf.weighted));
+  check('full: bridge items on the report', ['end of service benefits', 'lease liabilities', 'minority interest', 'surplus assets'].every((x) => f.toLowerCase().includes(x)));
+  check('full: normalised EBITDA on the report', f.includes('Normalised EBITDA'));
+  check('full: raised at least one warning', full.warnings.length > 0);
+  for (const w of format.warningTexts(full)) check(`full: warning "${w.title}" on the report`, f.includes(w.title));
+  check('full: no "none raised" line', !f.includes('None of the checks raised a warning.'));
+  check('minimal: no warnings, and says so', saudi.warnings.length === 0 && m.includes('None of the checks raised a warning.'));
+  check('minimal: whole equity, no stake line', m.includes('The valuation is for 100% of the equity') && !m.includes('stake with a'));
+  check('minimal: no bridge rows beyond net debt', !m.includes('Less lease liabilities') && !m.includes('Add surplus assets') && !m.includes('Less end of service benefits'));
+  check('minimal: assumptions say no other claims entered', /Other claims and surplus assets\s+None entered/.test(m));
+  check('full: bridge rows on the report', f.includes('Less lease liabilities') && f.includes('Add surplus assets and investments'));
+  check('closing page offers the booking link', texts.full[9].toLowerCase().includes('book'));
+  const code = qr.qrMatrix(BOOK);
+  const decoded = (await import('qrcode')).default.create(BOOK, { errorCorrectionLevel: 'M' }).segments.map((sg) => Buffer.from(sg.data).toString('utf8')).join('');
+  check('QR code encodes the tracked booking link', code.size >= 21 && decoded === BOOK, decoded);
 }
 check('file name is tidy', pdfModule.reportFileName('Acme & Sons / KSA', 'x', new Date('2026-09-16')) === 'PaceMakers valuation Acme  Sons  KSA 2026-09-16.pdf');
 
@@ -186,6 +283,186 @@ console.log('Brevo payload');
     if (saved.key === undefined) delete process.env.BREVO_API_KEY;
     if (saved.from === undefined) delete process.env.EMAIL_FROM_DEFAULT;
   }
+}
+
+console.log('Email shell and parts');
+{
+  const html = await base.baseLayoutBranded('<p>Body</p>');
+  const img = html.match(/<img[^>]*>/)?.[0] ?? '';
+  check('logo is the hosted PNG', img.includes(`src="${base.EMAIL_LOGO.src}"`) && base.EMAIL_LOGO.src.startsWith('https://www.pacemakersglobal.com/') && base.EMAIL_LOGO.src.endsWith('.png'), img);
+  check('logo has width and height attributes', img.includes(`width="${base.EMAIL_LOGO.width}"`) && img.includes(`height="${base.EMAIL_LOGO.height}"`));
+  check('logo has alt text', /alt="PaceMakers Business Consultants"/.test(img));
+  check('no SVG in the email', !/<svg|\.svg/i.test(html));
+  const file = path.join(root, 'public', new URL(base.EMAIL_LOGO.src).pathname);
+  const png = fs.existsSync(file) ? fs.readFileSync(file) : Buffer.alloc(0);
+  const pw = png.length > 24 ? png.readUInt32BE(16) : 0, ph = png.length > 24 ? png.readUInt32BE(20) : 0;
+  check('logo file is in public/ and is a PNG', png.subarray(1, 4).toString() === 'PNG', file);
+  // Drawn at half the file's pixels for sharp high-density screens, within a pixel of rounding.
+  check('logo file is twice the drawn size', Math.abs(pw / 2 - base.EMAIL_LOGO.width) <= 1 && Math.abs(ph / 2 - base.EMAIL_LOGO.height) <= 1, `${pw}x${ph}`);
+
+  const btn = templates.button('https://example.com/x', 'Book a free call');
+  const td = btn.match(/<td[^>]*>/)?.[0] ?? '';
+  const a = btn.match(/<a[^>]*>/)?.[0] ?? '';
+  check('button padding is on the cell', /padding:13px 26px/.test(td) && /mso-padding-alt:13px 26px/.test(td) && /bgcolor="#/.test(td), td);
+  check('button link carries no padding', !/padding/.test(a), a);
+
+  const build = (result) => templates.buildResultsEmail({ template: templates.DEFAULT_TEMPLATES[templates.RESULTS_TEMPLATE_KEY], name: 'A', email: 'a@example.com', company: null, result, bookingHref: BOOK }).body;
+  const fb = build(full), mb = build(saudi);
+  const hf = format.headline(full);
+  check('results email, full: weighted value row', fb.includes('Probability-weighted value') && fb.includes(templates.escapeHtml(hf.weighted)));
+  check('results email, full: stake value row', fb.includes(templates.escapeHtml(`Value of ${hf.stakeLabel}`)) && fb.includes(templates.escapeHtml(hf.stakeRange)));
+  check('results email, minimal: weighted row shown (scenarios always run)', mb.includes('Probability-weighted value'));
+  check('results email, minimal: no stake row', !mb.includes('Value of '));
+
+  const alertFor = (followUp) =>
+    templates.buildAlertEmail({
+      template: templates.DEFAULT_TEMPLATES[templates.ALERT_TEMPLATE_KEY],
+      toolName: 'Business Valuation',
+      lead: { name: 'T', email: 't@example.com', company: null, purpose: 'sale', dealSizeLabel: 'x', belowMinimum: false, country: 'Saudi Arabia', industry: 'Education', followUp, isTest: false },
+      result: saudi,
+      dashboardUrl: 'https://www.pacemakersglobal.com/admin/tool-leads/1',
+    }).body;
+  const consentCell = (body) => body.match(/Follow-up email consent<\/td>\s*<td[^>]*>([^<]*)</)?.[1];
+  check('alert: follow-up ticked shows Yes', consentCell(alertFor(true)) === 'Yes', String(consentCell(alertFor(true))));
+  check('alert: follow-up unticked shows No', consentCell(alertFor(false)) === 'No', String(consentCell(alertFor(false))));
+}
+
+console.log('Narrative and cover');
+{
+  const withWeight = (w) => fromState({ ...fullFeatureCase(state), dcfWeight: String(w) });
+  const text50 = format.executiveSummary(withWeight(50)).join(' ');
+  const text60 = format.executiveSummary(withWeight(60)).join(' ');
+  const text40 = format.executiveSummary(withWeight(40)).join(' ');
+  check('narrative: DCF weight 50% says nothing about the forecast carrying the answer', !text50.includes('forecast carries most of the answer'));
+  check('narrative: DCF weight 40% says nothing about it either', !text40.includes('forecast carries most of the answer'));
+  check('narrative: DCF weight 60% says the forecast carries most of the answer', text60.includes('so the forecast carries most of the answer'));
+  const diverging = [text40, text50, text60].find((t) => t.includes('gives the higher value'));
+  check('narrative: a diverging case exists to test the wording', Boolean(diverging));
+  check('narrative: "the comparables method gives", never "the comparables gives"', !/the comparables gives/.test(text40 + text50 + text60) && (text50.includes('the comparables method gives') || text50.includes('the DCF gives')));
+
+  // The cover: a KPI row under the headline, on the cover, in every case.
+  for (const [label, result] of [['Saudi', saudi], ['full', full], ['distressed', distressed]]) {
+    const t = await pageTexts(await pdfModule.renderValuationReport(result, { ...REPORT_META, company: 'Example Co', industry: 'I', country: 'C', bookingHref: BOOK }));
+    const h = format.headline(result);
+    const cover = t[0].replace(/ +/g, ' ');
+    const squash = cover.split(' ').join('').toLowerCase();
+    check(`${label}: cover KPI row carries WACC, terminal value share and EV / LTM EBITDA`, squash.includes('wacc') && squash.includes('terminalvalueshare') && squash.includes('ev/ltmebitda') && [h.wacc, h.tvShare, h.ltmMultiple].every((v) => squash.includes(v.split(" ").join("").toLowerCase())), cover.slice(0, 400));
+    check(`${label}: fourth KPI is the weighted value when scenarios ran`, h.weighted ? squash.includes('probability-weighted') && cover.includes(h.weighted) : squash.includes('impliedexitmultiple'));
+    check(`${label}: still ten pages with the KPI row`, t.length === 10);
+  }
+}
+
+console.log('Company profile on the report');
+{
+  const prof = await jiti.import(path.join(root, 'src/lib/tools/valuation/profile.ts'));
+  // The longest name the form allows, in words, as a real company name would be.
+  const maxName = prof.cleanCompanyName('Al Mashreq Integrated Industrial Manufacturing and Engineering Services Holding Company for Energy Water and Infrastructure Limited');
+  check('name fixture is at the limit', maxName.length === prof.PROFILE_LIMITS.companyName, String(maxName.length));
+  // The longest description the form allows, in two paragraphs of real words.
+  const words = 'The business designs, manufactures and services industrial equipment for energy and water clients across the region. ';
+  const para = (n) => words.repeat(Math.ceil(n / words.length)).slice(0, n).trim();
+  const maxDescription = prof.cleanDescription(`${para(495)}\n\n${para(495)}`);
+  check('profile fixture is at the limit', maxDescription.length >= 980 && maxDescription.length <= prof.PROFILE_LIMITS.description, String(maxDescription.length));
+  for (const [label, result] of [['full', full], ['distressed', distressed], ['Saudi', saudi]]) {
+    const buf = await pdfModule.renderValuationReport(result, { ...REPORT_META, company: maxName, industry: 'Industry', country: 'Country', bookingHref: BOOK, description: maxDescription });
+    const t = await pageTexts(buf);
+    check(`${label}, longest name and description: still ten pages`, t.length === 10, String(t.length));
+    // The cover carries it: the one page with room for the longest description in every case.
+    const squashed = t[0].replace(/\s+/g, '');
+    check(`${label}: cover carries About the business`, /aboutthebusiness/i.test(squashed), t[0].slice(-300));
+    check(`${label}: both paragraphs present on the cover, in full`, prof.descriptionParagraphs(maxDescription).every((p) => squashed.includes(p.replace(/\s+/g, ''))));
+    check(`${label}: attributed to the visitor`, t[0].includes('As described by') && t[0].includes('Not reviewed by PaceMakers'));
+    check(`${label}: the long company name is on the cover`, squashed.includes(maxName.replace(/\s+/g, '')));
+  }
+  const none = await pageTexts(await pdfModule.renderValuationReport(full, { ...REPORT_META, company: null, industry: 'I', country: 'C', bookingHref: BOOK }));
+  check('no description: no About block', !none[0].includes('Not reviewed by PaceMakers'));
+  check('clean: control characters removed and at most two paragraphs', prof.cleanDescription('a\u0000b\n\nc\n\nd') === 'ab\n\nc');
+  check('clean: blank is null', prof.cleanDescription(' \n ') === null && prof.cleanCompanyName('   ') === null && prof.cleanProfile({ companyName: ' ', description: '' }) === undefined);
+}
+
+console.log('Report branding and partner');
+{
+  // The mapping from the founder profile's hero, as stored. Nothing else is read.
+  const hero = {
+    name: ' Test Partner ', eyebrow: 'Founding Partner', title_primary: 'Corporate Finance Specialist', credentials_line: 'ACCA | FMVA | AFM |12+ Years Experience',
+    intro: 'An introduction   over two lines.', photo_url: 'https://example.supabase.co/storage/v1/object/public/team-photos/p.png',
+    cta_primary_href: 'https://www.linkedin.com/in/example/',
+    report_highlights: 'One\n Two \n\nThree\r\nFour\nFive\nSix',
+  };
+  const card = partnerModule.partnerFromHero(hero);
+  check('partner: name trimmed', card?.name === 'Test Partner');
+  check('partner: intro whitespace collapsed', card?.intro === 'An introduction over two lines.');
+  check('partner: credentials separators spaced evenly ("AFM |12+" fixed)', card?.credentialsLine === 'ACCA | FMVA | AFM | 12+ Years Experience', card?.credentialsLine);
+  check('partner: highlights from report_highlights, one per line, blanks dropped, at most five', JSON.stringify(card?.highlights) === JSON.stringify(['One', 'Two', 'Three', 'Four', 'Five']), JSON.stringify(card?.highlights));
+  check('partner: no report_highlights means no highlights', partnerModule.partnerFromHero({ ...hero, report_highlights: undefined })?.highlights.length === 0);
+  check('partner: the function takes only the hero (home card cannot feed it)', partnerModule.partnerFromHero.length === 1 && !('partnerFromSections' in partnerModule));
+  check('partner: fetch reads only the founder profile hero', (() => { const src = fs.readFileSync(path.join(root, 'src/lib/tools/brand/fetch.ts'), 'utf8'); return !src.includes("'founder_block'") && !src.includes("'home'") && src.includes("partnerFromHero(await sectionContent(FOUNDER_PAGE_SLUG, 'founder_hero'))"); })());
+  check('partner: highlights field is editable in the founder hero editor', fs.readFileSync(path.join(root, 'src/components/admin/editors/FounderHeroEditor.tsx'), 'utf8').includes("set('report_highlights'"));
+  check('partner: photo and LinkedIn from the hero', card?.photoUrl === hero.photo_url && card?.linkedinUrl === hero.cta_primary_href);
+  check('partner: profile path is the founder page', card?.profilePath === '/about/ahmad-din', card?.profilePath);
+  check('partner: a non-LinkedIn primary link is not offered as LinkedIn', partnerModule.partnerFromHero({ ...hero, cta_primary_href: '/book' })?.linkedinUrl === null);
+  check('partner: a non-https photo is dropped', partnerModule.partnerFromHero({ ...hero, photo_url: 'javascript:alert(1)' })?.photoUrl === null);
+  check('partner: no name means no card', partnerModule.partnerFromHero({ intro: 'x' }) === null);
+  check('partner: slug matches founderProfile.ts', founderProfileSrc.includes(`FOUNDER_PAGE_SLUG = '${partnerModule.PARTNER_PAGE_SLUG}'`));
+
+  // Navy and gold: green lettering becomes gold, navy and transparency stay.
+  {
+    const brandFetch = await jiti.import(path.join(root, 'src/lib/tools/brand/fetch.ts'));
+    const sharpMod = (await import('sharp')).default;
+    const px = Buffer.from([0x3f, 0xa6, 0x63, 255, 0x1b, 0x3a, 0x5f, 255, 0xc6, 0x9c, 0x3e, 255, 0x3f, 0xa6, 0x63, 0]);
+    const png = await sharpMod(px, { raw: { width: 4, height: 1, channels: 4 } }).png().toBuffer();
+    const out = await sharpMod(await brandFetch.recolourGreenToGold(png)).raw().toBuffer();
+    check('navy and gold logo: brand green becomes gold', out[0] === 0xc6 && out[1] === 0x9c && out[2] === 0x3e && out[3] === 255, [...out.subarray(0, 4)].join());
+    check('navy and gold logo: navy unchanged', out[4] === 0x1b && out[5] === 0x3a && out[6] === 0x5f);
+    check('navy and gold logo: gold unchanged', out[8] === 0xc6 && out[9] === 0x9c && out[10] === 0x3e);
+    check('navy and gold logo: transparent pixel untouched', out[15] === 0);
+    check('page 10 uses the navy and gold treatment', fs.readFileSync(path.join(root, 'src/lib/tools/brand/fetch.ts'), 'utf8').includes("processedImage(onLightSrc, 'logo-navy-gold')"));
+  }
+
+  // Real images from the repository stand in for the CMS files.
+  const logo = fs.readFileSync(path.join(root, 'public/email/pacemakers-logo-on-navy.png'));
+  const sharp = (await import('sharp')).default;
+  const portrait = await sharp({ create: { width: 360, height: 450, channels: 3, background: '#1B3A5F' } }).jpeg().toBuffer();
+  const branding = { logoOnDark: logo, logoOnLight: logo, partner: card, partnerPhoto: portrait };
+  const render = (b) => pdfModule.renderValuationReport(full, { ...REPORT_META, company: 'Example Co', industry: 'Industry', country: 'Country', bookingHref: BOOK, branding: b });
+  const withBrand = await render(branding);
+  const raw = withBrand.toString('latin1');
+  const t = await pageTexts(withBrand);
+  check('branded: still ten pages', t.length === 10, String(t.length));
+  check('branded: logo and portrait embedded as images', (raw.match(/\/Subtype\s*\/Image/g) ?? []).length >= 2);
+  check('branded: cover uses the logo, not the typeset name', !t[0].includes('PaceMakers Business Consultants ADVISORY') && !/^PaceMakers Business Consultants/.test(t[0]));
+  const last = t[9];
+  check('branded: closing page names the partner and role', last.includes('Test Partner') && last.includes('Founding Partner, Corporate Finance Specialist'));
+  check('branded: closing page carries credentials, intro and every highlight', last.includes('ACCA | FMVA | AFM | 12+ Years Experience') && last.includes('An introduction over two lines.') && card.highlights.every((h) => last.includes(h)));
+  check('branded: highlights attributed to the partner, not the firm', last.includes(partnerModule.PARTNER_RECORD_NOTE));
+  check('branded: services and booking still on the closing page', last.includes('CFO Advisory') && /bookafreecall/i.test(last.replace(/\s+/g, '')));
+
+  const bare = await render(null);
+  const tb = await pageTexts(bare);
+  check('no branding: still ten pages', tb.length === 10);
+  check('no branding: cover sets the name in type', tb[0].startsWith('PaceMakers Business Consultants'));
+  check('no branding: no partner block, full service summaries', !tb[9].includes('Who you will work with') && tb[9].includes('Institutional-grade'));
+  check('no branding: no images embedded', !/\/Subtype\s*\/Image/.test(bare.toString('latin1')));
+  const noPhoto = await pageTexts(await render({ ...branding, partnerPhoto: null, logoOnDark: null }));
+  check('partner without photo or logo: ten pages, block kept', noPhoto.length === 10 && noPhoto[9].includes('Test Partner'));
+}
+
+console.log('Booking links');
+{
+  const link = booking.bookingPageLink({ name: 'Ahmad Test', email: 'a@example.com', toolSlug: 'business-valuation', placement: 'pdf' });
+  const u = new URL(link, 'https://www.pacemakersglobal.com');
+  check('booking goes to /book on the site', link.startsWith('/book?') && u.pathname === '/book');
+  check('booking carries name and email', u.searchParams.get('name') === 'Ahmad Test' && u.searchParams.get('email') === 'a@example.com');
+  check('booking carries UTM tags', u.searchParams.get('utm_source') === 'pacemakersglobal' && u.searchParams.get('utm_medium') === 'free-tool' && u.searchParams.get('utm_campaign') === 'business-valuation' && u.searchParams.get('utm_content') === 'pdf');
+  check('no calendar host in the link', !/calendly/i.test(link));
+  const fwd = booking.withBookingPrefill('https://calendly.com/pacemakers/intro', { name: 'N', email: 'e@x.com', utm_campaign: 'business-valuation', redirect: 'https://evil.example', url: 'x' });
+  const f = new URL(fwd);
+  check('/book forwards prefill onto the calendar URL', f.host === 'calendly.com' && f.searchParams.get('name') === 'N' && f.searchParams.get('utm_campaign') === 'business-valuation');
+  check('/book drops unknown keys', !f.searchParams.has('redirect') && !f.searchParams.has('url'));
+  check('/book caps values at 200 characters', new URL(booking.withBookingPrefill('https://calendly.com/x', { name: 'n'.repeat(500) })).searchParams.get('name').length === 200);
+  check('blank calendar URL unchanged', booking.withBookingPrefill('', { name: 'N' }) === '');
+  const routeSrc = fs.readFileSync(path.join(root, 'src/app/api/tools/book/route.ts'), 'utf8');
+  check('tracked redirect builds its destination from bookingPageLink only', routeSrc.includes('bookingPageLink(') && !/booking_url|calendly/i.test(routeSrc.replace(/\/\*[\s\S]*?\*\//g, '')));
 }
 
 console.log(`\n${checks - failures} of ${checks} checks passed.`);

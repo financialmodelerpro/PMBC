@@ -92,6 +92,20 @@ export function FounderHeroEditor({ content, onChange }: SectionEditorProps) {
         />
       </div>
 
+      <div>
+        <label style={adminLabel}>Report highlights</label>
+        <textarea
+          value={s(content.report_highlights)}
+          placeholder={'200+ advisory engagements across his career\n200+ business valuations delivered'}
+          onChange={(e) => set('report_highlights', e.target.value)}
+          style={adminTextarea}
+        />
+        <p style={adminFieldHint}>
+          One per line, up to five. Shown only in the free tool reports and results, under &quot;Who you will work with&quot;, labelled as
+          the partner&apos;s career record. This profile page does not display them. Leave empty to show none.
+        </p>
+      </div>
+
       <div style={{ display: 'grid', gap: 12, gridTemplateColumns: '1fr 1fr' }}>
         <div>
           <label style={adminLabel}>Primary CTA label</label>

@@ -22,7 +22,8 @@ export type NavbarBrand = {
   logoDarkUrl: string | null;
 };
 
-export type NavbarItem = { label: string; href: string };
+/** `badge` marks an item only staff can see, such as Tools while every tool is Hidden. */
+export type NavbarItem = { label: string; href: string; badge?: string };
 
 /**
  * Child links for a nav item, keyed by that item's href.
@@ -322,6 +323,7 @@ export function Navbar({
                 style={{ letterSpacing: '0.08em' }}
               >
                 {item.label}
+                {item.badge && <NavBadge label={item.badge} />}
               </Link>
             );
           })}
@@ -398,6 +400,7 @@ export function Navbar({
                     }}
                   >
                     {item.label}
+                    {item.badge && <NavBadge label={item.badge} />}
                   </Link>
                   {/* Children are listed under the parent rather than behind a
                       second tap. The mobile menu is a stacked list with room to
@@ -443,5 +446,20 @@ export function Navbar({
         </div>
       )}
     </header>
+  );
+}
+
+/**
+ * A small amber tag on a nav item only staff can see, so nobody signed in
+ * mistakes a Hidden destination for a public one.
+ */
+function NavBadge({ label }: { label: string }) {
+  return (
+    <span
+      className="ml-1.5 inline-block rounded-[2px] border border-[#E0B64A] bg-[#FEF3C7] px-1 py-px align-middle text-[9px] font-semibold uppercase leading-none text-[#78350F]"
+      style={{ letterSpacing: '0.08em' }}
+    >
+      {label}
+    </span>
   );
 }

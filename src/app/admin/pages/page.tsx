@@ -1,12 +1,15 @@
-'use client';
-
 import Link from 'next/link';
 
 import { AdminPageHeader } from '@/components/admin/AdminPageHeader';
 import { SitePagesManager } from '@/components/admin/SitePagesManager';
 import { ADMIN_COLORS, adminPageMain } from '@/lib/admin/styles';
+import { fetchToolVisibility, liveToolsFrom } from '@/lib/tools/visibility';
 
-export default function AdminPagesNavPage() {
+export const dynamic = 'force-dynamic';
+
+export default async function AdminPagesNavPage() {
+  // How many tools are Live decides the note beside the Tools row.
+  const liveToolCount = liveToolsFrom(await fetchToolVisibility()).length;
   return (
     <div style={adminPageMain}>
       <div style={{ maxWidth: 1100, margin: '0 auto' }}>
@@ -43,10 +46,16 @@ export default function AdminPagesNavPage() {
             Header Settings
           </Link>
           . A pinned item stays in the navbar: its Visible switch locks and it
-          cannot be deleted until it is unpinned.
+          cannot be deleted until it is unpinned. The Tools item also drives the
+          footer Free Tools link, and reaches the public only while a tool is Live
+          in{' '}
+          <Link href="/admin/tools" style={{ color: ADMIN_COLORS.primaryDeep, fontWeight: 600 }}>
+            Tools
+          </Link>
+          .
         </div>
 
-        <SitePagesManager />
+        <SitePagesManager liveToolCount={liveToolCount} />
       </div>
     </div>
   );

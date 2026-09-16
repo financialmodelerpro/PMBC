@@ -10,6 +10,8 @@
 
 import type { ComponentType } from 'react';
 
+import type { PartnerCard } from '@/lib/tools/brand/partner';
+
 import { BusinessValuationTool } from './valuation/BusinessValuationTool';
 
 /** Per-request values every tool can rely on. */
@@ -18,6 +20,8 @@ export type ToolComponentProps = {
   bookingUrl: string;
   /** True when staff are viewing a Hidden tool. Submissions are saved as test leads. */
   preview: boolean;
+  /** The partner the visitor would work with, from the founder profile. Null hides the card. */
+  partner: PartnerCard | null;
 };
 
 export const TOOL_COMPONENTS: Record<string, ComponentType<ToolComponentProps>> = {

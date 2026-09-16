@@ -1,11 +1,13 @@
 'use client';
 
+import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ArrowDown, ArrowUp, Loader2, Lock, Plus, Trash2 } from 'lucide-react';
 
 import { ConfirmDialog } from '@/components/admin/ConfirmDialog';
 import { SaveButton } from '@/components/admin/SaveButton';
 import { ToggleSwitch } from '@/components/admin/ToggleSwitch';
+import { toolsNavNotice } from '@/lib/tools/navSetting';
 import {
   ADMIN_COLORS,
   adminBadge,
@@ -45,7 +47,7 @@ type Draft = { label: string; href: string };
  * tracks it per section in parity 3: one row's Save must not flush another
  * row's half-typed edit.
  */
-export function SitePagesManager() {
+export function SitePagesManager({ liveToolCount = 0 }: { liveToolCount?: number }) {
   const [rows, setRows] = useState<NavRow[]>([]);
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
   const [loading, setLoading] = useState(true);
@@ -332,6 +334,32 @@ export function SitePagesManager() {
                         }}
                         style={adminInput}
                       />
+                      {(() => {
+                        const notice = toolsNavNotice({ href: row.href, visible: row.visible !== false }, liveToolCount);
+                        if (!notice) return null;
+                        const warn = notice.tone === 'warning';
+                        return (
+                          <div
+                            role={warn ? 'alert' : undefined}
+                            data-tools-nav-notice={notice.tone}
+                            style={{
+                              marginTop: 6,
+                              padding: warn ? '7px 10px' : 0,
+                              borderRadius: 6,
+                              background: warn ? '#FEF3C7' : 'transparent',
+                              border: warn ? '1px solid #F59E0B' : 'none',
+                              color: warn ? '#92400E' : ADMIN_COLORS.textMuted,
+                              fontSize: 11.5,
+                              lineHeight: 1.5,
+                            }}
+                          >
+                            {notice.text}{' '}
+                            <Link href="/admin/tools" style={{ color: warn ? '#92400E' : ADMIN_COLORS.primaryDeep, fontWeight: 700 }}>
+                              Open Tools
+                            </Link>
+                          </div>
+                        );
+                      })()}
                     </td>
 
                     <td style={tdStyle}>

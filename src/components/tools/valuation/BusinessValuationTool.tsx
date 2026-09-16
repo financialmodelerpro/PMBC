@@ -1,11 +1,17 @@
 'use client';
 
 /**
- * The Business Valuation tool: four input steps, a lead gate, then results.
+ * The Business Valuation tool: four input steps, a lead gate, then a results
+ * dashboard.
+ *
+ * Layout: the step bar across the top; on large screens the step form on the
+ * left and a sticky live summary on the right, collapsing to a compact bar
+ * above the form below that. Results take the full width.
  *
  * Flow and validation follow `reference/tools/business-valuation.html`. The
- * arithmetic lives in `src/lib/tools/valuation/engine.ts` and nothing here
- * computes a value itself.
+ * arithmetic lives in `src/lib/tools/valuation/engine.ts`; nothing here computes
+ * a value itself. Form transitions are the plain functions in `state.ts`, which
+ * the verifiers drive directly.
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -15,25 +21,22 @@ import {
   currencyFor,
   dealBandOptions,
   financialYears,
-  peerStats,
+  peersInUse,
   runValuation,
   validateCompany,
   validateFinancials,
   validateTerminal,
   type FieldErrors,
+  type ValuationInputs,
   type ValuationResult,
 } from '@/lib/tools/valuation/engine';
-import { bookingLink } from '@/lib/tools/booking';
+import { headline } from '@/lib/tools/valuation/format';
 
 import type { ToolComponentProps } from '../toolComponents';
-import { captureAttribution, readAttribution, submitLead } from './submit';
-
 import { CompanyStep } from './CompanyStep';
 import { FinancialsStep } from './FinancialsStep';
-import { WaccStep } from './WaccStep';
-import { TerminalStep } from './TerminalStep';
 import { EMPTY_GATE, LeadGate, validateGate, type GateErrors, type GateValues } from './LeadGate';
-import { Results } from './Results';
+import { ResultsDashboard, TOOL_SLUG } from './ResultsDashboard';
 import {
   applyCountryDefaults,
   applyFill,
@@ -41,23 +44,32 @@ import {
   exampleState,
   initialState,
   newPeer,
+  num,
   onEnterWacc,
   onLeaveCompany,
   parseFinancials,
+  parsePeers,
   parseWacc,
   resetWacc,
-  syncExitMultiple,
+  str,
+  syncPeerDefaults,
+  syncStakeAdjustment,
   toInputs,
   type FormState,
 } from './state';
+import { StepBar, type StepState } from './StepBar';
+import { captureAttribution, readAttribution, submitLead } from './submit';
+import { SummaryPanel } from './SummaryPanel';
+import { TerminalStep } from './TerminalStep';
+import { WaccStep } from './WaccStep';
+
+export { TOOL_SLUG };
 
 type View = 0 | 1 | 2 | 3 | 'gate' | 'result';
 
 const STEP_LABELS = ['Company', 'Financials', 'Cost of capital', 'Terminal and comps'];
 
-export const TOOL_SLUG = 'business-valuation';
-
-export function BusinessValuationTool({ bookingUrl }: ToolComponentProps) {
+export function BusinessValuationTool({ preview, partner }: ToolComponentProps) {
   const [s, setS] = useState<FormState>(initialState);
   const [view, setView] = useState<View>(0);
   const [current, setCurrent] = useState(0);
@@ -72,10 +84,10 @@ export function BusinessValuationTool({ bookingUrl }: ToolComponentProps) {
   const [submitting, setSubmitting] = useState(false);
 
   const [pending, setPending] = useState<ValuationResult | null>(null);
-  const [result, setResult] = useState<ValuationResult | null>(null);
+  const [saved, setSaved] = useState<{ inputs: ValuationInputs; result: ValuationResult } | null>(null);
   const [lead, setLead] = useState<{ name: string; email: string; token: string | null } | null>(null);
 
-  const stepsRef = useRef<HTMLElement>(null);
+  const topRef = useRef<HTMLDivElement>(null);
   const mountedAt = useRef(Date.now());
 
   useEffect(() => {
@@ -96,26 +108,24 @@ export function BusinessValuationTool({ bookingUrl }: ToolComponentProps) {
       setCurrent(to);
       setMaxReached((m) => Math.max(m, to));
     }
-    requestAnimationFrame(() => stepsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    requestAnimationFrame(() => {
+      const el = topRef.current;
+      if (!el) return;
+      if (el.getBoundingClientRect().top < 0) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
   }
 
   /** The reference's `validate(step)`, including its side effects on success. */
   function validateStep(step: number): boolean {
     if (step === 0) {
       const errors = validateCompany(toInputs(s));
-      setCompanyErrors({
-        industry: errors.industry ?? '',
-        country: errors.country ?? '',
-        financialYear: errors.financialYear ?? '',
-        netDebt: errors.netDebt ?? '',
-      });
+      setCompanyErrors(errors);
       if (Object.keys(errors).length) return false;
-      // First time through, prefill the whole cost of capital.
       update(onLeaveCompany);
       return true;
     }
     if (step === 1) {
-      const e = validateFinancials(parseFinancials(s.fin));
+      const e = validateFinancials(parseFinancials(s.fin), toInputs(s));
       setFinError(e ?? '');
       return !e;
     }
@@ -129,21 +139,9 @@ export function BusinessValuationTool({ bookingUrl }: ToolComponentProps) {
     go(to as View);
   }
 
-  function onExample() {
-    update(exampleState);
-    setCompanyErrors({});
-    setFinError('');
-  }
-
-  function onFill() {
-    const { fillError, ...next } = applyFill(s);
-    setFinError(fillError ?? '');
-    if (!fillError) setS(next);
-  }
-
   function onRun() {
     const inputs = toInputs(s);
-    const e = validateTerminal(inputs, wacc.wacc);
+    const e = validateTerminal(inputs, computeWacc(inputs.wacc, currency, inputs.waccAdjustment ?? 0).wacc);
     if (e) {
       setTermError(e);
       return;
@@ -157,6 +155,10 @@ export function BusinessValuationTool({ bookingUrl }: ToolComponentProps) {
       return;
     }
     setPending(outcome.result);
+    // The company named in step 1 fills the gate's company field, unless the
+    // visitor has already typed one there.
+    const named = s.companyName.trim();
+    if (named) setGate((g) => (g.company.trim() ? g : { ...g, company: named }));
     go('gate');
   }
 
@@ -165,10 +167,11 @@ export function BusinessValuationTool({ bookingUrl }: ToolComponentProps) {
     setGateErrors(errors);
     if (Object.keys(errors).length || !pending) return;
     setSubmitting(true);
+    const inputs = toInputs(s);
     setLead({ name: gate.name.trim(), email: gate.email.trim(), token: null });
     try {
       const response = await submitLead({
-        inputs: toInputs(s),
+        inputs,
         gate: {
           name: gate.name.trim(),
           email: gate.email.trim(),
@@ -184,123 +187,180 @@ export function BusinessValuationTool({ bookingUrl }: ToolComponentProps) {
       });
       // The server's recomputation is what was saved and emailed, so it is what
       // the visitor sees. The browser's own run is the fallback, never the source.
-      setResult(response?.result ?? pending);
+      setSaved({ inputs, result: response?.result ?? pending });
       if (response?.token) setLead((l) => (l ? { ...l, token: response.token } : l));
     } finally {
       setSubmitting(false);
+      setMaxReached(3);
       go('result');
     }
   }
 
-  const peerDefaultActive = peerStats(toInputs(s).peers.map((p) => p.evEbitda)) !== null;
+  /* Step bar ------------------------------------------------------------- */
+  const stepStates: StepState[] = STEP_LABELS.map((_, i) => {
+    if (typeof view === 'number') {
+      if (i === view) return 'current';
+      return i <= maxReached ? 'done' : 'todo';
+    }
+    return i <= maxReached ? 'done' : 'todo';
+  });
 
-  // Through the tracking redirect when the lead was saved, so the click is
-  // attributed. Straight to the booking page when it was not.
-  const bookingHref = lead?.token
-    ? `/api/tools/book?t=${encodeURIComponent(lead.token)}&src=results`
-    : bookingLink({ bookingUrl, name: lead?.name, email: lead?.email, toolSlug: TOOL_SLUG, placement: 'results' });
+  /* Summary -------------------------------------------------------------- */
+  // Unlocked once the visitor has passed the gate. The panel shows beside the
+  // inputs, so this is what they see on returning to change something.
+  const summaryResult = saved?.result ?? null;
+  const summaryHeadline = summaryResult ? headline(summaryResult) : null;
+  const summary = {
+    companyName: s.companyName.trim(),
+    industry: s.industry,
+    country: s.country,
+    currency,
+    financialYear: s.financialYear,
+    revenue: s.fin.rev.map((v) => num(v) ?? NaN),
+    ebitda: s.fin.ebitda.map((v) => num(v) ?? NaN),
+    wacc: s.wacc.rf ? wacc.wacc : null,
+    range: summaryHeadline?.equityRange ?? null,
+    midpoint: summaryHeadline?.midpoint ?? null,
+  };
+
+  const peerDefaultActive = peersInUse(parsePeers(s.peers));
+  const showForm = view !== 'result';
 
   return (
-    <div className="mx-auto w-full max-w-[1200px]">
-      <nav
-        ref={stepsRef}
-        aria-label="Steps"
-        className="mx-auto mb-6 grid max-w-[900px] scroll-mt-28 grid-cols-4 gap-2"
-      >
-        {STEP_LABELS.map((label, i) => {
-          const isActive = view === i;
-          const isDone = typeof view === 'number' ? i < maxReached && i !== view : i <= maxReached;
-          const disabled = i > maxReached;
-          return (
-            <button
-              key={label}
-              type="button"
-              disabled={disabled}
-              aria-current={isActive ? 'step' : undefined}
-              onClick={() => go(i as View)}
-              className="border-t-[3px] pt-2.5 text-left text-[12px] text-[color:var(--pmbc-muted)] disabled:cursor-default sm:text-[14px]"
-              style={{ borderTopColor: isActive ? '#C69C3E' : isDone ? '#1B3A5F' : '#E8E2D6' }}
-            >
-              Step {i + 1}
-              <b className="block text-[13px] font-semibold text-[color:var(--pmbc-text)] sm:text-[15px]">{label}</b>
-            </button>
-          );
-        })}
-      </nav>
+    <div ref={topRef} className="mx-auto w-full max-w-[1200px] scroll-mt-28">
+      <div className="mx-auto mb-8 max-w-[760px]">
+        <StepBar labels={STEP_LABELS} states={stepStates} onGo={(i) => go(i as View)} />
+      </div>
 
-      {view === 0 && (
-        <CompanyStep
-          state={s}
-          currencyCode={currency.code}
-          errors={companyErrors}
-          onIndustry={(v) => update((prev) => applyIndustryDefaults({ ...prev, industry: v }))}
-          onCountry={(v) => update((prev) => applyCountryDefaults({ ...prev, country: v }))}
-          onChange={patch}
-          onExample={onExample}
-          onNext={() => next(1)}
-        />
+      {showForm ? (
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px] lg:gap-8">
+          <div className="min-w-0 space-y-4">
+            <div className="lg:hidden">
+              <SummaryPanel data={summary} />
+            </div>
+
+            {view === 0 && (
+              <CompanyStep
+                key="step-0"
+                state={s}
+                currencyCode={currency.code}
+                errors={companyErrors}
+                onIndustry={(v) => update((prev) => applyIndustryDefaults({ ...prev, industry: v }))}
+                onCountry={(v) => update((prev) => applyCountryDefaults({ ...prev, country: v }))}
+                onChange={patch}
+                onBridge={(k, v) => update((prev) => ({ ...prev, bridge: { ...prev.bridge, [k]: v } }))}
+                onExample={() => {
+                  update(exampleState);
+                  setCompanyErrors({});
+                  setFinError('');
+                }}
+                onNext={() => next(1)}
+              />
+            )}
+
+            {view === 1 && (
+              <FinancialsStep
+                key="step-1"
+                state={s}
+                currencyCode={currency.code}
+                years={years}
+                error={finError}
+                onCell={(k, i, v) => update((prev) => ({ ...prev, fin: { ...prev.fin, [k]: prev.fin[k].map((x, j) => (j === i ? v : x)) } }))}
+                onFillValue={(k, v) => update((prev) => ({ ...prev, fill: { ...prev.fill, [k]: v } }))}
+                onFill={() => {
+                  const { fillError, ...filled } = applyFill(s);
+                  setFinError(fillError ?? '');
+                  if (!fillError) setS(filled);
+                }}
+                onNorm={(p) => update((prev) => ({ ...prev, norm: { ...prev.norm, ...p } }))}
+                onChange={patch}
+                onBack={() => next(0)}
+                onNext={() => next(2)}
+              />
+            )}
+
+            {view === 2 && (
+              <WaccStep
+                key="step-2"
+                state={s}
+                currency={currency}
+                wacc={wacc}
+                onWacc={(k, v) => update((prev) => ({ ...prev, wacc: { ...prev.wacc, [k]: v }, spTouched: prev.spTouched || k === 'sp' }))}
+                onReset={() => update(resetWacc)}
+                onBack={() => next(1)}
+                onNext={() => next(3)}
+              />
+            )}
+
+            {view === 3 && (
+              <TerminalStep
+                key="step-3"
+                state={s}
+                error={termError}
+                peerDefaultActive={peerDefaultActive}
+                onChange={patch}
+                onExitMultiple={(v) => patch({ exitMultiple: v, xmTouched: true })}
+                onDiscount={(v) => patch({ privateDiscount: v, discountTouched: true })}
+                onPeer={(id, p) => update((prev) => syncPeerDefaults({ ...prev, peers: prev.peers.map((r) => (r.id === id ? { ...r, ...p } : r)) }))}
+                onAddPeer={() => update((prev) => ({ ...prev, peers: [...prev.peers, newPeer()] }))}
+                onRemovePeer={(id) => update((prev) => syncPeerDefaults({ ...prev, peers: prev.peers.filter((r) => r.id !== id) }))}
+                onScenario={(k, v) => update((prev) => ({ ...prev, scenarios: { ...prev.scenarios, [k]: v } }))}
+                onStake={(p) =>
+                  update((prev) =>
+                    syncStakeAdjustment({
+                      ...prev,
+                      stake: { ...prev.stake, ...p },
+                      stakeAdjustmentTouched: prev.stakeAdjustmentTouched || 'adjustment' in p,
+                    }),
+                  )
+                }
+                onBack={() => next(2)}
+                onRun={onRun}
+              />
+            )}
+
+            {view === 'gate' && (
+              <LeadGate
+                values={gate}
+                errors={gateErrors}
+                dealBands={dealBands}
+                submitting={submitting}
+                onChange={(p) => setGate((g) => ({ ...g, ...p }))}
+                onBack={() => go(3)}
+                onSubmit={onShow}
+              />
+            )}
+          </div>
+
+          <div className="hidden lg:block">
+            <SummaryPanel data={summary} />
+          </div>
+        </div>
+      ) : (
+        saved &&
+        lead && (
+          <ResultsDashboard
+            baseInputs={saved.inputs}
+            baseResult={saved.result}
+            lead={lead}
+            preview={preview}
+            partner={partner}
+            onEdit={() => go(3)}
+            onVersionSaved={(inputs, result) => {
+              setSaved({ inputs, result });
+              // Keep the form in step with the version just saved, so going back
+              // to the inputs shows what was emailed.
+              update((prev) => ({
+                ...prev,
+                growth: str(inputs.growth),
+                exitMultiple: str(inputs.exitMultiple),
+                xmTouched: true,
+                waccAdjustment: str(inputs.waccAdjustment ?? 0),
+              }));
+            }}
+          />
+        )
       )}
-
-      {view === 1 && (
-        <FinancialsStep
-          state={s}
-          currencyCode={currency.code}
-          years={years}
-          error={finError}
-          onCell={(k, i, v) =>
-            update((prev) => ({ ...prev, fin: { ...prev.fin, [k]: prev.fin[k].map((x, j) => (j === i ? v : x)) } }))
-          }
-          onFillValue={(k, v) => update((prev) => ({ ...prev, fill: { ...prev.fill, [k]: v } }))}
-          onFill={onFill}
-          onBack={() => next(0)}
-          onNext={() => next(2)}
-        />
-      )}
-
-      {view === 2 && (
-        <WaccStep
-          state={s}
-          currency={currency}
-          wacc={wacc}
-          onWacc={(k, v) =>
-            update((prev) => ({ ...prev, wacc: { ...prev.wacc, [k]: v }, spTouched: prev.spTouched || k === 'sp' }))
-          }
-          onReset={() => update(resetWacc)}
-          onBack={() => next(1)}
-          onNext={() => next(3)}
-        />
-      )}
-
-      {view === 3 && (
-        <TerminalStep
-          state={s}
-          error={termError}
-          peerDefaultActive={peerDefaultActive}
-          onChange={patch}
-          onExitMultiple={(v) => patch({ exitMultiple: v, xmTouched: true })}
-          onPeer={(id, p) =>
-            update((prev) => syncExitMultiple({ ...prev, peers: prev.peers.map((r) => (r.id === id ? { ...r, ...p } : r)) }))
-          }
-          onAddPeer={() => update((prev) => ({ ...prev, peers: [...prev.peers, newPeer()] }))}
-          onRemovePeer={(id) => update((prev) => syncExitMultiple({ ...prev, peers: prev.peers.filter((r) => r.id !== id) }))}
-          onBack={() => next(2)}
-          onRun={onRun}
-        />
-      )}
-
-      {view === 'gate' && (
-        <LeadGate
-          values={gate}
-          errors={gateErrors}
-          dealBands={dealBands}
-          submitting={submitting}
-          onChange={(p) => setGate((g) => ({ ...g, ...p }))}
-          onBack={() => go(3)}
-          onSubmit={onShow}
-        />
-      )}
-
-      {view === 'result' && result && <Results result={result} bookingHref={bookingHref} onEdit={() => go(3)} />}
     </div>
   );
 }

@@ -27,6 +27,20 @@
 /** Stamped on every lead. Bump on any change to a value in this file. */
 export const VALUATION_DATA_VERSION = '2026-09-16';
 
+/**
+ * How each data version is described to a reader: the PDF report's cover and
+ * footer, and the admin lead view. Add a line with every bump of
+ * `VALUATION_DATA_VERSION`, so leads computed under an older version keep the
+ * description of the data they were actually given.
+ */
+export const DATA_VERSION_LABELS: Record<string, string> = {
+  '2026-09-16': 'Damodaran January 2026, risk-free September 2026',
+};
+
+export function dataVersionLabel(version: string): string {
+  return DATA_VERSION_LABELS[version] ?? `Market data ${version}`;
+}
+
 export type SourceNote = { label: string; source: string; asOf: string };
 
 /* ------------------------------------------------------------------------ */
@@ -40,6 +54,12 @@ export const MARKET = {
   usDefaultSpread: 0.23,
   /** Damodaran implied mature market equity risk premium, percent. */
   matureErp: 4.23,
+  /**
+   * Long-run expected US inflation, percent. The expected local inflation for
+   * the currencies pegged to the dollar, used by the terminal growth check.
+   * Kept equal to `inflationUs` on the non-pegged countries.
+   */
+  usInflationLongRun: 2.5,
 } as const;
 
 /* ------------------------------------------------------------------------ */
@@ -66,6 +86,40 @@ export const ASSUMPTIONS = {
   defaultFinancialYear: 2025,
   minFinancialYear: 2015,
   maxFinancialYear: 2035,
+  /** Private company discount set automatically once the visitor enters their own peers, percent. */
+  privateDiscountWithPeers: 20,
+} as const;
+
+/* ------------------------------------------------------------------------ */
+/* Version 2 features. Every default here is neutral: it leaves the base     */
+/* valuation exactly as version 1 computed it.                               */
+/* ------------------------------------------------------------------------ */
+
+export const V2_DEFAULTS = {
+  /** Scenario adjustments to every forecast year, percentage points. */
+  scenarios: { upsideGrowth: 3, upsideMargin: 2, downsideGrowth: -3, downsideMargin: -2 },
+  /** Probability weights, percent: downside, base, upside. Must total 100. */
+  scenarioWeights: { downside: 25, base: 50, upside: 25 },
+  /** Stake defaults, percent. 100% with no adjustment is neutral. */
+  stake: { percent: 100, controlPremium: 25, minorityDiscount: 20 },
+} as const;
+
+/** Thresholds for the plain-language warnings on the results. */
+export const WARNING_RULES = {
+  /** Terminal value share of the DCF above this means the forecast period proves little. */
+  terminalValueShare: 0.75,
+  /** Exit multiple and the multiple implied by perpetuity growth differ by more than this, relative. */
+  exitMultipleMismatch: 0.3,
+  /** First forecast year EBITDA margin moves more than this from the last actual year, percentage points. */
+  marginJumpPoints: 10,
+  /** Growth implied by reinvestment and ROIC differs from long-term growth by more than this, percentage points. */
+  reinvestmentGapPoints: 2,
+  /** Terminal growth more than this below expected local inflation, percentage points. */
+  inflationBelowPoints: 1,
+  /** Terminal growth more than this above expected local inflation, percentage points. */
+  inflationAbovePoints: 2,
+  /** A stake must be above this percentage for a control premium to fit. */
+  controlStakeAbovePercent: 50,
 } as const;
 
 /* ------------------------------------------------------------------------ */
@@ -87,6 +141,13 @@ export type CountryData = {
   sarPerUnit: number;
   /** Default long-term growth, percent. */
   growth: number;
+  /**
+   * Highest long-term nominal growth that reads as sensible in this currency,
+   * percent. Above it the results carry a warning. Roughly long-run inflation
+   * plus real growth: about 4% for dollar-pegged currencies, higher where
+   * expected inflation is higher.
+   */
+  growthCeiling: number;
   /** Expected long-term local inflation, percent. Non-pegged currencies only. */
   inflationLocal?: number;
   /** Expected long-term US inflation, percent. Non-pegged currencies only. */
@@ -94,12 +155,12 @@ export type CountryData = {
 };
 
 export const COUNTRIES = {
-  'Saudi Arabia': { crp: 0.78, ds: 0.51, tax: 20, code: 'SAR', pegged: true, sarPerUnit: 1, growth: 2.5 },
-  'United Arab Emirates': { crp: 0.64, ds: 0.42, tax: 9, code: 'AED', pegged: true, sarPerUnit: 1.0211, growth: 2.5 },
-  Qatar: { crp: 0.64, ds: 0.42, tax: 10, code: 'QAR', pegged: true, sarPerUnit: 1.0302, growth: 2.5 },
-  Kuwait: { crp: 0.91, ds: 0.6, tax: 15, code: 'KWD', pegged: true, sarPerUnit: 12.2, growth: 2.5 },
-  Oman: { crp: 2.85, ds: 1.87, tax: 15, code: 'OMR', pegged: true, sarPerUnit: 9.753, growth: 2.5 },
-  Bahrain: { crp: 7.12, ds: 4.67, tax: 0, code: 'BHD', pegged: true, sarPerUnit: 9.973, growth: 2.5 },
+  'Saudi Arabia': { crp: 0.78, ds: 0.51, tax: 20, code: 'SAR', pegged: true, sarPerUnit: 1, growth: 2.5, growthCeiling: 4.0 },
+  'United Arab Emirates': { crp: 0.64, ds: 0.42, tax: 9, code: 'AED', pegged: true, sarPerUnit: 1.0211, growth: 2.5, growthCeiling: 4.0 },
+  Qatar: { crp: 0.64, ds: 0.42, tax: 10, code: 'QAR', pegged: true, sarPerUnit: 1.0302, growth: 2.5, growthCeiling: 4.0 },
+  Kuwait: { crp: 0.91, ds: 0.6, tax: 15, code: 'KWD', pegged: true, sarPerUnit: 12.2, growth: 2.5, growthCeiling: 4.0 },
+  Oman: { crp: 2.85, ds: 1.87, tax: 15, code: 'OMR', pegged: true, sarPerUnit: 9.753, growth: 2.5, growthCeiling: 4.0 },
+  Bahrain: { crp: 7.12, ds: 4.67, tax: 0, code: 'BHD', pegged: true, sarPerUnit: 9.973, growth: 2.5, growthCeiling: 4.0 },
   Pakistan: {
     crp: 9.71,
     ds: 6.37,
@@ -108,6 +169,7 @@ export const COUNTRIES = {
     pegged: false,
     sarPerUnit: 0.01333,
     growth: 6.0,
+    growthCeiling: 9.0,
     inflationLocal: 7.0,
     inflationUs: 2.5,
   },

@@ -12,7 +12,18 @@
 //      `delivered` never overwrites `clicked`, and a bounce or complaint wins.
 //      Alert-email events are recorded but never touch the lead's email status.
 //   4. Duplicates: a retried event is recorded once.
-//   5. Payloads: single objects and arrays, Brevo's event names, event time
+//   5. Concurrency: status writes are conditional on the stored status being
+//      weaker, so events applied in any order, interleaved with the send
+//      recording `sent`, settle on the strongest status. The mock applies the
+//      condition exactly as the conditional UPDATE in setEmailStatusIf does.
+//   6. Detail: Brevo's reason is kept only on events it explains.
+//   8. Engagement (src/lib/tools/engagement.ts): alert emails are resolved
+//      from the header, their own tag, message ids and recipient, and never
+//      move the status; a results click within 60 seconds of delivery (or of
+//      the send, before a delivered event) or on a bounced or blocked email is
+//      kept, flagged and not counted; booking clicks follow the same rule for
+//      the email link only; the lead detail shows the flag.
+//   7. Payloads: single objects and arrays, Brevo's event names, event time
 //      from ts_event, and a malformed body refused with 400.
 //
 //   npm run verify-brevo-webhook
@@ -27,6 +38,8 @@ import { createJiti } from 'jiti';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const jiti = createJiti(import.meta.url, { alias: { '@': path.join(root, 'src') } });
 const wh = await jiti.import(path.join(root, 'src/lib/tools/webhook.ts'));
+const eng = await jiti.import(path.join(root, 'src/lib/tools/engagement.ts'));
+const fs = await import('node:fs');
 
 let checks = 0, failures = 0;
 function check(label, ok, detail = '') {
@@ -42,7 +55,7 @@ const RESULTS_MSG = '<202609161200.results@smtp-relay.mailin.fr>';
 const ALERT_MSG = '<202609161200.alert@smtp-relay.mailin.fr>';
 
 function store() {
-  const lead = { id: LEAD, email_status: 'sent', email_message_id: RESULTS_MSG, alert_message_id: ALERT_MSG };
+  const lead = { id: LEAD, email: 'test@example.com', email_status: 'sent', email_message_id: RESULTS_MSG, email_sent_at: null, alert_message_id: ALERT_MSG };
   const events = [];
   const keys = new Set();
   return {
@@ -62,8 +75,21 @@ function store() {
       events.push(e);
       return 'inserted';
     },
-    async updateLeadStatus(id, patch) {
-      Object.assign(lead, patch);
+    // Mirrors resultsMessageTimeline: results events for that message only.
+    async resultsMessageTimeline(leadId, messageId) {
+      const rows = events
+        .filter((e) => e.lead_id === leadId && e.email_kind === 'results' && (!messageId || e.message_id === messageId))
+        .sort((a, b) => a.occurred_at.localeCompare(b.occurred_at));
+      return {
+        deliveredAt: rows.find((e) => e.event_type === 'delivered')?.occurred_at ?? null,
+        bounced: rows.some((e) => e.event_type === 'bounced' || e.event_type === 'blocked'),
+      };
+    },
+    // Mirrors setEmailStatusIf: one conditional UPDATE, never a read-then-write.
+    async advanceLeadStatus(id, { to, onlyFrom, at }) {
+      if (id !== lead.id) return;
+      if (onlyFrom.includes(lead.email_status)) lead.email_status = to;
+      if (at && (!lead.email_last_event_at || lead.email_last_event_at < at)) lead.email_last_event_at = at;
     },
   };
 }
@@ -97,12 +123,12 @@ console.log('Authentication');
 console.log('Status and matching');
 {
   const s = store();
-  const d = await run(s, ev('delivered'));
+  const d = await run(s, ev('delivered', { ts_event: 1789560000 }));
   check('delivered: 200, recorded', d.status === 200 && d.recorded === 1);
   check('delivered: status delivered', s.lead.email_status === 'delivered');
-  await run(s, ev('unique_opened'));
+  await run(s, ev('unique_opened', { ts_event: 1789560100 }));
   check('unique_opened maps to opened', s.lead.email_status === 'opened' && s.events.at(-1).event_type === 'opened');
-  await run(s, ev('click', { link: 'https://www.pacemakersglobal.com/api/tools/book?t=abc&src=email' }));
+  await run(s, ev('click', { link: 'https://www.pacemakersglobal.com/api/tools/book?t=abc&src=email', ts_event: 1789560200 }));
   check('click: status clicked, link kept', s.lead.email_status === 'clicked' && s.events.at(-1).link?.includes('/api/tools/book'));
   await run(s, ev('delivered'));
   check('late delivered does not downgrade clicked', s.lead.email_status === 'clicked');
@@ -131,6 +157,161 @@ console.log('Status and matching');
   check('untracked event name: ignored', untracked.ignored === 1 && s4.events.length === 0);
   const junkHeader = await run(store(), ev('delivered', { 'X-Mailin-custom': 'lead:not-a-uuid|kind:results', 'message-id': '<nobody@x>' }));
   check('malformed custom header does not match a lead', junkHeader.ignored === 1);
+}
+
+console.log('Concurrency');
+{
+  // The bug seen on the first real lead: a bounce and a stale 'sent' racing.
+  const perms = (a) => (a.length <= 1 ? [a] : a.flatMap((x, i) => perms([...a.slice(0, i), ...a.slice(i + 1)]).map((r) => [x, ...r])));
+  const names = ['request', 'delivered', 'hard_bounce', 'opened'];
+  for (const order of perms(names)) {
+    const s = store();
+    s.lead.email_status = 'pending';
+    // All four in flight at once, as separate requests.
+    await Promise.all(order.map((n, i) => run(s, ev(n, { ts_event: 1789560000 + i }))));
+    check(`${order.join(', ')} settles on bounced`, s.lead.email_status === 'bounced', s.lead.email_status);
+  }
+  {
+    // The send records 'sent' only from pending, after Brevo already bounced it.
+    const s = store();
+    s.lead.email_status = 'pending';
+    await run(s, ev('hard_bounce', { reason: 'no such user' }));
+    await s.advanceLeadStatus(LEAD, { to: 'sent', onlyFrom: ['pending'] });
+    check('send recording sent after a bounce leaves bounced', s.lead.email_status === 'bounced', s.lead.email_status);
+  }
+  {
+    const s = store();
+    s.lead.email_status = 'pending';
+    await s.advanceLeadStatus(LEAD, { to: 'sent', onlyFrom: ['pending'] });
+    await run(s, ev('delivered'));
+    check('send first, then delivered: delivered', s.lead.email_status === 'delivered');
+  }
+  {
+    const s = store();
+    await run(s, ev('delivered', { ts_event: 1789560500 }));
+    const later = s.lead.email_last_event_at;
+    await run(s, ev('opened', { ts_event: 1789560100 }));
+    check('event time never moves backward', s.lead.email_last_event_at === later);
+  }
+  check('weakerStatuses(bounced) excludes complaint and bounced', !wh.weakerStatuses('bounced').includes('complaint') && !wh.weakerStatuses('bounced').includes('bounced') && wh.weakerStatuses('bounced').includes('clicked'));
+  check('weakerStatuses(sent) is the unsent states', ['pending', 'failed', 'not_configured'].every((x) => wh.weakerStatuses('sent').includes(x)) && wh.weakerStatuses('sent').length === 3);
+  check('an error event never overwrites a status', wh.weakerStatuses(wh.statusForEvent('error')).length === 0);
+}
+
+console.log('Event detail');
+{
+  const s = store();
+  await run(s, ev('delivered', { reason: 'sent' }));
+  check('delivered with reason "sent": no detail', s.events.at(-1).detail === null, String(s.events.at(-1).detail));
+  await run(s, ev('unique_opened', { reason: 'sent' }));
+  check('unique_opened: detail is the Brevo event name', s.events.at(-1).detail === 'unique_opened');
+  await run(s, ev('soft_bounce', { reason: 'mailbox full' }));
+  check('soft bounce keeps its reason', s.events.at(-1).detail === 'mailbox full');
+  await run(s, ev('blocked', { reason: 'blocklisted' }));
+  check('blocked keeps its reason', s.events.at(-1).detail === 'blocklisted');
+}
+
+console.log('Engagement');
+{
+  const T0 = 1789570000;
+  const at = (sec) => new Date((T0 + sec) * 1000).toISOString();
+
+  // Results clicks around delivery.
+  {
+    const s = store();
+    s.lead.email_status = 'sent';
+    await run(s, ev('delivered', { ts_event: T0 }));
+    const soon = await run(s, ev('click', { ts_event: T0 + 30, link: 'https://www.pacemakersglobal.com/api/tools/book?t=x&src=email' }));
+    const flagged = s.events.at(-1);
+    check('click 30s after delivery: recorded in history', soon.recorded === 1 && flagged.event_type === 'clicked');
+    check('click 30s after delivery: flagged likely automated with the reason', eng.automatedReasonOf(flagged.payload) === 'within_60s_of_delivery' && flagged.detail === eng.AUTOMATED_REASON_TEXT.within_60s_of_delivery);
+    check('click 30s after delivery: raw Brevo payload kept', flagged.payload.event === 'click' && flagged.payload['message-id'] === RESULTS_MSG);
+    check('click 30s after delivery: status stays delivered', s.lead.email_status === 'delivered', s.lead.email_status);
+    await run(s, ev('click', { ts_event: T0 + 59 }));
+    check('click 59s after delivery: still flagged, status unchanged', eng.automatedReasonOf(s.events.at(-1).payload) === 'within_60s_of_delivery' && s.lead.email_status === 'delivered');
+    await run(s, ev('click', { ts_event: T0 + 60 }));
+    check('click 60s after delivery: counts, status clicked', eng.automatedReasonOf(s.events.at(-1).payload) === null && s.lead.email_status === 'clicked', s.lead.email_status);
+  }
+  {
+    const s = store();
+    s.lead.email_status = 'sent';
+    s.lead.email_sent_at = at(-20);
+    await run(s, ev('click', { ts_event: T0 }));
+    check('no delivered event yet: 20s after the send is flagged', eng.automatedReasonOf(s.events.at(-1).payload) === 'within_60s_of_delivery' && s.lead.email_status === 'sent');
+    const s2 = store();
+    s2.lead.email_status = 'sent';
+    s2.lead.email_sent_at = at(-300);
+    await run(s2, ev('click', { ts_event: T0 }));
+    check('no delivered event yet: 5 minutes after the send counts', eng.automatedReasonOf(s2.events.at(-1).payload) === null && s2.lead.email_status === 'clicked');
+  }
+  {
+    const s = store();
+    s.lead.email_status = 'sent';
+    await run(s, ev('hard_bounce', { ts_event: T0, reason: 'no such user' }));
+    await run(s, ev('click', { ts_event: T0 + 600 }));
+    check('click on a bounced email, 10 minutes later: flagged', eng.automatedReasonOf(s.events.at(-1).payload) === 'email_bounced');
+    check('click on a bounced email: status stays bounced', s.lead.email_status === 'bounced');
+    // The bounce is in the history but the lead's status never caught up.
+    const s3 = store();
+    s3.lead.email_status = 'delivered';
+    s3.events.push({ lead_id: LEAD, event_type: 'bounced', email_kind: 'results', message_id: RESULTS_MSG, occurred_at: at(0), payload: {}, dedupe_key: 'manual-bounce' });
+    await run(s3, ev('click', { ts_event: T0 + 600 }));
+    check('click on a message with a recorded bounce, status not yet bounced: flagged', eng.automatedReasonOf(s3.events.at(-1).payload) === 'email_bounced' && s3.lead.email_status === 'delivered', s3.lead.email_status);
+    const s2 = store();
+    s2.lead.email_status = 'blocked';
+    await run(s2, ev('click', { ts_event: T0 + 600 }));
+    check('click on a blocked email: flagged', eng.automatedReasonOf(s2.events.at(-1).payload) === 'email_bounced' && s2.lead.email_status === 'blocked');
+  }
+  {
+    // Opens and deliveries are not judged by the click rule.
+    const s = store();
+    s.lead.email_status = 'sent';
+    await run(s, ev('delivered', { ts_event: T0 }));
+    await run(s, ev('opened', { ts_event: T0 + 5 }));
+    check('an open inside the window is not flagged (weak signal, unchanged rule)', eng.automatedReasonOf(s.events.at(-1).payload) === null && s.lead.email_status === 'opened');
+  }
+
+  // Alert emails, however the event arrives.
+  const alertCases = [
+    ['header says alert', { 'X-Mailin-custom': `lead:${LEAD}|kind:alert`, email: 'advisory@pacemakersglobal.com' }],
+    ['no kind in header, new alert tag', { 'X-Mailin-custom': `lead:${LEAD}`, tags: ['tool-lead-alert', 'business-valuation', 'alert'], 'message-id': '<new@x>', email: 'advisory@pacemakersglobal.com' }],
+    ['no kind in header, old alert tags', { 'X-Mailin-custom': `lead:${LEAD}`, tags: ['tool-lead', 'business-valuation', 'alert'], 'message-id': '<new@x>', email: 'advisory@pacemakersglobal.com' }],
+    ['no kind, no tags, alert message id', { 'X-Mailin-custom': `lead:${LEAD}`, 'message-id': ALERT_MSG, email: 'advisory@pacemakersglobal.com' }],
+    ['no kind, no tags, unknown message, another recipient', { 'X-Mailin-custom': `lead:${LEAD}`, 'message-id': '<unknown@x>', email: 'someone@firm.test' }],
+  ];
+  for (const [label, extra] of alertCases) {
+    const s = store();
+    s.lead.email_status = 'delivered';
+    await run(s, [ev('delivered', { ts_event: T0, ...extra }), ev('click', { ts_event: T0 + 900, ...extra })]);
+    check(`alert (${label}): recorded as alert`, s.events.length === 2 && s.events.every((e) => e.email_kind === 'alert'), JSON.stringify(s.events.map((e) => e.email_kind)));
+    check(`alert (${label}): status never moves`, s.lead.email_status === 'delivered', s.lead.email_status);
+  }
+  {
+    const s = store();
+    s.lead.email_status = 'sent';
+    await run(s, ev('click', { ts_event: T0 + 900, 'X-Mailin-custom': `lead:${LEAD}`, 'message-id': '<unknown@x>', email: 'TEST@example.com' }));
+    check('no kind, no tags, unknown message, recipient is the visitor: results', s.events.at(-1).email_kind === 'results' && s.lead.email_status === 'clicked');
+  }
+
+  // The pure rules.
+  check('resolveEmailKind: new results tags are results', eng.resolveEmailKind({ headerKind: null, tags: ['tool-lead', 'x', 'results'], messageId: null, resultsMessageId: null, alertMessageId: null, recipient: null, leadEmail: null }) === 'results');
+  check('resolveEmailKind: nothing known is alert', eng.resolveEmailKind({ headerKind: null, tags: [], messageId: null, resultsMessageId: null, alertMessageId: null, recipient: null, leadEmail: null }) === 'alert');
+  const book = (src, clickSec, status = 'delivered', deliveredSec = 0) =>
+    eng.classifyBookingClick({ src, clickedAt: at(clickSec), deliveredAt: deliveredSec === null ? null : at(deliveredSec), sentAt: null, emailStatus: status });
+  check('booking click from the email 10s after delivery: not counted', book('email', 10) === 'within_60s_of_delivery');
+  check('booking click from the email 2 minutes after delivery: counted', book('email', 120) === null);
+  check('booking click from a bounced email: not counted', book('email', 3600, 'bounced') === 'email_bounced');
+  check('booking click from the results page is never judged', book('results', 1) === null && book('results', 1, 'bounced') === null);
+  check('booking click from the PDF is never judged', book('pdf', 1) === null);
+  check('marker round trip', eng.automatedReasonOf({ pmbc_engagement: eng.automatedMarker('email_bounced', null) }) === 'email_bounced' && eng.automatedReasonOf({ pmbc_engagement: { likely_automated: 'yes' } }) === null && eng.automatedReasonOf(null) === null);
+
+  // Wiring, read from source.
+  const read = (f) => fs.readFileSync(path.join(root, f), 'utf8');
+  check('alert emails carry their own tag', read('src/lib/tools/leads/deliver.ts').includes("tags: [ALERT_TAG, lead.tool_slug, 'alert'") && eng.ALERT_TAG !== eng.RESULTS_TAG);
+  check('booking redirect does not count a likely automated click', read('src/app/api/tools/book/route.ts').includes('automated ? Promise.resolve(true) : updateLead(lead.id, { booking_clicks'));
+  check('webhook status write skipped for a flagged click', read('src/lib/tools/webhook.ts').includes("if (kind === 'results' && to && !automated)"));
+  const detail = read('src/app/admin/tool-leads/[id]/page.tsx');
+  check('lead detail shows the flag, labels alerts, and says clicks were not counted', detail.includes('AUTOMATED_REASON_TEXT[automatedReasonOf(e.payload)!]') && detail.includes('Internal alert, not visitor engagement') && detail.includes('likely automated'));
 }
 
 console.log('Duplicates and payloads');

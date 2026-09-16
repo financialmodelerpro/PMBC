@@ -56,6 +56,8 @@ const nextConfig: NextConfig = {
     '/api/tools/[slug]/lead': ['./src/lib/tools/pdf/fonts/**'],
     '/api/admin/tool-leads/[id]/resend': ['./src/lib/tools/pdf/fonts/**'],
     '/api/admin/tool-leads/[id]/pdf': ['./src/lib/tools/pdf/fonts/**'],
+    '/api/tools/[slug]/lead/version': ['./src/lib/tools/pdf/fonts/**'],
+    '/api/tools/[slug]/pdf': ['./src/lib/tools/pdf/fonts/**'],
   },
   images: {
     remotePatterns,
