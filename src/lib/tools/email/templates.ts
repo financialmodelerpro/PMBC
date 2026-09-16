@@ -11,7 +11,8 @@
  * Plain variables are HTML-escaped (`renderTemplate`). `*_block` variables are
  * markup built here from escaped values, inserted as-is.
  *
- *   results: name, email, company, equity_range, midpoint, ev_range, wacc,
+ *   results: name, email, company, equity_range, midpoint, weighted_value,
+ *            stake_value, ev_range, wacc,
  *            methods, valuation_date, currency, booking_url,
  *            summary_block, booking_button_block
  *   alert:   tool_name, name, email, company, company_suffix, purpose,
@@ -91,12 +92,20 @@ ${rows
 </table>`;
 }
 
-/** A bulletproof button: a table cell, so Outlook draws the background. */
+/**
+ * A bulletproof button.
+ *
+ * The padding and the colour are on the table cell, with `bgcolor` as well as
+ * the style, because Outlook's Word renderer ignores padding on an `<a>`: with
+ * the padding on the link, as it was until 2026-09-16, Outlook drew the label
+ * pressed against the edges of its box. Every client honours cell padding. The
+ * link keeps a line height so the cell does not collapse around it.
+ */
 export function button(href: string, label: string, tone: 'gold' | 'navy' = 'gold'): string {
   const bg = tone === 'gold' ? GOLD : NAVY;
   const fg = tone === 'gold' ? '#14304F' : '#FFFFFF';
-  return `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:8px 0 8px;"><tr><td style="background:${bg};border-radius:2px;">
-<a href="${escapeHtml(href)}" style="display:inline-block;padding:13px 26px;font-family:${SANS};font-size:13px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:${fg};text-decoration:none;">${escapeHtml(label)}</a>
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:8px 0;border-collapse:separate;"><tr><td align="center" bgcolor="${bg}" style="background:${bg};border-radius:2px;padding:13px 26px;mso-padding-alt:13px 26px;">
+<a href="${escapeHtml(href)}" style="display:inline-block;font-family:${SANS};font-size:13px;line-height:18px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:${fg};text-decoration:none;">${escapeHtml(label)}</a>
 </td></tr></table>`;
 }
 
@@ -118,6 +127,8 @@ export function buildResultsEmail(i: ResultsEmailInput): { subject: string; body
   const rows: [string, string][] = [
     ['Indicative equity value', h.equityRange],
     ['Midpoint', h.midpoint],
+    ...(h.weighted ? ([['Probability-weighted value', h.weighted]] as [string, string][]) : []),
+    ...(h.stakeRange && h.stakeLabel ? ([[`Value of ${h.stakeLabel}`, h.stakeRange]] as [string, string][]) : []),
     ['Enterprise value', h.evRange],
     ['WACC', h.wacc],
     ['Methods', methods],
@@ -135,6 +146,8 @@ export function buildResultsEmail(i: ResultsEmailInput): { subject: string; body
     company: i.company ?? '',
     equity_range: h.equityRange,
     midpoint: h.midpoint,
+    weighted_value: h.weighted ?? '',
+    stake_value: h.stakeRange ?? '',
     ev_range: h.evRange,
     wacc: h.wacc,
     methods,
