@@ -185,6 +185,7 @@ const CASES = [
     },
     expectFloor: 'none',
     expectPeerExitMultiple: 10.65,
+    expectAutoDiscount: 20,
   },
   {
     name: 'B. Pakistan, PKR with inflation conversion',
@@ -420,6 +421,15 @@ async function runCase(page, c) {
   }
   s = { ...s, exitMultiple: refIn.exitMultiple, xmTouched: true };
 
+  // CHANGED 3: the private company discount. Ours defaults to 20% once peers
+  // are in use, and applies to the exit multiple as well as the comparables.
+  // Assert the default, then give the reference the same discount and the
+  // discounted exit multiple, which is exactly what our DCF uses.
+  const oursDisc = parseFloat(s.privateDiscount) || 0;
+  if (c.expectAutoDiscount !== undefined) num('CHANGED discount defaults with peers', oursDisc, c.expectAutoDiscount);
+  const appliedXm = oursDisc ? parseFloat(refIn.exitMultiple) * (1 - oursDisc / 100) : parseFloat(refIn.exitMultiple);
+  await page.evaluate(`(() => { $("xm").value = ${JSON.stringify(String(appliedXm))}; $("dlom").value = ${JSON.stringify(String(oursDisc))}; })()`);
+
   // 2. Run both.
   const refOut = await page.evaluate(RUN_AND_READ);
   if (refOut.error) return fail(`reference run failed: ${refOut.error}`);
@@ -459,7 +469,8 @@ async function runCase(page, c) {
   same('KPI terminal value share', h.tvShare, t.kTv);
   same('KPI implied exit multiple', h.impliedExitMultiple, t.kIm);
   same('KPI EV / LTM EBITDA', h.ltmMultiple, t.kLtm);
-  const rows = format.footballFieldRows(r);
+  // The reference's five rows. Version 2 adds a scenarios row it never had.
+  const rows = format.footballFieldRows(r).filter((x) => format.REFERENCE_FOOTBALL_KEYS.includes(x.key));
   same('football field values', rows.map((x) => (x.range ? `${format.fmtMillions(x.range[0])} to ${format.fmtMillions(x.range[2])}` : '')), t.ffVals);
   same('football field scale', format.footballFieldScale(rows).ticks, t.ffScale);
   same('FCF table', tableCells(format.fcfTable(r)), normaliseNegativeZero(t.fcf));

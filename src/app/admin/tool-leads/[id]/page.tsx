@@ -12,7 +12,7 @@ import { emailStatusLabel } from '@/lib/tools/admin';
 import type { ToolLeadEventRow } from '@/lib/tools/db';
 import { dealSizeLabel } from '@/lib/tools/leads/deliver';
 import { getLead, getLeadEvents } from '@/lib/tools/leads/store';
-import { PURPOSES } from '@/lib/tools/valuation/data';
+import { PURPOSES, dataVersionLabel } from '@/lib/tools/valuation/data';
 import type { ValuationInputs } from '@/lib/tools/valuation/engine';
 import { bridgeTable, fcfTable, headline, sensitivityTable, type Table } from '@/lib/tools/valuation/format';
 import { reviveResult } from '@/lib/tools/valuation/serialize';
@@ -174,7 +174,7 @@ export default async function ToolLeadDetailPage(props: { params: Promise<{ id: 
         <AdminPageHeader
           eyebrow={tool?.name ?? lead.tool_slug}
           title={lead.company ? `${lead.name}, ${lead.company}` : lead.name}
-          description={`Received ${when(lead.created_at)}. Market data ${lead.data_version}.`}
+          description={`Received ${when(lead.created_at)}. ${dataVersionLabel(lead.data_version)} (data version ${lead.data_version}).`}
         />
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: -16, marginBottom: 20 }}>
           {lead.is_test && <span style={adminBadge('warning')}>Test lead</span>}
