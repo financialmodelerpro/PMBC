@@ -4,7 +4,8 @@ import { fetchPublishedServices } from '@/lib/cms/collections';
 import { fetchSuppressedNavHrefs, isSuppressed } from '@/lib/public/collectionGates';
 import { SERVICES } from '@/config/services';
 import { getAdminSession } from '@/lib/auth/requireAdmin';
-import { applyToolsNavItem, fetchToolVisibility, liveToolsFrom } from '@/lib/tools/visibility';
+import { applyToolsNavSetting, toolsNavNeedsSession } from '@/lib/tools/navSetting';
+import { fetchToolVisibility, liveToolsFrom, withLocalToolsNavOverride } from '@/lib/tools/visibility';
 import { Navbar, type NavbarDropdowns } from './Navbar';
 
 /**
@@ -68,11 +69,13 @@ export async function NavbarServer() {
    * This subtracts from the operator's list and never adds to it: a row hidden
    * in Pages & Nav was already gone before this ran.
    */
-  const filtered = header.nav_items.filter((item) => !isSuppressed(item.href, suppressed));
-  // Tools follows the visibility switch at /admin/tools. The session is only
-  // read when no tool is Live, which is the one case where it changes the menu.
-  const staff = liveToolsFrom(tools).length === 0 ? Boolean(await getAdminSession().catch(() => null)) : false;
-  const navItems = applyToolsNavItem(filtered, tools, staff);
+  const filtered = withLocalToolsNavOverride(header.nav_items.filter((item) => !isSuppressed(item.href, suppressed)));
+  // Tools is offered only when an operator switched its row on in Pages & Nav.
+  // With nothing Live the public loses it and staff see it badged Hidden, so
+  // the session is read only in that one case (src/lib/tools/navSetting.ts).
+  const live = liveToolsFrom(tools).length;
+  const staff = toolsNavNeedsSession(filtered, live) ? Boolean(await getAdminSession().catch(() => null)) : false;
+  const navItems = applyToolsNavSetting(filtered, live, staff);
 
   return (
     <Navbar

@@ -537,6 +537,7 @@ Three flags matter when rebuilding:
 078  tool_email_templates      the results email and lead alert rows in email_templates. Code carries the same defaults
 079  retire_tools_link_rows    removes 075's two rows; the footer link and CTA are now rendered from the visibility switch
 080  tool_hero_promise         DML, safe any time. The valuation hero subtitle becomes the one-line promise, only if still 074's wording
+081  tools_nav_item            DML, safe any time. A hidden "Tools" row in Pages & Nav after Financial Modeler Pro, only if no /tools row exists
 ```
 
 **Every migration from 076 on states when it is safe to apply** in a `SAFE TO APPLY:` line in its header: before or after which deploy, and what the site does in the gap. 075 is why: it was applied before the routes it linked to were deployed, and previews share the production database, so the live footer linked to a 404.
@@ -941,8 +942,25 @@ nothing else may decide:
 - `/tools`: 404 while no tool is Live. Lists Live tools only.
 - `sitemap.xml`: `/tools` and each Live tool. The sitemap is rendered per request.
 - `WebApplication` JSON-LD: only on a Live tool's public page.
-- Footer "Free Tools": shown while at least one tool is Live. **Not** a row in Footer Links.
-- Navbar "Tools" (`applyToolsNavItem`): after Financial Modeler Pro while at least one tool is Live. While none is, signed-in staff still see it with a **Hidden** badge and the public sees nothing. A `/tools` row added in Pages & Nav is removed, so there is never a second switch. The session is only read while nothing is Live.
+- Service page CTA and each tool page: the tool's own Live or Hidden status only.
+
+### Tools in the navbar: Pages & Nav decides
+
+**Since 2026-09-16 the Tools nav item is an ordinary Pages & Nav row** (`site_pages`, link `/tools`, seeded hidden by migration 081). The operator sets its label, its place in the order and whether it is on, like any other page. Nothing adds it automatically any more. Two switches, each with one job:
+
+| Switch | Where | Decides |
+|---|---|---|
+| Tools row Visible | Pages & Nav | Whether Tools is offered in the navbar, and the footer "Free Tools" link with it |
+| Tool Live or Hidden | Tools | Whether each tool page is public, and so whether the hub has anything to show |
+
+The rules, in `src/lib/tools/navSetting.ts` (pure, shared by the navbar, Pages & Nav and the verifier):
+
+- **Row off:** no Tools link and no Free Tools link, for anyone.
+- **Row on, nothing Live:** the public sees no link (the hub would 404). Signed-in staff see the link with a **Hidden** badge so they can check it, and Pages & Nav shows a warning beside the row with a link to Tools. The session is only read in this one case.
+- **Row on, a tool Live:** the public sees Tools under the operator's label and position, the footer shows Free Tools after Financial Modeler Pro, and the hub lists the Live tools.
+- `/tools` itself is unchanged: a 404 to the public while nothing is Live, the hub with the Admin preview banner for signed-in staff.
+
+"Free Tools" is still not a Footer Links row: any stored `/tools` footer link is removed, so there is never a third switch. Pages & Nav has no footer placement control; the link sits after Financial Modeler Pro in the Firm column.
 - Service page CTA: the tool's `serviceCta`, while it is Live. **Not** a page builder section.
 - Lead API: refuses a Hidden tool unless the caller is staff.
 
@@ -956,7 +974,8 @@ production database, so flipping a tool to check a Hidden or Live page would
 change the public site. `TOOLS_VISIBILITY_OVERRIDE=hidden` or `=live` on a local
 `next start` makes that server behave as if every tool were Hidden or Live. It
 is **ignored whenever `VERCEL` is set**, which Vercel sets on every deployment,
-and the verifier asserts that.
+and the verifier asserts that. `TOOLS_NAV_OVERRIDE=on` or `=off` does the same for
+the Pages & Nav Tools row, with the same guard.
 
 **Any submission by signed-in staff is a test lead** (`is_test`), on a Hidden or
 a Live tool, and test leads are excluded from counts and from the lead list by

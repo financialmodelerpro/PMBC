@@ -5,17 +5,19 @@ import { parseFooterConfig } from '@/lib/cms/footerSettings';
 import { parseFooterLinks } from '@/lib/cms/footerLinks';
 import { fetchSuppressedNavHrefs, isSuppressed } from '@/lib/public/collectionGates';
 import { TOOLS_FOOTER_LINK } from '@/config/tools';
-import { applyToolsFooterLink, fetchToolVisibility } from '@/lib/tools/visibility';
+import { applyToolsFooterLink, fetchToolVisibility, fetchToolsNavOn } from '@/lib/tools/visibility';
 import { Footer } from './Footer';
 
 export async function FooterServer() {
-  const [branding, footerContent, settings, suppressed, tools] = await Promise.all([
+  const [branding, footerContent, settings, suppressed, tools, toolsNavOn] = await Promise.all([
     safe(fetchBranding(), null),
     safe(fetchContentBySection('footer_settings'), {} as Record<string, string>),
     safe(fetchSiteSettings(), {} as SiteSettings),
     safe(fetchSuppressedNavHrefs(), new Set<string>()),
     // Never rejects: a failed read already resolves to every tool Hidden.
     fetchToolVisibility(),
+    // Never rejects: an absent or unreadable Tools row is off.
+    fetchToolsNavOn(),
   ]);
 
   /*
@@ -26,10 +28,11 @@ export async function FooterServer() {
    */
   const links = applyToolsFooterLink(
     parseFooterLinks(footerContent.links),
-    // "Free Tools" is not an operator switch in Footer Links. It follows the
-    // tool visibility switch at /admin/tools, shown while any tool is Live.
+    // "Free Tools" is not a switch in Footer Links. It follows the Tools row
+    // in Pages & Nav, and shows only while a tool is Live.
     tools,
     TOOLS_FOOTER_LINK,
+    toolsNavOn,
   ).filter((link) => !isSuppressed(link.href, suppressed));
 
   return (
