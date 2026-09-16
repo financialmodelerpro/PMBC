@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
 
 import { toolsDb } from '@/lib/tools/db';
-import { insertLeadEvent, setEmailStatusIf } from '@/lib/tools/leads/store';
+import { insertLeadEvent, resultsMessageTimeline, setEmailStatusIf } from '@/lib/tools/leads/store';
 import { extractToken, handleBrevoWebhook, type WebhookLead, type WebhookStore } from '@/lib/tools/webhook';
 
 export const dynamic = 'force-dynamic';
 
-const COLUMNS = 'id, email_status, email_message_id, alert_message_id';
+const COLUMNS = 'id, email, email_status, email_message_id, email_sent_at, alert_message_id';
 
 const store: WebhookStore = {
   async findLeadById(id) {
@@ -26,6 +26,7 @@ const store: WebhookStore = {
   },
   insertEvent: (event) => insertLeadEvent(event),
   advanceLeadStatus: (id, change) => setEmailStatusIf(id, change),
+  resultsMessageTimeline: (leadId, messageId) => resultsMessageTimeline(leadId, messageId),
 };
 
 /**

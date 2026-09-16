@@ -87,6 +87,32 @@ export async function setEmailStatusIf(
   }
 }
 
+/**
+ * Delivery evidence for one results email: its `delivered` time and whether a
+ * bounce or block was recorded. Read only. Without a message id, the lead's
+ * results events of any message.
+ */
+export async function resultsMessageTimeline(leadId: string, messageId: string | null): Promise<{ deliveredAt: string | null; bounced: boolean }> {
+  try {
+    let q = toolsDb()
+      .from('tool_lead_events')
+      .select('event_type, occurred_at')
+      .eq('lead_id', leadId)
+      .eq('email_kind', 'results')
+      .in('event_type', ['delivered', 'bounced', 'blocked'])
+      .order('occurred_at', { ascending: true });
+    if (messageId) q = q.eq('message_id', messageId);
+    const { data } = await q;
+    const rows = (data ?? []) as { event_type: string; occurred_at: string }[];
+    return {
+      deliveredAt: rows.find((r) => r.event_type === 'delivered')?.occurred_at ?? null,
+      bounced: rows.some((r) => r.event_type === 'bounced' || r.event_type === 'blocked'),
+    };
+  } catch {
+    return { deliveredAt: null, bounced: false };
+  }
+}
+
 export async function getLead(id: string): Promise<{ lead: ToolLeadRow | null; missingTable: boolean }> {
   try {
     const { data, error } = await toolsDb().from('tool_leads').select('*').eq('id', id).maybeSingle();

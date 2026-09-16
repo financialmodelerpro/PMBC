@@ -39,6 +39,7 @@
 import { timingSafeEqual } from 'node:crypto';
 
 import type { EmailStatus } from './db';
+import { AUTOMATED_REASON_TEXT, automatedMarker, classifyResultsClick, resolveEmailKind } from './engagement';
 
 export type NormalisedEvent = {
   /** Our vocabulary. Null for Brevo events we do not track. */
@@ -50,6 +51,9 @@ export type NormalisedEvent = {
   kind: 'results' | 'alert' | null;
   link: string | null;
   reason: string | null;
+  /** Brevo's tags for the message, lower case. */
+  tags: string[];
+  /** The recipient, as Brevo reports it. */
   occurredAt: string;
   dedupeKey: string;
   raw: Record<string, unknown>;
@@ -140,6 +144,7 @@ export function normaliseEvent(raw: Record<string, unknown>): NormalisedEvent {
     kind: custom.kind,
     link,
     reason: str(raw.reason),
+    tags: (Array.isArray(raw.tags) ? raw.tags : typeof raw.tag === 'string' ? [raw.tag] : []).filter((t): t is string => typeof t === 'string').map((t) => t.toLowerCase()),
     occurredAt,
     dedupeKey: `brevo:${messageId ?? 'none'}:${brevoEvent}:${str(raw.ts_event) ?? str(raw.ts_epoch) ?? str(raw.date) ?? ''}:${link ?? ''}`.slice(0, 500),
     raw,
@@ -212,8 +217,10 @@ export function nextEmailStatus(current: EmailStatus, event: NormalisedEvent['ty
 
 export type WebhookLead = {
   id: string;
+  email: string | null;
   email_status: EmailStatus;
   email_message_id: string | null;
+  email_sent_at: string | null;
   alert_message_id: string | null;
 };
 
@@ -238,6 +245,8 @@ export type WebhookStore = {
    * `at` when it is later than the stored value.
    */
   advanceLeadStatus(id: string, change: { to: EmailStatus; onlyFrom: EmailStatus[]; at: string }): Promise<void>;
+  /** For one results message: when it was delivered, and whether it bounced or was blocked. */
+  resultsMessageTimeline(leadId: string, messageId: string | null): Promise<{ deliveredAt: string | null; bounced: boolean }>;
 };
 
 export type WebhookOutcome = {
@@ -269,16 +278,42 @@ export async function handleBrevoWebhook(
     if (ev.leadId) lead = await store.findLeadById(ev.leadId);
     if (!lead && ev.messageId) {
       const found = await store.findLeadByMessageId(ev.messageId);
-      if (found) {
-        lead = found.lead;
-        kind = kind ?? found.kind;
-      }
+      if (found) lead = found.lead;
     }
     if (!lead || !ev.type) {
       ignored++;
       continue;
     }
-    if (!kind) kind = ev.messageId && ev.messageId === lead.alert_message_id ? 'alert' : 'results';
+    // Alert events never count as engagement; an unmatched event is treated as one.
+    kind = resolveEmailKind({
+      headerKind: kind,
+      tags: ev.tags,
+      messageId: ev.messageId,
+      resultsMessageId: lead.email_message_id,
+      alertMessageId: lead.alert_message_id,
+      recipient: ev.email,
+      leadEmail: lead.email,
+    });
+
+    // A results click on arrival or on an undelivered email is kept, flagged,
+    // and does not move the status.
+    let automated: ReturnType<typeof classifyResultsClick> = null;
+    let payload = ev.raw;
+    let detail = eventDetail(ev);
+    if (kind === 'results' && ev.type === 'clicked') {
+      const timeline = await store.resultsMessageTimeline(lead.id, ev.messageId);
+      automated = classifyResultsClick({
+        clickedAt: ev.occurredAt,
+        deliveredAt: timeline.deliveredAt,
+        sentAt: lead.email_sent_at,
+        bounced: timeline.bounced,
+        emailStatus: lead.email_status,
+      });
+      if (automated) {
+        payload = { ...ev.raw, pmbc_engagement: automatedMarker(automated, timeline.deliveredAt ?? lead.email_sent_at) };
+        detail = AUTOMATED_REASON_TEXT[automated];
+      }
+    }
 
     const result = await store.insertEvent({
       lead_id: lead.id,
@@ -287,8 +322,8 @@ export async function handleBrevoWebhook(
       email_kind: kind,
       message_id: ev.messageId,
       link: ev.link,
-      detail: eventDetail(ev),
-      payload: ev.raw,
+      detail,
+      payload,
       occurred_at: ev.occurredAt,
       dedupe_key: ev.dedupeKey,
     });
@@ -302,7 +337,7 @@ export async function handleBrevoWebhook(
     }
     recorded++;
     const to = statusForEvent(ev.type);
-    if (kind === 'results' && to) {
+    if (kind === 'results' && to && !automated) {
       await store.advanceLeadStatus(lead.id, { to, onlyFrom: weakerStatuses(to), at: ev.occurredAt });
     }
   }

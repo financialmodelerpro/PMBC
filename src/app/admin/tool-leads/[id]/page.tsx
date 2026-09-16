@@ -11,6 +11,7 @@ import { ADMIN_COLORS, adminBadge, adminCard, adminPageMain } from '@/lib/admin/
 import { emailStatusLabel } from '@/lib/tools/admin';
 import type { ToolLeadEventRow } from '@/lib/tools/db';
 import { dealSizeLabel } from '@/lib/tools/leads/deliver';
+import { AUTOMATED_REASON_TEXT, automatedReasonOf } from '@/lib/tools/engagement';
 import { getLead, getLeadEvents } from '@/lib/tools/leads/store';
 import { PURPOSES, dataVersionLabel } from '@/lib/tools/valuation/data';
 import { resolveExtras, type ValuationInputs, type ValuationResult } from '@/lib/tools/valuation/engine';
@@ -121,7 +122,7 @@ const PLACEMENTS: Record<string, string> = { results: 'from the results page', e
 function eventContext(e: ToolLeadEventRow): string {
   if (e.event_type === 'booking_click') return PLACEMENTS[e.detail ?? ''] ?? '';
   const parts: string[] = [];
-  if (e.email_kind) parts.push(`${e.email_kind === 'alert' ? 'Alert' : 'Results'} email`);
+  if (e.email_kind) parts.push(e.email_kind === 'alert' ? 'Internal alert, not visitor engagement' : 'Results email');
   if (e.source === 'brevo') parts.push('from Brevo');
   if (e.source === 'admin') parts.push('by staff');
   if (e.source === 'results' && e.event_type !== 'version_saved') parts.push('by the visitor');
@@ -161,6 +162,9 @@ function isV2(r: ValuationResult): boolean {
 }
 
 function eventTone(e: ToolLeadEventRow): 'neutral' | 'success' | 'warning' | 'danger' {
+  // Staff opening the alert, and likely automated clicks, are never engagement.
+  if (e.email_kind === 'alert' && ['clicked', 'opened', 'delivered'].includes(e.event_type)) return 'neutral';
+  if (automatedReasonOf(e.payload)) return 'neutral';
   if (['bounced', 'complaint', 'blocked', 'error', 'email_failed', 'alert_failed', 'pdf_failed'].includes(e.event_type)) return 'danger';
   if (['clicked', 'booking_click', 'delivered'].includes(e.event_type)) return 'success';
   if (['deferred', 'soft_bounced', 'email_not_configured'].includes(e.event_type)) return 'warning';
@@ -210,6 +214,7 @@ export default async function ToolLeadDetailPage(props: { params: Promise<{ id: 
   const extras = resolveExtras(inputs);
   const warnings = v2 ? warningTexts(result) : [];
   const versions = versionHistory(events);
+  const automatedClicks = events.filter((e) => (e.event_type === 'booking_click' || e.event_type === 'clicked') && automatedReasonOf(e.payload)).length;
   const code = result.currency.code;
   const opt = (v: number | null | undefined, unit = '') => (v === null || v === undefined ? 'Not entered' : `${v}${unit}`);
   const signed = (v: number | null | undefined) => (v ? `${v > 0 ? '+' : ''}${v} points` : 'None');
@@ -432,7 +437,7 @@ export default async function ToolLeadDetailPage(props: { params: Promise<{ id: 
                 ...(lead.email_error ? ([['Error', <span key="err" style={{ color: ADMIN_COLORS.danger }}>{lead.email_error}</span>]] as [string, ReactNode][]) : []),
                 ['Internal alert', <span key="a" style={adminBadge(as.tone)}>{as.label}</span>],
                 ...(lead.alert_error ? ([['Alert error', <span key="aerr" style={{ color: ADMIN_COLORS.danger }}>{lead.alert_error}</span>]] as [string, ReactNode][]) : []),
-                ['Booking clicks', `${lead.booking_clicks}${lead.last_booking_click_at ? `, last ${when(lead.last_booking_click_at)}` : ''}`],
+                ['Booking clicks', `${lead.booking_clicks}${lead.last_booking_click_at ? `, last ${when(lead.last_booking_click_at)}` : ''}${automatedClicks ? `. ${automatedClicks} likely automated ${automatedClicks === 1 ? 'click' : 'clicks'} not counted` : ''}`],
               ]}
             />
             <p style={{ ...muted, margin: '12px 0 0', lineHeight: 1.5 }}>
@@ -467,7 +472,12 @@ export default async function ToolLeadDetailPage(props: { params: Promise<{ id: 
                     <span style={adminBadge(eventTone(e))}>{EVENT_LABELS[e.event_type] ?? e.event_type}</span>
                     <span style={muted}>{eventContext(e)}</span>
                     {e.link && <span style={{ ...muted, wordBreak: 'break-all' }}>{e.link}</span>}
-                    {e.detail && e.event_type !== 'booking_click' && <span style={{ ...small }}>{e.detail}</span>}
+                    {automatedReasonOf(e.payload) && (
+                      <span style={adminBadge('warning')} title="Kept in history. Not counted in email status or booking clicks.">
+                        {AUTOMATED_REASON_TEXT[automatedReasonOf(e.payload)!]}, not counted
+                      </span>
+                    )}
+                    {e.detail && e.event_type !== 'booking_click' && !automatedReasonOf(e.payload) && <span style={{ ...small }}>{e.detail}</span>}
                   </li>
                 ))}
               </ol>

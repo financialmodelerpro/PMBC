@@ -29,6 +29,7 @@ import { fetchReportBranding } from '../brand/fetch';
 import { renderValuationReport, reportFileName } from '../pdf/ValuationReport';
 import { DEAL_BAND_UNSURE, DEAL_BANDS_SAR } from '../valuation/data';
 import { dealBandLabel, currencyFor, type ValuationResult } from '../valuation/engine';
+import { ALERT_TAG, RESULTS_TAG } from '../engagement';
 import { insertLeadEvent, setEmailStatusIf, updateLead } from './store';
 
 type LeadForDelivery = Pick<
@@ -139,7 +140,7 @@ export async function sendResultsEmail(
     html: await baseLayoutBranded(body),
     from: process.env.EMAIL_FROM_CONTACT || undefined,
     attachments,
-    tags: ['tool-lead', lead.tool_slug, 'results', ...(lead.is_test ? ['test'] : [])],
+    tags: [RESULTS_TAG, lead.tool_slug, 'results', ...(lead.is_test ? ['test'] : [])],
     headers: { 'X-Mailin-custom': `lead:${lead.id}|kind:results` },
   });
 
@@ -199,7 +200,9 @@ export async function sendLeadAlert(lead: LeadForDelivery, result: ValuationResu
     subject,
     html: await baseLayoutBranded(body),
     replyTo: lead.email,
-    tags: ['tool-lead', lead.tool_slug, 'alert', ...(lead.is_test ? ['test'] : [])],
+    // Its own first tag, so Brevo reporting and the webhook never mix staff
+    // opening the alert with the visitor's engagement (src/lib/tools/engagement.ts).
+    tags: [ALERT_TAG, lead.tool_slug, 'alert', ...(lead.is_test ? ['test'] : [])],
     headers: { 'X-Mailin-custom': `lead:${lead.id}|kind:alert` },
   });
   await updateLead(lead.id, {
