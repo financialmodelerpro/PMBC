@@ -51,7 +51,6 @@ const jiti = createJiti(import.meta.url, { alias: { '@': path.join(root, 'src') 
 const engine = await jiti.import(path.join(root, 'src/lib/tools/valuation/engine.ts'));
 const format = await jiti.import(path.join(root, 'src/lib/tools/valuation/format.ts'));
 const state = await jiti.import(path.join(root, 'src/components/tools/valuation/state.ts'));
-const tools = await jiti.import(path.join(root, 'src/config/tools.ts'));
 
 let failures = 0;
 let checks = 0;
@@ -487,34 +486,8 @@ async function runCase(page, c) {
 }
 
 async function main() {
-  // Registry: every live tool must have a component, or its hub card links to a 404.
-  console.log('Registry');
-  const componentsSrc = fs.readFileSync(path.join(root, 'src/components/tools/toolComponents.ts'), 'utf8');
-  for (const tool of tools.liveTools()) {
-    if (componentsSrc.includes(`'${tool.slug}':`)) pass();
-    else fail(`live tool "${tool.slug}" has no entry in TOOL_COMPONENTS`);
-  }
-
-  // Drafts are unreachable: the route resolves tools only through findLiveTool
-  // (so a draft slug is notFound), and the sitemap and hub list only liveTools.
-  const drafts = tools.TOOLS.filter((t) => t.status !== 'live');
-  if (drafts.length === 0) console.log('  (no draft tools in the registry to check)');
-  for (const d of drafts) {
-    if (tools.findLiveTool(d.slug) === null) pass();
-    else fail(`draft tool "${d.slug}" resolves as live`);
-    if (!tools.liveTools().some((t) => t.slug === d.slug)) pass();
-    else fail(`draft tool "${d.slug}" is in liveTools()`);
-    console.log(`  draft "${d.slug}" resolves to 404 and is excluded from liveTools`);
-  }
-  const routeSrc = fs.readFileSync(path.join(root, 'src/app/(public)/tools/[slug]/page.tsx'), 'utf8');
-  const sitemapSrc = fs.readFileSync(path.join(root, 'src/app/sitemap.ts'), 'utf8');
-  const hubSrc = fs.readFileSync(path.join(root, 'src/app/(public)/tools/page.tsx'), 'utf8');
-  if (/findLiveTool\(slug\)/.test(routeSrc) && /notFound\(\)/.test(routeSrc) && !/\bTOOLS\b/.test(routeSrc)) pass();
-  else fail('the tool route no longer resolves slugs only through findLiveTool');
-  if (/liveTools\(\)/.test(sitemapSrc) && !/\bTOOLS\b/.test(sitemapSrc)) pass();
-  else fail('the sitemap no longer lists tools only through liveTools()');
-  if (/liveTools\(\)/.test(hubSrc) && !/\bTOOLS\b[^_]/.test(hubSrc)) pass();
-  else fail('the hub no longer lists tools only through liveTools()');
+  // Registry and visibility rules live in verify-tools-visibility.mjs. This
+  // verifier is only about the engine agreeing with the reference.
 
   const { page, close: closeChrome } = await launchChrome();
   try {

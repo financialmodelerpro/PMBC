@@ -1,7 +1,7 @@
 import type { MetadataRoute } from 'next';
 
 import { SERVICES } from '@/config/services';
-import { liveTools, toolPath } from '@/config/tools';
+import { fetchToolVisibility, toolSitemapPaths } from '@/lib/tools/visibility';
 import {
   fetchPublishedCaseStudies,
   fetchPublishedArticles,
@@ -14,14 +14,22 @@ function baseUrl(): string {
   return 'https://pacemakersglobal.com';
 }
 
+/**
+ * Built per request rather than at build time, so the tool visibility switch at
+ * /admin/tools (and a collection gaining its first row) reaches crawlers without
+ * a redeploy. The page count is small enough that this costs nothing.
+ */
+export const dynamic = 'force-dynamic';
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const base = baseUrl();
   const now = new Date();
 
-  const [studies, articles, team] = await Promise.all([
+  const [studies, articles, team, tools] = await Promise.all([
     fetchPublishedCaseStudies(),
     fetchPublishedArticles(),
     fetchVisibleTeam(),
+    fetchToolVisibility(),
   ]);
 
   /**
@@ -72,10 +80,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // but nothing links to them and they are not offered to crawlers, so /fmp
     // is the single canonical platform page. Re-adding a line here is all it
     // takes to bring one back.
-    // The free tools hub and every live tool, from the registry, so a tool
-    // enters the sitemap when its entry goes live and not before.
-    '/tools',
-    ...liveTools().map((t) => toolPath(t.slug)),
+    // The free tools hub and each Live tool, from the visibility switch at
+    // /admin/tools. Nothing at all while every tool is Hidden.
+    ...toolSitemapPaths(tools),
     '/contact',
     '/book',
     '/privacy',

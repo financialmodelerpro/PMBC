@@ -1,17 +1,23 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { notFound } from 'next/navigation';
 import { ArrowRight } from 'lucide-react';
 
-import { TOOLS_HUB_HERO, liveTools, toolPath } from '@/config/tools';
+import { TOOLS_HUB_HERO, toolPath } from '@/config/tools';
 import { FirmPageBody } from '@/components/public/FirmPageBody';
 import { ToolsHubJsonLd } from '@/components/seo/ToolJsonLd';
+import { AdminPreviewBanner } from '@/components/tools/AdminPreviewBanner';
+import { getAdminSession } from '@/lib/auth/requireAdmin';
 import { fetchPage, fetchPageSections } from '@/lib/cms/pages';
 import { PAGE_GUTTER, PAGE_INNER, SECTION_PADDING } from '@/lib/public/layout';
 import { buildPageMetadata } from '@/lib/seo/metadata';
+import { fetchToolVisibility, liveToolsFrom } from '@/lib/tools/visibility';
 
 export const dynamic = 'force-dynamic';
 
 export async function generateMetadata(): Promise<Metadata> {
+  const live = liveToolsFrom(await fetchToolVisibility());
+  if (live.length === 0) return { title: 'Not found', robots: { index: false, follow: false } };
   return buildPageMetadata({
     path: '/tools',
     cmsPage: await fetchPage('tools'),
@@ -27,27 +33,38 @@ export async function generateMetadata(): Promise<Metadata> {
 /**
  * The free tools hub.
  *
- * The hero is a CMS section (migration 074), edited in the page builder, with
- * the registry's copy as the fallback. The cards are not section content: they
- * are the `live` entries in `src/config/tools.ts`, so a new tool appears here by
- * registry entry alone.
+ * Lists Live tools only. With none Live it is a 404 to the public, since a hub
+ * with no cards is an empty promise; signed-in staff see every ready tool with
+ * an Admin preview banner. The hero is a CMS section (migration 074).
  */
 export default async function ToolsHubPage(props: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const search = await props.searchParams;
+  const snapshot = await fetchToolVisibility();
+  const live = liveToolsFrom(snapshot);
+  const staff = live.length === 0 ? await getAdminSession().catch(() => null) : null;
+  if (live.length === 0 && !staff) notFound();
+  const preview = live.length === 0;
+  const cards = preview ? snapshot.tools.filter((t) => t.build === 'ready') : live;
+
   const sections = await fetchPageSections('tools', { onlyVisible: search.preview !== '1' });
-  const tools = liveTools();
 
   return (
     <main>
-      <ToolsHubJsonLd />
+      {!preview && <ToolsHubJsonLd tools={live} />}
+      {preview && (
+        <AdminPreviewBanner
+          reason="No tool is Live, so this page is a 404 for the public. Hidden tools are listed here for staff only."
+          manageHref="/admin/tools"
+        />
+      )}
       <FirmPageBody sections={sections} fallbackHero={TOOLS_HUB_HERO} />
 
       <section className={`bg-[color:var(--pmbc-surface-cream)] ${PAGE_GUTTER} ${SECTION_PADDING}`}>
         <div className={PAGE_INNER}>
           <ul className="grid gap-6 md:grid-cols-2">
-            {tools.map((t) => (
+            {cards.map((t) => (
               <li key={t.slug}>
                 <Link
                   href={toolPath(t.slug)}
@@ -59,6 +76,7 @@ export default async function ToolsHubPage(props: {
                     style={{ letterSpacing: '0.18em' }}
                   >
                     {t.eyebrow}
+                    {preview && !t.live && <span className="ml-2 text-[#92400E]">Hidden</span>}
                   </p>
                   <h2 className="pmbc-display mt-3 text-[28px] leading-[1.15] text-[color:var(--pmbc-text)] sm:text-[32px]">
                     {t.name}

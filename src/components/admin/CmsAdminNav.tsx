@@ -13,8 +13,10 @@ import {
 import {
   ArrowUpRight,
   Briefcase,
+  Calculator,
   ChevronLeft,
   ChevronRight,
+  ClipboardList,
   ExternalLink,
   FileCode2,
   FileText,
@@ -99,6 +101,8 @@ const NAV: NavEntry[] = [
   { kind: 'item', label: 'Services', href: '/admin/services', icon: Briefcase },
   { kind: 'item', label: 'Case Studies', href: '/admin/case-studies', icon: FolderKanban },
   { kind: 'item', label: 'Team & Advisors', href: '/admin/team', icon: Users },
+  { kind: 'divider', label: 'Tools' },
+  { kind: 'item', label: 'Tools', href: '/admin/tools', icon: Calculator },
   { kind: 'divider', label: 'Leads' },
   {
     kind: 'item',
@@ -107,6 +111,7 @@ const NAV: NavEntry[] = [
     icon: Inbox,
     matchPaths: ['/admin/leads'],
   },
+  { kind: 'item', label: 'Tool Leads', href: '/admin/tool-leads', icon: ClipboardList },
   { kind: 'divider', label: 'Email' },
   { kind: 'item', label: 'Email Branding', href: '/admin/email-branding', icon: Mail },
   { kind: 'item', label: 'Email Templates', href: '/admin/email-templates', icon: FileCode2 },

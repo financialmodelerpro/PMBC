@@ -1,12 +1,14 @@
 /**
- * Structured data for the free tools.
+ * Structured data for the free tools. Rendered only for Live tools: a Hidden
+ * tool's page is a 404 to the public and an Admin preview to staff, and neither
+ * should describe an application to a crawler.
  *
  * A tool page is a `WebApplication` offered at no cost, with the firm as its
  * provider, referenced by the `@id` the Organization node declares in
- * OrganizationJsonLd. The hub is an `ItemList` of the live tools.
+ * OrganizationJsonLd. The hub is an `ItemList` of the Live tools.
  */
 
-import { liveTools, toolPath, type ToolEntry } from '@/config/tools';
+import { toolPath, type ToolEntry } from '@/config/tools';
 import { siteUrl } from '@/lib/seo/metadata';
 
 function Script({ data }: { data: unknown }) {
@@ -35,7 +37,7 @@ export function ToolJsonLd({ tool }: { tool: ToolEntry }) {
   );
 }
 
-export function ToolsHubJsonLd() {
+export function ToolsHubJsonLd({ tools }: { tools: ToolEntry[] }) {
   const base = siteUrl();
   return (
     <Script
@@ -44,7 +46,7 @@ export function ToolsHubJsonLd() {
         '@type': 'ItemList',
         '@id': `${base}/tools#list`,
         name: 'Free tools',
-        itemListElement: liveTools().map((t, i) => ({
+        itemListElement: tools.map((t, i) => ({
           '@type': 'ListItem',
           position: i + 1,
           url: `${base}${toolPath(t.slug)}`,
