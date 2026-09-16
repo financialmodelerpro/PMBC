@@ -73,7 +73,7 @@ When you find an em dash in *existing* content while doing other work, fix it as
 in Phase 9 is review rather than code: read the deployed site end to end, send one
 real contact submission, check the OG cards, clear the Supabase advisor. The
 public site renders on nineteen routes, every page's copy is editable in the page
-builder, and 79 migrations are applied. Free tools (section 7b) were added on 2026-09-16 and ship Hidden.
+builder, and 79 migrations are applied (080 is written and waiting). Free tools (section 7b) were added on 2026-09-16 and ship Hidden; version 2 of the valuation tool followed the same day on `feat/tools-v2`.
 
 **The per-phase summary index moved to [`PHASE_HISTORY.md`](./PHASE_HISTORY.md) on 2026-08-16**,
 along with the detailed rows that were already there. This file states where the
@@ -536,6 +536,7 @@ Three flags matter when rebuilding:
 077  tool_leads                **DDL.** tool_leads and tool_lead_events. Missing tables mean results still shown, nothing saved
 078  tool_email_templates      the results email and lead alert rows in email_templates. Code carries the same defaults
 079  retire_tools_link_rows    removes 075's two rows; the footer link and CTA are now rendered from the visibility switch
+080  tool_hero_promise         DML, safe any time. The valuation hero subtitle becomes the one-line promise, only if still 074's wording
 ```
 
 **Every migration from 076 on states when it is safe to apply** in a `SAFE TO APPLY:` line in its header: before or after which deploy, and what the site does in the gap. 075 is why: it was applied before the routes it linked to were deployed, and previews share the production database, so the live footer linked to a 404.
@@ -910,6 +911,13 @@ recorded reversal that allows them.
 |------|-------|
 | Which tools exist, their copy, their service page CTA | `src/config/tools.ts` (the registry) |
 | Each tool's component | `src/components/tools/toolComponents.ts`, then `src/components/tools/<tool>/` |
+| Form state and every form transition (defaults, peer sync, inputs out) | `src/components/tools/valuation/state.ts`, plain functions the verifiers drive |
+| Chart geometry, drawn by both the page (`ChartSvg`) and the PDF (`PdfChart`) | `src/lib/tools/valuation/charts.ts` |
+| Warning thresholds, version 2 defaults, growth ceilings, the market data label | `src/lib/tools/valuation/data.ts` (`WARNING_RULES`, `V2_DEFAULTS`, `growthCeiling`, `DATA_VERSION_LABELS`) |
+| Email me this version | `src/lib/tools/leads/version.ts` (pure), route `src/app/api/tools/[slug]/lead/version/route.ts` |
+| Download PDF for what is on screen | `src/app/api/tools/[slug]/pdf/route.ts`, writes nothing |
+| Logo and partner card in the report and on the results | `src/lib/tools/brand/partner.ts` (pure), `src/lib/tools/brand/fetch.ts` (server), `src/components/tools/PartnerCard.tsx` |
+| Booking link | `src/lib/tools/booking.ts`, always the site's `/book` |
 | **Every tunable number** (Damodaran data, FX, market rates, presets, deal bands) | `src/lib/tools/valuation/data.ts`, and nowhere else |
 | The valuation arithmetic | `src/lib/tools/valuation/engine.ts`, pure, no UI |
 | Every sentence and number format shown about a result | `src/lib/tools/valuation/format.ts`, shared by the page, the PDF and the emails |
@@ -918,7 +926,7 @@ recorded reversal that allows them.
 | Results email and alert | `src/lib/tools/email/templates.ts`, sent by `src/lib/tools/leads/deliver.ts`, editable at `/admin/email-templates` |
 | PDF report | `src/lib/tools/pdf/ValuationReport.tsx`, fonts in `src/lib/tools/pdf/fonts/` |
 | Brevo webhook | `src/lib/tools/webhook.ts` (pure), route `src/app/api/webhooks/brevo/route.ts` |
-| Booking click tracking | `src/app/api/tools/book/route.ts` |
+| Booking click tracking | `src/app/api/tools/book/route.ts`, redirecting to `/book` |
 | Admin | `/admin/tools`, `/admin/tools/[slug]`, `/admin/tool-leads`, `/admin/tool-leads/[id]` |
 
 ### Visibility: one switch per tool
@@ -933,6 +941,7 @@ nothing else may decide:
 - `sitemap.xml`: `/tools` and each Live tool. The sitemap is rendered per request.
 - `WebApplication` JSON-LD: only on a Live tool's public page.
 - Footer "Free Tools": shown while at least one tool is Live. **Not** a row in Footer Links.
+- Navbar "Tools" (`applyToolsNavItem`): after Financial Modeler Pro while at least one tool is Live. While none is, signed-in staff still see it with a **Hidden** badge and the public sees nothing. A `/tools` row added in Pages & Nav is removed, so there is never a second switch. The session is only read while nothing is Live.
 - Service page CTA: the tool's `serviceCta`, while it is Live. **Not** a page builder section.
 - Lead API: refuses a Hidden tool unless the caller is staff.
 
@@ -940,6 +949,13 @@ Switching is admin only (not editors), confirms first, and writes an audit entry
 (`entity_type` `tool`, action `tool_visibility`) that is the history on the tool
 detail page. `npm run verify-tools-visibility` proves all of this; with
 `VERIFY_BASE` it checks a running site as a logged-out visitor.
+
+**Local verification without touching the switch.** Local builds read the
+production database, so flipping a tool to check a Hidden or Live page would
+change the public site. `TOOLS_VISIBILITY_OVERRIDE=hidden` or `=live` on a local
+`next start` makes that server behave as if every tool were Hidden or Live. It
+is **ignored whenever `VERCEL` is set**, which Vercel sets on every deployment,
+and the verifier asserts that.
 
 **Any submission by signed-in staff is a test lead** (`is_test`), on a Hidden or
 a Live tool, and test leads are excluded from counts and from the lead list by
@@ -978,7 +994,8 @@ never recomputed, and each lead records its `data_version`.
 - **Emails run after the response** (`after()`), so a slow PDF or Brevo never delays results. Outcomes are written to the lead (`email_status`, `alert_status`, errors) and as events. Staff can resend and download the PDF from the lead.
 - **The alert** goes to `site_settings.admin_email`, then `EMAIL_TO_ADMIN`.
 - **Tracking:** every tool email carries `X-Mailin-custom: lead:<id>|kind:<results|alert>` and Brevo tags. The webhook records delivered, opened, clicked, bounced, blocked, deferred and complaint events against the lead. `email_status` only moves to stronger evidence (complaint > bounced > blocked > clicked > opened > delivered > deferred > sent). **Opens are a weak signal**; clicks and booking clicks are the real one.
-- **Booking clicks** from the results page, the email and the PDF go through `/api/tools/book?t=<access_token>&src=...`, which records the click and redirects to `site_settings.booking_url` with name, email and UTM tags, or `/book`. Email security scanners can open links, so check the user agent on an email-sourced click.
+- **Booking clicks** from the results page, the email and the PDF go through `/api/tools/book?t=<access_token>&src=...`, which records the click and redirects to the site's own **`/book`** page with name, email and UTM tags (`utm_source=pacemakersglobal`, `utm_medium=free-tool`, `utm_campaign=<slug>`, `utm_content=<results|email|pdf>`). **Never to Calendly directly**: `/book` passes the known keys into the embedded calendar (`withBookingPrefill`), so the visitor stays on the site and the booking is still attributed. Email security scanners can open links, so check the user agent on an email-sourced click.
+- **Status writes are conditional, never read-then-write.** Brevo sends events as separate requests within the same second, and a fast bounce can arrive before the send has recorded `sent`. The first real lead bounced and stayed `sent` that way. `setEmailStatusIf` is one UPDATE that applies only where the stored status is weaker (`weakerStatuses`), the send records `sent` only from `pending`, and a resend resets to `pending` first. Brevo's `reason` is kept as the event detail only on bounces, blocks, deferrals, errors and complaints; a delivered event carries the reason "sent", which read as a fault.
 
 ### Brevo webhook setup
 
@@ -990,6 +1007,84 @@ never recomputed, and each lead records its `data_version`.
 6. Alternatively create it through the API with `"auth": {"type": "bearer", "token": "<BREVO_WEBHOOK_TOKEN>"}` and the URL without `?token=`. Both are accepted.
 
 `npm run verify-brevo-webhook` covers authentication, matching, status ordering and duplicates; with `VERIFY_BASE` it confirms a running site refuses a missing or wrong token.
+
+### Business Valuation version 2
+
+Everything below is on by default in a neutral state, so a visitor who touches
+none of it gets exactly the version 1 figures, and `verify-valuation-engine`
+still matches the reference at 493 checks.
+
+**The page.** Navy hero with the promise and three chips (registry `chips`), a
+numbered step bar where reached steps are clickable, Back on every step and the
+gate, and a sticky live summary beside the form on large screens (a compact
+expanding bar below 1024px). The summary unlocks the range once the gate is
+passed. Results are a dashboard: count-up range card, tiles, exploration
+sliders, and six tabs (Summary, DCF, Comparables, Scenarios, Sensitivity,
+Assumptions), then "Who you will work with" and the booking call to action.
+
+**What the engine added** (`engine.ts`, all optional inputs):
+
+| Feature | Rule |
+|---|---|
+| Private company discount | Applies to the exit multiple as well as the comparables (`exitMultipleApplied`). Defaults to 20% once two or more peers are in use (`syncPrivateDiscount`), 0 otherwise; a typed value (`discountTouched`) is kept. |
+| Scenarios | Upside and downside move every forecast year's revenue growth and EBITDA margin by points (`scenarioFinancials`), each valued in full. Weights must total 100. `weightedEquity` is the weighted midpoint. |
+| Normalised EBITDA | One-off costs and owner costs above market are added back to the last actual year for comparables and the LTM multiple. Owner costs, and only those, can be carried into the forecast, which changes the DCF. |
+| Bridge items | End of service benefits, leases, minority interest (deducted) and surplus assets (added), beyond net debt. With none entered the reference's `ev - netDebt` is kept exactly. |
+| Stake | Percent of equity, times a control premium or minority discount. Shown only when not 100% with no adjustment. |
+| WACC adjustment | Points added by the exploration slider. Zero keeps the reference WACC bit for bit. |
+
+**Warning rules** (`WARNING_RULES` in `data.ts`, text in `format.ts`):
+terminal value above 75% of the DCF; perpetual growth above the currency's
+`growthCeiling` (4.0 for the GCC currencies, 9.0 for PKR); exit multiple after
+the discount more than 30% from the multiple implied by perpetuity growth;
+negative free cash flow in the final forecast year; a first forecast year margin
+more than 10 points from the last actual (normalised); ROIC below WACC; and
+growth more than 2 points from reinvestment rate times ROIC. The last two need
+invested capital. Each is proved triggering and silent by `verify-valuation-v2`.
+
+**Input schema versioning.** Stored inputs carry `schemaVersion`
+(`INPUT_SCHEMA_VERSION`, now 2) inside the `inputs` JSONB, stamped by the server
+whatever the browser sends. No migration: every version 2 block is optional and
+`resolveExtras` fills an absent one with its neutral default, so a version 1
+lead revives and formats unchanged. Bump the version when a stored input changes
+meaning, and branch on it in `resolveExtras`, never by guessing from shape.
+
+**Exploration and versions.** The sliders recompute in the browser and save
+nothing. **Email me this version** posts the explored inputs; the server
+recomputes, keeps the replaced inputs and results as a `version_saved` event,
+overwrites the lead, and resends the results email with a new report, limited
+to 5 an hour and 20 a day per lead (staff exempt). The emailed version becomes
+the new base, so Reset to base returns to it. **Download PDF** renders what is on
+screen and writes nothing. Both need the lead's access token. The admin lead
+detail shows the version 2 inputs, the warnings the visitor saw, and the version
+history.
+
+**The PDF is ten fixed pages** (`REPORT_PAGE_TITLES`): cover, executive summary
+(rule-based, so the same inputs read the same), valuation summary with the
+football field and value bridge, financial profile, free cash flow and
+sensitivity heatmap, scenarios stake and checks, value levers, assumptions,
+methodology and sources, and working with PaceMakers (partner card, services,
+booking button and QR code). A section with nothing to say says so, so the page
+count never depends on the inputs. Every serif style sets
+`fontFeatureSettings: NO_LIGATURES`; a unitless `lineHeight` needs `fontSize` on
+the same element. The logo (from Header Settings) and the partner card (from the
+founder profile sections) come through `meta.branding`, fetched and resized by
+`brand/fetch.ts` and optional at every point.
+
+**Adding a scenario input or a bridge item.**
+1. The type and its neutral default in `engine.ts` (`BridgeInputs` or `ScenarioInputs`, `defaultExtras`) and, for defaults a person tunes, `V2_DEFAULTS` in `data.ts`.
+2. Validation in `validateCompany` or `validateTerminal`, and the arithmetic in `compute`, keeping the no-input path identical to today.
+3. The zod schema in `leads/valuation.ts` (optional), the form field and `toInputs`/`stateFromInputs` in `state.ts`.
+4. The rows in `format.ts` (`bridgeTable`, `bridgeSteps`, `scenariosTable`), which the page, the PDF, the email and the admin detail all read.
+5. Checks in `verify-valuation-v2` for the item on its own and absent, then `verify-valuation-engine` to prove the neutral path.
+
+**Verifiers.** `verify-valuation-engine` (493, reference parity),
+`verify-valuation-v2` (161), `verify-tool-lead-api` (106),
+`verify-tool-email-pdf` (191, pdfjs text and operator list, so a ligature glyph is
+caught even though extracted text maps it back to letters),
+`verify-tools-visibility` (78) and `verify-brevo-webhook` (132). Each was
+break-tested. `npm run render-valuation-examples -- <dir>` renders the minimal and
+full-feature reports for review, reading the logo and partner read-only.
 
 ### Privacy
 
