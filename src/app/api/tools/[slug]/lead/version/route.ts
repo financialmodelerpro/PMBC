@@ -73,7 +73,7 @@ export async function POST(req: Request, props: { params: Promise<{ slug: string
     const result = outcome.result;
     after(async () => {
       const { lead } = await getLead(leadId);
-      if (lead) await sendResultsEmail(lead as ToolLeadRow, result, { resend: true }).catch((err) => console.error('[tool-leads] version email failed:', err));
+      if (lead) await sendResultsEmail(lead as ToolLeadRow, result, { resend: true, source: 'results' }).catch((err) => console.error('[tool-leads] version email failed:', err));
     });
   }
   return NextResponse.json(outcome.body, { status: outcome.status });

@@ -28,7 +28,7 @@ import {
 import { renderValuationReport, reportFileName } from '../pdf/ValuationReport';
 import { DEAL_BAND_UNSURE, DEAL_BANDS_SAR } from '../valuation/data';
 import { dealBandLabel, currencyFor, type ValuationResult } from '../valuation/engine';
-import { insertLeadEvent, updateLead } from './store';
+import { insertLeadEvent, setEmailStatusIf, updateLead } from './store';
 
 type LeadForDelivery = Pick<
   ToolLeadRow,
@@ -81,7 +81,7 @@ export function dealSizeLabel(band: string | null, country: string | null): stri
 export async function sendResultsEmail(
   lead: LeadForDelivery,
   result: ValuationResult,
-  opts: { resend?: boolean; adminId?: string } = {},
+  opts: { resend?: boolean; adminId?: string; source?: 'admin' | 'results' } = {},
 ): Promise<SendEmailResult> {
   const now = new Date();
   const template = await loadToolTemplate(RESULTS_TEMPLATE_KEY);
@@ -99,6 +99,10 @@ export async function sendResultsEmail(
     result,
     bookingHref: bookingRedirectUrl(lead.access_token, 'email'),
   });
+
+  // A resend is a new message, so its status starts again. Set before the send,
+  // so webhook events for the new message can only move it forward from here.
+  if (opts.resend) await updateLead(lead.id, { email_status: 'pending', email_error: null });
 
   let attachments: { name: string; content: string }[] | undefined;
   try {
@@ -136,8 +140,10 @@ export async function sendResultsEmail(
   });
 
   const status = statusFrom(sent);
+  // Only from pending: Brevo can report a bounce for this message before this
+  // line runs, and `sent` must not overwrite it.
+  await setEmailStatusIf(lead.id, { to: status, onlyFrom: ['pending'] }).catch((err) => console.error('[tool-leads]', err));
   await updateLead(lead.id, {
-    email_status: status,
     email_message_id: sent.ok ? sent.id : null,
     email_sent_at: sent.ok ? now.toISOString() : null,
     email_error: sent.ok ? null : (sent.message ?? sent.reason),
@@ -145,7 +151,7 @@ export async function sendResultsEmail(
   await insertLeadEvent({
     lead_id: lead.id,
     event_type: sent.ok ? (opts.resend ? 'email_resent' : 'email_sent') : status === 'not_configured' ? 'email_not_configured' : 'email_failed',
-    source: opts.resend ? 'admin' : 'system',
+    source: opts.resend ? (opts.source ?? 'admin') : 'system',
     email_kind: 'results',
     message_id: sent.ok ? sent.id : null,
     detail: sent.ok ? (attachments ? 'with PDF report' : 'without PDF report') : (sent.message ?? sent.reason),

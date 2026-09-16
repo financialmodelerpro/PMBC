@@ -13,8 +13,18 @@ import type { ToolLeadEventRow } from '@/lib/tools/db';
 import { dealSizeLabel } from '@/lib/tools/leads/deliver';
 import { getLead, getLeadEvents } from '@/lib/tools/leads/store';
 import { PURPOSES, dataVersionLabel } from '@/lib/tools/valuation/data';
-import type { ValuationInputs } from '@/lib/tools/valuation/engine';
-import { bridgeTable, fcfTable, headline, sensitivityTable, type Table } from '@/lib/tools/valuation/format';
+import { resolveExtras, type ValuationInputs, type ValuationResult } from '@/lib/tools/valuation/engine';
+import {
+  bridgeTable,
+  fcfTable,
+  headline,
+  keyRatiosTable,
+  normalisationRows,
+  scenariosTable,
+  sensitivityTable,
+  warningTexts,
+  type Table,
+} from '@/lib/tools/valuation/format';
 import { reviveResult } from '@/lib/tools/valuation/serialize';
 
 export const metadata: Metadata = { title: 'Tool Lead | PMBC Admin', robots: { index: false, follow: false } };
@@ -91,6 +101,7 @@ const EVENT_LABELS: Record<string, string> = {
   alert_sent: 'Internal alert sent',
   alert_failed: 'Internal alert failed',
   booking_click: 'Book a call clicked',
+  version_saved: 'Visitor emailed an updated version',
   sent: 'Accepted by Brevo',
   delivered: 'Delivered',
   opened: 'Opened (weak signal)',
@@ -113,7 +124,40 @@ function eventContext(e: ToolLeadEventRow): string {
   if (e.email_kind) parts.push(`${e.email_kind === 'alert' ? 'Alert' : 'Results'} email`);
   if (e.source === 'brevo') parts.push('from Brevo');
   if (e.source === 'admin') parts.push('by staff');
+  if (e.source === 'results' && e.event_type !== 'version_saved') parts.push('by the visitor');
   return parts.join(', ');
+}
+
+/** One replaced version: when it was replaced and what it said. */
+type VersionEntry = { at: string; midpoint: string; range: string; growth: string; exitMultiple: string; waccAdjustment: string };
+
+function versionHistory(events: ToolLeadEventRow[]): VersionEntry[] {
+  const out: VersionEntry[] = [];
+  for (const e of events) {
+    if (e.event_type !== 'version_saved') continue;
+    const prev = (e.payload as { previous?: { inputs?: ValuationInputs; results?: unknown } } | null)?.previous;
+    if (!prev?.results || !prev.inputs) continue;
+    try {
+      const h = headline(reviveResult(prev.results));
+      const adj = prev.inputs.waccAdjustment;
+      out.push({
+        at: e.occurred_at,
+        midpoint: h.midpoint,
+        range: h.equityRange,
+        growth: `${prev.inputs.growth}%`,
+        exitMultiple: `${prev.inputs.exitMultiple}x`,
+        waccAdjustment: adj ? `${adj > 0 ? '+' : ''}${adj} points` : 'None',
+      });
+    } catch {
+      // A payload this page cannot read is still listed in the event history.
+    }
+  }
+  return out;
+}
+
+/** Whether the stored result carries the version 2 blocks. Leads saved before it do not. */
+function isV2(r: ValuationResult): boolean {
+  return Array.isArray(r.warnings) && Boolean(r.stake);
 }
 
 function eventTone(e: ToolLeadEventRow): 'neutral' | 'success' | 'warning' | 'danger' {
@@ -162,6 +206,13 @@ export default async function ToolLeadDetailPage(props: { params: Promise<{ id: 
     ).map(([label, k]) => ({ label, values: inputs.financials[k].map(n) })),
   };
   const w = inputs.wacc;
+  const v2 = isV2(result);
+  const extras = resolveExtras(inputs);
+  const warnings = v2 ? warningTexts(result) : [];
+  const versions = versionHistory(events);
+  const code = result.currency.code;
+  const opt = (v: number | null | undefined, unit = '') => (v === null || v === undefined ? 'Not entered' : `${v}${unit}`);
+  const signed = (v: number | null | undefined) => (v ? `${v > 0 ? '+' : ''}${v} points` : 'None');
 
   return (
     <div style={adminPageMain}>
@@ -224,6 +275,41 @@ export default async function ToolLeadDetailPage(props: { params: Promise<{ id: 
             </div>
           </Card>
 
+          {v2 && (
+            <Card title="Scenarios, stake and checks" span>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))', gap: 16 }}>
+                <div>
+                  <p style={{ ...muted, margin: '0 0 6px' }}>Scenarios</p>
+                  {result.scenarios.length ? <MiniTable table={scenariosTable(result)} /> : <p style={{ ...small, margin: 0 }}>Not run.</p>}
+                  <p style={{ ...muted, margin: '14px 0 6px' }}>Stake</p>
+                  <p style={{ ...small, margin: 0 }}>{h.stakeRange ? `${h.stakeLabel}: ${h.stakeRange}` : 'Whole business, no premium or discount.'}</p>
+                  <p style={{ ...muted, margin: '14px 0 6px' }}>Normalised EBITDA ({code} millions)</p>
+                  {result.normalisation.used ? (
+                    <Pairs rows={normalisationRows(result)} />
+                  ) : (
+                    <p style={{ ...small, margin: 0 }}>No adjustments entered. Reported EBITDA used.</p>
+                  )}
+                </div>
+                <div>
+                  <p style={{ ...muted, margin: '0 0 6px' }}>Warnings shown to the visitor ({warnings.length})</p>
+                  {warnings.length === 0 ? (
+                    <p style={{ ...small, margin: 0 }}>None triggered.</p>
+                  ) : (
+                    <ul style={{ margin: 0, paddingLeft: 18 }}>
+                      {warnings.map((wt) => (
+                        <li key={wt.code} style={{ ...small, marginBottom: 8 }}>
+                          <strong>{wt.title}.</strong> {wt.detail}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  <p style={{ ...muted, margin: '14px 0 6px' }}>Key ratios</p>
+                  <MiniTable table={keyRatiosTable(result)} />
+                </div>
+              </div>
+            </Card>
+          )}
+
           <Card title="Stored inputs" span>
             <Pairs
               rows={[
@@ -263,6 +349,8 @@ export default async function ToolLeadDetailPage(props: { params: Promise<{ id: 
                   ['Discounting', inputs.midYear ? 'Mid-year' : 'End of year'],
                   ['Private company discount', `${n(inputs.privateDiscount)}%`],
                   ['DCF weight', `${n(inputs.dcfWeight)}%`],
+                  ['Exit multiple used', v2 ? `${result.exitMultipleApplied.toFixed(2)}x after the discount` : 'As entered (saved before version 2)'],
+                  ['WACC adjustment', signed(inputs.waccAdjustment)],
                   [
                     'Peers',
                     inputs.peers.length
@@ -272,7 +360,56 @@ export default async function ToolLeadDetailPage(props: { params: Promise<{ id: 
                 ]}
               />
             </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16, marginTop: 14 }}>
+              <Pairs
+                rows={[
+                  ['Input schema version', String(inputs.schemaVersion ?? 1)],
+                  ['One-off costs added back', opt(extras.normalisation.oneOff, ` ${code} m`)],
+                  ['Owner costs added back', opt(extras.normalisation.ownerCosts, ` ${code} m`)],
+                  ['Carry owner costs into forecast', extras.normalisation.carryOwnerCosts ? 'Yes' : 'No'],
+                  ['Invested capital', opt(inputs.investedCapital, ` ${code} m`)],
+                  ['End of service benefits', opt(extras.bridge.eosb, ` ${code} m`)],
+                  ['Lease liabilities', opt(extras.bridge.leases, ` ${code} m`)],
+                  ['Minority interest', opt(extras.bridge.minorityInterest, ` ${code} m`)],
+                  ['Surplus assets', opt(extras.bridge.surplusAssets, ` ${code} m`)],
+                ]}
+              />
+              <Pairs
+                rows={[
+                  ['Stake', opt(extras.stake.percent, '%')],
+                  [
+                    'Stake adjustment',
+                    extras.stake.adjustment === 'control_premium'
+                      ? `Control premium ${opt(extras.stake.controlPremium, '%')}`
+                      : extras.stake.adjustment === 'minority_discount'
+                        ? `Minority discount ${opt(extras.stake.minorityDiscount, '%')}`
+                        : 'None',
+                  ],
+                  ['Upside', `${opt(extras.scenarios.upsideGrowth, ' points')} growth, ${opt(extras.scenarios.upsideMargin, ' points')} margin`],
+                  ['Downside', `${opt(extras.scenarios.downsideGrowth, ' points')} growth, ${opt(extras.scenarios.downsideMargin, ' points')} margin`],
+                  [
+                    'Weights',
+                    `Downside ${opt(extras.scenarios.weightDownside, '%')}, base ${opt(extras.scenarios.weightBase, '%')}, upside ${opt(extras.scenarios.weightUpside, '%')}`,
+                  ],
+                ]}
+              />
+            </div>
           </Card>
+
+          {versions.length > 0 && (
+            <Card title={`Version history (${versions.length})`} span>
+              <p style={{ ...muted, margin: '0 0 10px', lineHeight: 1.5 }}>
+                Each time the visitor used Email me this version, the stored inputs and results above were replaced, and the version replaced is kept
+                here. Most recent first.
+              </p>
+              <MiniTable
+                table={{
+                  head: ['Replaced', 'Equity range', 'Midpoint', 'Growth', 'Exit multiple', 'WACC adjustment'],
+                  rows: versions.map((vv) => ({ label: when(vv.at), values: [vv.range, vv.midpoint, vv.growth, vv.exitMultiple, vv.waccAdjustment] })),
+                }}
+              />
+            </Card>
+          )}
 
           <Card title="Email">
             <Pairs
