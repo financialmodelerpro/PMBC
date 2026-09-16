@@ -85,6 +85,8 @@ console.log('1. Neutral defaults');
   check('headline shows no stake', format.headline(B).stakeRange === null);
   check('default weights 25/50/25', B.scenarios.map((s) => s.weight).join() === '0.25,0.5,0.25');
   check('reference example triggers no warnings', B.warnings.length === 0, codes(B).join());
+  const withProfile = run({ ...BASE, profile: { companyName: 'Anything Ltd', description: 'Text.' } });
+  check('a company profile changes no figure', JSON.stringify(withProfile.equity) === JSON.stringify(B.equity) && withProfile.weightedEquity === B.weightedEquity);
 }
 
 console.log('2. Scenarios and weights');

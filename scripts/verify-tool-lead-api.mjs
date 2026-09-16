@@ -18,6 +18,10 @@
 //   9. Version 2 inputs: every optional block accepted and stored, inputs from
 //      before version 2 still accepted, schemaVersion stamped by the server
 //      whatever the browser claims, and the new validation refused with 400.
+//  11. Company profile: the name and description are cleaned by the schema
+//      itself (control characters, whitespace, two paragraphs, length caps),
+//      stored with the inputs, used as the lead's company when the gate has
+//      none, and never change a figure.
 //  10. Email me this version (src/lib/tools/leads/version.ts): found by token
 //      only, recomputed, the previous version kept before the lead is
 //      overwritten, 5 an hour and 20 a day per lead with staff exempt, the
@@ -253,6 +257,42 @@ console.log('Version 2 inputs');
     const r = await leads.processValuationSubmission(body({ inputs }), ctx(), st);
     check(`${label}: 400, nothing saved`, r.status === 400 && st.inserted.length === 0, `${r.status} ${r.kind}`);
   }
+}
+
+console.log('Company profile');
+{
+  const profileInputs = (profile) => ({ ...exampleInputs(), profile });
+  const messy = {
+    companyName: '  Acme\u0007   Foods \n Ltd  ',
+    description: '  First   paragraph\u0000 here.  \r\n\r\n\r\nSecond\tparagraph.\nThird paragraph is dropped.',
+  };
+  const st = memoryStore();
+  const out = await leads.processValuationSubmission(body({ inputs: profileInputs(messy), gate: { ...body().gate, company: '' } }), ctx(), st);
+  const stored = st.inserted[0]?.inputs.profile;
+  check('profile: saved', out.kind === 'saved', out.kind);
+  check('profile: company name cleaned', stored?.companyName === 'Acme Foods Ltd', JSON.stringify(stored?.companyName));
+  check('profile: two paragraphs kept, cleaned, the third dropped', stored?.description === 'First paragraph here.\n\nSecond paragraph.', JSON.stringify(stored?.description));
+  check('profile: the gate had no company, so the lead takes the profile name', st.inserted[0]?.company === 'Acme Foods Ltd');
+  check('profile: figures unchanged', JSON.stringify(out.body.result) === expectedJson);
+
+  const gateWins = memoryStore();
+  await leads.processValuationSubmission(body({ inputs: profileInputs(messy) }), ctx(), gateWins);
+  check('profile: a company typed at the gate wins', gateWins.inserted[0]?.company === 'Example Co');
+
+  const long = memoryStore();
+  await leads.processValuationSubmission(body({ inputs: profileInputs({ companyName: 'N'.repeat(500), description: 'x'.repeat(4000) }) }), ctx(), long);
+  const lp = long.inserted[0]?.inputs.profile;
+  check('profile: name capped at 120 and description at 1,000 characters', lp?.companyName.length === 120 && lp?.description.length === 1000, JSON.stringify([lp?.companyName?.length, lp?.description?.length]));
+
+  const empty = memoryStore();
+  await leads.processValuationSubmission(body({ inputs: profileInputs({ companyName: '   ', description: '\n\n' }) }), ctx(), empty);
+  check('profile: blank fields store no profile', empty.inserted[0] && !('profile' in empty.inserted[0].inputs && empty.inserted[0].inputs.profile));
+
+  const absurd = memoryStore();
+  const refused = await leads.processValuationSubmission(body({ inputs: profileInputs({ companyName: 'x', description: 'y'.repeat(20000) }) }), ctx(), absurd);
+  check('profile: an absurd payload is refused', refused.status === 400 && absurd.inserted.length === 0, refused.status);
+  const wrongType = await leads.processValuationSubmission(body({ inputs: profileInputs({ companyName: 5 }) }), ctx(), memoryStore());
+  check('profile: a non-string name is refused', wrongType.status === 400);
 }
 
 console.log('Email me this version');

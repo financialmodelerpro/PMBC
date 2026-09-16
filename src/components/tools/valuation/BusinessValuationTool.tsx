@@ -154,6 +154,10 @@ export function BusinessValuationTool({ preview, partner }: ToolComponentProps) 
       return;
     }
     setPending(outcome.result);
+    // The company named in step 1 fills the gate's company field, unless the
+    // visitor has already typed one there.
+    const named = s.companyName.trim();
+    if (named) setGate((g) => (g.company.trim() ? g : { ...g, company: named }));
     go('gate');
   }
 
@@ -206,6 +210,7 @@ export function BusinessValuationTool({ preview, partner }: ToolComponentProps) 
   const summaryResult = saved?.result ?? null;
   const summaryHeadline = summaryResult ? headline(summaryResult) : null;
   const summary = {
+    companyName: s.companyName.trim(),
     industry: s.industry,
     country: s.country,
     currency,

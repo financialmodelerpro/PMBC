@@ -327,6 +327,34 @@ console.log('Email shell and parts');
   check('alert: follow-up unticked shows No', consentCell(alertFor(false)) === 'No', String(consentCell(alertFor(false))));
 }
 
+console.log('Company profile on the report');
+{
+  const prof = await jiti.import(path.join(root, 'src/lib/tools/valuation/profile.ts'));
+  // The longest name the form allows, in words, as a real company name would be.
+  const maxName = prof.cleanCompanyName('Al Mashreq Integrated Industrial Manufacturing and Engineering Services Holding Company for Energy Water and Infrastructure Limited');
+  check('name fixture is at the limit', maxName.length === prof.PROFILE_LIMITS.companyName, String(maxName.length));
+  // The longest description the form allows, in two paragraphs of real words.
+  const words = 'The business designs, manufactures and services industrial equipment for energy and water clients across the region. ';
+  const para = (n) => words.repeat(Math.ceil(n / words.length)).slice(0, n).trim();
+  const maxDescription = prof.cleanDescription(`${para(495)}\n\n${para(495)}`);
+  check('profile fixture is at the limit', maxDescription.length >= 980 && maxDescription.length <= prof.PROFILE_LIMITS.description, String(maxDescription.length));
+  for (const [label, result] of [['full', full], ['distressed', distressed], ['Saudi', saudi]]) {
+    const buf = await pdfModule.renderValuationReport(result, { ...REPORT_META, company: maxName, industry: 'Industry', country: 'Country', bookingHref: BOOK, description: maxDescription });
+    const t = await pageTexts(buf);
+    check(`${label}, longest name and description: still ten pages`, t.length === 10, String(t.length));
+    // The cover carries it: the one page with room for the longest description in every case.
+    const squashed = t[0].replace(/\s+/g, '');
+    check(`${label}: cover carries About the business`, /aboutthebusiness/i.test(squashed), t[0].slice(-300));
+    check(`${label}: both paragraphs present on the cover, in full`, prof.descriptionParagraphs(maxDescription).every((p) => squashed.includes(p.replace(/\s+/g, ''))));
+    check(`${label}: attributed to the visitor`, t[0].includes('As described by') && t[0].includes('Not reviewed by PaceMakers'));
+    check(`${label}: the long company name is on the cover`, squashed.includes(maxName.replace(/\s+/g, '')));
+  }
+  const none = await pageTexts(await pdfModule.renderValuationReport(full, { ...REPORT_META, company: null, industry: 'I', country: 'C', bookingHref: BOOK }));
+  check('no description: no About block', !none[0].includes('Not reviewed by PaceMakers'));
+  check('clean: control characters removed and at most two paragraphs', prof.cleanDescription('a\u0000b\n\nc\n\nd') === 'ab\n\nc');
+  check('clean: blank is null', prof.cleanDescription(' \n ') === null && prof.cleanCompanyName('   ') === null && prof.cleanProfile({ companyName: ' ', description: '' }) === undefined);
+}
+
 console.log('Report branding and partner');
 {
   // The mapping from the two founder sections, as stored.

@@ -26,6 +26,7 @@
  * Relative imports only, so the verifiers can load this file outside Next.
  */
 
+import type { CompanyProfile } from './profile';
 import {
   ASSUMPTIONS,
   COUNTRIES,
@@ -132,6 +133,8 @@ export type ValuationInputs = {
   investedCapital?: number | null;
   /** Percentage points added to the computed WACC. Set by the exploration slider. */
   waccAdjustment?: number | null;
+  /** Company name and a description for the report. Never read by the engine. See `profile.ts`. */
+  profile?: CompanyProfile;
 };
 
 export type Currency = { code: string; pegged: boolean; sarPerUnit: number };

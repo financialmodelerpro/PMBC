@@ -1,11 +1,12 @@
 'use client';
 
 import { COUNTRIES, INDUSTRIES } from '@/lib/tools/valuation/data';
+import { PROFILE_LIMITS } from '@/lib/tools/valuation/profile';
 import type { FieldErrors } from '@/lib/tools/valuation/engine';
 
 import { SearchSelect } from './SearchSelect';
 import type { BridgeKey, FormState } from './state';
-import { Collapsible, Field, NumberInput, Panel, PanelTitle, StepNav } from './ui';
+import { Collapsible, Field, NumberInput, Panel, PanelTitle, StepNav, inputClass } from './ui';
 
 const INDUSTRY_OPTIONS = Object.keys(INDUSTRIES).map((name) => ({ value: name, label: name }));
 const COUNTRY_OPTIONS = Object.entries(COUNTRIES).map(([name, c]) => ({ value: name, label: name, tag: c.code }));
@@ -61,6 +62,41 @@ export function CompanyStep({
         title="Company profile"
         lead="Amounts are entered in millions of the local currency of the country you select. GCC currencies are pegged to the US dollar, so the Damodaran cost of capital applies directly. For Pakistan, the tool converts the US dollar cost of capital into rupee terms using expected inflation."
       />
+      <div className="mb-2 rounded-[2px] border border-[color:var(--pmbc-border-warm)] bg-[#FDFBF7] p-4 sm:p-5">
+        <p className="mb-3 text-[13.5px] leading-[1.55] text-[#52606B]">
+          Optional. Your company name and a short description make the PDF report your own. Neither changes the figures.
+        </p>
+        <Field label="Company name (optional)" hint="Shown on the report cover and on your results.">
+          {({ id, describedBy }) => (
+            <input
+              id={id}
+              type="text"
+              autoComplete="organization"
+              maxLength={PROFILE_LIMITS.companyName}
+              value={state.companyName}
+              onChange={(e) => onChange({ companyName: e.target.value })}
+              aria-describedby={describedBy}
+              className={inputClass}
+            />
+          )}
+        </Field>
+        <Field
+          label="About the business (optional)"
+          hint={`One or two paragraphs: what the business does, where, and for whom. ${state.description.length.toLocaleString('en-US')} of ${PROFILE_LIMITS.description.toLocaleString('en-US')} characters.`}
+        >
+          {({ id, describedBy }) => (
+            <textarea
+              id={id}
+              rows={5}
+              maxLength={PROFILE_LIMITS.description}
+              value={state.description}
+              onChange={(e) => onChange({ description: e.target.value })}
+              aria-describedby={describedBy}
+              className={`${inputClass} min-h-[132px] resize-y leading-[1.55]`}
+            />
+          )}
+        </Field>
+      </div>
       <div className="grid gap-x-5 sm:grid-cols-2">
         <Field label="Industry" hint="Damodaran global industry classification. Sets beta, debt ratio and preset multiples." error={errors.industry ?? ''}>
           {({ id, describedBy, invalid }) => (

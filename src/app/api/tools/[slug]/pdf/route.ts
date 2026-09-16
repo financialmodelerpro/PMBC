@@ -44,7 +44,7 @@ export async function POST(req: Request, props: { params: Promise<{ slug: string
   const now = new Date();
   const pdf = await renderValuationReport(recomputed.result, {
     preparedFor: lead.name,
-    company: lead.company,
+    company: lead.company || recomputed.inputs.profile?.companyName || null,
     industry: recomputed.inputs.industry,
     country: recomputed.inputs.country,
     purpose: lead.purpose,
@@ -52,6 +52,7 @@ export async function POST(req: Request, props: { params: Promise<{ slug: string
     dataVersion: VALUATION_DATA_VERSION,
     bookingHref: bookingRedirectUrl(lead.access_token, 'pdf'),
     branding: await fetchReportBranding(),
+    description: recomputed.inputs.profile?.description ?? null,
   });
   return new NextResponse(new Uint8Array(pdf), {
     headers: {

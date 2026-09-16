@@ -283,6 +283,9 @@ export function ResultsDashboard({
             shifts after the visitor's click had finished. */}
         <div>
           <div className="min-w-0">
+            {baseInputs.profile?.companyName && (
+              <p className="pmbc-display mb-2 text-[20px] leading-tight text-white sm:text-[24px]">{baseInputs.profile.companyName}</p>
+            )}
             <p id="valuation-headline" className="text-[11px] font-semibold uppercase text-[#C69C3E]" style={{ letterSpacing: '0.16em' }}>
               Indicative equity value, blended{explored ? ', exploration' : ''}
             </p>

@@ -20,6 +20,7 @@ import { fmtPct } from '@/lib/tools/valuation/format';
 import { ChartSvg } from '../charts/ChartSvg';
 
 export type SummaryData = {
+  companyName: string;
   industry: string;
   country: string;
   currency: Currency;
@@ -36,6 +37,7 @@ function Rows({ d }: { d: SummaryData }) {
   const ltmRev = d.revenue[2], ltmEb = d.ebitda[2];
   const margin = Number.isFinite(ltmRev) && Number.isFinite(ltmEb) && ltmRev > 0 ? ltmEb / ltmRev : NaN;
   const rows: [string, string][] = [
+    ...(d.companyName ? ([['Company', d.companyName]] as [string, string][]) : []),
     ['Industry', d.industry || 'Not chosen yet'],
     ['Country', d.country ? `${d.country}, ${d.currency.code}` : 'Not chosen yet'],
     ['Last financial year', d.financialYear ? `FY${d.financialYear}` : ''],
@@ -130,7 +132,7 @@ export function SummaryPanel({ data }: { data: SummaryData }) {
         >
           <span className="min-w-0">
             <span className="block truncate text-[13.5px] font-semibold text-[color:var(--pmbc-text)]">
-              {data.industry || 'Your valuation'}
+              {data.companyName || data.industry || 'Your valuation'}
               {data.country ? `, ${data.currency.code}` : ''}
             </span>
             <span className="block truncate text-[12.5px] text-[color:var(--pmbc-muted)]">

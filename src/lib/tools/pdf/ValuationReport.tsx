@@ -34,6 +34,7 @@ import { SERVICES } from '@/config/services';
 import { PARTNER_RECORD_NOTE, type PartnerCard } from '../brand/partner';
 
 import { PURPOSES, SOURCE_NOTES, dataVersionLabel } from '../valuation/data';
+import { descriptionParagraphs } from '../valuation/profile';
 import type { ValuationResult } from '../valuation/engine';
 import {
   cashConversionChart,
@@ -79,6 +80,8 @@ export type ReportMeta = {
   bookingHref: string;
   /** Logos and the partner card. Optional: every piece has a fallback. */
   branding?: ReportBranding | null;
+  /** The visitor's own description of the business, already cleaned. Shown on the executive summary. */
+  description?: string | null;
 };
 
 export type ReportBranding = {
@@ -232,6 +235,9 @@ export function ValuationReport({ result, meta }: { result: ValuationResult; met
   const W = PAGE.contentWidth;
   const brand = meta.branding ?? null;
   const partner = brand?.partner ?? null;
+  const about = descriptionParagraphs(meta.description);
+  // Long company names step down so the cover never runs onto a second page.
+  const titleSize = who.length > 80 ? 20 : who.length > 44 ? 26 : 34;
 
   return (
     <Document title={`Indicative valuation, ${who}`} author="PaceMakers Business Consultants" subject="Indicative business valuation">
@@ -247,22 +253,35 @@ export function ValuationReport({ result, meta }: { result: ValuationResult; met
           )}
           <Text style={{ fontSize: 7.5, color: C.gold, letterSpacing: 1.6, textTransform: 'uppercase', marginTop: brand?.logoOnDark ? 10 : 4 }}>Advisory from Structure to Exit</Text>
 
-          <View style={{ marginTop: 170 }}>
+          <View style={{ marginTop: about.length ? 84 : 170 }}>
             <View style={{ height: 1.5, width: 64, backgroundColor: C.gold, marginBottom: 18 }} />
             <Text style={{ fontSize: 8.5, color: C.gold, letterSpacing: 1.6, textTransform: 'uppercase' }}>{REPORT_PAGE_TITLES[0]}</Text>
-            <Text style={{ fontFamily: 'SourceSerif', fontFeatureSettings: NO_LIGATURES, fontWeight: 600, fontSize: 34, lineHeight: 1.1, marginTop: 12 }}>{who}</Text>
+            <Text style={{ fontFamily: 'SourceSerif', fontFeatureSettings: NO_LIGATURES, fontWeight: 600, fontSize: titleSize, lineHeight: 1.1, marginTop: 12 }}>{who}</Text>
             <Text style={{ fontSize: 10.5, color: CREAM_ON_NAVY, marginTop: 10 }}>
               {meta.industry}, {meta.country}. Prepared {dateText}.
             </Text>
           </View>
 
-          <View style={{ marginTop: 56, borderTopWidth: 0.5, borderTopColor: '#E8DDC455', paddingTop: 22 }}>
+          <View style={{ marginTop: about.length ? 32 : 56, borderTopWidth: 0.5, borderTopColor: '#E8DDC455', paddingTop: 22 }}>
             <Text style={{ fontSize: 8, color: CREAM_ON_NAVY, letterSpacing: 1.2, textTransform: 'uppercase' }}>Indicative equity value</Text>
             <Text style={{ fontFamily: 'SourceSerif', fontFeatureSettings: NO_LIGATURES, fontWeight: 600, fontSize: 26, color: C.gold, marginTop: 8 }}>{h.equityRange}</Text>
             <Text style={{ fontSize: 10, color: CREAM_ON_NAVY, marginTop: 8 }}>
               Midpoint {h.midpoint} as at end of {h.valuationDate}. Enterprise value {h.evRange}.
             </Text>
           </View>
+
+          {/* The visitor's own words about the business, set apart as theirs. */}
+          {about.length > 0 && (
+            <View style={{ marginTop: 26, borderLeftWidth: 2, borderLeftColor: C.gold, paddingLeft: 12 }}>
+              <Text style={{ fontSize: 8, color: C.gold, letterSpacing: 1.2, textTransform: 'uppercase' }}>About the business</Text>
+              {about.map((para, i) => (
+                <Text key={i} style={{ fontSize: 9.5, lineHeight: 1.5, color: C.white, marginTop: i ? 5 : 6 }}>
+                  {para}
+                </Text>
+              ))}
+              <Text style={{ fontSize: 7, color: CREAM_ON_NAVY, marginTop: 5 }}>As described by {meta.preparedFor}. Not reviewed by PaceMakers.</Text>
+            </View>
+          )}
         </View>
         <View style={{ paddingHorizontal: 56, paddingBottom: 40 }}>
           <Text style={{ fontSize: 7.5, color: CREAM_ON_NAVY, lineHeight: 1.5 }}>

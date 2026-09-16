@@ -48,7 +48,7 @@ for (const [name, build, meta] of [
 ]) {
   const outcome = engine.runValuation(state.toInputs(build(state)));
   if (!outcome.ok) throw new Error(`${name} did not run: ${JSON.stringify(outcome.errors)}`);
-  const buf = await pdf.renderValuationReport(outcome.result, { ...REPORT_META, ...meta, branding });
+  const buf = await pdf.renderValuationReport(outcome.result, { ...REPORT_META, ...meta, branding, description: outcome.result && state.toInputs(build(state)).profile?.description });
   const file = path.join(out, `valuation-example-${name}.pdf`);
   fs.writeFileSync(file, buf);
   console.log(`${file}  ${(buf.length / 1024).toFixed(0)} KB, warnings: ${outcome.result.warnings.map((w) => w.code).join(', ') || 'none'}`);

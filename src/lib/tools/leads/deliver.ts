@@ -47,6 +47,7 @@ type LeadForDelivery = Pick<
   | 'industry'
   | 'follow_up_consent'
   | 'access_token'
+  | 'inputs'
 >;
 
 export async function loadToolTemplate(key: string): Promise<EmailTemplate> {
@@ -117,6 +118,7 @@ export async function sendResultsEmail(
       dataVersion: lead.data_version,
       bookingHref: bookingRedirectUrl(lead.access_token, 'pdf'),
       branding: await fetchReportBranding(),
+      description: (lead.inputs as { profile?: { description?: string | null } } | null)?.profile?.description ?? null,
     });
     attachments = [{ name: reportFileName(lead.company, lead.name, now), content: pdf.toString('base64') }];
   } catch (err) {

@@ -11,6 +11,7 @@
  */
 
 import { ASSUMPTIONS, COUNTRIES, EXAMPLE_COMPANY, MARKET, V2_DEFAULTS } from '@/lib/tools/valuation/data';
+import { cleanProfile } from '@/lib/tools/valuation/profile';
 import {
   INPUT_SCHEMA_VERSION,
   currencyFor,
@@ -41,6 +42,9 @@ export type BridgeKey = 'eosb' | 'leases' | 'minorityInterest' | 'surplusAssets'
 export type ScenarioKey = 'upsideGrowth' | 'upsideMargin' | 'downsideGrowth' | 'downsideMargin' | 'weightDownside' | 'weightBase' | 'weightUpside';
 
 export type FormState = {
+  /** Report only. Never read by the engine. */
+  companyName: string;
+  description: string;
   industry: string;
   country: string;
   financialYear: string;
@@ -79,6 +83,8 @@ export function initialState(): FormState {
   const fill = ASSUMPTIONS.forecastFill;
   const d = V2_DEFAULTS;
   return {
+    companyName: '',
+    description: '',
     industry: '',
     country: '',
     financialYear: String(ASSUMPTIONS.defaultFinancialYear),
@@ -204,6 +210,7 @@ export function toInputs(s: FormState): ValuationInputs {
       weightUpside: num(sc.weightUpside),
     },
     waccAdjustment: num(s.waccAdjustment) ?? 0,
+    profile: cleanProfile({ companyName: s.companyName, description: s.description }),
   };
 }
 
@@ -332,6 +339,8 @@ export function stateFromInputs(i: ValuationInputs): FormState {
   for (const k of WACC_KEYS) wacc[k] = d(i.wacc[k]);
   return {
     ...base,
+    companyName: i.profile?.companyName ?? '',
+    description: i.profile?.description ?? '',
     industry: i.industry,
     country: i.country,
     financialYear: d(i.financialYear),

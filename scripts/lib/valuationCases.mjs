@@ -42,6 +42,9 @@ export function fullFeatureCase(state) {
     },
     midYear: false,
     dcfWeight: '50',
+    companyName: 'Example Foods Pakistan',
+    description:
+      'Example Foods Pakistan processes and packages dairy and ready meals for retail chains across Punjab and Sindh, from two plants near Lahore and Karachi.\n\nThe owners are preparing to sell a minority stake to fund a third plant and a cold chain for export to the GCC, and want an independent view of value before speaking to investors.',
   };
   s = state.syncPeerDefaults(s);
   return s;

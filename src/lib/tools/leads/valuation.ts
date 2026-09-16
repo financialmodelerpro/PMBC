@@ -25,6 +25,7 @@ import { z } from 'zod';
 
 import { BELOW_MINIMUM_BAND, DEAL_BANDS_SAR, DEAL_BAND_UNSURE, PURPOSES, VALUATION_DATA_VERSION } from '../valuation/data';
 import { INPUT_SCHEMA_VERSION, runValuation, TOTAL_YEARS, type ValuationInputs, type ValuationResult } from '../valuation/engine';
+import { cleanProfile } from '../valuation/profile';
 import { serializeResult } from '../valuation/serialize';
 import { CONSENT_TEXT, FOLLOW_UP_TEXT } from '../consent';
 
@@ -78,6 +79,13 @@ const inputsSchema = z.object({
     .optional(),
   investedCapital: cell.optional(),
   waccAdjustment: z.number().finite().gte(-10).lte(10).nullable().optional(),
+  // Visitor text for the report. Cleaned here, so every endpoint stores and
+  // renders the same plain text. The raw caps only refuse absurd payloads; the
+  // real limits are applied by cleanProfile.
+  profile: z
+    .object({ companyName: z.string().max(1000).nullable().optional(), description: z.string().max(10000).nullable().optional() })
+    .optional()
+    .transform((p) => cleanProfile(p)),
 });
 
 export type SubmittedInputs = z.infer<typeof inputsSchema>;
@@ -249,7 +257,7 @@ export async function processValuationSubmission(
     data_version: VALUATION_DATA_VERSION,
     name: g.name,
     email: g.email.toLowerCase(),
-    company: g.company || null,
+    company: g.company || data.inputs.profile?.companyName || null,
     purpose: g.purpose,
     deal_size_band: g.dealSize,
     below_minimum: g.dealSize === BELOW_MINIMUM_BAND,

@@ -363,6 +363,17 @@ export default async function ToolLeadDetailPage(props: { params: Promise<{ id: 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16, marginTop: 14 }}>
               <Pairs
                 rows={[
+                  ['Company name, as typed in step 1', inputs.profile?.companyName ?? 'Not entered'],
+                  [
+                    'About the business',
+                    inputs.profile?.description ? (
+                      <span key="about" style={{ whiteSpace: 'pre-line' }}>
+                        {inputs.profile.description}
+                      </span>
+                    ) : (
+                      'Not entered'
+                    ),
+                  ],
                   ['Input schema version', String(inputs.schemaVersion ?? 1)],
                   ['One-off costs added back', opt(extras.normalisation.oneOff, ` ${code} m`)],
                   ['Owner costs added back', opt(extras.normalisation.ownerCosts, ` ${code} m`)],

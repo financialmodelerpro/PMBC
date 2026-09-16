@@ -916,6 +916,7 @@ recorded reversal that allows them.
 | Warning thresholds, version 2 defaults, growth ceilings, the market data label | `src/lib/tools/valuation/data.ts` (`WARNING_RULES`, `V2_DEFAULTS`, `growthCeiling`, `DATA_VERSION_LABELS`) |
 | Email me this version | `src/lib/tools/leads/version.ts` (pure), route `src/app/api/tools/[slug]/lead/version/route.ts` |
 | Download PDF for what is on screen | `src/app/api/tools/[slug]/pdf/route.ts`, writes nothing |
+| Company name and description a visitor adds to their report | `src/lib/tools/valuation/profile.ts` (cleaning and limits, shared by the form, the API and the PDF) |
 | Logo and partner card in the report and on the results | `src/lib/tools/brand/partner.ts` (pure), `src/lib/tools/brand/fetch.ts` (server), `src/components/tools/PartnerCard.tsx` |
 | Booking link | `src/lib/tools/booking.ts`, always the site's `/book` |
 | **Every tunable number** (Damodaran data, FX, market rates, presets, deal bands) | `src/lib/tools/valuation/data.ts`, and nowhere else |
@@ -1032,6 +1033,7 @@ Assumptions), then "Who you will work with" and the booking call to action.
 | Bridge items | End of service benefits, leases, minority interest (deducted) and surplus assets (added), beyond net debt. With none entered the reference's `ev - netDebt` is kept exactly. |
 | Stake | Percent of equity, times a control premium or minority discount. Shown only when not 100% with no adjustment. |
 | WACC adjustment | Points added by the exploration slider. Zero keeps the reference WACC bit for bit. |
+| Company profile (`inputs.profile`) | A company name (120 characters) and one or two paragraphs about the business (1,000 characters), typed on step 1. **Never read by the engine.** Cleaned to plain text by the API schema itself (control characters, whitespace, two paragraphs, the caps), so every endpoint stores and renders the same text. The name fills the gate's company field and the results headline; the description goes on the PDF cover, marked as the visitor's words and not reviewed by the firm. Optional, so it did not bump the input schema version. |
 
 **Warning rules** (`WARNING_RULES` in `data.ts`, text in `format.ts`):
 terminal value above 75% of the DCF; perpetual growth above the currency's
@@ -1059,7 +1061,7 @@ screen and writes nothing. Both need the lead's access token. The admin lead
 detail shows the version 2 inputs, the warnings the visitor saw, and the version
 history.
 
-**The PDF is ten fixed pages** (`REPORT_PAGE_TITLES`): cover, executive summary
+**The PDF is ten fixed pages** (`REPORT_PAGE_TITLES`): cover (with the visitor's company name and description when given; the cover is the one page with room for the longest description in every case, and long names step the title size down), executive summary
 (rule-based, so the same inputs read the same), valuation summary with the
 football field and value bridge, financial profile, free cash flow and
 sensitivity heatmap, scenarios stake and checks, value levers, assumptions,
@@ -1079,8 +1081,8 @@ founder profile sections) come through `meta.branding`, fetched and resized by
 5. Checks in `verify-valuation-v2` for the item on its own and absent, then `verify-valuation-engine` to prove the neutral path.
 
 **Verifiers.** `verify-valuation-engine` (493, reference parity),
-`verify-valuation-v2` (161), `verify-tool-lead-api` (106),
-`verify-tool-email-pdf` (191, pdfjs text and operator list, so a ligature glyph is
+`verify-valuation-v2` (162), `verify-tool-lead-api` (116),
+`verify-tool-email-pdf` (211, pdfjs text and operator list, so a ligature glyph is
 caught even though extracted text maps it back to letters),
 `verify-tools-visibility` (78) and `verify-brevo-webhook` (132). Each was
 break-tested. `npm run render-valuation-examples -- <dir>` renders the minimal and
