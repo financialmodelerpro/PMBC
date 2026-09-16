@@ -73,7 +73,7 @@ When you find an em dash in *existing* content while doing other work, fix it as
 in Phase 9 is review rather than code: read the deployed site end to end, send one
 real contact submission, check the OG cards, clear the Supabase advisor. The
 public site renders on nineteen routes, every page's copy is editable in the page
-builder, and 73 migrations are applied.
+builder, and 79 migrations are applied. Free tools (section 7b) were added on 2026-09-16 and ship Hidden.
 
 **The per-phase summary index moved to [`PHASE_HISTORY.md`](./PHASE_HISTORY.md) on 2026-08-16**,
 along with the detailed rows that were already there. This file states where the
@@ -102,7 +102,7 @@ is review.**
 Every phase is done bar Phase 9, and Phase 9 no longer contains code. The public
 site renders on nineteen routes, every page's copy is editable in the page
 builder, the admin console is at parity with FMP and past it in three places
-(roles, page metadata, testimonial collection), and 73 migrations are applied.
+(roles, page metadata, testimonial collection), and 79 migrations are applied.
 
 Ordered by what stops a launch, not by when it was added.
 
@@ -246,6 +246,7 @@ Single Next.js application, single domain (pacemakersglobal.com), no subdomain r
 | Rich Text | @tiptap/react | latest | Admin content editing |
 | Captcha | @hcaptcha/react-hcaptcha | ^2 | Contact form spam protection |
 | Passwords | bcryptjs | ^3 | Admin password hashing |
+| PDF | @react-pdf/renderer | ^4 | Free tool PDF reports, rendered on the server. Kept out of the bundle via `serverExternalPackages`; fonts traced in with `outputFileTracingIncludes`. See "Free Tools". |
 
 ### Explicitly NOT Used in v1
 
@@ -254,7 +255,7 @@ The following are in FMP but NOT in PMBC v1. Do not install them. They add maint
 | Excluded | Reason |
 |----------|--------|
 | Google Apps Script | No external roster system |
-| pdf-lib, @react-pdf/renderer | No certificate generation |
+| pdf-lib | No certificate generation. **`@react-pdf/renderer` was on this line and was lifted on 2026-09-16** for the free tools' PDF reports; one PDF library is enough, so pdf-lib stays excluded. |
 | exceljs | No spreadsheet export |
 | Recharts | No data visualizations |
 | @anthropic-ai/sdk | No AI features in v1 |
@@ -529,11 +530,19 @@ Three flags matter when rebuilding:
 071  team_meta_description   the /team meta description stops promising "practitioners who lead every mandate", which is the plural claim the firm does not make
 072  testimonial_submissions **DDL, HAND-RUN.** Six columns on `testimonials` plus the `testimonial_links` table, for client-submitted testimonials
 073  place_testimonial_sections  the form on /contact and home, the quotes on home between the founder card and the network line, all shipped hidden
+074  tools_pages               cms_pages rows and hero sections for /tools and /tools/business-valuation (`npm run seed-tools-pages`)
+075  tools_links               a footer link and a service page CTA into the tools. Applied early by hand, hidden the same day, retired by 079
+076  tool_visibility           **DDL.** Per-tool Hidden or Live, seeded Hidden. Missing table means every tool Hidden
+077  tool_leads                **DDL.** tool_leads and tool_lead_events. Missing tables mean results still shown, nothing saved
+078  tool_email_templates      the results email and lead alert rows in email_templates. Code carries the same defaults
+079  retire_tools_link_rows    removes 075's two rows; the footer link and CTA are now rendered from the visibility switch
 ```
+
+**Every migration from 076 on states when it is safe to apply** in a `SAFE TO APPLY:` line in its header: before or after which deploy, and what the site does in the gap. 075 is why: it was applied before the routes it linked to were deployed, and previews share the production database, so the live footer linked to a 404.
 
 After running migrations, manually insert one admin_users row via SQL with a bcrypt hash for the password.
 
-**DDL migrations must be run by hand.** 031, 032, 033 and 072 use `ALTER TABLE` or `CREATE TABLE`, which supabase-js cannot execute. The Supabase CLI is not installed and `.env.local` carries no direct Postgres connection string, so the seed-script pattern used for 029 does not work for them. Paste them into the Supabase SQL editor. Every consumer of those columns degrades safely if the migration has not run: the page list treats a missing `is_system` as "system" so nothing is deletable, `writeAudit` retries without the diff columns rather than failing the mutation, and `/api/admin/site-pages` replays a write with `can_toggle` stripped when Postgres rejects the column (so Pages & Nav keeps working, minus pinning).
+**DDL migrations must be run by hand.** 031, 032, 033, 072, 076 and 077 use `ALTER TABLE` or `CREATE TABLE`, which supabase-js cannot execute. The Supabase CLI is not installed and `.env.local` carries no direct Postgres connection string, so the seed-script pattern used for 029 does not work for them. Paste them into the Supabase SQL editor. Every consumer of those columns degrades safely if the migration has not run: the page list treats a missing `is_system` as "system" so nothing is deletable, `writeAudit` retries without the diff columns rather than failing the mutation, and `/api/admin/site-pages` replays a write with `can_toggle` stripped when Postgres rejects the column (so Pages & Nav keeps working, minus pinning).
 
 ---
 
@@ -654,6 +663,8 @@ Editors should:
 | `/book` | book | Booking page. CMS hero plus a `booking_body` section (migration 066) around a Calendly inline embed reading `site_settings.booking_url`. Deliberately not in the top nav (footer and CTAs only). |
 | `/privacy` | privacy | Privacy policy (static, hardcoded for v1) |
 | `/terms` | terms | Terms of engagement (static, hardcoded for v1) |
+| `/tools` | tools | The free tools hub. **404 while no tool is Live.** Hero is a CMS section (074); the cards come from the registry and the visibility switch. See section 7b. |
+| `/tools/[slug]` | tool-{slug} | One free tool. **404 and noindex while Hidden**, Admin preview for signed-in staff. Compact hero from the CMS page; the calculator is code. |
 | `/confidentiality` | confidentiality | How information shared before, during and after an engagement is treated. Static and hardcoded, for the same reason as the two above: a statement settled by counsel should not be editable from an admin console afterwards. |
 
 ### Service Slugs
@@ -763,6 +774,8 @@ export default async function middleware(req) {
 | `/admin/email-templates` | Edit email subject and body for the two templates |
 | `/admin/audit` | Audit log viewer: filters (admin, action, date range), 100-row paging, before/after JSON diff |
 | `/admin/settings` | Misc site settings (analytics IDs, social URLs, etc.) |
+| `/admin/tools` | Free tools: Live or Hidden per tool (admin only to switch), lead counts, visibility history. See section 7b |
+| `/admin/tool-leads` | Leads from the free tools, with filters (tool, dates, deal size, below minimum, email status, test leads), detail with stored inputs and results, email events, resend and PDF download |
 
 ### Sidebar (`src/components/admin/CmsAdminNav.tsx`)
 
@@ -883,6 +896,106 @@ export async function sendEmail(args: SendEmailArgs): Promise<SendEmailResult> {
 ```
 
 ---
+
+## 7b. Free Tools
+
+Added 2026-09-16. Free calculators at `/tools`, first the Business Valuation
+tool (DCF and comparables) at `/tools/business-valuation`, ported from
+`reference/tools/business-valuation.html`. See Critical Reminder 1 for the
+recorded reversal that allows them.
+
+### Where things live
+
+| What | Where |
+|------|-------|
+| Which tools exist, their copy, their service page CTA | `src/config/tools.ts` (the registry) |
+| Each tool's component | `src/components/tools/toolComponents.ts`, then `src/components/tools/<tool>/` |
+| **Every tunable number** (Damodaran data, FX, market rates, presets, deal bands) | `src/lib/tools/valuation/data.ts`, and nowhere else |
+| The valuation arithmetic | `src/lib/tools/valuation/engine.ts`, pure, no UI |
+| Every sentence and number format shown about a result | `src/lib/tools/valuation/format.ts`, shared by the page, the PDF and the emails |
+| Whether a tool is public | `tool_visibility` table, switched at `/admin/tools`, read only through `src/lib/tools/visibility.ts` |
+| Lead submission rules | `src/lib/tools/leads/valuation.ts` (pure), route `src/app/api/tools/[slug]/lead/route.ts` |
+| Results email and alert | `src/lib/tools/email/templates.ts`, sent by `src/lib/tools/leads/deliver.ts`, editable at `/admin/email-templates` |
+| PDF report | `src/lib/tools/pdf/ValuationReport.tsx`, fonts in `src/lib/tools/pdf/fonts/` |
+| Brevo webhook | `src/lib/tools/webhook.ts` (pure), route `src/app/api/webhooks/brevo/route.ts` |
+| Booking click tracking | `src/app/api/tools/book/route.ts` |
+| Admin | `/admin/tools`, `/admin/tools/[slug]`, `/admin/tool-leads`, `/admin/tool-leads/[id]` |
+
+### Visibility: one switch per tool
+
+A tool is Live only when the registry marks it `build: 'ready'` **and** its
+`tool_visibility` row says `live`. Everything else is Hidden, including a
+missing row, a missing table and a failed read. That one answer decides, and
+nothing else may decide:
+
+- `/tools/[slug]`: 404 and noindex when Hidden. Signed-in staff see the page with an amber **Admin preview** banner.
+- `/tools`: 404 while no tool is Live. Lists Live tools only.
+- `sitemap.xml`: `/tools` and each Live tool. The sitemap is rendered per request.
+- `WebApplication` JSON-LD: only on a Live tool's public page.
+- Footer "Free Tools": shown while at least one tool is Live. **Not** a row in Footer Links.
+- Service page CTA: the tool's `serviceCta`, while it is Live. **Not** a page builder section.
+- Lead API: refuses a Hidden tool unless the caller is staff.
+
+Switching is admin only (not editors), confirms first, and writes an audit entry
+(`entity_type` `tool`, action `tool_visibility`) that is the history on the tool
+detail page. `npm run verify-tools-visibility` proves all of this; with
+`VERIFY_BASE` it checks a running site as a logged-out visitor.
+
+**Any submission by signed-in staff is a test lead** (`is_test`), on a Hidden or
+a Live tool, and test leads are excluded from counts and from the lead list by
+default.
+
+### Adding a tool
+
+1. Registry entry in `src/config/tools.ts` with `build: 'draft'`. It is now listed at `/admin/tools` as In development and cannot be switched Live.
+2. Data and engine under `src/lib/tools/<slug>/`, pure, with every tunable value in a data module.
+3. Component under `src/components/tools/<slug>/`, registered in `toolComponents.ts`.
+4. A lead processor like `leads/valuation.ts`, added to the `slug` check in the lead route, and its email and PDF if it sends them.
+5. A `cms_pages` row `tool-<slug>` with a hero section, by migration, stating when it is safe to apply.
+6. A verifier against whatever the tool was specified from.
+7. `build: 'ready'`, deploy, preview it signed in, then switch it Live at `/admin/tools`.
+
+### Refreshing the Damodaran data each January
+
+Damodaran publishes his annual update in early January. All values are in
+`src/lib/tools/valuation/data.ts`, and its header lists these steps too.
+
+1. Country risk premiums, default spreads and marginal tax rates for each country in `COUNTRIES`.
+2. Unlevered beta (corrected for cash) and market debt to equity for each industry in `INDUSTRIES`, from the global datasets.
+3. `MARKET.matureErp` (implied ERP) and `MARKET.usDefaultSpread`.
+4. `MARKET.usTreasury10y` on the day of the refresh.
+5. FX to SAR (`sarPerUnit`) and the inflation expectations for non-pegged currencies. Review the preset multiples and size premium bands while there.
+6. Update every `asOf` in `SOURCE_NOTES` and the `WACC_SOURCE_SENTENCE`, and bump `VALUATION_DATA_VERSION`.
+7. `npm run verify-valuation-engine`. The reference HTML carries the old values, so after a refresh update the numbers in `reference/tools/business-valuation.html` to match, or the verifier will report the difference (which is the point).
+
+Old leads keep the results they were given: `results` is stored as computed and
+never recomputed, and each lead records its `data_version`.
+
+### Leads, email and tracking
+
+- **The server recomputes.** The browser posts inputs and gate details; the API validates to the form's limits, reruns the engine, and stores and returns its own result. The page shows the server's result, or its own if the request fails, so a visitor always sees results.
+- **Spam:** honeypot field, a 3 second minimum from page load, and 5 per hour or 20 per day per hashed IP (staff exempt). All three answer exactly as a real save does and store nothing.
+- **Emails run after the response** (`after()`), so a slow PDF or Brevo never delays results. Outcomes are written to the lead (`email_status`, `alert_status`, errors) and as events. Staff can resend and download the PDF from the lead.
+- **The alert** goes to `site_settings.admin_email`, then `EMAIL_TO_ADMIN`.
+- **Tracking:** every tool email carries `X-Mailin-custom: lead:<id>|kind:<results|alert>` and Brevo tags. The webhook records delivered, opened, clicked, bounced, blocked, deferred and complaint events against the lead. `email_status` only moves to stronger evidence (complaint > bounced > blocked > clicked > opened > delivered > deferred > sent). **Opens are a weak signal**; clicks and booking clicks are the real one.
+- **Booking clicks** from the results page, the email and the PDF go through `/api/tools/book?t=<access_token>&src=...`, which records the click and redirects to `site_settings.booking_url` with name, email and UTM tags, or `/book`. Email security scanners can open links, so check the user agent on an email-sourced click.
+
+### Brevo webhook setup
+
+1. Set `BREVO_WEBHOOK_TOKEN` on Vercel (Production) to a long random string, and redeploy.
+2. In Brevo: **Transactional**, then **Settings**, then **Webhook**, then **Add a new webhook** (menu names as of September 2026; Brevo moves them occasionally).
+3. URL: `https://www.pacemakersglobal.com/api/webhooks/brevo?token=<BREVO_WEBHOOK_TOKEN>`. Use the `www` host: the apex redirects, and a webhook should not depend on a redirect.
+4. Events: Delivered, Opened, Clicked, Hard bounce, Soft bounce, Spam, Blocked, Invalid email, Deferred, Error, Unsubscribed. Proxy open and First opening are optional; they are recorded as opens.
+5. Save, then use Brevo's test button: the response is 200 with `ignored: 1`, because the test event matches no lead.
+6. Alternatively create it through the API with `"auth": {"type": "bearer", "token": "<BREVO_WEBHOOK_TOKEN>"}` and the URL without `?token=`. Both are accepted.
+
+`npm run verify-brevo-webhook` covers authentication, matching, status ordering and duplicates; with `VERIFY_BASE` it confirms a running site refuses a missing or wrong token.
+
+### Privacy
+
+`PRIVACY_TOOLS_DRAFT.md` holds proposed policy wording and open questions for
+counsel (retention period, tracking consent). The live `/privacy` was not
+changed. Settle it before switching a tool Live.
 
 ## 8. SEO and OG
 
@@ -1066,6 +1179,15 @@ FMP_API_KEY=
 HCAPTCHA_SECRET_KEY=
 NEXT_PUBLIC_HCAPTCHA_SITE_KEY=
 
+# Free tools (see "Free Tools")
+# Secret for hashing visitor IPs before they are stored for rate limiting. Any
+# long random string. Falls back to NEXTAUTH_SECRET when unset; changing it
+# resets rate limiting, nothing else.
+TOOL_LEAD_IP_SALT=
+# Shared secret in the Brevo webhook URL (?token=) or its Bearer header. Unset,
+# /api/webhooks/brevo refuses every request with 503.
+BREVO_WEBHOOK_TOKEN=
+
 # Optional
 NEXT_PUBLIC_GA_ID=
 ```
@@ -1162,7 +1284,7 @@ Conventional Commits style: `feat:`, `fix:`, `chore:`, `docs:`, `refactor:`. Kee
 ## 15. Critical Reminders
 
 0. **"PMBC" never appears in public copy.** The firm is PaceMakers to a reader, and PMBC is a name for this repository, the Vercel project and these documents. The abbreviation had reached one live surface, the closing eyebrow on all nine service detail pages, and was removed on 2026-08-16. **Composed copy needs the same care:** the heading beneath that eyebrow was built as `Discuss a {title.toLowerCase()} mandate` and produced "Discuss a m&a advisory mandate" on three of the nine pages. Use `withIndefiniteArticle` from `src/lib/public/grammar.ts` rather than a hardcoded "a", and never lowercase a proper title.
-1. **PMBC is a credibility document, not a lead engine.** Every decision should be evaluated against this. Heavy SEO content and lead magnets are not v1.
+1. ~~**PMBC is a credibility document, not a lead engine.** Every decision should be evaluated against this. Heavy SEO content and lead magnets are not v1.~~ **Partly reversed 2026-09-16 by explicit instruction: free tools are part of the site.** A tool is a lead magnet by design, which is exactly what this rule excluded, so the reversal is recorded rather than the rule quietly deleted. What survives of it: the site is still a credibility document first, a tool is published only when it is good enough to carry the firm's name (every tool ships Hidden and is switched Live by hand at /admin/tools), and quality of inbound still outranks volume, which is why each lead records the planned deal size and a below-minimum flag. Heavy SEO content remains out of scope.
 2. **Design feels institutional, not modern-startup.** No gradient backgrounds, no animated icons, no playful microcopy. Senior, considered, calm.
 3. **Honest credentials only, and the firm's are not the partner's.** PMBC's own track record is 30+ mandates since 2017 across biofuel, oil and gas, waste management, data centers, construction, and industrial services. Ahmad's broader career (200+ engagements, 200+ valuations, SAR 20B+ real estate NAV, SAR 300M+ deployed via equity research, ACWA Power, Saudi Aramco-backed projects) is attributed to him as a professional and lives in his credentials, never in a firm statistic. **Migration 044 fixed a live instance of exactly this**: home and about were presenting his career totals as PMBC's track record. Keep the two separate.
 
