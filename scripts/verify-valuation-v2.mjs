@@ -23,6 +23,10 @@
 //   8. Pakistan with every feature in use at once, and every formatter run over
 //      it with no NaN or undefined in the text.
 //   9. Schema version and the WACC adjustment.
+//  10. Review round two: the cost of capital lever equals the sensitivity
+//      table's cells; a control premium on a stake of 50% or less warns and the
+//      form defaults such a stake to a minority discount; terminal growth more
+//      than one point below or two points above expected local inflation warns.
 //
 //   npm run verify-valuation-v2
 //
@@ -356,7 +360,8 @@ console.log('8. Pakistan with every feature');
     check('owner costs carried into the forecast', r.rows.every((row, k) => close(row.ebitda, i.financials.ebitda[3 + k] + 40)));
     near('other claims 160 + 220 + 75 - 300', r.bridge.otherClaims, 155);
     check('equity is EV less net debt less claims', r.equity.every((v, k) => close(v, r.ev[k] - 1200 - 155)));
-    check('stake 40% with 25% premium', r.stake.value.every((v, k) => close(v, r.equityDisplay[k] * 0.4 * 1.25)));
+    check('stake 40% with a 20% minority discount', r.stake.value.every((v, k) => close(v, r.equityDisplay[k] * 0.4 * 0.8)));
+    check('the full example raises no stake warning', !codes(r).includes('premium_on_minority_stake'));
     check('scenario weights 30/50/20', r.scenarios.map((x) => x.weight).join() === '0.3,0.5,0.2');
     near('weighted value', r.weightedEquity, Math.max(0, 0.3 * r.scenarios[0].equity[1] + 0.5 * r.scenarios[1].equity[1] + 0.2 * r.scenarios[2].equity[1]));
     check('ROIC computed from invested capital', Number.isFinite(r.ratios.roic));
@@ -381,6 +386,74 @@ console.log('8. Pakistan with every feature');
     const back = state.toInputs(state.stateFromInputs(i));
     const r2 = run(back);
     check('inputs survive the form round trip', r2.equity.every((v, k) => close(v, r.equity[k])) && close(r2.weightedEquity, r.weightedEquity));
+  }
+}
+
+console.log('10. Lever, stake rule and inflation band');
+{
+  // The lever reads the table: centre cell and one point lower WACC, same growth.
+  for (const [label, inputs] of [['minimal', BASE], ['full', state.toInputs(fullFeatureCase(state))]]) {
+    const r = run(inputs);
+    const lever = format.waccLeverFromSensitivity(r);
+    const s = r.sensitivity;
+    const wi = s.waccs.findIndex((w) => close(w, r.wacc.wacc)), wl = s.waccs.findIndex((w) => close(w, r.wacc.wacc - 0.01));
+    const gi = s.growths.findIndex((g) => close(g, r.growth));
+    check(`${label}: lever uses the table's centre and one point lower WACC at the same growth`, lever && lever.from === s.grid[wi][gi] && lever.to === s.grid[wl][gi], JSON.stringify(lever));
+    check(`${label}: lever is not the old flexed figure (which also moved growth)`, lever && !close(lever.uplift, r.hiG - r.base.evG));
+    const table = format.sensitivityTable(r);
+    const leverText = format.valueLevers(r).find((l) => l.title === 'Lower the risk a buyer prices in')?.detail ?? '';
+    check(`${label}: lever text quotes the two table cells exactly as printed`, leverText.includes(table.rows[wi].values[gi]) && leverText.includes(table.rows[wl].values[gi]), leverText);
+    // An independent recomputation of the cell: equity at WACC minus one point, same growth.
+    const alt = run({ ...inputs, waccAdjustment: (inputs.waccAdjustment ?? 0) - 1 });
+    check(`${label}: the lower cell equals a full run at one point lower WACC`, close(lever.to, alt.base.evG - alt.netDebt - alt.bridge.otherClaims, 1e-9), `${lever.to} vs ${alt.base.evG - alt.netDebt - alt.bridge.otherClaims}`);
+  }
+
+  // Stake: a premium on 50% or less warns; above 50% it does not; a discount never does.
+  const stake = (percent, adjustment) => ({ ...BASE, stake: { percent, adjustment, controlPremium: 25, minorityDiscount: 20 } });
+  check('40% with a control premium warns', codes(run(stake(40, 'control_premium'))).includes('premium_on_minority_stake'));
+  check('exactly 50% with a control premium warns', codes(run(stake(50, 'control_premium'))).includes('premium_on_minority_stake'));
+  check('51% with a control premium is silent', !codes(run(stake(51, 'control_premium'))).includes('premium_on_minority_stake'));
+  check('40% with a minority discount is silent', !codes(run(stake(40, 'minority_discount'))).includes('premium_on_minority_stake'));
+  check('the premium is still applied as chosen', close(run(stake(40, 'control_premium')).stake.value[1], B.equityDisplay[1] * 0.4 * 1.25));
+
+  // The form: the adjustment follows the stake until chosen.
+  let st = minimalCase(state);
+  const setStake = (s0, p) => state.syncStakeAdjustment({ ...s0, stake: { ...s0.stake, ...p }, stakeAdjustmentTouched: s0.stakeAdjustmentTouched || 'adjustment' in p });
+  check('form: 100% starts with no adjustment', st.stake.adjustment === 'none' && !st.stakeAdjustmentTouched);
+  st = setStake(st, { percent: '40' });
+  check('form: 40% defaults to a minority discount', st.stake.adjustment === 'minority_discount');
+  st = setStake(st, { percent: '50' });
+  check('form: 50% is still a minority discount', st.stake.adjustment === 'minority_discount');
+  st = setStake(st, { percent: '60' });
+  check('form: 60% returns to no adjustment', st.stake.adjustment === 'none');
+  st = setStake(st, { percent: '30' });
+  st = setStake(st, { adjustment: 'control_premium' });
+  check('form: a premium chosen at 30% is kept, not overridden', st.stake.adjustment === 'control_premium' && st.stakeAdjustmentTouched);
+  st = setStake(st, { percent: '20' });
+  check('form: once chosen, changing the stake keeps the choice', st.stake.adjustment === 'control_premium');
+  check('form: stored inputs restore as chosen', state.stateFromInputs(state.toInputs(st)).stakeAdjustmentTouched === true);
+
+  // Inflation band. SAR is pegged: US long-run inflation 2.5, so 1.5 to 4.5 is silent.
+  const has = (r, code) => codes(r).includes(code);
+  check('pegged currencies use long-run US inflation', data.MARKET.usInflationLongRun === 2.5 && data.WARNING_RULES.inflationBelowPoints === 1 && data.WARNING_RULES.inflationAbovePoints === 2);
+  check('SAR growth 1.4% warns (below inflation less one point)', has(run({ ...BASE, growth: 1.4 }), 'growth_vs_inflation'));
+  check('SAR growth 1.5% is silent (at the lower edge)', !has(run({ ...BASE, growth: 1.5 }), 'growth_vs_inflation'));
+  check('SAR growth 4.5% is silent (at the upper edge)', !has(run({ ...BASE, growth: 4.5 }), 'growth_vs_inflation'));
+  check('SAR growth 4.6% warns (above inflation plus two points)', has(run({ ...BASE, growth: 4.6 }), 'growth_vs_inflation'));
+  check('the reference example stays free of warnings', B.warnings.length === 0, codes(B).join());
+  const pk = state.toInputs(fullFeatureCase(state));
+  const pkInfl = pk.wacc.inflationLocal;
+  check('PKR uses the local inflation entered', pkInfl === 7);
+  check('PKR growth 5.9% warns', has(run({ ...pk, growth: 5.9 }), 'growth_vs_inflation'));
+  check('PKR growth 6.0% is silent', !has(run({ ...pk, growth: 6.0 }), 'growth_vs_inflation'));
+  check('PKR growth 9.0% is silent', !has(run({ ...pk, growth: 9.0 }), 'growth_vs_inflation'));
+  check('PKR growth 9.1% warns', has(run({ ...pk, growth: 9.1 }), 'growth_vs_inflation'));
+  check('PKR with 10% local inflation, growth 6.0% now warns', has(run({ ...pk, growth: 6.0, wacc: { ...pk.wacc, inflationLocal: 10 } }), 'growth_vs_inflation'));
+  const low = run({ ...BASE, growth: 1 }).warnings.find((w) => w.code === 'growth_vs_inflation');
+  check('inflation warning carries growth, inflation and both edges', low && close(low.values.inflation, 0.025) && close(low.values.low, 0.015) && close(low.values.high, 0.045));
+  for (const [code, values] of [['growth_vs_inflation', { growth: 0.01, inflation: 0.025, low: 0.015, high: 0.045 }], ['growth_vs_inflation', { growth: 0.05, inflation: 0.025, low: 0.015, high: 0.045 }], ['premium_on_minority_stake', { percent: 40, threshold: 50, premium: 0.25 }]]) {
+    const t = format.warningText({ code, values }, B);
+    check(`${code}: has a title and detail`, Boolean(t && t.title && t.detail && !/NaN|undefined/.test(t.title + t.detail)), t?.detail);
   }
 }
 

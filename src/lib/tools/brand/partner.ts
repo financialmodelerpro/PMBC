@@ -2,10 +2,14 @@
  * The partner a tool visitor would work with, as shown on the results page and
  * in the PDF report.
  *
- * Every word comes from the founder profile the page builder already edits:
- * the `founder_hero` section on /about/ahmad-din for identity and introduction,
- * and the `founder_block` card on home for the career highlights. Nothing here
- * is a second copy of the bio, so an edit in the builder reaches the report.
+ * Every word comes from ONE place: the `founder_hero` section on the founder
+ * profile (/about/ahmad-din), edited in the page builder. Identity, title,
+ * credentials and introduction are the fields that page already shows. The
+ * career highlights are a separate field on the same section,
+ * `report_highlights` (one per line), which the public profile page does not
+ * render. It ships empty, so no highlight appears until one is written and
+ * confirmed there; home's founder card is deliberately not read, so editing it
+ * can never change a report.
  *
  * The highlights are the partner's career record, earned before and alongside
  * PaceMakers, and are labelled as his (`PARTNER_RECORD_NOTE`), never as the
@@ -23,17 +27,19 @@ import { publicPathForPageSlug } from '@/lib/cms/pageRoutes';
  */
 export const PARTNER_PAGE_SLUG = 'about-ahmad-din';
 
+export const MAX_REPORT_HIGHLIGHTS = 5;
+
 export type PartnerCard = {
   name: string;
   /** "Founding Partner". */
   role: string;
   /** The primary title line, such as "Corporate Finance and Transaction Advisory Specialist". */
   title: string;
-  /** "ACCA | FMVA | AFM | 12+ Years Experience". */
+  /** "ACCA | FMVA | AFM | 12+ Years Experience", with the separators spaced evenly. */
   credentialsLine: string;
   /** One paragraph. */
   intro: string;
-  /** Career highlights, at most five. */
+  /** Career highlights from `report_highlights`, at most five. Empty until written. */
   highlights: string[];
   photoUrl: string | null;
   profilePath: string;
@@ -48,27 +54,34 @@ const url = (v: unknown): string | null => {
   return /^https:\/\//i.test(s) ? s : null;
 };
 
+/** "ACCA | FMVA | AFM |12+ Years" becomes "ACCA | FMVA | AFM | 12+ Years". */
+export function spaceSeparators(line: string): string {
+  return line.replace(/\s*\|\s*/g, ' | ').trim();
+}
+
+/** The highlights field, one per line, or a list. Blank lines dropped, at most five. */
+export function reportHighlights(v: unknown): string[] {
+  const items = Array.isArray(v) ? v : typeof v === 'string' ? v.split(/\r?\n/) : [];
+  return items.map(text).filter(Boolean).slice(0, MAX_REPORT_HIGHLIGHTS);
+}
+
 /**
- * Builds the card from the two sections' stored content. Null without a name,
+ * Builds the card from the founder profile's hero content. Null without a name,
  * in which case both surfaces leave the block out rather than show a frame.
  */
-export function partnerFromSections(hero: Record<string, unknown> | null, block: Record<string, unknown> | null): PartnerCard | null {
-  const name = text(hero?.name) || text(block?.name);
+export function partnerFromHero(hero: Record<string, unknown> | null): PartnerCard | null {
+  const name = text(hero?.name);
   if (!name) return null;
-  const highlights = (Array.isArray(block?.credentials) ? block.credentials : [])
-    .map(text)
-    .filter(Boolean)
-    .slice(0, 5);
-  const heroLinkedin = url(hero?.cta_primary_href);
+  const linkedin = url(hero?.cta_primary_href);
   return {
     name,
     role: text(hero?.eyebrow) || 'Founding Partner',
     title: text(hero?.title_primary),
-    credentialsLine: text(hero?.credentials_line) || text(block?.credentials_line),
+    credentialsLine: spaceSeparators(text(hero?.credentials_line)),
     intro: text(hero?.intro),
-    highlights,
-    photoUrl: url(hero?.photo_url) || url(block?.photo_url),
+    highlights: reportHighlights(hero?.report_highlights),
+    photoUrl: url(hero?.photo_url),
     profilePath: publicPathForPageSlug(PARTNER_PAGE_SLUG),
-    linkedinUrl: heroLinkedin && /linkedin\.com/i.test(heroLinkedin) ? heroLinkedin : null,
+    linkedinUrl: linkedin && /linkedin\.com/i.test(linkedin) ? linkedin : null,
   };
 }

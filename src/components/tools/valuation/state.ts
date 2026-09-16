@@ -10,7 +10,7 @@
  * transitions the page does.
  */
 
-import { ASSUMPTIONS, COUNTRIES, EXAMPLE_COMPANY, MARKET, V2_DEFAULTS } from '@/lib/tools/valuation/data';
+import { ASSUMPTIONS, COUNTRIES, EXAMPLE_COMPANY, MARKET, V2_DEFAULTS, WARNING_RULES } from '@/lib/tools/valuation/data';
 import { cleanProfile } from '@/lib/tools/valuation/profile';
 import {
   INPUT_SCHEMA_VERSION,
@@ -67,6 +67,8 @@ export type FormState = {
   bridge: Record<BridgeKey, string>;
   investedCapital: string;
   stake: { percent: string; adjustment: StakeAdjustment; controlPremium: string; minorityDiscount: string };
+  /** True once the visitor picks an adjustment. Until then it follows the stake size. */
+  stakeAdjustmentTouched: boolean;
   scenarios: Record<ScenarioKey, string>;
   /** Exploration only: percentage points on WACC from the results slider. */
   waccAdjustment: string;
@@ -110,6 +112,7 @@ export function initialState(): FormState {
     norm: { oneOff: '', ownerCosts: '', carryOwnerCosts: false },
     bridge: { eosb: '', leases: '', minorityInterest: '', surplusAssets: '' },
     investedCapital: '',
+    stakeAdjustmentTouched: false,
     stake: {
       percent: String(d.stake.percent),
       adjustment: 'none',
@@ -247,6 +250,19 @@ export function syncExitMultiple(s: FormState): FormState {
 }
 
 /** Keeps the private company discount on its default (20% with peers, 0% without) until the visitor types one. */
+/**
+ * The stake adjustment follows the stake until the visitor picks one: a
+ * minority discount at or below the control threshold (50%), none above it.
+ * A control premium chosen for a stake without control is kept and warned
+ * about (`premium_on_minority_stake`), never silently changed.
+ */
+export function syncStakeAdjustment(s: FormState): FormState {
+  if (s.stakeAdjustmentTouched) return s;
+  const p = num(s.stake.percent);
+  const adjustment: StakeAdjustment = p !== null && p > 0 && p <= WARNING_RULES.controlStakeAbovePercent ? 'minority_discount' : 'none';
+  return adjustment === s.stake.adjustment ? s : { ...s, stake: { ...s.stake, adjustment } };
+}
+
 export function syncPrivateDiscount(s: FormState): FormState {
   if (s.discountTouched) return s;
   return { ...s, privateDiscount: str(defaultPrivateDiscount(parsePeers(s.peers))) };
@@ -363,6 +379,7 @@ export function stateFromInputs(i: ValuationInputs): FormState {
       ? { eosb: d(i.bridge.eosb), leases: d(i.bridge.leases), minorityInterest: d(i.bridge.minorityInterest), surplusAssets: d(i.bridge.surplusAssets) }
       : base.bridge,
     investedCapital: d(i.investedCapital),
+    stakeAdjustmentTouched: true,
     stake: i.stake
       ? { percent: d(i.stake.percent), adjustment: i.stake.adjustment, controlPremium: d(i.stake.controlPremium), minorityDiscount: d(i.stake.minorityDiscount) }
       : base.stake,

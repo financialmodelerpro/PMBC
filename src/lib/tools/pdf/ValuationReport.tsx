@@ -87,7 +87,7 @@ export type ReportMeta = {
 export type ReportBranding = {
   /** The logo for the navy cover, already resized. PNG. */
   logoOnDark: Buffer | null;
-  /** The logo for white pages. PNG. */
+  /** The navy and gold logo for white pages (see `recolourGreenToGold`). PNG. */
   logoOnLight: Buffer | null;
   partner: PartnerCard | null;
   /** The partner portrait, resized to 360 by 450. JPEG. */
@@ -236,6 +236,13 @@ export function ValuationReport({ result, meta }: { result: ValuationResult; met
   const brand = meta.branding ?? null;
   const partner = brand?.partner ?? null;
   const about = descriptionParagraphs(meta.description);
+  // Four figures under the headline, so the cover reads as a summary on its own.
+  const coverKpis: [string, string][] = [
+    ['WACC', h.wacc],
+    ['Terminal value share', h.tvShare],
+    ['EV / LTM EBITDA', h.ltmMultiple],
+    h.weighted ? ['Probability-weighted', h.weighted] : ['Implied exit multiple', h.impliedExitMultiple],
+  ];
   // Long company names step down so the cover never runs onto a second page.
   const titleSize = who.length > 80 ? 20 : who.length > 44 ? 26 : 34;
 
@@ -268,6 +275,14 @@ export function ValuationReport({ result, meta }: { result: ValuationResult; met
             <Text style={{ fontSize: 10, color: CREAM_ON_NAVY, marginTop: 8 }}>
               Midpoint {h.midpoint} as at end of {h.valuationDate}. Enterprise value {h.evRange}.
             </Text>
+            <View style={{ flexDirection: 'row', marginTop: 16, borderTopWidth: 0.5, borderTopColor: '#E8DDC433' }}>
+              {coverKpis.map(([label, value], i) => (
+                <View key={label} style={{ flex: 1, paddingTop: 10, paddingLeft: i ? 12 : 0, borderLeftWidth: i ? 0.5 : 0, borderLeftColor: '#E8DDC433' }}>
+                  <Text style={{ fontSize: 7, color: CREAM_ON_NAVY, letterSpacing: 0.8, textTransform: 'uppercase' }}>{label}</Text>
+                  <Text style={{ fontSize: 13, fontWeight: 600, color: C.white, marginTop: 4 }}>{value}</Text>
+                </View>
+              ))}
+            </View>
           </View>
 
           {/* The visitor's own words about the business, set apart as theirs. */}

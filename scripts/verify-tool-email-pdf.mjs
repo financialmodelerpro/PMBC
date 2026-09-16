@@ -327,6 +327,31 @@ console.log('Email shell and parts');
   check('alert: follow-up unticked shows No', consentCell(alertFor(false)) === 'No', String(consentCell(alertFor(false))));
 }
 
+console.log('Narrative and cover');
+{
+  const withWeight = (w) => fromState({ ...fullFeatureCase(state), dcfWeight: String(w) });
+  const text50 = format.executiveSummary(withWeight(50)).join(' ');
+  const text60 = format.executiveSummary(withWeight(60)).join(' ');
+  const text40 = format.executiveSummary(withWeight(40)).join(' ');
+  check('narrative: DCF weight 50% says nothing about the forecast carrying the answer', !text50.includes('forecast carries most of the answer'));
+  check('narrative: DCF weight 40% says nothing about it either', !text40.includes('forecast carries most of the answer'));
+  check('narrative: DCF weight 60% says the forecast carries most of the answer', text60.includes('so the forecast carries most of the answer'));
+  const diverging = [text40, text50, text60].find((t) => t.includes('gives the higher value'));
+  check('narrative: a diverging case exists to test the wording', Boolean(diverging));
+  check('narrative: "the comparables method gives", never "the comparables gives"', !/the comparables gives/.test(text40 + text50 + text60) && (text50.includes('the comparables method gives') || text50.includes('the DCF gives')));
+
+  // The cover: a KPI row under the headline, on the cover, in every case.
+  for (const [label, result] of [['Saudi', saudi], ['full', full], ['distressed', distressed]]) {
+    const t = await pageTexts(await pdfModule.renderValuationReport(result, { ...REPORT_META, company: 'Example Co', industry: 'I', country: 'C', bookingHref: BOOK }));
+    const h = format.headline(result);
+    const cover = t[0].replace(/ +/g, ' ');
+    const squash = cover.split(' ').join('').toLowerCase();
+    check(`${label}: cover KPI row carries WACC, terminal value share and EV / LTM EBITDA`, squash.includes('wacc') && squash.includes('terminalvalueshare') && squash.includes('ev/ltmebitda') && [h.wacc, h.tvShare, h.ltmMultiple].every((v) => squash.includes(v.split(" ").join("").toLowerCase())), cover.slice(0, 400));
+    check(`${label}: fourth KPI is the weighted value when scenarios ran`, h.weighted ? squash.includes('probability-weighted') && cover.includes(h.weighted) : squash.includes('impliedexitmultiple'));
+    check(`${label}: still ten pages with the KPI row`, t.length === 10);
+  }
+}
+
 console.log('Company profile on the report');
 {
   const prof = await jiti.import(path.join(root, 'src/lib/tools/valuation/profile.ts'));
@@ -357,23 +382,42 @@ console.log('Company profile on the report');
 
 console.log('Report branding and partner');
 {
-  // The mapping from the two founder sections, as stored.
+  // The mapping from the founder profile's hero, as stored. Nothing else is read.
   const hero = {
-    name: ' Test Partner ', eyebrow: 'Founding Partner', title_primary: 'Corporate Finance Specialist', credentials_line: 'ACCA | FMVA',
+    name: ' Test Partner ', eyebrow: 'Founding Partner', title_primary: 'Corporate Finance Specialist', credentials_line: 'ACCA | FMVA | AFM |12+ Years Experience',
     intro: 'An introduction   over two lines.', photo_url: 'https://example.supabase.co/storage/v1/object/public/team-photos/p.png',
     cta_primary_href: 'https://www.linkedin.com/in/example/',
+    report_highlights: 'One\n Two \n\nThree\r\nFour\nFive\nSix',
   };
-  const block = { name: 'Other', credentials: ['One', ' Two ', '', 'Three', 'Four', 'Five', 'Six'], photo_url: 'https://example.com/b.png' };
-  const card = partnerModule.partnerFromSections(hero, block);
-  check('partner: name trimmed from the hero', card?.name === 'Test Partner');
+  const card = partnerModule.partnerFromHero(hero);
+  check('partner: name trimmed', card?.name === 'Test Partner');
   check('partner: intro whitespace collapsed', card?.intro === 'An introduction over two lines.');
-  check('partner: highlights from the home card, blanks dropped, at most five', JSON.stringify(card?.highlights) === JSON.stringify(['One', 'Two', 'Three', 'Four', 'Five']));
+  check('partner: credentials separators spaced evenly ("AFM |12+" fixed)', card?.credentialsLine === 'ACCA | FMVA | AFM | 12+ Years Experience', card?.credentialsLine);
+  check('partner: highlights from report_highlights, one per line, blanks dropped, at most five', JSON.stringify(card?.highlights) === JSON.stringify(['One', 'Two', 'Three', 'Four', 'Five']), JSON.stringify(card?.highlights));
+  check('partner: no report_highlights means no highlights', partnerModule.partnerFromHero({ ...hero, report_highlights: undefined })?.highlights.length === 0);
+  check('partner: the function takes only the hero (home card cannot feed it)', partnerModule.partnerFromHero.length === 1 && !('partnerFromSections' in partnerModule));
+  check('partner: fetch reads only the founder profile hero', (() => { const src = fs.readFileSync(path.join(root, 'src/lib/tools/brand/fetch.ts'), 'utf8'); return !src.includes("'founder_block'") && !src.includes("'home'") && src.includes("partnerFromHero(await sectionContent(FOUNDER_PAGE_SLUG, 'founder_hero'))"); })());
+  check('partner: highlights field is editable in the founder hero editor', fs.readFileSync(path.join(root, 'src/components/admin/editors/FounderHeroEditor.tsx'), 'utf8').includes("set('report_highlights'"));
   check('partner: photo and LinkedIn from the hero', card?.photoUrl === hero.photo_url && card?.linkedinUrl === hero.cta_primary_href);
   check('partner: profile path is the founder page', card?.profilePath === '/about/ahmad-din', card?.profilePath);
-  check('partner: a non-LinkedIn primary link is not offered as LinkedIn', partnerModule.partnerFromSections({ ...hero, cta_primary_href: '/book' }, block)?.linkedinUrl === null);
-  check('partner: a non-https photo is dropped', partnerModule.partnerFromSections({ ...hero, photo_url: 'javascript:alert(1)' }, { ...block, photo_url: '' })?.photoUrl === null);
-  check('partner: no name anywhere means no card', partnerModule.partnerFromSections({ intro: 'x' }, { credentials: ['a'] }) === null);
+  check('partner: a non-LinkedIn primary link is not offered as LinkedIn', partnerModule.partnerFromHero({ ...hero, cta_primary_href: '/book' })?.linkedinUrl === null);
+  check('partner: a non-https photo is dropped', partnerModule.partnerFromHero({ ...hero, photo_url: 'javascript:alert(1)' })?.photoUrl === null);
+  check('partner: no name means no card', partnerModule.partnerFromHero({ intro: 'x' }) === null);
   check('partner: slug matches founderProfile.ts', founderProfileSrc.includes(`FOUNDER_PAGE_SLUG = '${partnerModule.PARTNER_PAGE_SLUG}'`));
+
+  // Navy and gold: green lettering becomes gold, navy and transparency stay.
+  {
+    const brandFetch = await jiti.import(path.join(root, 'src/lib/tools/brand/fetch.ts'));
+    const sharpMod = (await import('sharp')).default;
+    const px = Buffer.from([0x3f, 0xa6, 0x63, 255, 0x1b, 0x3a, 0x5f, 255, 0xc6, 0x9c, 0x3e, 255, 0x3f, 0xa6, 0x63, 0]);
+    const png = await sharpMod(px, { raw: { width: 4, height: 1, channels: 4 } }).png().toBuffer();
+    const out = await sharpMod(await brandFetch.recolourGreenToGold(png)).raw().toBuffer();
+    check('navy and gold logo: brand green becomes gold', out[0] === 0xc6 && out[1] === 0x9c && out[2] === 0x3e && out[3] === 255, [...out.subarray(0, 4)].join());
+    check('navy and gold logo: navy unchanged', out[4] === 0x1b && out[5] === 0x3a && out[6] === 0x5f);
+    check('navy and gold logo: gold unchanged', out[8] === 0xc6 && out[9] === 0x9c && out[10] === 0x3e);
+    check('navy and gold logo: transparent pixel untouched', out[15] === 0);
+    check('page 10 uses the navy and gold treatment', fs.readFileSync(path.join(root, 'src/lib/tools/brand/fetch.ts'), 'utf8').includes("processedImage(onLightSrc, 'logo-navy-gold')"));
+  }
 
   // Real images from the repository stand in for the CMS files.
   const logo = fs.readFileSync(path.join(root, 'public/email/pacemakers-logo-on-navy.png'));
@@ -389,7 +433,7 @@ console.log('Report branding and partner');
   check('branded: cover uses the logo, not the typeset name', !t[0].includes('PaceMakers Business Consultants ADVISORY') && !/^PaceMakers Business Consultants/.test(t[0]));
   const last = t[9];
   check('branded: closing page names the partner and role', last.includes('Test Partner') && last.includes('Founding Partner, Corporate Finance Specialist'));
-  check('branded: closing page carries credentials, intro and every highlight', last.includes('ACCA | FMVA') && last.includes('An introduction over two lines.') && card.highlights.every((h) => last.includes(h)));
+  check('branded: closing page carries credentials, intro and every highlight', last.includes('ACCA | FMVA | AFM | 12+ Years Experience') && last.includes('An introduction over two lines.') && card.highlights.every((h) => last.includes(h)));
   check('branded: highlights attributed to the partner, not the firm', last.includes(partnerModule.PARTNER_RECORD_NOTE));
   check('branded: services and booking still on the closing page', last.includes('CFO Advisory') && /bookafreecall/i.test(last.replace(/\s+/g, '')));
 

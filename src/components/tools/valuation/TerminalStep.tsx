@@ -2,7 +2,7 @@
 
 import { X } from 'lucide-react';
 
-import { ASSUMPTIONS } from '@/lib/tools/valuation/data';
+import { ASSUMPTIONS, WARNING_RULES } from '@/lib/tools/valuation/data';
 import { industryFor, type StakeAdjustment } from '@/lib/tools/valuation/engine';
 
 import { num, type FormState, type PeerRow, type ScenarioKey } from './state';
@@ -301,6 +301,12 @@ export function TerminalStep({
             ))}
           </div>
         </fieldset>
+        {state.stake.adjustment === 'control_premium' && !(num(state.stake.percent) !== null && (num(state.stake.percent) as number) > WARNING_RULES.controlStakeAbovePercent) && (
+          <p role="status" className="mt-3 border-l-2 border-[#C69C3E] bg-[#FDF8EC] px-3 py-2 text-[13px] text-[#6B4E12]">
+            A stake of {WARNING_RULES.controlStakeAbovePercent}% or less does not carry control, so buyers apply a minority discount. The
+            premium will be used as chosen, with a warning in the results.
+          </p>
+        )}
         {state.stake.adjustment === 'control_premium' && (
           <div className="mt-3 max-w-xs">
             <Field label="Control premium">

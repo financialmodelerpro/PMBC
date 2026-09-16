@@ -917,7 +917,7 @@ recorded reversal that allows them.
 | Email me this version | `src/lib/tools/leads/version.ts` (pure), route `src/app/api/tools/[slug]/lead/version/route.ts` |
 | Download PDF for what is on screen | `src/app/api/tools/[slug]/pdf/route.ts`, writes nothing |
 | Company name and description a visitor adds to their report | `src/lib/tools/valuation/profile.ts` (cleaning and limits, shared by the form, the API and the PDF) |
-| Logo and partner card in the report and on the results | `src/lib/tools/brand/partner.ts` (pure), `src/lib/tools/brand/fetch.ts` (server), `src/components/tools/PartnerCard.tsx` |
+| Logo and partner card in the report and on the results | `src/lib/tools/brand/partner.ts` (pure), `src/lib/tools/brand/fetch.ts` (server), `src/components/tools/PartnerCard.tsx`. **The partner card reads only the founder profile's `founder_hero`**; its career highlights are that section's **Report highlights** field (one per line, up to five), which the profile page itself does not show and which ships empty. Home's founder card is never read, so editing it cannot change a report. The closing page logo is the Header Settings logo with its green lettering recoloured to gold (`recolourGreenToGold`), since no navy and gold file is stored |
 | Booking link | `src/lib/tools/booking.ts`, always the site's `/book` |
 | **Every tunable number** (Damodaran data, FX, market rates, presets, deal bands) | `src/lib/tools/valuation/data.ts`, and nowhere else |
 | The valuation arithmetic | `src/lib/tools/valuation/engine.ts`, pure, no UI |
@@ -1031,7 +1031,7 @@ Assumptions), then "Who you will work with" and the booking call to action.
 | Scenarios | Upside and downside move every forecast year's revenue growth and EBITDA margin by points (`scenarioFinancials`), each valued in full. Weights must total 100. `weightedEquity` is the weighted midpoint. |
 | Normalised EBITDA | One-off costs and owner costs above market are added back to the last actual year for comparables and the LTM multiple. Owner costs, and only those, can be carried into the forecast, which changes the DCF. |
 | Bridge items | End of service benefits, leases, minority interest (deducted) and surplus assets (added), beyond net debt. With none entered the reference's `ev - netDebt` is kept exactly. |
-| Stake | Percent of equity, times a control premium or minority discount. Shown only when not 100% with no adjustment. |
+| Stake | Percent of equity, times a control premium or minority discount. Shown only when not 100% with no adjustment. **A stake of 50% or less defaults to a minority discount** (`syncStakeAdjustment`, until the visitor picks one); a control premium chosen for it is kept, used, and warned about. |
 | WACC adjustment | Points added by the exploration slider. Zero keeps the reference WACC bit for bit. |
 | Company profile (`inputs.profile`) | A company name (120 characters) and one or two paragraphs about the business (1,000 characters), typed on step 1. **Never read by the engine.** Cleaned to plain text by the API schema itself (control characters, whitespace, two paragraphs, the caps), so every endpoint stores and renders the same text. The name fills the gate's company field and the results headline; the description goes on the PDF cover, marked as the visitor's words and not reviewed by the firm. Optional, so it did not bump the input schema version. |
 
@@ -1041,8 +1041,20 @@ terminal value above 75% of the DCF; perpetual growth above the currency's
 the discount more than 30% from the multiple implied by perpetuity growth;
 negative free cash flow in the final forecast year; a first forecast year margin
 more than 10 points from the last actual (normalised); ROIC below WACC; and
-growth more than 2 points from reinvestment rate times ROIC. The last two need
-invested capital. Each is proved triggering and silent by `verify-valuation-v2`.
+growth more than 2 points from reinvestment rate times ROIC (these two need
+invested capital); terminal growth more than 1 point below or 2 points above
+expected local inflation (the inflation entered on step 3, or long-run US
+inflation, `MARKET.usInflationLongRun`, for the pegged currencies); and a control
+premium on a stake of 50% or less. Each is proved triggering and silent,
+including at its edges, by `verify-valuation-v2`.
+
+**Numbers quoted in prose come from the table they refer to.** The cost of
+capital lever ("What would increase your value") is read from the sensitivity
+grid by `waccLeverFromSensitivity`: the centre cell and one point lower WACC at
+the same growth. It once used the flexed range, which also moved growth half a
+point, and quoted a figure the table on the same report did not show. The
+executive summary says the forecast carries most of the answer only when the DCF
+weight is above 50%.
 
 **Input schema versioning.** Stored inputs carry `schemaVersion`
 (`INPUT_SCHEMA_VERSION`, now 2) inside the `inputs` JSONB, stamped by the server
@@ -1061,7 +1073,7 @@ screen and writes nothing. Both need the lead's access token. The admin lead
 detail shows the version 2 inputs, the warnings the visitor saw, and the version
 history.
 
-**The PDF is ten fixed pages** (`REPORT_PAGE_TITLES`): cover (with the visitor's company name and description when given; the cover is the one page with room for the longest description in every case, and long names step the title size down), executive summary
+**The PDF is ten fixed pages** (`REPORT_PAGE_TITLES`): cover (the headline, a KPI row of WACC, terminal value share, EV / LTM EBITDA and the weighted value, and the visitor's company name and description when given; the cover is the one page with room for the longest description in every case, and long names step the title size down), executive summary
 (rule-based, so the same inputs read the same), valuation summary with the
 football field and value bridge, financial profile, free cash flow and
 sensitivity heatmap, scenarios stake and checks, value levers, assumptions,
@@ -1081,8 +1093,8 @@ founder profile sections) come through `meta.branding`, fetched and resized by
 5. Checks in `verify-valuation-v2` for the item on its own and absent, then `verify-valuation-engine` to prove the neutral path.
 
 **Verifiers.** `verify-valuation-engine` (493, reference parity),
-`verify-valuation-v2` (162), `verify-tool-lead-api` (116),
-`verify-tool-email-pdf` (211, pdfjs text and operator list, so a ligature glyph is
+`verify-valuation-v2` (199), `verify-tool-lead-api` (116),
+`verify-tool-email-pdf` (235, pdfjs text and operator list, so a ligature glyph is
 caught even though extracted text maps it back to letters),
 `verify-tools-visibility` (78) and `verify-brevo-webhook` (132). Each was
 break-tested. `npm run render-valuation-examples -- <dir>` renders the minimal and

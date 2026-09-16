@@ -54,6 +54,12 @@ export const MARKET = {
   usDefaultSpread: 0.23,
   /** Damodaran implied mature market equity risk premium, percent. */
   matureErp: 4.23,
+  /**
+   * Long-run expected US inflation, percent. The expected local inflation for
+   * the currencies pegged to the dollar, used by the terminal growth check.
+   * Kept equal to `inflationUs` on the non-pegged countries.
+   */
+  usInflationLongRun: 2.5,
 } as const;
 
 /* ------------------------------------------------------------------------ */
@@ -108,6 +114,12 @@ export const WARNING_RULES = {
   marginJumpPoints: 10,
   /** Growth implied by reinvestment and ROIC differs from long-term growth by more than this, percentage points. */
   reinvestmentGapPoints: 2,
+  /** Terminal growth more than this below expected local inflation, percentage points. */
+  inflationBelowPoints: 1,
+  /** Terminal growth more than this above expected local inflation, percentage points. */
+  inflationAbovePoints: 2,
+  /** A stake must be above this percentage for a control premium to fit. */
+  controlStakeAbovePercent: 50,
 } as const;
 
 /* ------------------------------------------------------------------------ */

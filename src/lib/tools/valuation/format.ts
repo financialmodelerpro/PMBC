@@ -393,6 +393,21 @@ export function warningText(w: Warning, r: ValuationResult): WarningText {
         title: 'Returns are below the cost of capital',
         detail: `Return on invested capital of ${fmtPct(v.roic, 1)} is below the WACC of ${fmtPct(v.wacc, 1)}. On these figures growth destroys value rather than creating it.`,
       };
+    case 'growth_vs_inflation':
+      return {
+        code: w.code,
+        title: v.growth < v.low ? 'Long-term growth is below inflation' : 'Long-term growth is well above inflation',
+        detail:
+          v.growth < v.low
+            ? `Growth of ${fmtPct(v.growth, 1)} forever is more than one point below expected inflation of ${fmtPct(v.inflation, 1)} in ${r.currency.code}, which means the business shrinks in real terms every year. If that is not the intent, growth nearer inflation fits better.`
+            : `Growth of ${fmtPct(v.growth, 1)} forever is more than two points above expected inflation of ${fmtPct(v.inflation, 1)} in ${r.currency.code}. Real growth that high for ever is rare, so a buyer will test it.`,
+      };
+    case 'premium_on_minority_stake':
+      return {
+        code: w.code,
+        title: 'A control premium on a stake without control',
+        detail: `A ${+v.percent.toFixed(2)}% stake does not carry control, so buyers apply a minority discount rather than a control premium. The stake value shown uses the premium chosen.`,
+      };
     case 'reinvestment_inconsistent':
       return {
         code: w.code,
@@ -426,12 +441,12 @@ export function executiveSummary(r: ValuationResult): string[] {
   // Method agreement: how far apart the DCF and comparables midpoints are.
   const dcfMid = r.dcfRange[1], compMid = r.compRange[1];
   const gap = Math.abs(dcfMid - compMid) / Math.max(Math.abs(dcfMid), Math.abs(compMid));
-  const higher = dcfMid > compMid ? 'the DCF' : 'the comparables';
+  const higher = dcfMid > compMid ? 'the DCF' : 'the comparables method';
   if (Number.isFinite(gap)) {
     out.push(
       gap <= 0.15
         ? `The two methods agree closely: the DCF midpoint of ${fmtBig(dcfMid, c)} and the comparables midpoint of ${fmtBig(compMid, c)} are within ${fmtPct(gap, 0)} of each other, which gives the range some support.`
-        : `The two methods diverge: ${higher} gives the higher value, and the DCF midpoint of ${fmtBig(dcfMid, c)} and the comparables midpoint of ${fmtBig(compMid, c)} differ by ${fmtPct(gap, 0)}. The blend weights the DCF at ${r.dcfWeight}%, so the forecast carries most of the answer.`,
+        : `The two methods diverge: ${higher} gives the higher value, and the DCF midpoint of ${fmtBig(dcfMid, c)} and the comparables midpoint of ${fmtBig(compMid, c)} differ by ${fmtPct(gap, 0)}. The blend weights the DCF at ${r.dcfWeight}%${r.dcfWeight > 50 ? ', so the forecast carries most of the answer' : ''}.`,
     );
   }
 
@@ -469,6 +484,24 @@ export function executiveSummary(r: ValuationResult): string[] {
 }
 
 /**
+ * The cells of the sensitivity table behind the cost of capital lever: the
+ * centre (WACC and growth as used) and one point lower WACC at the same growth.
+ * Null when either cell is not finite or the lower WACC does not add value.
+ */
+export function waccLeverFromSensitivity(r: ValuationResult): { from: number; to: number; uplift: number } | null {
+  const s = r.sensitivity;
+  if (!s) return null;
+  const close = (a: number, b: number) => Math.abs(a - b) < 1e-9;
+  const gi = s.growths.findIndex((g) => close(g, r.growth));
+  const wi = s.waccs.findIndex((w) => close(w, r.wacc.wacc));
+  const wl = s.waccs.findIndex((w) => close(w, r.wacc.wacc - 0.01));
+  if (gi < 0 || wi < 0 || wl < 0) return null;
+  const from = s.grid[wi][gi], to = s.grid[wl][gi];
+  if (!Number.isFinite(from) || !Number.isFinite(to) || !(to > from)) return null;
+  return { from, to, uplift: to - from };
+}
+
+/**
  * "What would increase your value": points chosen by rule from the results and
  * the warnings, most material first. Always at least three.
  */
@@ -478,12 +511,13 @@ export function valueLevers(r: ValuationResult): { title: string; detail: string
   const q = r.ratios;
   const codes = new Set((r.warnings ?? []).map((w) => w.code));
 
-  // Cost of capital: a one point lower WACC, from the flexed ranges.
-  const waccUplift = r.hiG - r.base.evG;
-  if (Number.isFinite(waccUplift) && waccUplift > 0) {
+  // Cost of capital: one point lower at the same growth, read from the
+  // sensitivity table itself, so the two can never disagree.
+  const lever = waccLeverFromSensitivity(r);
+  if (lever) {
     out.push({
       title: 'Lower the risk a buyer prices in',
-      detail: `A cost of capital about one point lower adds roughly ${fmtBig(waccUplift, c)} to the perpetuity growth value. Audited accounts, contracted revenue, customer diversification and a management team that does not depend on the owner are what bring it down.`,
+      detail: `A cost of capital one point lower, at the same long-term growth, raises the perpetuity growth equity value from ${fmtMillions(lever.from)} to ${fmtMillions(lever.to)} ${currencyMillions(c)} in the sensitivity table, about ${fmtBig(lever.uplift, c)} more. Audited accounts, contracted revenue, customer diversification and a management team that does not depend on the owner are what bring it down.`,
     });
   }
   if (r.normalisation?.used) {

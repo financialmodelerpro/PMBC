@@ -32,6 +32,7 @@ import {
   COUNTRIES,
   DEAL_BANDS_SAR,
   INDUSTRIES,
+  MARKET,
   V2_DEFAULTS,
   WARNING_RULES,
   type IndustryData,
@@ -555,7 +556,9 @@ export type WarningCode =
   | 'terminal_fcf_negative'
   | 'margin_jump'
   | 'roic_below_wacc'
-  | 'reinvestment_inconsistent';
+  | 'reinvestment_inconsistent'
+  | 'growth_vs_inflation'
+  | 'premium_on_minority_stake';
 
 export type Warning = { code: WarningCode; values: Record<string, number> };
 
@@ -825,6 +828,19 @@ function compute(i: ValuationInputs, withScenarios: boolean): ValuationResult {
     warnings.push({ code: 'margin_jump', values: { from: marginLtm, to: marginF1, threshold: rule.marginJumpPoints / 100 } });
   }
   if (Number.isFinite(roic) && roic < w.wacc) warnings.push({ code: 'roic_below_wacc', values: { roic, wacc: w.wacc } });
+  // Terminal growth against expected local inflation. Pegged currencies take
+  // long-run US inflation; the others the inflation entered on step 3.
+  const inflationPct = currency.pegged ? MARKET.usInflationLongRun : n(i.wacc.inflationLocal);
+  if (Number.isFinite(inflationPct)) {
+    const lowPct = inflationPct - rule.inflationBelowPoints, highPct = inflationPct + rule.inflationAbovePoints;
+    const gPct = g * 100;
+    if (gPct < lowPct - 1e-9 || gPct > highPct + 1e-9) {
+      warnings.push({ code: 'growth_vs_inflation', values: { growth: g, inflation: inflationPct / 100, low: lowPct / 100, high: highPct / 100 } });
+    }
+  }
+  if (st.adjustment === 'control_premium' && stakePct <= rule.controlStakeAbovePercent) {
+    warnings.push({ code: 'premium_on_minority_stake', values: { percent: stakePct, threshold: rule.controlStakeAbovePercent, premium: adjustmentRate } });
+  }
   if (
     Number.isFinite(ratios.impliedGrowthFromReinvestment) &&
     Math.abs(ratios.impliedGrowthFromReinvestment - g) * 100 > rule.reinvestmentGapPoints

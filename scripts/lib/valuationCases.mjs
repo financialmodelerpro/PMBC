@@ -14,7 +14,7 @@ export function minimalCase(state) {
 
 /**
  * Pakistan with every version 2 feature in use: normalised EBITDA carried into
- * the forecast, all four bridge items, a 40% stake with a control premium,
+ * the forecast, all four bridge items, a 40% stake with a minority discount,
  * custom scenarios and weights, invested capital, and two listed peers.
  */
 export function fullFeatureCase(state) {
@@ -35,7 +35,8 @@ export function fullFeatureCase(state) {
     norm: { oneOff: '85', ownerCosts: '40', carryOwnerCosts: true },
     bridge: { eosb: '160', leases: '220', minorityInterest: '75', surplusAssets: '300' },
     investedCapital: '6200',
-    stake: { percent: '40', adjustment: 'control_premium', controlPremium: '25', minorityDiscount: '20' },
+    stake: { percent: '40', adjustment: 'minority_discount', controlPremium: '25', minorityDiscount: '20' },
+    stakeAdjustmentTouched: true,
     scenarios: {
       upsideGrowth: '4', upsideMargin: '2', downsideGrowth: '-5', downsideMargin: '-3',
       weightDownside: '30', weightBase: '50', weightUpside: '20',

@@ -20,7 +20,7 @@ import { FOUNDER_PAGE_SLUG } from '@/lib/cms/founderProfile';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 
 import type { ReportBranding } from '../pdf/ValuationReport';
-import { partnerFromSections, type PartnerCard } from './partner';
+import { partnerFromHero, type PartnerCard } from './partner';
 
 const TTL_MS = 10 * 60 * 1000;
 const FETCH_TIMEOUT_MS = 6000;
@@ -42,15 +42,37 @@ async function sectionContent(pageSlug: string, type: string): Promise<Record<st
 /** The partner card, or null when the profile has no name or cannot be read. */
 export async function fetchPartnerCard(): Promise<PartnerCard | null> {
   try {
-    const [hero, block] = await Promise.all([sectionContent(FOUNDER_PAGE_SLUG, 'founder_hero'), sectionContent('home', 'founder_block')]);
-    return partnerFromSections(hero, block);
+    return partnerFromHero(await sectionContent(FOUNDER_PAGE_SLUG, 'founder_hero'));
   } catch {
     return null;
   }
 }
 
+/**
+ * The navy and gold logo for white pages, derived from the Header Settings file:
+ * its green lettering ("Business Consultants") recoloured to the site gold,
+ * everything else (the navy wordmark, the gold ring, transparency) untouched. No
+ * navy and gold file is stored; if one is uploaded to Header Settings later,
+ * nothing here needs to change, since a file with no green passes through as is.
+ */
+export async function recolourGreenToGold(png: Buffer): Promise<Buffer> {
+  const { data, info } = await sharp(png).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const [gr, gg, gb] = [0xc6, 0x9c, 0x3e];
+  for (let i = 0; i < data.length; i += 4) {
+    const r = data[i], g = data[i + 1], b = data[i + 2], a = data[i + 3];
+    if (a === 0) continue;
+    // Green dominant, as the brand green #3FA663 and its anti-aliased edges are.
+    if (g > r + 25 && g > b + 15) {
+      data[i] = gr;
+      data[i + 1] = gg;
+      data[i + 2] = gb;
+    }
+  }
+  return sharp(data, { raw: { width: info.width, height: info.height, channels: 4 } }).png({ compressionLevel: 9 }).toBuffer();
+}
+
 /** Fetches an image and resizes it, cached by URL and treatment. Null on any failure. */
-async function processedImage(src: string | null, kind: 'logo' | 'portrait'): Promise<Buffer | null> {
+async function processedImage(src: string | null, kind: 'logo' | 'logo-navy-gold' | 'portrait'): Promise<Buffer | null> {
   if (!src || !/^https:\/\//i.test(src)) return null;
   const key = `${kind}:${src}`;
   const hit = cache.get(key);
@@ -60,10 +82,13 @@ async function processedImage(src: string | null, kind: 'logo' | 'portrait'): Pr
     const res = await fetch(src, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
     if (res.ok) {
       const input = Buffer.from(await res.arrayBuffer());
+      const logo = async () => sharp(input).trim().resize({ width: 900, withoutEnlargement: true }).png({ compressionLevel: 9 }).toBuffer();
       value =
         kind === 'logo'
-          ? await sharp(input).trim().resize({ width: 900, withoutEnlargement: true }).png({ compressionLevel: 9 }).toBuffer()
-          : await sharp(input).resize({ width: 360, height: 450, fit: 'cover', position: 'top' }).flatten({ background: '#FFFFFF' }).jpeg({ quality: 84 }).toBuffer();
+          ? await logo()
+          : kind === 'logo-navy-gold'
+            ? await recolourGreenToGold(await logo())
+            : await sharp(input).resize({ width: 360, height: 450, fit: 'cover', position: 'top' }).flatten({ background: '#FFFFFF' }).jpeg({ quality: 84 }).toBuffer();
     }
   } catch (err) {
     console.error(`[tool-brand] ${kind} image unavailable:`, err instanceof Error ? err.message : err);
@@ -81,7 +106,7 @@ export async function fetchReportBranding(): Promise<ReportBranding> {
   const onLightSrc = branding?.logo_url || null;
   const [logoOnDark, logoOnLight, partnerPhoto] = await Promise.all([
     processedImage(onDarkSrc, 'logo'),
-    processedImage(onLightSrc, 'logo'),
+    processedImage(onLightSrc, 'logo-navy-gold'),
     processedImage(partner?.photoUrl ?? null, 'portrait'),
   ]);
   return { logoOnDark, logoOnLight, partner, partnerPhoto };

@@ -158,6 +158,7 @@ export const SECTION_TYPES: SectionTypeMeta[] = [
       title_accent: '',
       credentials_line: '',
       intro: '',
+      report_highlights: '',
       photo_url: '',
       cta_primary_label: '',
       cta_primary_href: '',

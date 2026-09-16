@@ -53,6 +53,7 @@ import {
   resetWacc,
   str,
   syncPeerDefaults,
+  syncStakeAdjustment,
   toInputs,
   type FormState,
 } from './state';
@@ -304,7 +305,15 @@ export function BusinessValuationTool({ preview, partner }: ToolComponentProps) 
                 onAddPeer={() => update((prev) => ({ ...prev, peers: [...prev.peers, newPeer()] }))}
                 onRemovePeer={(id) => update((prev) => syncPeerDefaults({ ...prev, peers: prev.peers.filter((r) => r.id !== id) }))}
                 onScenario={(k, v) => update((prev) => ({ ...prev, scenarios: { ...prev.scenarios, [k]: v } }))}
-                onStake={(p) => update((prev) => ({ ...prev, stake: { ...prev.stake, ...p } }))}
+                onStake={(p) =>
+                  update((prev) =>
+                    syncStakeAdjustment({
+                      ...prev,
+                      stake: { ...prev.stake, ...p },
+                      stakeAdjustmentTouched: prev.stakeAdjustmentTouched || 'adjustment' in p,
+                    }),
+                  )
+                }
                 onBack={() => next(2)}
                 onRun={onRun}
               />

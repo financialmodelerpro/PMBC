@@ -386,7 +386,10 @@ export function ResultsDashboard({
             >
               {t.label}
               {t.id === 'summary' && warnings.length > 0 && (
-                <span className="ml-1.5 rounded-full bg-[#B3412F] px-1.5 text-[11px] text-white">{warnings.length}</span>
+                <>
+                  <span aria-hidden className="ml-1.5 rounded-full bg-[#B3412F] px-1.5 text-[11px] text-white">{warnings.length}</span>
+                  <span className="sr-only">, {warnings.length === 1 ? '1 warning' : `${warnings.length} warnings`}</span>
+                </>
               )}
             </button>
           ))}
