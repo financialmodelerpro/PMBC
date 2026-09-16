@@ -12,7 +12,12 @@
 //      `delivered` never overwrites `clicked`, and a bounce or complaint wins.
 //      Alert-email events are recorded but never touch the lead's email status.
 //   4. Duplicates: a retried event is recorded once.
-//   5. Payloads: single objects and arrays, Brevo's event names, event time
+//   5. Concurrency: status writes are conditional on the stored status being
+//      weaker, so events applied in any order, interleaved with the send
+//      recording `sent`, settle on the strongest status. The mock applies the
+//      condition exactly as the conditional UPDATE in setEmailStatusIf does.
+//   6. Detail: Brevo's reason is kept only on events it explains.
+//   7. Payloads: single objects and arrays, Brevo's event names, event time
 //      from ts_event, and a malformed body refused with 400.
 //
 //   npm run verify-brevo-webhook
@@ -62,8 +67,11 @@ function store() {
       events.push(e);
       return 'inserted';
     },
-    async updateLeadStatus(id, patch) {
-      Object.assign(lead, patch);
+    // Mirrors setEmailStatusIf: one conditional UPDATE, never a read-then-write.
+    async advanceLeadStatus(id, { to, onlyFrom, at }) {
+      if (id !== lead.id) return;
+      if (onlyFrom.includes(lead.email_status)) lead.email_status = to;
+      if (at && (!lead.email_last_event_at || lead.email_last_event_at < at)) lead.email_last_event_at = at;
     },
   };
 }
@@ -131,6 +139,58 @@ console.log('Status and matching');
   check('untracked event name: ignored', untracked.ignored === 1 && s4.events.length === 0);
   const junkHeader = await run(store(), ev('delivered', { 'X-Mailin-custom': 'lead:not-a-uuid|kind:results', 'message-id': '<nobody@x>' }));
   check('malformed custom header does not match a lead', junkHeader.ignored === 1);
+}
+
+console.log('Concurrency');
+{
+  // The bug seen on the first real lead: a bounce and a stale 'sent' racing.
+  const perms = (a) => (a.length <= 1 ? [a] : a.flatMap((x, i) => perms([...a.slice(0, i), ...a.slice(i + 1)]).map((r) => [x, ...r])));
+  const names = ['request', 'delivered', 'hard_bounce', 'opened'];
+  for (const order of perms(names)) {
+    const s = store();
+    s.lead.email_status = 'pending';
+    // All four in flight at once, as separate requests.
+    await Promise.all(order.map((n, i) => run(s, ev(n, { ts_event: 1789560000 + i }))));
+    check(`${order.join(', ')} settles on bounced`, s.lead.email_status === 'bounced', s.lead.email_status);
+  }
+  {
+    // The send records 'sent' only from pending, after Brevo already bounced it.
+    const s = store();
+    s.lead.email_status = 'pending';
+    await run(s, ev('hard_bounce', { reason: 'no such user' }));
+    await s.advanceLeadStatus(LEAD, { to: 'sent', onlyFrom: ['pending'] });
+    check('send recording sent after a bounce leaves bounced', s.lead.email_status === 'bounced', s.lead.email_status);
+  }
+  {
+    const s = store();
+    s.lead.email_status = 'pending';
+    await s.advanceLeadStatus(LEAD, { to: 'sent', onlyFrom: ['pending'] });
+    await run(s, ev('delivered'));
+    check('send first, then delivered: delivered', s.lead.email_status === 'delivered');
+  }
+  {
+    const s = store();
+    await run(s, ev('delivered', { ts_event: 1789560500 }));
+    const later = s.lead.email_last_event_at;
+    await run(s, ev('opened', { ts_event: 1789560100 }));
+    check('event time never moves backward', s.lead.email_last_event_at === later);
+  }
+  check('weakerStatuses(bounced) excludes complaint and bounced', !wh.weakerStatuses('bounced').includes('complaint') && !wh.weakerStatuses('bounced').includes('bounced') && wh.weakerStatuses('bounced').includes('clicked'));
+  check('weakerStatuses(sent) is the unsent states', ['pending', 'failed', 'not_configured'].every((x) => wh.weakerStatuses('sent').includes(x)) && wh.weakerStatuses('sent').length === 3);
+  check('an error event never overwrites a status', wh.weakerStatuses(wh.statusForEvent('error')).length === 0);
+}
+
+console.log('Event detail');
+{
+  const s = store();
+  await run(s, ev('delivered', { reason: 'sent' }));
+  check('delivered with reason "sent": no detail', s.events.at(-1).detail === null, String(s.events.at(-1).detail));
+  await run(s, ev('unique_opened', { reason: 'sent' }));
+  check('unique_opened: detail is the Brevo event name', s.events.at(-1).detail === 'unique_opened');
+  await run(s, ev('soft_bounce', { reason: 'mailbox full' }));
+  check('soft bounce keeps its reason', s.events.at(-1).detail === 'mailbox full');
+  await run(s, ev('blocked', { reason: 'blocklisted' }));
+  check('blocked keeps its reason', s.events.at(-1).detail === 'blocklisted');
 }
 
 console.log('Duplicates and payloads');

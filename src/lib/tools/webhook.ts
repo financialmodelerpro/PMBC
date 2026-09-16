@@ -23,6 +23,15 @@
  * image proxies open mail no person read); the admin view labels them so.
  * Clicks and booking clicks are the real signal.
  *
+ * CONCURRENCY
+ * Brevo sends events as separate requests, often within the same second, and
+ * the send itself records `sent` after Brevo answers, which a fast bounce can
+ * beat. A read-then-write would let the later writer win with a weaker status,
+ * which is how a bounced lead once stayed `sent`. So the status is never
+ * written from what was read: each write is conditional on the stored status
+ * being weaker than the new one (`weakerStatuses`), and the database applies
+ * the condition in the same statement.
+ *
  * Pure apart from the injected `WebhookStore`, so `npm run verify-brevo-webhook`
  * exercises it without a database.
  */
@@ -164,6 +173,34 @@ const STATUS_FOR: Partial<Record<NonNullable<NormalisedEvent['type']>, EmailStat
   error: 'failed',
 };
 
+const ALL_STATUSES = Object.keys(RANK) as EmailStatus[];
+
+/**
+ * The stored statuses a write of `to` may replace: every status strictly
+ * weaker. The store applies this as a condition on the update itself.
+ */
+export function weakerStatuses(to: EmailStatus): EmailStatus[] {
+  const r = RANK[to] ?? 0;
+  return ALL_STATUSES.filter((s) => (RANK[s] ?? 0) < r);
+}
+
+/** The status an event asks for, before comparing with anything stored. */
+export function statusForEvent(event: NormalisedEvent['type']): EmailStatus | null {
+  return (event && STATUS_FOR[event]) || null;
+}
+
+/**
+ * Event types whose Brevo `reason` explains something. On other events Brevo
+ * fills `reason` with noise (a delivered event arrives with reason "sent"),
+ * which read as a fault in the admin timeline.
+ */
+const REASON_EVENTS = new Set<NonNullable<NormalisedEvent['type']>>(['bounced', 'soft_bounced', 'blocked', 'deferred', 'error', 'complaint']);
+
+export function eventDetail(ev: Pick<NormalisedEvent, 'type' | 'brevoEvent' | 'reason'>): string | null {
+  if (ev.type && REASON_EVENTS.has(ev.type) && ev.reason) return ev.reason;
+  return ev.brevoEvent !== ev.type ? ev.brevoEvent : null;
+}
+
 /** The status after this event, never weaker than the one before. */
 export function nextEmailStatus(current: EmailStatus, event: NormalisedEvent['type']): EmailStatus {
   const candidate = event ? STATUS_FOR[event] : undefined;
@@ -195,7 +232,12 @@ export type WebhookStore = {
     occurred_at: string;
     dedupe_key: string;
   }): Promise<'inserted' | 'duplicate' | 'failed'>;
-  updateLeadStatus(id: string, patch: { email_status: EmailStatus; email_last_event_at: string }): Promise<void>;
+  /**
+   * Sets `email_status` to `to` only where the stored status is one of
+   * `onlyFrom`, in one statement, and moves `email_last_event_at` forward to
+   * `at` when it is later than the stored value.
+   */
+  advanceLeadStatus(id: string, change: { to: EmailStatus; onlyFrom: EmailStatus[]; at: string }): Promise<void>;
 };
 
 export type WebhookOutcome = {
@@ -245,7 +287,7 @@ export async function handleBrevoWebhook(
       email_kind: kind,
       message_id: ev.messageId,
       link: ev.link,
-      detail: ev.reason ?? (ev.brevoEvent !== ev.type ? ev.brevoEvent : null),
+      detail: eventDetail(ev),
       payload: ev.raw,
       occurred_at: ev.occurredAt,
       dedupe_key: ev.dedupeKey,
@@ -259,10 +301,9 @@ export async function handleBrevoWebhook(
       continue;
     }
     recorded++;
-    if (kind === 'results') {
-      const next = nextEmailStatus(lead.email_status, ev.type);
-      await store.updateLeadStatus(lead.id, { email_status: next, email_last_event_at: ev.occurredAt });
-      lead.email_status = next;
+    const to = statusForEvent(ev.type);
+    if (kind === 'results' && to) {
+      await store.advanceLeadStatus(lead.id, { to, onlyFrom: weakerStatuses(to), at: ev.occurredAt });
     }
   }
   return { status: 200, body: { ok: true, recorded, duplicates, ignored }, recorded, duplicates, ignored };
