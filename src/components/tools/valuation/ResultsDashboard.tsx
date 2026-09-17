@@ -29,22 +29,35 @@ import {
 import { runValuation, type ValuationInputs, type ValuationResult } from '@/lib/tools/valuation/engine';
 import {
   INDICATIVE_NOTE,
-  TAX_NOTE,
+  LABELS,
+  PRE_MONEY_NOTE,
+  amountUnit,
   bridgeTable,
-  currencyMillions,
+  checkItems,
+  comparablesRows,
+  comparablesSource,
+  dcfSummaryRows,
+  disclosures,
   fcfTable,
+  fmtAmount,
   fmtBig,
-  fmtMillions,
   fmtMultiple,
   fmtPct,
   fmtPoints,
+  fmtWacc,
   headline,
   keyRatiosTable,
   normalisationRows,
+  raiseTable,
   scenariosTable,
   sensitivityTable,
+  sensitivityTitle,
   stakeLabel,
+  taxNote,
+  taxRows,
+  terminalNote,
   terminalRows,
+  timingRows,
   waccBuildRows,
   warningTexts,
   type Table,
@@ -241,8 +254,12 @@ export function ResultsDashboard({
   const c = r.currency;
   const low = useCountUp(r.equityDisplay[0]);
   const high = useCountUp(r.equityDisplay[2]);
-  const unit = currencyMillions(c);
+  const u = amountUnit(r);
+  const unit = u.label;
   const warnings = warningTexts(r);
+  const checks = checkItems(r);
+  const notes = disclosures(r);
+  const raise = raiseTable(r);
 
   const onTabKey = (e: React.KeyboardEvent, i: number) => {
     const move = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : e.key === 'Home' ? -i : e.key === 'End' ? TABS.length - 1 - i : 0;
@@ -253,21 +270,20 @@ export function ResultsDashboard({
     tabRefs.current[next.id]?.focus();
   };
 
+  const cp = r.comparables;
+  const multiples = (v: number[]) => v.map(fmtMultiple).join(', ');
   const compsTable: Table = {
-    head: ['Method', 'Multiples used', 'Low', 'Mid', 'High'],
+    head: ['Method', 'Multiples after discount', 'Low', LABELS.baseCase, 'High'],
     rows: [
       {
         label: 'EV / EBITDA',
-        values: [
-          `${r.comps.ebitda.map(fmtMultiple).join(', ')} (${r.comps.peersE ? `${r.comps.peersE} peers` : 'preset'})`,
-          ...(r.compsEbitda ? r.compsEbitda.map(fmtMillions) : ['n/a', 'n/a', 'n/a']),
-        ],
+        values: [multiples(cp.ebitdaMultiplesPost), ...(r.compsEbitda ? r.compsEbitda.map((v) => fmtAmount(v, u)) : ['n/a', 'n/a', 'n/a'])],
       },
       {
-        label: 'EV / Revenue',
-        values: [`${r.comps.revenue.map(fmtMultiple).join(', ')} (${r.comps.peersR ? `${r.comps.peersR} peers` : 'preset'})`, ...r.compsRevenue.map(fmtMillions)],
+        label: r.compsEbitda ? 'EV / Revenue (for reference)' : 'EV / Revenue',
+        values: [multiples(cp.revenueMultiplesPost), ...r.compsRevenue.map((v) => fmtAmount(v, u))],
       },
-      { label: 'Comparables value used', values: [r.compsEbitda ? 'EV / EBITDA' : 'EV / Revenue', ...r.compRange.map(fmtMillions)], tone: 'strong' },
+      { label: 'Comparables value used', values: [r.compsEbitda ? 'EV / EBITDA' : 'EV / Revenue', ...r.compRange.map((v) => fmtAmount(v, u))], tone: 'strong' },
     ],
   };
 
@@ -293,10 +309,10 @@ export function ResultsDashboard({
               {fmtBig(low, c)} to {fmtBig(high, c)}
             </p>
             <p className="sr-only" aria-live="polite">
-              Indicative equity value {h.equityRange}, midpoint {h.midpoint}.
+              Indicative equity value {h.equityRange}, base case {h.midpoint}.
             </p>
             <p className="mt-2 text-[15px] text-[#E8DDC4]">
-              Midpoint <strong className="text-white">{h.midpoint}</strong> as at end of {h.valuationDate}. Enterprise value {h.evRange}.
+              Base case <strong className="text-white">{h.midpoint}</strong>, equity value {h.asAt}. Enterprise value {h.evRange}.
             </p>
             {h.floorNote && <p className="mt-3 max-w-[70ch] border-l-2 border-[#C69C3E] pl-3 text-[13.5px] text-[#E8DDC4]">{h.floorNote}</p>}
           </div>
@@ -324,11 +340,11 @@ export function ResultsDashboard({
 
       {/* Tiles ----------------------------------------------------------- */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <Tile label="WACC" value={h.wacc} />
-        <Tile label="Terminal value share of DCF" value={h.tvShare} />
-        <Tile label="Implied exit multiple" value={h.impliedExitMultiple} />
-        <Tile label="Implied EV / LTM EBITDA" value={h.ltmMultiple} />
-        {h.weighted && <Tile label="Probability-weighted equity" value={h.weighted} accent />}
+        <Tile label={LABELS.wacc} value={h.wacc} />
+        <Tile label={`${LABELS.tvShare}, perpetuity DCF`} value={h.tvShare} />
+        <Tile label={LABELS.impliedTerminalMultiple} value={h.impliedExitMultiple} />
+        <Tile label={LABELS.ltmMultiple} value={h.ltmMultiple} />
+        {h.weighted && <Tile label={LABELS.weighted} value={h.weighted} accent />}
         {h.stakeRange && <Tile label={`Value of ${stakeLabel(r)}`} value={h.stakeRange} accent />}
       </div>
 
@@ -352,7 +368,7 @@ export function ResultsDashboard({
           </button>
         </div>
         <div className="mt-5 grid gap-6 md:grid-cols-3">
-          <Slider id="explore-wacc" label="WACC adjustment" value={adj} min={-3} max={3} step={0.25} display={`${fmtPoints(adj)}, WACC ${fmtPct(r.wacc.wacc)}`} onChange={setAdj} />
+          <Slider id="explore-wacc" label="WACC adjustment" value={adj} min={-3} max={3} step={0.25} display={`${fmtPoints(adj)}, WACC ${fmtWacc(r.wacc.wacc)}`} onChange={setAdj} />
           <Slider id="explore-growth" label="Long-term growth" value={growth} min={+(baseGrowth - 2).toFixed(1)} max={+(baseGrowth + 2).toFixed(1)} step={0.1} display={`${growth.toFixed(1)}%`} onChange={setGrowth} />
           <Slider id="explore-exit" label="Exit EV / EBITDA multiple" value={xm} min={Math.max(0.5, +(baseXm * 0.5).toFixed(1))} max={+(baseXm * 1.5).toFixed(1)} step={0.1} display={`${xm.toFixed(1)}x`} onChange={setXm} />
         </div>
@@ -398,39 +414,59 @@ export function ResultsDashboard({
         <div id={`panel-${tab}`} role="tabpanel" aria-labelledby={`tab-${tab}`} tabIndex={0} key={tab} className="pmbc-enter mt-5 space-y-5 focus-visible:outline-none">
           {tab === 'summary' && (
             <>
-              {warnings.length > 0 && (
-                <Card title="Checks to review" sub="Rule-based tests of your inputs and results.">
-                  <ul className="space-y-3">
-                    {warnings.map((w) => (
-                      <li key={w.code} className="flex gap-3 rounded-[2px] border-l-2 border-[#B3412F] bg-[#FDF6F4] px-3 py-2.5">
+              <Card
+                title="Checks"
+                sub={warnings.length ? `${warnings.length} of ${checks.length} checks raise a warning. Every check runs on every valuation.` : `All ${checks.length} checks passed.`}
+              >
+                <ul className="divide-y divide-[color:var(--pmbc-border-warm)]">
+                  {[...checks].sort((a, b) => (a.status === b.status ? 0 : a.status === 'warning' ? -1 : 1)).map((x) => (
+                    <li key={x.id} className="flex gap-3 py-2.5">
+                      {x.status === 'warning' ? (
                         <AlertTriangle aria-hidden size={16} className="mt-0.5 shrink-0 text-[#B3412F]" />
-                        <span>
-                          <strong className="block text-[14px] text-[color:var(--pmbc-text)]">{w.title}</strong>
-                          <span className="text-[13.5px] leading-[1.55] text-[#52606B]">{w.detail}</span>
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </Card>
-              )}
-              <Card title="Value by method" sub={`Enterprise value, ${unit}. Hover a bar for its range and midpoint.`}>
-                <ChartSvg chart={footballFieldChart(r)} />
+                      ) : (
+                        <span aria-hidden className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-[#3FA663]" />
+                      )}
+                      <span>
+                        <strong className="block text-[14px] text-[color:var(--pmbc-text)]">
+                          {x.label}
+                          <span className={`ml-2 text-[11px] font-semibold uppercase ${x.status === 'warning' ? 'text-[#B3412F]' : 'text-[#2F7D4A]'}`}>{x.status === 'warning' ? 'Warning' : 'Pass'}</span>
+                        </strong>
+                        <span className="text-[13.5px] leading-[1.55] text-[#52606B]">{x.message}</span>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
               </Card>
-              <Card title="From enterprise value to equity" sub={`Midpoint, ${unit}.`}>
+              <Card title="Value by method" sub={`Enterprise value, ${unit}. Each bar runs from low to high; the marker is the base case.`}>
+                <ChartSvg chart={footballFieldChart(r)} />
+                {notes.evRevenue && <p className="mt-3 text-[13px] text-[color:var(--pmbc-muted)]">{notes.evRevenue}</p>}
+              </Card>
+              <Card title="From enterprise value to equity" sub={`Base case, ${unit}. ${h.netDebtNote ?? ''}`}>
                 <ChartSvg chart={waterfallChart(r)} />
                 <div className="mt-4">
                   <DataTable table={bridgeTable(r)} caption="Enterprise to equity value bridge" />
                 </div>
                 <p className="mt-3 text-[13px] leading-[1.6] text-[color:var(--pmbc-muted)]">{INDICATIVE_NOTE}</p>
               </Card>
+              {r.meta?.purpose === 'raise' && (
+                <Card title="Pre-money and post-money">
+                  {raise ? <DataTable table={raise} caption="Pre-money and post-money equity value" /> : <p className="text-[14px] text-[#52606B]">{PRE_MONEY_NOTE}</p>}
+                </Card>
+              )}
             </>
           )}
 
           {tab === 'dcf' && (
             <>
-              <Card title="Free cash flow and DCF" sub={`Base case, ${unit}.`}>
+              <Card title="Free cash flow to firm" sub={`Base case, ${unit}. Equity value ${h.asAt}.`}>
                 <DataTable table={fcfTable(r)} caption="Free cash flow and discounted cash flow" />
-                <p className="mt-3 text-[13px] leading-[1.6] text-[color:var(--pmbc-muted)]">{TAX_NOTE}</p>
+                <p className="mt-3 text-[13px] leading-[1.6] text-[color:var(--pmbc-muted)]">
+                  {terminalNote(r)} {taxNote(r)}
+                </p>
+                <div className="mt-4 max-w-[560px]">
+                  <KeyValueList rows={dcfSummaryRows(r)} />
+                </div>
+                <p className="mt-3 text-[13px] leading-[1.6] text-[color:var(--pmbc-muted)]">{notes.exitMultiple}</p>
               </Card>
               <div className="grid gap-5 xl:grid-cols-2">
                 <Card title="Revenue and EBITDA margin" sub={`Actual and forecast, ${unit}.`}>
@@ -448,24 +484,27 @@ export function ResultsDashboard({
 
           {tab === 'comps' && (
             <>
-              <Card title="Comparables" sub={`Enterprise value from multiples of the last actual year, ${unit}, after a ${fmtPct(r.privateDiscount, 0)} private company discount.`}>
+              <Card title="Comparables" sub={`${comparablesSource(r, r.compsEbitda ? 'ebitda' : 'revenue')}. Enterprise value from multiples of the last actual year, ${unit}, after a ${fmtPct(r.privateDiscount, 0)} private company discount.`}>
                 <DataTable table={compsTable} caption="Comparables valuation" />
+                <div className="mt-4 max-w-[640px]">
+                  <KeyValueList rows={comparablesRows(r)} />
+                </div>
               </Card>
               <div className="grid gap-5 md:grid-cols-2">
                 <Card title="EBITDA used">
                   {r.normalisation?.used ? (
                     <KeyValueList rows={normalisationRows(r)} />
                   ) : (
-                    <p className="text-[14px] text-[#52606B]">Reported EBITDA of {fmtMillions(r.ltmEbitda)} {c.code} m, with no normalisation adjustments.</p>
+                    <p className="text-[14px] text-[#52606B]">Reported EBITDA of {fmtAmount(r.ltmEbitda, u)} {u.short}, with no normalisation adjustments.</p>
                   )}
                 </Card>
                 <Card title="Exit multiple">
                   <KeyValueList
                     rows={[
-                      ['Entered', fmtMultiple(r.exitMultiple)],
-                      ['Private company discount', fmtPct(r.privateDiscount, 0)],
-                      ['Used in the DCF', fmtMultiple(r.exitMultipleApplied)],
-                      ['Implied by perpetuity growth', h.impliedExitMultiple],
+                      [LABELS.exitMultipleEntered, fmtMultiple(r.exitMultiple)],
+                      [LABELS.privateDiscount, fmtPct(r.privateDiscount, 0)],
+                      [LABELS.exitMultipleApplied, fmtMultiple(r.exitMultipleApplied)],
+                      [LABELS.impliedTerminalMultiple, h.impliedExitMultiple],
                     ]}
                   />
                 </Card>
@@ -482,6 +521,7 @@ export function ResultsDashboard({
                     Probability-weighted equity value: <strong>{h.weighted}</strong>. The headline range stays your base case.
                   </p>
                 )}
+                <p className="mt-2 text-[13px] text-[color:var(--pmbc-muted)]">{notes.scenarios}</p>
               </Card>
               <Card title="Stake value">
                 {r.stake?.used ? (
@@ -502,7 +542,7 @@ export function ResultsDashboard({
           )}
 
           {tab === 'sensitivity' && (
-            <Card title="Sensitivity" sub={`Equity value from the perpetuity growth DCF, ${unit}. Rows are WACC, columns long-term growth. The outlined cell is the base case.`}>
+            <Card title={sensitivityTitle(r)} sub="Rows are WACC, columns long-term growth. The outlined centre cell is the base case, at the unrounded WACC.">
               <ChartSvg chart={sensitivityHeatmap(r)} />
               <details className="mt-4">
                 <summary className="cursor-pointer text-[13.5px] font-medium text-[#14304F]">Show as a table</summary>
@@ -519,8 +559,20 @@ export function ResultsDashboard({
                 <Card title="Cost of capital">
                   <KeyValueList rows={waccBuildRows(r)} />
                 </Card>
-                <Card title="Terminal value and comparables">
+                <Card title="Terminal value">
                   <KeyValueList rows={terminalRows(r)} />
+                </Card>
+                <Card title={r.tax?.zakatApplies ? 'Tax and zakat' : 'Tax'}>
+                  <KeyValueList rows={taxRows(r)} />
+                  {notes.zakat && <p className="mt-3 text-[13px] leading-[1.6] text-[color:var(--pmbc-muted)]">{notes.zakat}</p>}
+                  {notes.premiumAndDiscount && <p className="mt-3 text-[13px] text-[color:var(--pmbc-muted)]">{notes.premiumAndDiscount}</p>}
+                </Card>
+                <Card title="Valuation date and net debt">
+                  <KeyValueList rows={timingRows(r)} />
+                  <ul className="mt-3 space-y-1 text-[13px] leading-[1.6] text-[color:var(--pmbc-muted)]">
+                    <li>{notes.financialYearEnd}</li>
+                    {notes.valuationDate && <li>{notes.valuationDate}</li>}
+                  </ul>
                 </Card>
               </div>
               <Card title="Sources">
@@ -529,7 +581,7 @@ export function ResultsDashboard({
                     <li key={n.label} className="text-[13.5px]">
                       <strong className="text-[color:var(--pmbc-text)]">{n.label}.</strong>{' '}
                       <span className="text-[#52606B]">
-                        {n.source}, {n.asOf}.
+                        {n.source}{/ as at$/.test(n.source) ? ' ' : ', '}{n.asOf}.
                       </span>
                     </li>
                   ))}

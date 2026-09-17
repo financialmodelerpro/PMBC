@@ -71,7 +71,7 @@ export async function processVersionUpdate(
   const parsed = bodySchema.safeParse(raw);
   if (!parsed.success) return fail('invalid', 400, { error: 'Validation failed' });
 
-  const recomputed = recomputeInputs(parsed.data.inputs);
+  const recomputed = recomputeInputs(parsed.data.inputs, ctx.now);
   if (!recomputed.ok) return fail('invalid', 400, { error: 'Validation failed', issues: recomputed.issues });
   const result = recomputed.result;
   const serialized = serializeResult(result);

@@ -3,6 +3,12 @@
 // Shared valuation cases for the verifiers and the example PDF renderer, built
 // through the same state functions the tool page uses. No database, no network.
 
+/**
+ * The valuation date every verifier and example uses, so a figure does not move
+ * with the day a script runs. The report date in REPORT_META matches it.
+ */
+export const VALUATION_DATE = '2026-09-16';
+
 export function withFin(s, fin) {
   return { ...s, fin: Object.fromEntries(Object.entries(fin).map(([k, v]) => [k, v.map(String)])) };
 }
@@ -55,6 +61,6 @@ export const REPORT_META = {
   preparedFor: 'Example Reader',
   purpose: 'sale',
   generatedAt: new Date('2026-09-16T12:00:00Z'),
-  dataVersion: '2026-09-16',
+  dataVersion: '2026-09-17',
   bookingHref: 'https://www.pacemakersglobal.com/api/tools/book?t=example-token&src=pdf',
 };

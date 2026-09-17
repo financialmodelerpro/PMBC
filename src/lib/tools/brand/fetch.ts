@@ -48,31 +48,8 @@ export async function fetchPartnerCard(): Promise<PartnerCard | null> {
   }
 }
 
-/**
- * The navy and gold logo for white pages, derived from the Header Settings file:
- * its green lettering ("Business Consultants") recoloured to the site gold,
- * everything else (the navy wordmark, the gold ring, transparency) untouched. No
- * navy and gold file is stored; if one is uploaded to Header Settings later,
- * nothing here needs to change, since a file with no green passes through as is.
- */
-export async function recolourGreenToGold(png: Buffer): Promise<Buffer> {
-  const { data, info } = await sharp(png).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
-  const [gr, gg, gb] = [0xc6, 0x9c, 0x3e];
-  for (let i = 0; i < data.length; i += 4) {
-    const r = data[i], g = data[i + 1], b = data[i + 2], a = data[i + 3];
-    if (a === 0) continue;
-    // Green dominant, as the brand green #3FA663 and its anti-aliased edges are.
-    if (g > r + 25 && g > b + 15) {
-      data[i] = gr;
-      data[i + 1] = gg;
-      data[i + 2] = gb;
-    }
-  }
-  return sharp(data, { raw: { width: info.width, height: info.height, channels: 4 } }).png({ compressionLevel: 9 }).toBuffer();
-}
-
 /** Fetches an image and resizes it, cached by URL and treatment. Null on any failure. */
-async function processedImage(src: string | null, kind: 'logo' | 'logo-navy-gold' | 'portrait'): Promise<Buffer | null> {
+async function processedImage(src: string | null, kind: 'logo' | 'portrait'): Promise<Buffer | null> {
   if (!src || !/^https:\/\//i.test(src)) return null;
   const key = `${kind}:${src}`;
   const hit = cache.get(key);
@@ -86,9 +63,7 @@ async function processedImage(src: string | null, kind: 'logo' | 'logo-navy-gold
       value =
         kind === 'logo'
           ? await logo()
-          : kind === 'logo-navy-gold'
-            ? await recolourGreenToGold(await logo())
-            : await sharp(input).resize({ width: 360, height: 450, fit: 'cover', position: 'top' }).flatten({ background: '#FFFFFF' }).jpeg({ quality: 84 }).toBuffer();
+          : await sharp(input).resize({ width: 360, height: 450, fit: 'cover', position: 'top' }).flatten({ background: '#FFFFFF' }).jpeg({ quality: 84 }).toBuffer();
     }
   } catch (err) {
     console.error(`[tool-brand] ${kind} image unavailable:`, err instanceof Error ? err.message : err);
@@ -103,10 +78,12 @@ export async function fetchReportBranding(): Promise<ReportBranding> {
   const [branding, partner] = await Promise.all([fetchBranding().catch(() => null), fetchPartnerCard()]);
   // The same fallback chain the navbar uses: the on-dark file when there is one.
   const onDarkSrc = branding?.logo_dark_url || branding?.logo_url || null;
+  // The closing page uses the colour logo exactly as Header Settings stores it
+  // for the header: trimmed and resized only, never recoloured.
   const onLightSrc = branding?.logo_url || null;
   const [logoOnDark, logoOnLight, partnerPhoto] = await Promise.all([
     processedImage(onDarkSrc, 'logo'),
-    processedImage(onLightSrc, 'logo-navy-gold'),
+    processedImage(onLightSrc, 'logo'),
     processedImage(partner?.photoUrl ?? null, 'portrait'),
   ]);
   return { logoOnDark, logoOnLight, partner, partnerPhoto };

@@ -15,17 +15,20 @@
  *      Spreads and Risk Premiums" and "Corporate Marginal Tax Rates by country".
  *   2. Unlevered beta (corrected for cash) and market D/E: the global
  *      "Betas by Sector" and "Debt Fundamentals by Sector" datasets.
- *   3. Mature market implied ERP and the US default spread.
- *   4. The US 10-year Treasury yield, on the date of the refresh.
+ *   3. Mature market implied ERP (add the month to `IMPLIED_ERP_BY_MONTH`,
+ *      ideally the same month as the Treasury yield) and the US default spread.
+ *   4. The US 10-year Treasury yield, on the date of the refresh, and its date
+ *      in `usTreasury10yAsOf`.
  *   5. FX to SAR and the inflation expectations for non-pegged currencies.
  *   6. Update every `asOf` below, bump `VALUATION_DATA_VERSION`, run
- *      `npm run verify-valuation-engine`.
+ *      `npm run verify-valuation-engine`. The verifier passes these values into
+ *      the reference HTML itself; do not edit the reference file.
  * Leads store the version they were computed under, so older leads keep
  * showing the numbers their owner was actually given.
  */
 
 /** Stamped on every lead. Bump on any change to a value in this file. */
-export const VALUATION_DATA_VERSION = '2026-09-16';
+export const VALUATION_DATA_VERSION = '2026-09-17';
 
 /**
  * How each data version is described to a reader: the PDF report's cover and
@@ -35,6 +38,7 @@ export const VALUATION_DATA_VERSION = '2026-09-16';
  */
 export const DATA_VERSION_LABELS: Record<string, string> = {
   '2026-09-16': 'Damodaran January 2026, risk-free September 2026',
+  '2026-09-17': 'Market data: Damodaran 2026, risk-free 15 September 2026',
 };
 
 export function dataVersionLabel(version: string): string {
@@ -50,16 +54,76 @@ export type SourceNote = { label: string; source: string; asOf: string };
 export const MARKET = {
   /** US 10-year Treasury yield, percent. */
   usTreasury10y: 5.0,
+  /**
+   * When the Treasury yield above was taken, YYYY-MM-DD (YYYY-MM also accepted).
+   * 5.00% is the US Treasury daily par yield curve 10-year close on
+   * 15 September 2026 (home.treasury.gov, checked 2026-09-17).
+   */
+  usTreasury10yAsOf: '2026-09-15',
   /** Damodaran's US sovereign default spread, percent, subtracted to get a risk-free rate. */
   usDefaultSpread: 0.23,
-  /** Damodaran implied mature market equity risk premium, percent. */
-  matureErp: 4.23,
+  /**
+   * Damodaran implied mature market equity risk premium, percent. Always the
+   * figure `marketDataInUse` selects from `IMPLIED_ERP_BY_MONTH`; kept here
+   * because the form prefills from it.
+   */
+  matureErp: 4.14,
   /**
    * Long-run expected US inflation, percent. The expected local inflation for
    * the currencies pegged to the dollar, used by the terminal growth check.
    * Kept equal to `inflationUs` on the non-pegged countries.
    */
   usInflationLongRun: 2.5,
+} as const;
+
+/**
+ * Damodaran's implied equity risk premium by the date it is as at, YYYY-MM-DD
+ * to percent (trailing 12 month cash yield with adjusted payout, the figure he
+ * leads with). Add a month whenever a newer figure is taken. The value
+ * used is the month of the risk-free rate where there is one; otherwise the
+ * latest month here, and the report then prints both dates so the gap shows.
+ */
+export const IMPLIED_ERP_BY_MONTH: Record<string, number> = {
+  '2026-01-01': 4.23,
+  // pages.stern.nyu.edu/~adamodar, "Implied ERP on September 1, 2026 = 4.14%
+  // (Trailing 12 month, with adjusted payout)", checked 2026-09-17.
+  '2026-09-01': 4.14,
+};
+
+export type DatedValue = { value: number; asOf: string };
+
+/** The risk-free yield and the implied ERP chosen for it, each with its date. */
+export function marketDataInUse(): { treasury: DatedValue; erp: DatedValue; aligned: boolean } {
+  const treasury = { value: MARKET.usTreasury10y, asOf: MARKET.usTreasury10yAsOf };
+  const month = treasury.asOf.slice(0, 7);
+  const sameMonth = Object.keys(IMPLIED_ERP_BY_MONTH).filter((d) => d.startsWith(month)).sort().at(-1);
+  if (sameMonth) return { treasury, erp: { value: IMPLIED_ERP_BY_MONTH[sameMonth], asOf: sameMonth }, aligned: true };
+  const latest = Object.keys(IMPLIED_ERP_BY_MONTH).sort().at(-1) as string;
+  return { treasury, erp: { value: IMPLIED_ERP_BY_MONTH[latest], asOf: latest }, aligned: false };
+}
+
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+/** "2026-09" as "September 2026"; "2026-09-15" as "15 September 2026". */
+export function formatDataDate(asOf: string): string {
+  const [y, m, d] = asOf.split('-').map((x) => parseInt(x, 10));
+  const month = MONTH_NAMES[(m || 1) - 1];
+  return d ? `${d} ${month} ${y}` : `${month} ${y}`;
+}
+
+/* ------------------------------------------------------------------------ */
+/* Tax and zakat                                                             */
+/* ------------------------------------------------------------------------ */
+
+export const TAX = {
+  /**
+   * Zakat rate, percent, applied to an approximate zakat base on the Saudi / GCC
+   * owned share, or to profit when invested capital was not entered (see
+   * `taxProfile` and `zakatBase` in engine.ts).
+   */
+  zakatRate: 2.5,
+  /** The one country where the Saudi / GCC ownership input is asked and zakat applies. */
+  zakatCountry: 'Saudi Arabia',
 } as const;
 
 /* ------------------------------------------------------------------------ */
@@ -90,6 +154,16 @@ export const ASSUMPTIONS = {
   privateDiscountWithPeers: 20,
 } as const;
 
+/**
+ * The financial year a new form and the example company start on: last
+ * calendar year, and never earlier than `defaultFinancialYear`. A fixed year
+ * would be refused by the stub period check once it is more than twelve months
+ * old, which would break "Load an example company" every January.
+ */
+export function defaultFinancialYearFor(today: Date = new Date()): number {
+  return Math.max(ASSUMPTIONS.defaultFinancialYear, today.getUTCFullYear() - 1);
+}
+
 /* ------------------------------------------------------------------------ */
 /* Version 2 features. Every default here is neutral: it leaves the base     */
 /* valuation exactly as version 1 computed it.                               */
@@ -104,14 +178,25 @@ export const V2_DEFAULTS = {
   stake: { percent: 100, controlPremium: 25, minorityDiscount: 20 },
 } as const;
 
-/** Thresholds for the plain-language warnings on the results. */
+/**
+ * Thresholds for the checks run on every result (`checks.ts`). Every check is
+ * run every time and reported as Pass or Warning.
+ */
 export const WARNING_RULES = {
-  /** Terminal value share of the DCF above this means the forecast period proves little. */
+  /** DCF and comparables base values differ by more than this, relative. */
+  methodDivergence: 0.2,
+  /** Implied terminal multiple (perpetuity method) and the exit multiple after discount differ by more than this, relative. */
+  terminalGap: 0.25,
+  /** Terminal value share of the perpetuity DCF above this is a warning. */
   terminalValueShare: 0.75,
-  /** Exit multiple and the multiple implied by perpetuity growth differ by more than this, relative. */
-  exitMultipleMismatch: 0.3,
-  /** First forecast year EBITDA margin moves more than this from the last actual year, percentage points. */
-  marginJumpPoints: 10,
+  /** Above this the terminal value warning is marked strong. */
+  terminalValueShareStrong: 0.85,
+  /** Fewer peers than this, when the visitor entered peers, is a warning. */
+  minPeers: 3,
+  /** Target debt to equity and actual net debt to equity differ by more than this, percentage points. */
+  capitalStructurePoints: 20,
+  /** First forecast year EBITDA margin above the last actual year by more than this, percentage points. */
+  marginStepPoints: 1.5,
   /** Growth implied by reinvestment and ROIC differs from long-term growth by more than this, percentage points. */
   reinvestmentGapPoints: 2,
   /** Terminal growth more than this below expected local inflation, percentage points. */
@@ -120,6 +205,18 @@ export const WARNING_RULES = {
   inflationAbovePoints: 2,
   /** A stake must be above this percentage for a control premium to fit. */
   controlStakeAbovePercent: 50,
+} as const;
+
+/** Thresholds for choosing the factors that could support a higher valuation (`recommendations.ts`). */
+export const RECOMMENDATION_RULES = {
+  /** A one point lower WACC moving perpetuity DCF equity by more than this share is material. */
+  waccSensitivityMaterial: 0.1,
+  /** Forecast free cash flow below this share of forecast EBITDA. */
+  fcfConversionBelow: 0.6,
+  /** Final forecast year EBITDA margin below this. */
+  terminalMarginBelow: 0.15,
+  /** At most this many are listed, the always eligible diligence point included. */
+  maxItems: 5,
 } as const;
 
 /* ------------------------------------------------------------------------ */
@@ -152,15 +249,21 @@ export type CountryData = {
   inflationLocal?: number;
   /** Expected long-term US inflation, percent. Non-pegged currencies only. */
   inflationUs?: number;
+  /**
+   * Tax losses carried forward can offset at most this share of a year's
+   * taxable profit, percent. 100 is no cap. Simplified: loss expiry periods
+   * are not modelled.
+   */
+  lossOffsetCap: number;
 };
 
 export const COUNTRIES = {
-  'Saudi Arabia': { crp: 0.78, ds: 0.51, tax: 20, code: 'SAR', pegged: true, sarPerUnit: 1, growth: 2.5, growthCeiling: 4.0 },
-  'United Arab Emirates': { crp: 0.64, ds: 0.42, tax: 9, code: 'AED', pegged: true, sarPerUnit: 1.0211, growth: 2.5, growthCeiling: 4.0 },
-  Qatar: { crp: 0.64, ds: 0.42, tax: 10, code: 'QAR', pegged: true, sarPerUnit: 1.0302, growth: 2.5, growthCeiling: 4.0 },
-  Kuwait: { crp: 0.91, ds: 0.6, tax: 15, code: 'KWD', pegged: true, sarPerUnit: 12.2, growth: 2.5, growthCeiling: 4.0 },
-  Oman: { crp: 2.85, ds: 1.87, tax: 15, code: 'OMR', pegged: true, sarPerUnit: 9.753, growth: 2.5, growthCeiling: 4.0 },
-  Bahrain: { crp: 7.12, ds: 4.67, tax: 0, code: 'BHD', pegged: true, sarPerUnit: 9.973, growth: 2.5, growthCeiling: 4.0 },
+  'Saudi Arabia': { crp: 0.78, ds: 0.51, tax: 20, code: 'SAR', pegged: true, sarPerUnit: 1, growth: 2.5, growthCeiling: 4.0, lossOffsetCap: 25 },
+  'United Arab Emirates': { crp: 0.64, ds: 0.42, tax: 9, code: 'AED', pegged: true, sarPerUnit: 1.0211, growth: 2.5, growthCeiling: 4.0, lossOffsetCap: 75 },
+  Qatar: { crp: 0.64, ds: 0.42, tax: 10, code: 'QAR', pegged: true, sarPerUnit: 1.0302, growth: 2.5, growthCeiling: 4.0, lossOffsetCap: 100 },
+  Kuwait: { crp: 0.91, ds: 0.6, tax: 15, code: 'KWD', pegged: true, sarPerUnit: 12.2, growth: 2.5, growthCeiling: 4.0, lossOffsetCap: 100 },
+  Oman: { crp: 2.85, ds: 1.87, tax: 15, code: 'OMR', pegged: true, sarPerUnit: 9.753, growth: 2.5, growthCeiling: 4.0, lossOffsetCap: 100 },
+  Bahrain: { crp: 7.12, ds: 4.67, tax: 0, code: 'BHD', pegged: true, sarPerUnit: 9.973, growth: 2.5, growthCeiling: 4.0, lossOffsetCap: 100 },
   Pakistan: {
     crp: 9.71,
     ds: 6.37,
@@ -170,6 +273,7 @@ export const COUNTRIES = {
     sarPerUnit: 0.01333,
     growth: 6.0,
     growthCeiling: 9.0,
+    lossOffsetCap: 100,
     inflationLocal: 7.0,
     inflationUs: 2.5,
   },
@@ -274,6 +378,8 @@ export const EXAMPLE_COMPANY = {
     nwc: [30, 33, 37],
   },
   fill: { growth: 12, ebitdaMargin: 18, daOfRevenue: 3.5, capexOfRevenue: 5, nwcOfRevenue: 16 },
+  /** Saudi / GCC ownership, percent. The form has no default; the example company fills it like every other field. */
+  gccOwnership: 100,
   peers: [
     { name: 'Listed peer A', evEbitda: 11.5, evRevenue: 1.9 },
     { name: 'Listed peer B', evEbitda: 9.8, evRevenue: 1.4 },
@@ -283,6 +389,12 @@ export const EXAMPLE_COMPANY = {
 /* ------------------------------------------------------------------------ */
 /* Source notes                                                              */
 /* ------------------------------------------------------------------------ */
+
+const MARKET_DATA = marketDataInUse();
+const pct2 = (v: number) => v.toFixed(2) + '%';
+const ERP_DATE_TEXT = MARKET_DATA.aligned
+  ? formatDataDate(MARKET_DATA.erp.asOf)
+  : `${formatDataDate(MARKET_DATA.erp.asOf)}, latest month on file`;
 
 export const SOURCE_NOTES: SourceNote[] = [
   {
@@ -296,32 +408,26 @@ export const SOURCE_NOTES: SourceNote[] = [
     asOf: 'January 2026 update',
   },
   {
-    label: 'Mature market equity risk premium and US default spread',
-    source: 'Aswath Damodaran, implied equity risk premium',
-    asOf: 'January 2026 update',
+    label: 'Mature market implied equity risk premium',
+    source: `Aswath Damodaran, implied equity risk premium of ${pct2(MARKET_DATA.erp.value)} (trailing 12 month cash yield, with adjusted payout), as at`,
+    asOf: ERP_DATE_TEXT,
   },
   {
     label: 'Risk-free rate',
-    source: 'US 10-year Treasury at about 5.0%, less the 0.23% US default spread per Damodaran',
-    asOf: 'mid September 2026',
+    source: `US 10-year Treasury yield of ${pct2(MARKET_DATA.treasury.value)}, less the ${pct2(MARKET.usDefaultSpread)} US default spread per Damodaran. Yield as at`,
+    asOf: formatDataDate(MARKET_DATA.treasury.asOf),
   },
   {
-    label: 'Exchange rates to SAR',
-    source: 'Indicative rates, used only for deal size bands and size premium thresholds',
+    label: 'Set by PaceMakers',
+    source: 'Indicative exchange rates to SAR, long-term inflation for non-pegged currencies, preset private company multiples, size premium bands and credit spread, reviewed annually',
     asOf: 'September 2026',
   },
   {
-    label: 'Inflation expectations for non-pegged currencies',
-    source: 'Long-term expectations set by PaceMakers',
-    asOf: 'September 2026',
-  },
-  {
-    label: 'Preset comparables multiples, size premium bands and credit spread',
-    source: 'Indicative private company ranges set by PaceMakers, reviewed annually',
+    label: 'Zakat and tax loss carry-forward',
+    source: `Zakat at ${TAX.zakatRate}% of an approximate base; loss offset caps simplified from local rules (Saudi Arabia 25%, United Arab Emirates 75%, elsewhere uncapped), expiry not modelled. Set by PaceMakers`,
     asOf: 'September 2026',
   },
 ];
 
 /** The one-paragraph version shown under the WACC build. */
-export const WACC_SOURCE_SENTENCE =
-  'Sources: country risk premiums, default spreads, tax rates and mature market premium from Aswath Damodaran, January 2026 update. Unlevered betas (corrected for cash) and D/E from Damodaran global industry data, January 2026. Risk-free rate uses the US 10-year Treasury at about 5.0% in mid September 2026, less the 0.23% US default spread per Damodaran’s method.';
+export const WACC_SOURCE_SENTENCE = `Sources: country risk premiums, default spreads and tax rates from Aswath Damodaran, January 2026 update. Implied equity risk premium of ${pct2(MARKET_DATA.erp.value)}, Damodaran, as at ${ERP_DATE_TEXT}. Unlevered betas (corrected for cash) and D/E from Damodaran global industry data, January 2026. Risk-free rate uses the US 10-year Treasury yield of ${pct2(MARKET_DATA.treasury.value)} (${formatDataDate(MARKET_DATA.treasury.asOf)}), less the ${pct2(MARKET.usDefaultSpread)} US default spread per Damodaran’s method.`;

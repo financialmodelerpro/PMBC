@@ -1,33 +1,55 @@
 /**
- * Presentation of a `ValuationResult`: number formats, tables, notes, warnings
- * and the rule-based narrative.
+ * Presentation of a `ValuationResult`: number formats, labels, tables, notes,
+ * checks and the rule-based narrative.
  *
- * Shared by the results dashboard, the PDF report and the emails, so the three
- * say the same thing in the same format. Every sentence here is built from the
- * numbers by fixed rules, never generated, so every figure in it is exact.
+ * Shared by the results dashboard, the PDF report, the emails and the admin
+ * view, so all of them say the same thing in the same format. Every sentence
+ * here is built from the result by fixed rules, never generated, and nothing
+ * here computes a value: it rounds and words what the engine produced. The one
+ * exception is a sum or difference printed purely to lay a table out, and the
+ * reconciliation assertions (`reconcile.ts`) check those against the engine.
  *
- * The version 1 formats are the reference's, and the verifier compares them.
+ * Results stored before version 3 lack the canonical blocks. The functions the
+ * admin lead view calls on stored results (`headline`, the tables and
+ * `warningTexts`) still format them, from the fields they did have.
  */
 
-import { COUNTRIES, SOURCE_NOTES, WARNING_RULES } from './data';
-import type { Currency, EquityFloor, Range3, ValuationResult, Warning } from './engine';
+import { COUNTRIES, SOURCE_NOTES, TAX, WARNING_RULES, formatDataDate } from './data';
+import type {
+  Check,
+  Currency,
+  EquityFloor,
+  Range3,
+  Recommendation,
+  ValuationResult,
+  Warning,
+} from './engine';
 
-/** One decimal, thousands separators, negatives in brackets. */
+/* ------------------------------------------------------------------------ */
+/* Numbers                                                                   */
+/* ------------------------------------------------------------------------ */
+
+/** One decimal, thousands separators, negatives in brackets. A value that rounds to zero is "0.0", never "(0.0)". */
 export function fmtMillions(v: number): string {
   if (!Number.isFinite(v)) return 'n/a';
+  if (Math.abs(v) < 0.05) return '0.0';
   const s = Math.abs(v).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
   return v < 0 ? `(${s})` : s;
 }
 
-/** A ratio as a percentage. */
+/** A ratio as a percentage. A value that rounds to zero carries no sign. */
 export function fmtPct(v: number, digits = 2): string {
-  return Number.isFinite(v) ? (v * 100).toFixed(digits) + '%' : 'n/a';
+  if (!Number.isFinite(v)) return 'n/a';
+  const s = (v * 100).toFixed(digits);
+  return (/^-0\.?0*$/.test(s) ? s.slice(1) : s) + '%';
 }
 
-/** "SAR 12.5 million", "SAR 245 million", "SAR 1.25 billion". */
+/** "SAR 450 thousand", "SAR 12.5 million", "SAR 245 million", "SAR 1.25 billion". */
 export function fmtBig(v: number, currency: Currency): string {
   if (!Number.isFinite(v)) return 'n/a';
-  const a = Math.abs(v), s = v < 0 ? 'negative ' : '';
+  const a = Math.abs(v), s = v < 0 && a >= 0.0005 ? 'negative ' : '';
+  // Under one million, thousands; a figure that rounds to zero stays in millions, as "SAR 0.0 million".
+  if (a < 1 && a >= 0.0005) return `${s}${currency.code} ${Math.round(a * 1000).toLocaleString('en-US')} thousand`;
   return a >= 1000
     ? `${s}${currency.code} ${(a / 1000).toFixed(2)} billion`
     : `${s}${currency.code} ${a.toFixed(a >= 100 ? 0 : 1)} million`;
@@ -40,11 +62,71 @@ export function fmtMultiple(v: number): string {
 /** Percentage points, signed: "+3.0 pts", "-2.0 pts". */
 export function fmtPoints(v: number): string {
   if (!Number.isFinite(v)) return 'n/a';
-  return `${v > 0 ? '+' : v < 0 ? '-' : ''}${Math.abs(v).toFixed(1)} pts`;
+  const s = Math.abs(v).toFixed(1);
+  return `${v > 0 && s !== '0.0' ? '+' : v < 0 && s !== '0.0' ? '-' : ''}${s} pts`;
+}
+
+/** WACC, everywhere: two decimals. */
+export function fmtWacc(v: number): string {
+  return fmtPct(v, 2);
+}
+
+/** A growth rate on an axis: two decimals, so a half point never rounds away. */
+export function fmtRate(v: number): string {
+  return fmtPct(v, 2);
+}
+
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+/** "2026-09-16" as "16 September 2026". */
+export function fmtDate(iso: string): string {
+  const [y, m, d] = iso.split('-').map((x) => parseInt(x, 10));
+  return `${d} ${MONTHS[m - 1]} ${y}`;
 }
 
 export function currencyMillions(currency: Currency): string {
   return `${currency.code} millions`;
+}
+
+/**
+ * The unit amounts are printed in. Millions, as entered, unless the business is
+ * small enough that one decimal of a million would hide the figures (enterprise
+ * value and revenue both under 10 million), when tables switch to thousands
+ * with no decimals. Chosen once per result, so every table and chart agrees.
+ */
+export type AmountUnit = { scale: number; digits: number; label: string; short: string };
+
+export function amountUnit(r: ValuationResult): AmountUnit {
+  const code = r.currency.code;
+  const size = Math.max(Math.abs(r.ev?.[2] ?? 0), Math.abs(r.ltmRevenue ?? 0));
+  return Number.isFinite(size) && size < 10
+    ? { scale: 1000, digits: 0, label: `${code} thousands`, short: `${code} thousand` }
+    : { scale: 1, digits: 1, label: `${code} millions`, short: `${code} m` };
+}
+
+/** An amount held in millions, printed in the result's unit. Negatives in brackets; a value that rounds to zero carries no sign. */
+export function fmtAmount(v: number, u: AmountUnit): string {
+  if (!Number.isFinite(v)) return 'n/a';
+  const x = v * u.scale;
+  if (Math.abs(x) < 0.5 * Math.pow(10, -u.digits)) return (0).toFixed(u.digits);
+  const s = Math.abs(x).toLocaleString('en-US', { minimumFractionDigits: u.digits, maximumFractionDigits: u.digits });
+  return x < 0 ? `(${s})` : s;
+}
+
+/** Shorthand for the functions below, which all hold a result. */
+function amt(r: ValuationResult, v: number): string {
+  return fmtAmount(v, amountUnit(r));
+}
+function unitLabel(r: ValuationResult): string {
+  return amountUnit(r).label;
+}
+function unitShort(r: ValuationResult): string {
+  return amountUnit(r).short;
+}
+
+/** True when a result carries the version 3 blocks. Mirrors `isCanonicalResult` without a runtime import of the engine. */
+function canonical(r: ValuationResult): boolean {
+  return (r.schemaVersion ?? 0) >= 3 && Array.isArray(r.checks) && Boolean(r.dcfBlock && r.terminal && r.meta);
 }
 
 /** Version 2 fields read defensively, for results stored by version 1. */
@@ -52,16 +134,59 @@ function exitApplied(r: ValuationResult): number {
   return Number.isFinite(r.exitMultipleApplied) ? r.exitMultipleApplied : r.exitMultiple;
 }
 
-/** The headline figures, as shown at the top of the results and in the email. */
+/* ------------------------------------------------------------------------ */
+/* Labels. One wording for each concept, used on every surface.              */
+/* ------------------------------------------------------------------------ */
+
+export const LABELS = {
+  baseCase: 'Base case',
+  ltmMultiple: 'Implied EV / LTM EBITDA',
+  impliedTerminalMultiple: 'Implied terminal multiple (perpetuity method)',
+  tradingMultiples: 'Comparable trading multiples (before discount)',
+  privateDiscount: 'Private company discount',
+  multiplesAfterDiscount: 'Comparable multiples after discount',
+  exitMultipleEntered: 'DCF exit multiple (before discount)',
+  exitMultipleApplied: 'DCF exit multiple (after discount)',
+  dcfPerpetuity: 'DCF, perpetuity growth',
+  dcfExit: 'DCF, exit multiple',
+  dcfCombined: 'DCF (average of perpetuity and exit multiple)',
+  dcfPerpetuityOnly: 'DCF (perpetuity growth only)',
+  factors: 'Factors that could support a higher valuation',
+  tvShare: 'Terminal value share',
+  weighted: 'Probability-weighted equity',
+  wacc: 'WACC',
+} as const;
+
+export function dcfCombinedLabel(r: ValuationResult): string {
+  return canonical(r) && r.dcfBlock.combination === 'perpetuity_only' ? LABELS.dcfPerpetuityOnly : LABELS.dcfCombined;
+}
+
+/** "Selected comparable companies (2)" or "Preset industry ranges". */
+export function comparablesSource(r: ValuationResult, which: 'ebitda' | 'revenue' = 'ebitda'): string {
+  const n = which === 'ebitda' ? r.comps.peersE : r.comps.peersR;
+  return n ? `Selected comparable companies (${n})` : 'Preset industry ranges';
+}
+
+/* ------------------------------------------------------------------------ */
+/* Headline                                                                  */
+/* ------------------------------------------------------------------------ */
+
+/** The headline figures, as shown at the top of the results, on the cover and in the email. */
 export function headline(r: ValuationResult) {
   const c = r.currency;
   const stake = r.stake;
+  const dated = canonical(r) && r.meta.valuationDate;
   return {
     equityRange: `${fmtBig(r.equityDisplay[0], c)} to ${fmtBig(r.equityDisplay[2], c)}`,
+    /** The base case. Named midpoint for the email template variable it feeds. */
     midpoint: fmtBig(r.equityDisplay[1], c),
     evRange: `${fmtBig(r.ev[0], c)} to ${fmtBig(r.ev[2], c)}`,
-    valuationDate: `FY${r.years.history[2]}`,
-    wacc: fmtPct(r.wacc.wacc) + (c.pegged ? '' : ` ${c.code}`),
+    /** "16 September 2026", or "FY2025" for results stored before the valuation date existed. */
+    valuationDate: dated ? fmtDate(r.meta.valuationDate as string) : `FY${r.years.history[2]}`,
+    /** "Equity value as at 16 September 2026." */
+    asAt: dated ? `as at ${fmtDate(r.meta.valuationDate as string)}` : `as at end of FY${r.years.history[2]}`,
+    netDebtNote: canonical(r) ? netDebtSentence(r) : null,
+    wacc: fmtWacc(r.wacc.wacc) + (c.pegged ? '' : ` ${c.code}`),
     tvShare: Number.isFinite(r.tvShare) ? fmtPct(r.tvShare, 0) : 'n/a',
     impliedExitMultiple: fmtMultiple(r.impliedExitMultiple),
     ltmMultiple: fmtMultiple(r.ltmMultiple),
@@ -70,6 +195,15 @@ export function headline(r: ValuationResult) {
     stakeRange: stake?.used ? `${fmtBig(stake.value[0], c)} to ${fmtBig(stake.value[2], c)}` : null,
     stakeLabel: stake?.used ? stakeLabel(r) : null,
   };
+}
+
+/** Where net debt comes from and the date it is at. The same sentence on the results, in the email and in the report. */
+export function netDebtSentence(r: ValuationResult): string {
+  const m = r.meta;
+  const entered = `Net debt at ${fmtDate(m.lastFyEnd)}, as entered`;
+  if (!(m.stubFraction > 0) || !m.valuationDate) return `${entered}.`;
+  const interest = r.bridge.elapsedInterest ? ', plus after-tax interest on it for that period,' : '';
+  return `${entered}, less free cash flow earned from then to ${fmtDate(m.valuationDate)}${interest} gives net debt at the valuation date.`;
 }
 
 export function stakeLabel(r: ValuationResult): string {
@@ -87,11 +221,11 @@ export function stakeLabel(r: ValuationResult): string {
 export function equityFloorNote(floor: EquityFloor): string | null {
   switch (floor) {
     case 'all':
-      return 'Net debt exceeds enterprise value across the whole range, so equity value is shown as zero. The bridge below shows the negative figures.';
+      return 'Net debt exceeds enterprise value across the whole range, so equity value is shown as zero. The bridge shows the negative figures.';
     case 'low_and_mid':
-      return 'Net debt exceeds enterprise value at the low end and the midpoint, so both are shown as zero. The bridge below shows the negative figures.';
+      return 'Net debt exceeds enterprise value at the low end and the base case, so both are shown as zero. The bridge shows the negative figures.';
     case 'low':
-      return 'Net debt exceeds enterprise value at the low end of the range, so the low end is shown as zero. The bridge below shows the negative figure.';
+      return 'Net debt exceeds enterprise value at the low end of the range, so the low end is shown as zero. The bridge shows the negative figure.';
     default:
       return null;
   }
@@ -102,9 +236,10 @@ export function equityFloorNote(floor: EquityFloor): string | null {
 /* ------------------------------------------------------------------------ */
 
 export type FootballFieldRow = {
-  key: 'dcf_growth' | 'dcf_exit' | 'comps_ebitda' | 'comps_revenue' | 'blended' | 'scenarios';
+  key: 'dcf_growth' | 'dcf_exit' | 'dcf_combined' | 'comps_ebitda' | 'comps_revenue' | 'blended' | 'scenarios';
   label: string;
   sub: string;
+  /** Low, base case, high. The marker is always drawn at the base case. */
   range: Range3 | null;
   blend: boolean;
 };
@@ -113,51 +248,55 @@ export type FootballFieldRow = {
 export const REFERENCE_FOOTBALL_KEYS: FootballFieldRow['key'][] = ['dcf_growth', 'dcf_exit', 'comps_ebitda', 'comps_revenue', 'blended'];
 
 export function footballFieldRows(r: ValuationResult): FootballFieldRow[] {
-  const srcE = r.comps.peersE ? `Your ${r.comps.peersE} peers` : 'Preset';
-  const srcR = r.comps.peersR ? `Your ${r.comps.peersR} peers` : 'Preset';
+  const discount = r.privateDiscount ? `, after ${fmtPct(r.privateDiscount, 0)} discount` : '';
   const rows: FootballFieldRow[] = [
     {
       key: 'dcf_growth',
-      label: 'DCF, perpetuity growth',
-      sub: `WACC ${fmtPct(r.wacc.wacc, 1)}, g ${fmtPct(r.growth, 1)}`,
+      label: LABELS.dcfPerpetuity,
+      sub: `WACC ${fmtWacc(r.wacc.wacc)}, g ${fmtRate(r.growth)}`,
       range: [r.loG, r.base.evG, r.hiG],
       blend: false,
     },
     {
       key: 'dcf_exit',
-      label: 'DCF, exit multiple',
-      sub: `${exitApplied(r).toFixed(1)}x terminal EBITDA`,
+      label: LABELS.dcfExit,
+      sub: `${fmtMultiple(exitApplied(r))} final year EBITDA`,
       range: Number.isFinite(r.base.evX) ? [r.loX, r.base.evX, r.hiX] : null,
       blend: false,
     },
-    { key: 'comps_ebitda', label: 'Comps, EV / EBITDA', sub: `${srcE}, LTM`, range: r.compsEbitda, blend: false },
-    { key: 'comps_revenue', label: 'Comps, EV / Revenue', sub: `${srcR}, LTM`, range: r.compsRevenue, blend: false },
+  ];
+  if (canonical(r)) {
+    rows.push({ key: 'dcf_combined', label: dcfCombinedLabel(r), sub: 'Used in the blend', range: r.dcfRange, blend: false });
+  }
+  rows.push(
+    { key: 'comps_ebitda', label: 'Comparables, EV / EBITDA', sub: `${comparablesSource(r, 'ebitda')}${discount}`, range: r.compsEbitda, blend: false },
+    {
+      key: 'comps_revenue',
+      label: 'Comparables, EV / Revenue',
+      sub: r.compsEbitda ? 'For reference; not used in the blend' : `${comparablesSource(r, 'revenue')}${discount}`,
+      range: r.compsRevenue,
+      blend: false,
+    },
     {
       key: 'blended',
       label: 'Blended',
-      sub: `${r.dcfWeight}% DCF, ${100 - r.dcfWeight}% comps`,
+      sub: `${r.dcfWeight}% DCF, ${100 - r.dcfWeight}% comparables`,
       range: r.ev,
       blend: true,
     },
-  ];
-  // Scenarios, as enterprise value like every other row: downside, the
-  // probability-weighted midpoint, upside.
+  );
+  // Scenarios, in enterprise value like every other row: downside, the base
+  // case (the marker, as on every row), upside.
   if (r.scenarios?.length === 3) {
-    const [down, , up] = r.scenarios;
-    const weightedEv = r.scenarios.reduce((a, s) => a + s.weight * s.ev[1], 0);
-    rows.push({
-      key: 'scenarios',
-      label: 'Scenarios',
-      sub: `Downside, weighted, upside`,
-      range: [down.ev[1], weightedEv, up.ev[1]],
-      blend: false,
-    });
+    const [down, base, up] = r.scenarios;
+    rows.push({ key: 'scenarios', label: 'Scenarios', sub: 'Downside, base case, upside', range: [down.ev[1], base.ev[1], up.ev[1]], blend: false });
   }
   return rows;
 }
 
 /** Axis bounds and a position function for the football field, as the reference draws it. */
-export function footballFieldScale(rows: FootballFieldRow[]) {
+/** `scale` turns millions into the printed unit for the tick labels; 1 keeps millions. */
+export function footballFieldScale(rows: FootballFieldRow[], scale = 1) {
   const all = rows.flatMap((row) => (row.range ? [row.range[0], row.range[2]] : [])).filter(Number.isFinite);
   const maxV = Math.max(...all) * 1.08, minV = Math.min(0, Math.min(...all));
   const span = maxV - minV;
@@ -165,7 +304,7 @@ export function footballFieldScale(rows: FootballFieldRow[]) {
     minV,
     maxV,
     pos: (v: number) => ((v - minV) / span) * 100,
-    ticks: [0, 0.25, 0.5, 0.75, 1].map((p) => Math.round(minV + span * p).toLocaleString('en-US')),
+    ticks: [0, 0.25, 0.5, 0.75, 1].map((p) => Math.round((minV + span * p) * scale).toLocaleString('en-US')),
   };
 }
 
@@ -188,67 +327,164 @@ export function methodsUsed(r: ValuationResult): string[] {
 export type TableRow = { label: string; values: string[]; tone?: 'strong' | 'muted' };
 export type Table = { head: string[]; rows: TableRow[] };
 
+/** "Less tax and zakat at 2.5%" in Saudi Arabia with GCC ownership, "Less tax at 20.0%" otherwise. */
+export function taxRowLabel(r: ValuationResult): string {
+  const method = canonical(r) ? r.tax.zakatMethod ?? (r.tax.gccOwnership > 0 ? 'profit_proxy' : 'none') : 'none';
+  if (method === 'base') return 'Less tax and zakat';
+  return `Less ${method === 'profit_proxy' ? 'tax and zakat' : 'tax'} at ${fmtPct(r.wacc.t, 1)}`;
+}
+
+/**
+ * Free cash flow to the firm, the five forecast years and a terminal column
+ * holding the normalised cash flow the perpetuity is built on. Rows the
+ * terminal cash flow does not have (EBITDA, D&A) are left blank in that column,
+ * and its capex row is net of D&A, which the table's note says.
+ */
 export function fcfTable(r: ValuationResult): Table {
-  const m = (arr: number[]) => arr.map(fmtMillions);
-  return {
-    head: [currencyMillions(r.currency), ...r.years.forecast.map((y) => `FY${y} F`)],
-    rows: [
-      { label: 'Revenue', values: m(r.rows.map((x) => x.rev)) },
-      { label: 'EBITDA', values: m(r.rows.map((x) => x.ebitda)) },
-      { label: 'Less depreciation and amortisation', values: m(r.rows.map((x) => -x.da)), tone: 'muted' },
-      { label: 'EBIT', values: m(r.rows.map((x) => x.ebit)) },
-      { label: `Less tax at ${fmtPct(r.wacc.t, 1)}`, values: m(r.rows.map((x) => -x.tax)), tone: 'muted' },
-      { label: 'Add back depreciation and amortisation', values: m(r.rows.map((x) => x.da)), tone: 'muted' },
-      { label: 'Less capital expenditure', values: m(r.rows.map((x) => -x.capex)), tone: 'muted' },
-      { label: 'Less increase in working capital', values: m(r.rows.map((x) => -x.dnwc)), tone: 'muted' },
-      { label: 'Free cash flow to firm', values: m(r.rows.map((x) => x.fcf)), tone: 'strong' },
-      { label: 'Discount factor', values: r.base.dfs.map((v) => v.toFixed(3)), tone: 'muted' },
-      { label: 'Present value', values: m(r.rows.map((x, i) => x.fcf * r.base.dfs[i])) },
-    ],
-  };
+  const m = (arr: number[]) => arr.map((v) => amt(r, v));
+  if (!canonical(r)) {
+    return {
+      head: [unitLabel(r), ...r.years.forecast.map((y) => `FY${y} F`)],
+      rows: [
+        { label: 'Revenue', values: m(r.rows.map((x) => x.rev)) },
+        { label: 'EBITDA', values: m(r.rows.map((x) => x.ebitda)) },
+        { label: 'Less depreciation and amortisation', values: m(r.rows.map((x) => -x.da)), tone: 'muted' },
+        { label: 'EBIT', values: m(r.rows.map((x) => x.ebit)) },
+        { label: taxRowLabel(r), values: m(r.rows.map((x) => -x.tax)), tone: 'muted' },
+        { label: 'Add back depreciation and amortisation', values: m(r.rows.map((x) => x.da)), tone: 'muted' },
+        { label: 'Less capital expenditure', values: m(r.rows.map((x) => -x.capex)), tone: 'muted' },
+        { label: 'Less increase in working capital', values: m(r.rows.map((x) => -x.dnwc)), tone: 'muted' },
+        { label: 'Free cash flow to firm', values: m(r.rows.map((x) => x.fcf)), tone: 'strong' },
+        { label: 'Discount factor', values: r.base.dfs.map((v) => v.toFixed(3)), tone: 'muted' },
+        { label: 'Present value', values: m(r.rows.map((x, i) => x.fcf * r.base.dfs[i])) },
+      ],
+    };
+  }
+  const f = r.forecast, t = r.terminal;
+  const normalised = t.method === 'normalised';
+  const tc = (v: number) => (normalised ? amt(r, v) : '');
+  const rows: TableRow[] = [
+    { label: 'Revenue', values: [...m(f.map((x) => x.rev)), tc(t.revenue)] },
+    { label: 'EBITDA', values: [...m(f.map((x) => x.ebitda)), ''] },
+    { label: 'Less depreciation and amortisation', values: [...m(f.map((x) => -x.da)), ''], tone: 'muted' },
+    { label: 'EBIT', values: [...m(f.map((x) => x.ebit)), tc(t.ebit)] },
+    { label: taxRowLabel(r), values: [...m(f.map((x) => -x.tax)), tc(-t.tax)], tone: 'muted' },
+    { label: 'Add back depreciation and amortisation', values: [...m(f.map((x) => x.da)), ''], tone: 'muted' },
+    { label: 'Less capital expenditure', values: [...m(f.map((x) => -x.capex)), tc(-t.netCapex)], tone: 'muted' },
+    { label: 'Less increase in working capital', values: [...m(f.map((x) => -x.dnwc)), tc(-t.dWc)], tone: 'muted' },
+    { label: 'Free cash flow to firm', values: [...m(f.map((x) => x.fcf)), amt(r, t.fcf)], tone: 'strong' },
+  ];
+  if (r.meta.stubFraction > 0) {
+    rows.push({ label: 'Free cash flow after the valuation date', values: [...m(f.map((x) => x.fcfValued)), ''] });
+  }
+  rows.push(
+    { label: 'Discount period, years', values: [...f.map((x) => x.period.toFixed(2)), t.period.toFixed(2)], tone: 'muted' },
+    { label: 'Discount factor', values: [...f.map((x) => x.df.toFixed(3)), t.df.toFixed(3)], tone: 'muted' },
+    { label: 'Present value', values: [...m(f.map((x) => x.pv)), amt(r, t.pvPerpetuity)] },
+  );
+  return { head: [unitLabel(r), ...r.years.forecast.map((y) => `FY${y} F`), 'Terminal'], rows };
+}
+
+/** Under the FCFF table: how the perpetuity DCF adds up, and the exit multiple alternative. */
+export function dcfSummaryRows(r: ValuationResult): [string, string][] {
+  const t = r.terminal, d = r.dcfBlock;
+  const rows: [string, string][] = [
+    ['Present value of forecast free cash flow', amt(r, d.pvForecast)],
+    ['Terminal value, perpetuity growth', amt(r, t.tvPerpetuity)],
+    ['Present value of terminal value', amt(r, t.pvPerpetuity)],
+    ['DCF enterprise value, perpetuity growth', amt(r, d.perpetuity[1])],
+    [LABELS.impliedTerminalMultiple, fmtMultiple(t.impliedMultiple)],
+    [`${LABELS.tvShare}, perpetuity growth`, fmtPct(t.tvShare, 0)],
+  ];
+  if (d.exit) {
+    rows.push(
+      [`Terminal value, exit multiple of ${fmtMultiple(exitApplied(r))}`, amt(r, t.tvExit)],
+      ['DCF enterprise value, exit multiple', amt(r, d.exit[1])],
+    );
+  }
+  rows.push([dcfCombinedLabel(r), amt(r, d.combined[1])]);
+  return rows;
+}
+
+export function sensitivityTitle(r: ValuationResult): string {
+  return `Equity value, perpetuity growth DCF (${unitShort(r)})`;
 }
 
 /** Rows are WACC, columns are growth. The centre cell is the base case. */
 export function sensitivityTable(r: ValuationResult): Table {
   return {
-    head: ['WACC \\ growth', ...r.sensitivity.growths.map((g) => fmtPct(g, 1))],
+    head: ['WACC \\ growth', ...r.sensitivity.growths.map(fmtRate)],
     rows: r.sensitivity.grid.map((row, i) => ({
-      label: fmtPct(r.sensitivity.waccs[i], 1),
-      values: row.map(fmtMillions),
+      label: fmtWacc(r.sensitivity.waccs[i]),
+      values: row.map((v) => amt(r, v)),
     })),
   };
 }
 
 /**
- * Enterprise to equity. Version 2 bridge items appear only when entered, so a
- * valuation without them has exactly the version 1 table.
+ * Enterprise to equity, low, base case and high. Other bridge items appear only
+ * when entered, so a valuation without them has only net debt between the two.
  */
 export function bridgeTable(r: ValuationResult): Table {
-  const m = (arr: number[]) => arr.map(fmtMillions);
+  const m = (arr: number[]) => arr.map((v) => amt(r, v));
   const nd = r.netDebt;
   const b = r.bridge;
   const three = (v: number) => m([v, v, v]);
+  const compsLabel = r.compsEbitda ? 'Comparables enterprise value, EV / EBITDA' : 'Comparables enterprise value, EV / Revenue';
   const rows: TableRow[] = [
-    { label: 'DCF enterprise value', values: m(r.dcfRange) },
-    { label: 'Comparables enterprise value', values: m(r.compRange) },
-    { label: `Blended enterprise value (${r.dcfWeight}% DCF)`, values: m(r.ev) },
-    { label: nd >= 0 ? 'Less net debt' : 'Add net cash', values: m([-nd, -nd, -nd]), tone: 'muted' },
+    { label: canonical(r) ? `${dcfCombinedLabel(r)}, enterprise value` : 'DCF enterprise value', values: m(r.dcfRange) },
+    { label: canonical(r) ? compsLabel : 'Comparables enterprise value', values: m(r.compRange) },
+    { label: `Blended enterprise value (${r.dcfWeight}% DCF, ${100 - r.dcfWeight}% comparables)`, values: m(r.ev), tone: 'strong' },
+    {
+      label: canonical(r) ? `${nd >= 0 ? 'Less net debt' : 'Add net cash'} at ${fmtDate(r.meta.lastFyEnd)}, as entered` : nd >= 0 ? 'Less net debt' : 'Add net cash',
+      values: m([-nd, -nd, -nd]),
+      tone: 'muted',
+    },
   ];
+  const elapsed = b?.elapsedFcf ?? 0;
+  if (canonical(r) && elapsed) {
+    rows.push({ label: `${elapsed >= 0 ? 'Add' : 'Less'} free cash flow from ${fmtDate(r.meta.lastFyEnd)} to the valuation date`, values: three(elapsed), tone: 'muted' });
+  }
+  const interest = b?.elapsedInterest ?? 0;
+  if (canonical(r) && interest) {
+    rows.push({ label: 'Less after-tax interest on net debt for that period', values: three(-interest), tone: 'muted' });
+  }
   if (b?.eosb) rows.push({ label: 'Less end of service benefits', values: three(-b.eosb), tone: 'muted' });
   if (b?.leases) rows.push({ label: 'Less lease liabilities', values: three(-b.leases), tone: 'muted' });
   if (b?.minorityInterest) rows.push({ label: 'Less minority interest', values: three(-b.minorityInterest), tone: 'muted' });
   if (b?.surplusAssets) rows.push({ label: 'Add surplus assets and investments', values: three(b.surplusAssets), tone: 'muted' });
   rows.push({ label: 'Equity value', values: m(r.equity), tone: 'strong' });
-  return { head: [currencyMillions(r.currency), 'Low', 'Mid', 'High'], rows };
+  return { head: [unitLabel(r), 'Low', LABELS.baseCase, 'High'], rows };
 }
 
-/** The steps of the value bridge at the midpoint, for the waterfall chart. */
+/** Pre-money and post-money, when a raise amount was entered. */
+export function raiseTable(r: ValuationResult): Table | null {
+  if (!canonical(r) || !r.raise) return null;
+  const x = r.raise;
+  return {
+    head: [unitLabel(r), 'Low', LABELS.baseCase, 'High'],
+    rows: [
+      { label: 'Pre-money equity value', values: x.preMoney.map((v) => amt(r, v)) },
+      { label: 'Add amount raised', values: [x.amount, x.amount, x.amount].map((v) => amt(r, v)), tone: 'muted' },
+      { label: 'Post-money equity value', values: x.postMoney.map((v) => amt(r, v)), tone: 'strong' },
+      { label: 'Investor stake after the raise', values: x.investorStake.map((v) => fmtPct(v, 1)) },
+    ],
+  };
+}
+
+export const PRE_MONEY_NOTE = 'Values shown are pre-money.';
+
+/** The steps of the value bridge at the base case, for the waterfall chart. */
 export type BridgeStep = { label: string; value: number; kind: 'total' | 'add' | 'less' };
 
 export function bridgeSteps(r: ValuationResult): BridgeStep[] {
   const b = r.bridge;
   const steps: BridgeStep[] = [{ label: 'Enterprise value', value: r.ev[1], kind: 'total' }];
   steps.push({ label: r.netDebt >= 0 ? 'Net debt' : 'Net cash', value: -r.netDebt, kind: r.netDebt >= 0 ? 'less' : 'add' });
+  const elapsed = b?.elapsedFcf ?? 0;
+  if (elapsed) steps.push({ label: 'Cash flow since year end', value: elapsed, kind: elapsed >= 0 ? 'add' : 'less' });
+  const interest = b?.elapsedInterest ?? 0;
+  if (interest) steps.push({ label: 'Interest since year end', value: -interest, kind: 'less' });
   if (b?.eosb) steps.push({ label: 'End of service benefits', value: -b.eosb, kind: 'less' });
   if (b?.leases) steps.push({ label: 'Lease liabilities', value: -b.leases, kind: 'less' });
   if (b?.minorityInterest) steps.push({ label: 'Minority interest', value: -b.minorityInterest, kind: 'less' });
@@ -272,24 +508,46 @@ export function keyRatiosTable(r: ValuationResult): Table {
   return { head: ['Ratio', 'Value'], rows };
 }
 
+/** The six ratios beside the financial profile chart in the report. */
+export function profileRatios(r: ValuationResult): [string, string][] {
+  const q = r.ratios;
+  return [
+    ['Revenue CAGR, actual years', fmtPct(q.revenueCagrHistory, 1)],
+    ['Revenue CAGR, forecast', fmtPct(q.revenueCagrForecast, 1)],
+    [r.normalisation?.used ? 'EBITDA margin, last actual (normalised)' : 'EBITDA margin, last actual', fmtPct(q.ebitdaMarginLtm, 1)],
+    ['EBITDA margin, final forecast year', fmtPct(q.ebitdaMarginTerminal, 1)],
+    ['Capex intensity, forecast average', fmtPct(q.capexIntensity, 1)],
+    ['Free cash flow conversion of EBITDA', fmtPct(q.fcfConversion, 0)],
+  ];
+}
+
+/**
+ * Downside, base and upside with their adjustments, probabilities and base case
+ * values, then the probability-weighted total. Equity is shown before the floor
+ * at zero, so each column adds up to the weighted row.
+ */
 export function scenariosTable(r: ValuationResult): Table {
   const c = r.currency;
   const names = { downside: 'Downside', base: 'Base', upside: 'Upside' } as const;
   const rows: TableRow[] = (r.scenarios ?? []).map((s) => ({
     label: names[s.key],
     values: [
-      s.key === 'base' ? 'As entered' : `${fmtPoints(s.growthPoints)} growth, ${fmtPoints(s.marginPoints)} margin`,
+      s.key === 'base' ? 'As entered' : fmtPoints(s.growthPoints),
+      s.key === 'base' ? 'As entered' : fmtPoints(s.marginPoints),
       fmtPct(s.weight, 0),
-      fmtMillions(s.terminalRevenue),
-      fmtMillions(s.ev[1]),
-      fmtMillions(s.equityDisplay[1]),
+      amt(r, s.terminalRevenue),
+      amt(r, s.ev[1]),
+      amt(r, s.equity[1]),
     ],
   }));
-  if (Number.isFinite(r.weightedEquity)) {
-    rows.push({ label: 'Probability-weighted', values: ['', '100%', '', '', fmtMillions(r.weightedEquity)], tone: 'strong' });
+  if (Number.isFinite(r.weightedEquity) && r.scenarios?.length) {
+    const raw = Number.isFinite(r.weightedEquityRaw) ? r.weightedEquityRaw : r.weightedEquity;
+    const weightedEv = r.scenarios.reduce((a, s) => a + s.weight * s.ev[1], 0);
+    const total = Number.isFinite(r.weightsTotal) ? r.weightsTotal : r.scenarios.reduce((a, s) => a + s.weight, 0);
+    rows.push({ label: 'Probability-weighted', values: ['', '', fmtPct(total, 0), '', amt(r, weightedEv), amt(r, raw)], tone: 'strong' });
   }
   return {
-    head: ['Scenario', 'Adjustment', 'Weight', `Final year revenue, ${c.code} m`, `EV mid, ${c.code} m`, `Equity mid, ${c.code} m`],
+    head: ['Scenario', 'Growth', 'Margin', 'Probability', `Final year revenue`, `EV, ${unitShort(r)}`, `Equity, ${unitShort(r)}`],
     rows,
   };
 }
@@ -297,6 +555,7 @@ export function scenariosTable(r: ValuationResult): Table {
 /** The cost of capital build, as label and value pairs. */
 export function waccBuildRows(r: ValuationResult): [string, string][] {
   const w = r.wacc;
+  const zakat = canonical(r) && r.tax.zakatApplies && r.tax.gccOwnership > 0;
   const rows: [string, string][] = [
     ['Risk-free rate', fmtPct(w.rf)],
     ['Mature market equity risk premium', fmtPct(w.erp)],
@@ -309,30 +568,54 @@ export function waccBuildRows(r: ValuationResult): [string, string][] {
     ['Country default spread', fmtPct(w.ds)],
     ['Company credit spread', fmtPct(w.cs, 1)],
     ['Pre-tax cost of debt', fmtPct(w.kd)],
-    ['Tax rate', fmtPct(w.t, 1)],
+    [zakat ? 'Income tax rate, non-GCC share' : 'Tax rate', fmtPct(w.t, 1)],
     ['After-tax cost of debt', fmtPct(w.kdt)],
     ['Equity weight', fmtPct(w.we, 1)],
     ['Debt weight', fmtPct(w.wd, 1)],
   ];
-  if (!r.currency.pegged) rows.push(['WACC in US dollars', fmtPct(w.waccUsd)]);
+  if (!r.currency.pegged) rows.push(['WACC in US dollars', fmtWacc(w.waccUsd)]);
   if (w.adjustment) rows.push(['Adjustment (exploration)', fmtPoints(w.adjustment * 100)]);
   return rows;
 }
 
-/** Terminal value and comparables assumptions, as label and value pairs. */
+/** Terminal value assumptions, as label and value pairs. */
 export function terminalRows(r: ValuationResult): [string, string][] {
   const rows: [string, string][] = [
-    ['Long-term growth', fmtPct(r.growth, 1)],
-    ['Exit EV / EBITDA multiple', fmtMultiple(r.exitMultiple)],
+    ['Long-term growth', fmtRate(r.growth)],
+    [LABELS.exitMultipleEntered, fmtMultiple(r.exitMultiple)],
   ];
-  if (r.privateDiscount) {
-    rows.push(['Private company discount', fmtPct(r.privateDiscount, 0)]);
-    rows.push(['Exit multiple after discount', fmtMultiple(exitApplied(r))]);
+  if (r.privateDiscount) rows.push([LABELS.exitMultipleApplied, fmtMultiple(exitApplied(r))]);
+  if (canonical(r)) {
+    rows.push([LABELS.impliedTerminalMultiple, fmtMultiple(r.terminal.impliedMultiple)]);
+    if (r.terminal.method === 'normalised') {
+      rows.push(['Terminal free cash flow (normalised)', `${amt(r, r.terminal.fcf)} ${unitShort(r)}`]);
+      rows.push(['Terminal reinvestment rate', Number.isFinite(r.terminal.reinvestmentRate) ? fmtPct(r.terminal.reinvestmentRate, 0) : 'Not meaningful']);
+      rows.push(['Implied terminal ROIC', Number.isFinite(r.terminal.impliedRoic) ? fmtPct(r.terminal.impliedRoic, 1) : 'Not meaningful (no reinvestment)']);
+    }
   }
   rows.push(['Discounting', r.midYear ? 'Mid-year convention' : 'End of year']);
-  rows.push(['EV / EBITDA used', `${r.comps.ebitda.map((v) => fmtMultiple(v)).join(', ')} (${r.comps.peersE ? `${r.comps.peersE} peers` : 'preset'})`]);
-  rows.push(['EV / Revenue used', `${r.comps.revenue.map((v) => fmtMultiple(v)).join(', ')} (${r.comps.peersR ? `${r.comps.peersR} peers` : 'preset'})`]);
   rows.push(['Weight on DCF', `${r.dcfWeight}%`]);
+  return rows;
+}
+
+/** Comparables: the five concepts kept apart, and the companies by name. */
+export function comparablesRows(r: ValuationResult): [string, string][] {
+  const list = (v: Range3) => v.map(fmtMultiple).join(', ');
+  const rows: [string, string][] = [
+    ['Source', comparablesSource(r, r.compsEbitda ? 'ebitda' : 'revenue')],
+  ];
+  if (canonical(r)) {
+    const cp = r.comparables;
+    rows.push(
+      ['Trading multiples, EV / EBITDA', list(cp.ebitdaMultiplesPre)],
+      [LABELS.privateDiscount, fmtPct(cp.discount, 0)],
+      ['After discount, EV / EBITDA', list(cp.ebitdaMultiplesPost)],
+      ['After discount, EV / Revenue', list(cp.revenueMultiplesPost)],
+    );
+    if (cp.peerNames.length) rows.push([`Companies (${cp.peerNames.length})`, cp.peerNames.join(', ')]);
+  } else {
+    rows.push(['EV / EBITDA used', list(r.comps.ebitda)], ['EV / Revenue used', list(r.comps.revenue)]);
+  }
   return rows;
 }
 
@@ -340,85 +623,156 @@ export function normalisationRows(r: ValuationResult): [string, string][] {
   const nrm = r.normalisation;
   if (!nrm?.used) return [];
   return [
-    ['Reported EBITDA, last actual year', fmtMillions(r.ltmEbitdaReported)],
-    ['Add back one-off costs', fmtMillions(nrm.oneOff)],
-    ['Add back owner costs above market', fmtMillions(nrm.ownerCosts)],
-    ['Normalised EBITDA', fmtMillions(r.ltmEbitda)],
+    ['Reported EBITDA, last actual year', amt(r, r.ltmEbitdaReported)],
+    ['Add back one-off costs', amt(r, nrm.oneOff)],
+    ['Add back owner costs above market', amt(r, nrm.ownerCosts)],
+    ['Normalised EBITDA', amt(r, r.ltmEbitda)],
     ['Owner cost add-back in forecast years', nrm.carryOwnerCosts ? 'Yes' : 'No'],
   ];
 }
 
+/** Tax, zakat and losses. */
+export function taxRows(r: ValuationResult): [string, string][] {
+  const t = r.tax;
+  const rows: [string, string][] = [['Corporate income tax rate', fmtPct(t.cit, 1)]];
+  if (t.zakatApplies) rows.push(['Saudi / GCC ownership', fmtPct(t.gccOwnership, 0)]);
+  if (t.zakatMethod === 'base' && t.zakatBaseLtm) {
+    const u = unitShort(r);
+    rows.push(
+      ['Zakat', `${fmtPct(t.zakatRate, 1)} of zakat base`],
+      ['Working capital, year end', `${amt(r, t.zakatBaseLtm.workingCapital)} ${u}`],
+      ['Add cash, year end', t.zakatBaseLtm.cash === null ? 'Not entered' : `${amt(r, t.zakatBaseLtm.cash)} ${u}`],
+      ['Zakat base (approximate)', `${amt(r, t.zakatBaseLtm.base)} ${u}`],
+      [`Zakat, FY${r.years.forecast[0]} to FY${r.years.forecast[4]}`, `${amt(r, t.zakatByYear[0])} to ${amt(r, t.zakatByYear[4])} ${u}`],
+      ['Income tax rate, non-GCC share', fmtPct(t.rate, 2)],
+    );
+  } else if (t.zakatMethod === 'profit_proxy') {
+    rows.push(['Zakat', `${fmtPct(t.zakatRate, 1)} of profit (fallback)`], ['Effective rate on positive EBIT', fmtPct(t.rate, 2)]);
+  } else {
+    rows.push(['Effective rate on positive EBIT', fmtPct(t.rate, 2)]);
+  }
+  rows.push(['Losses carried forward', t.lossCarryForward ? `Capped at ${fmtPct(t.lossOffsetCap, 0)} of profit` : 'No']);
+  if (t.lossesUsed > 0) rows.push(['Losses used in the forecast', `${amt(r, t.lossesUsed)} ${unitShort(r)}`]);
+  return rows;
+}
+
+/** Valuation date and stub period. */
+export function timingRows(r: ValuationResult): [string, string][] {
+  const m = r.meta;
+  return [
+    ['Valuation date', m.valuationDate ? fmtDate(m.valuationDate) : 'End of the last actual year'],
+    ['Last actual year end (assumed)', fmtDate(m.lastFyEnd)],
+    ['Stub period', m.stubFraction > 0 ? `${m.stubMonths.toFixed(1)} months elapsed` : 'None'],
+    ['Net debt at year end (entered)', `${amt(r, r.netDebt)} ${unitShort(r)}`],
+    ...(m.stubFraction > 0
+      ? ([
+          ['Cash flow since year end', `${amt(r, r.bridge.elapsedFcf ?? 0)} ${unitShort(r)}`],
+          ...(r.bridge.elapsedInterest ? ([['After-tax interest since year end', `${amt(r, r.bridge.elapsedInterest)} ${unitShort(r)}`]] as [string, string][]) : []),
+          ['Net debt at valuation date', `${amt(r, r.bridge.netDebtAtValuationDate ?? r.netDebt)} ${unitShort(r)}`],
+        ] as [string, string][])
+      : []),
+  ];
+}
+
 /* ------------------------------------------------------------------------ */
-/* Warnings                                                                  */
+/* Notes and disclosures                                                     */
 /* ------------------------------------------------------------------------ */
 
-export type WarningText = { code: Warning['code']; title: string; detail: string };
+export const TERMINAL_NOTE = 'Terminal cash flow reflects reinvestment at long-term growth.';
 
+/** The terminal value note for a result, including one valued under the method used before 17 September 2026. */
+export function terminalNote(r: ValuationResult): string {
+  return canonical(r) && r.terminal.method === 'normalised'
+    ? `${TERMINAL_NOTE} ${TERMINAL_COLUMN_NOTE}`
+    : 'Terminal value grows the final forecast year’s free cash flow at long-term growth, the method used for valuations before 17 September 2026.';
+}
+export const TERMINAL_COLUMN_NOTE = 'In the terminal column, capital expenditure is shown net of depreciation and amortisation.';
+export const ZAKAT_BASE_NOTE = `Zakat is ${TAX.zakatRate}% of an approximate zakat base on the Saudi / GCC owned share: working capital plus cash, floored at zero, with cash held at its year end level through the forecast.`;
+export const ZAKAT_NO_CASH_NOTE = 'Cash was not entered, so the base is working capital alone and may be understated.';
+export const ZAKAT_FALLBACK_NOTE = `Invested capital was not entered, so the zakat base cannot be estimated; zakat is instead approximated as ${TAX.zakatRate}% of profit on the Saudi / GCC owned share.`;
+export const FINANCIAL_YEAR_END_NOTE = 'Financial years are assumed to end on 31 December.';
+export const VALUATION_DATE_NOTE = 'Cash flow is valued from the valuation date. The elapsed part of the first forecast year uses forecast free cash flow, not actual results, and is assumed kept in the business (no distributions). Net debt at the valuation date is the year end figure, less that cash flow, plus after-tax interest on it at the cost of debt.';
+
+/** Shown under the free cash flow table. */
+export function taxNote(r: ValuationResult): string {
+  if (!canonical(r) || !r.tax.lossCarryForward) return 'Tax is applied to positive EBIT only. A loss in one year is not carried forward to reduce tax in later years.';
+  const t = r.tax;
+  const losses = `Income tax is applied to positive EBIT. Losses are carried forward and offset up to ${fmtPct(t.lossOffsetCap, 0)} of each later year’s taxable profit.`;
+  if (t.zakatMethod === 'base') return `${losses} Zakat is charged on an approximate zakat base; see the assumptions.`;
+  if (t.zakatMethod === 'profit_proxy') return `${losses} ${ZAKAT_FALLBACK_NOTE}`;
+  return losses;
+}
+
+/** The disclosure lines, each only when it applies. */
+export function disclosures(r: ValuationResult): {
+  evRevenue: string | null;
+  scenarios: string;
+  exitMultiple: string;
+  premiumAndDiscount: string | null;
+  financialYearEnd: string;
+  zakat: string | null;
+  valuationDate: string | null;
+} {
+  const method = canonical(r) ? r.tax.zakatMethod : 'none';
+  return {
+    financialYearEnd: FINANCIAL_YEAR_END_NOTE,
+    zakat: method === 'base' ? (r.tax.zakatBaseLtm?.cash === null ? `${ZAKAT_BASE_NOTE} ${ZAKAT_NO_CASH_NOTE}` : ZAKAT_BASE_NOTE) : method === 'profit_proxy' ? ZAKAT_FALLBACK_NOTE : null,
+    valuationDate: canonical(r) && r.meta.stubFraction > 0 ? VALUATION_DATE_NOTE : null,
+    evRevenue: r.ltmEbitda > 0 ? 'EV / Revenue shown for reference; not used in the blend.' : null,
+    scenarios: 'Scenarios flex the DCF; comparables use the last actual year.',
+    exitMultiple: 'Exit multiple applies current comparable multiples to the final forecast year.',
+    premiumAndDiscount: r.wacc.sp > 0 && r.privateDiscount > 0 ? 'A size premium and a private company discount are both applied.' : null,
+  };
+}
+
+/* ------------------------------------------------------------------------ */
+/* Checks                                                                    */
+/* ------------------------------------------------------------------------ */
+
+export type WarningText = { code: string; title: string; detail: string };
+
+/** Every check, Pass and Warning. Results stored before version 3 list their warnings only. */
+export function checkItems(r: ValuationResult): Check[] {
+  if (canonical(r)) return r.checks;
+  return (r.warnings ?? []).map((w) => {
+    const t = warningText(w, r);
+    return { id: 'growth_ceiling', label: t.title, status: 'warning', message: t.detail, values: w.values } as Check;
+  });
+}
+
+/** The checks that raised a warning, as title and detail. */
+export function warningTexts(r: ValuationResult): WarningText[] {
+  if (canonical(r)) return r.checks.filter((c) => c.status === 'warning').map((c) => ({ code: c.id, title: c.label, detail: c.message }));
+  return (r.warnings ?? []).map((w) => warningText(w, r));
+}
+
+/** The wording of a version 2 warning, for leads stored before version 3. */
 export function warningText(w: Warning, r: ValuationResult): WarningText {
   const v = w.values;
   switch (w.code) {
     case 'terminal_value_share':
-      return {
-        code: w.code,
-        title: 'Most of the value sits beyond the forecast',
-        detail: `The terminal value is ${fmtPct(v.share, 0)} of the DCF, above ${fmtPct(v.threshold, 0)}. The result depends heavily on long-term growth and WACC, so test those first.`,
-      };
+      return { code: w.code, title: 'Most of the value sits beyond the forecast', detail: `The terminal value is ${fmtPct(v.share, 0)} of the DCF, above ${fmtPct(v.threshold, 0)}.` };
     case 'growth_ceiling':
-      return {
-        code: w.code,
-        title: 'Long-term growth is high for the currency',
-        detail: `Growth of ${fmtPct(v.growth, 1)} forever is above ${fmtPct(v.ceiling, 1)}, which is roughly long-run inflation plus real growth in ${r.currency.code}. No business outgrows its economy indefinitely.`,
-      };
+      return { code: w.code, title: 'Long-term growth is high for the currency', detail: `Growth of ${fmtPct(v.growth, 1)} for ever is above ${fmtPct(v.ceiling, 1)} in ${r.currency.code}.` };
     case 'exit_multiple_mismatch':
-      return {
-        code: w.code,
-        title: 'The two terminal value methods disagree',
-        detail: `The exit multiple used is ${fmtMultiple(v.applied)}, but perpetuity growth implies ${fmtMultiple(v.implied)}, a gap of more than ${fmtPct(v.threshold, 0)}. One of the growth rate or the multiple is likely out of line.`,
-      };
+      return { code: w.code, title: 'The two terminal value methods disagree', detail: `The exit multiple used is ${fmtMultiple(v.applied)}, but perpetuity growth implies ${fmtMultiple(v.implied)}.` };
     case 'terminal_fcf_negative':
-      return {
-        code: w.code,
-        title: 'Free cash flow is negative in the final year',
-        detail: `The final forecast year's free cash flow is ${fmtMillions(v.fcf)} ${currencyMillions(r.currency)}. A perpetuity built on a negative cash flow has no meaning, so rely on the exit multiple and comparables.`,
-      };
+      return { code: w.code, title: 'Free cash flow is negative in the final year', detail: `The final forecast year's free cash flow is ${amt(r, v.fcf)} ${unitLabel(r)}.` };
     case 'margin_jump':
-      return {
-        code: w.code,
-        title: 'The forecast margin jumps from the last actual year',
-        detail: `EBITDA margin moves from ${fmtPct(v.from, 1)} to ${fmtPct(v.to, 1)} in the first forecast year, more than ${(v.threshold * 100).toFixed(0)} points. A buyer will ask what changes.`,
-      };
+      return { code: w.code, title: 'The forecast margin jumps from the last actual year', detail: `EBITDA margin moves from ${fmtPct(v.from, 1)} to ${fmtPct(v.to, 1)} in the first forecast year.` };
     case 'roic_below_wacc':
-      return {
-        code: w.code,
-        title: 'Returns are below the cost of capital',
-        detail: `Return on invested capital of ${fmtPct(v.roic, 1)} is below the WACC of ${fmtPct(v.wacc, 1)}. On these figures growth destroys value rather than creating it.`,
-      };
+      return { code: w.code, title: 'Returns are below the cost of capital', detail: `Return on invested capital of ${fmtPct(v.roic, 1)} is below the WACC of ${fmtWacc(v.wacc)}.` };
     case 'growth_vs_inflation':
       return {
         code: w.code,
         title: v.growth < v.low ? 'Long-term growth is below inflation' : 'Long-term growth is well above inflation',
-        detail:
-          v.growth < v.low
-            ? `Growth of ${fmtPct(v.growth, 1)} forever is more than one point below expected inflation of ${fmtPct(v.inflation, 1)} in ${r.currency.code}, which means the business shrinks in real terms every year. If that is not the intent, growth nearer inflation fits better.`
-            : `Growth of ${fmtPct(v.growth, 1)} forever is more than two points above expected inflation of ${fmtPct(v.inflation, 1)} in ${r.currency.code}. Real growth that high for ever is rare, so a buyer will test it.`,
+        detail: `Growth of ${fmtPct(v.growth, 1)} against expected inflation of ${fmtPct(v.inflation, 1)} in ${r.currency.code}.`,
       };
     case 'premium_on_minority_stake':
-      return {
-        code: w.code,
-        title: 'A control premium on a stake without control',
-        detail: `A ${+v.percent.toFixed(2)}% stake does not carry control, so buyers apply a minority discount rather than a control premium. The stake value shown uses the premium chosen.`,
-      };
+      return { code: w.code, title: 'A control premium on a stake without control', detail: `A ${+v.percent.toFixed(2)}% stake does not carry control.` };
     case 'reinvestment_inconsistent':
-      return {
-        code: w.code,
-        title: 'Growth and reinvestment do not line up',
-        detail: `Reinvesting ${Number.isFinite(v.reinvestmentRate) ? fmtPct(v.reinvestmentRate, 0) : 'n/a'} of profit at a ${fmtPct(v.roic, 1)} return supports growth of about ${fmtPct(v.implied, 1)}, not the ${fmtPct(v.growth, 1)} assumed. Either the reinvestment or the growth rate needs revisiting.`,
-      };
+      return { code: w.code, title: 'Growth and reinvestment do not line up', detail: `Reinvestment supports growth of about ${fmtPct(v.implied, 1)}, not the ${fmtPct(v.growth, 1)} assumed.` };
   }
-}
-
-export function warningTexts(r: ValuationResult): WarningText[] {
-  return (r.warnings ?? []).map((w) => warningText(w, r));
 }
 
 /* ------------------------------------------------------------------------ */
@@ -426,8 +780,10 @@ export function warningTexts(r: ValuationResult): WarningText[] {
 /* ------------------------------------------------------------------------ */
 
 /**
- * The executive summary: a few paragraphs, each built by a fixed rule from the
- * results. Deterministic, so the same inputs always read the same.
+ * The executive summary: short paragraphs, each built by a fixed rule from the
+ * result. Deterministic, so the same inputs always read the same. Covers the
+ * two methods, the weighting, the key sensitivity, the terminal value share,
+ * the scenarios and the number of warnings.
  */
 export function executiveSummary(r: ValuationResult): string[] {
   const c = r.currency;
@@ -435,56 +791,52 @@ export function executiveSummary(r: ValuationResult): string[] {
   const out: string[] = [];
 
   out.push(
-    `On the figures entered, the business has an indicative equity value of ${h.equityRange}, with a midpoint of ${h.midpoint} as at the end of ${h.valuationDate}. That rests on an enterprise value of ${h.evRange} and a cost of capital of ${h.wacc}.`,
+    `On the figures entered, the business has an indicative equity value of ${h.equityRange}, with a base case of ${h.midpoint} ${h.asAt}. That rests on an enterprise value of ${h.evRange} and a WACC of ${h.wacc}.`,
   );
 
-  // Method agreement: how far apart the DCF and comparables midpoints are.
-  const dcfMid = r.dcfRange[1], compMid = r.compRange[1];
-  const gap = Math.abs(dcfMid - compMid) / Math.max(Math.abs(dcfMid), Math.abs(compMid));
-  const higher = dcfMid > compMid ? 'the DCF' : 'the comparables method';
+  const dcfBase = r.dcfRange[1], compBase = r.compRange[1];
+  const gap = compBase > 0 ? Math.abs(dcfBase / compBase - 1) : NaN;
+  const higher = dcfBase > compBase ? 'the DCF' : 'the comparables method';
+  const weighting = `The blend weights the DCF at ${r.dcfWeight}%${r.dcfWeight > 50 ? ', so the forecast carries most of the answer' : ''}.`;
   if (Number.isFinite(gap)) {
     out.push(
-      gap <= 0.15
-        ? `The two methods agree closely: the DCF midpoint of ${fmtBig(dcfMid, c)} and the comparables midpoint of ${fmtBig(compMid, c)} are within ${fmtPct(gap, 0)} of each other, which gives the range some support.`
-        : `The two methods diverge: ${higher} gives the higher value, and the DCF midpoint of ${fmtBig(dcfMid, c)} and the comparables midpoint of ${fmtBig(compMid, c)} differ by ${fmtPct(gap, 0)}. The blend weights the DCF at ${r.dcfWeight}%${r.dcfWeight > 50 ? ', so the forecast carries most of the answer' : ''}.`,
+      gap <= WARNING_RULES.methodDivergence
+        ? `The two methods agree: the DCF base case of ${fmtBig(dcfBase, c)} and the comparables base case of ${fmtBig(compBase, c)} are within ${fmtPct(gap, 0)} of each other. ${weighting}`
+        : `The two methods diverge: ${higher} gives the higher value, and the DCF base case of ${fmtBig(dcfBase, c)} and the comparables base case of ${fmtBig(compBase, c)} differ by ${fmtPct(gap, 0)}. ${weighting}`,
     );
   }
 
-  // Main drivers: the largest swings in the sensitivity and flex ranges.
-  const growthSwing = r.hiG - r.loG;
-  const drivers: [string, number][] = [
-    ['the discount rate and long-term growth', growthSwing],
-    ['the exit multiple', Number.isFinite(r.hiX - r.loX) ? r.hiX - r.loX : 0],
-  ];
-  if (r.scenarios?.length === 3) drivers.push(['the forecast growth and margin scenarios', r.scenarios[2].ev[1] - r.scenarios[0].ev[1]]);
-  drivers.sort((a, b) => b[1] - a[1]);
-  if (drivers[0][1] > 0) {
+  const lever = waccLeverFromSensitivity(r);
+  const tv = Number.isFinite(r.tvShare) ? ` The terminal value is ${h.tvShare} of the perpetuity DCF.` : '';
+  if (lever) {
     out.push(
-      `The value is most sensitive to ${drivers[0][0]}, which moves enterprise value across a range of ${fmtBig(drivers[0][1], c)}. The terminal value accounts for ${h.tvShare} of the DCF.`,
+      `In the sensitivity table, a WACC one point lower at the same growth moves perpetuity DCF equity from ${fmtBig(lever.from, c)} to ${fmtBig(lever.to, c)}.${tv}`,
     );
+  } else if (tv) {
+    out.push(tv.trim());
   }
 
-  if (h.weighted) {
-    out.push(`Weighting the downside, base and upside scenarios by their probabilities gives an equity value of ${h.weighted}.`);
-  }
-  if (h.stakeRange && h.stakeLabel) {
-    out.push(`For a ${h.stakeLabel}, the indicative value is ${h.stakeRange}.`);
-  }
-
-  const warnings = warningTexts(r);
-  if (warnings.length) {
+  if (h.weighted && r.scenarios?.length === 3) {
+    const [down, , up] = r.scenarios;
     out.push(
-      `${warnings.length === 1 ? 'One check needs attention' : `${warnings.length} checks need attention`}: ${warnings.map((w) => w.title.toLowerCase()).join('; ')}. Each is explained with the assumptions.`,
+      `The downside and upside scenarios give equity of ${fmtBig(down.equityDisplay[1], c)} and ${fmtBig(up.equityDisplay[1], c)}; weighted by probability, ${h.weighted}.`,
     );
-  } else {
-    out.push('None of the consistency checks raised a warning.');
   }
+  if (h.stakeRange && h.stakeLabel) out.push(`For a ${h.stakeLabel}, the indicative value is ${h.stakeRange}.`);
+
+  const items = checkItems(r);
+  const warnings = items.filter((x) => x.status === 'warning');
+  out.push(
+    warnings.length === 0
+      ? `All ${items.length} checks passed.`
+      : `${warnings.length} of ${items.length} checks ${warnings.length === 1 ? 'raises a warning' : 'raise warnings'}: ${warnings.map((w) => w.label).join('; ')}. Each is set out with the assumptions.`,
+  );
   if (h.floorNote) out.push(h.floorNote);
   return out;
 }
 
 /**
- * The cells of the sensitivity table behind the cost of capital lever: the
+ * The cells of the sensitivity table behind the cost of capital point: the
  * centre (WACC and growth as used) and one point lower WACC at the same growth.
  * Null when either cell is not finite or the lower WACC does not add value.
  */
@@ -501,70 +853,73 @@ export function waccLeverFromSensitivity(r: ValuationResult): { from: number; to
   return { from, to, uplift: to - from };
 }
 
+/** The wording of one factor that could support a higher valuation. Never promises an increase. */
+export function recommendationText(rec: Recommendation, r: ValuationResult): { title: string; detail: string } {
+  const c = r.currency;
+  const v = rec.values;
+  switch (rec.id) {
+    case 'reduce_risk':
+      return {
+        title: 'Reduce the risk a buyer prices in',
+        detail: `In the sensitivity table, a WACC one point lower at the same growth corresponds to perpetuity DCF equity of ${amt(r, v.to)} rather than ${amt(r, v.from)} ${unitLabel(r)}. Audited accounts, contracted revenue, a diversified customer base and a management team that does not depend on the owner can reduce perceived risk.`,
+      };
+    case 'review_normalisation':
+      return {
+        title: 'Review EBITDA for one-off and owner costs',
+        detail: 'Costs that will not continue under a new owner, such as one-off legal fees or owner salaries above a market rate, could support a higher EBITDA if they are evidenced. The comparables value moves with it.',
+      };
+    case 'evidence_normalisation':
+      return {
+        title: 'Evidence the normalisation adjustments',
+        detail: `Add-backs take last year’s EBITDA from ${fmtBig(v.reported, c)} to ${fmtBig(v.normalised, c)}. They count only if a buyer’s diligence accepts them, so documenting each one may improve how much of them is recognised.`,
+      };
+    case 'cash_conversion':
+      return {
+        title: 'Convert more EBITDA into cash',
+        detail: `${fmtPct(v.conversion, 0)} of forecast EBITDA becomes free cash flow. Tighter working capital and phased capital expenditure could support a higher DCF value.`,
+      };
+    case 'forecast_credibility':
+      return {
+        title: 'Make the forecast easier to rely on',
+        detail: 'A step up in margin, high long-term growth or a large terminal value is the first thing a buyer tests. Tying each forecast line to evidence, such as signed contracts, pipeline and pricing, may improve how much of the forecast is credited.',
+      };
+    case 'returns':
+      return {
+        title: 'Improve returns before growing',
+        detail: `${v.terminal ? 'The return on new capital the terminal value implies' : 'Return on invested capital'}, ${fmtPct(v.roic, 1)}, is below the WACC of ${fmtWacc(v.wacc)}. Pricing, mix and asset efficiency could support value more than expansion on these terms.`,
+      };
+    case 'margin':
+      return {
+        title: 'Build margin',
+        detail: `A final year EBITDA margin of ${fmtPct(v.margin, 1)} leaves little room. Margin improvement could support both the DCF and the comparables value.`,
+      };
+    case 'diligence':
+      return {
+        title: 'Prepare for diligence early',
+        detail: 'Clean monthly management accounts, a reconciled working capital history and an organised data room can shorten a process and may help protect the price agreed at heads of terms.',
+      };
+  }
+}
+
 /**
- * "What would increase your value": points chosen by rule from the results and
- * the warnings, most material first. Always at least three.
+ * Factors that could support a higher valuation, as selected by the engine.
+ * Results stored before version 3 have no selection and list none.
  */
 export function valueLevers(r: ValuationResult): { title: string; detail: string }[] {
-  const c = r.currency;
-  const out: { title: string; detail: string }[] = [];
-  const q = r.ratios;
-  const codes = new Set((r.warnings ?? []).map((w) => w.code));
-
-  // Cost of capital: one point lower at the same growth, read from the
-  // sensitivity table itself, so the two can never disagree.
-  const lever = waccLeverFromSensitivity(r);
-  if (lever) {
-    out.push({
-      title: 'Lower the risk a buyer prices in',
-      detail: `A cost of capital one point lower, at the same long-term growth, raises the perpetuity growth equity value from ${fmtMillions(lever.from)} to ${fmtMillions(lever.to)} ${currencyMillions(c)} in the sensitivity table, about ${fmtBig(lever.uplift, c)} more. Audited accounts, contracted revenue, customer diversification and a management team that does not depend on the owner are what bring it down.`,
-    });
-  }
-  if (r.normalisation?.used) {
-    out.push({
-      title: 'Document the normalisation adjustments',
-      detail: `Add-backs lift last year's EBITDA from ${fmtBig(r.ltmEbitdaReported, c)} to ${fmtBig(r.ltmEbitda, c)}. They only count if a buyer's diligence accepts them, so evidence each one.`,
-    });
-  } else {
-    out.push({
-      title: 'Review EBITDA for one-off and owner costs',
-      detail: 'Costs that will not continue under a new owner, such as one-off legal fees or owner salaries above a market rate, can be added back to EBITDA. Every point of margin is multiplied into the comparables value.',
-    });
-  }
-  if (Number.isFinite(q.fcfConversion) && q.fcfConversion < 0.5) {
-    out.push({
-      title: 'Convert more EBITDA into cash',
-      detail: `Only ${fmtPct(q.fcfConversion, 0)} of forecast EBITDA becomes free cash flow. Tighter working capital and phased capital expenditure raise the DCF directly.`,
-    });
-  }
-  if (codes.has('margin_jump') || codes.has('growth_ceiling') || codes.has('terminal_value_share')) {
-    out.push({
-      title: 'Make the forecast easier to believe',
-      detail: 'Value that rests on a step change in margin, very high long-term growth or a large terminal value is the first thing a buyer discounts. Tie each forecast line to evidence: signed contracts, pipeline, pricing.',
-    });
-  }
-  if (codes.has('roic_below_wacc')) {
-    out.push({
-      title: 'Improve returns before growing',
-      detail: 'Returns are below the cost of capital, so growth on these terms reduces value. Pricing, mix and asset efficiency come before expansion.',
-    });
-  }
-  if (Number.isFinite(q.ebitdaMarginTerminal) && q.ebitdaMarginTerminal < 0.15) {
-    out.push({
-      title: 'Build margin',
-      detail: `A final year EBITDA margin of ${fmtPct(q.ebitdaMarginTerminal, 1)} leaves little room. Margin improvement raises both the DCF and the comparables value.`,
-    });
-  }
-  out.push({
-    title: 'Prepare for diligence early',
-    detail: 'Clean monthly management accounts, a reconciled working capital history and a data room shorten a process and protect the price agreed at heads of terms.',
-  });
-  return out.slice(0, 6);
+  return (r.recommendations ?? []).map((rec) => recommendationText(rec, r));
 }
 
 /** The sources, from the data module, for the methodology page. */
 export function sourceNotes(): { label: string; source: string; asOf: string }[] {
   return SOURCE_NOTES;
+}
+
+/** Market data dates as the report states them. */
+export function marketDataLine(r: ValuationResult): string {
+  const m = r.meta;
+  const rf = `US 10-year Treasury ${fmtPct(m.treasury.value / 100)} (${formatDataDate(m.treasury.asOf)})`;
+  const erp = `implied equity risk premium ${fmtPct(m.erp.value / 100)} (${formatDataDate(m.erp.asOf)}${m.erpAligned ? '' : ', latest available'})`;
+  return `${rf}; ${erp}.`;
 }
 
 export function growthCeilingFor(country: string): number | null {
@@ -574,12 +929,11 @@ export function growthCeilingFor(country: string): number | null {
 
 export const WARNING_THRESHOLDS = WARNING_RULES;
 
-/** Shown under the free cash flow table. States the engine's simplification on tax. */
-export const TAX_NOTE =
-  'Tax is applied to positive EBIT only. A loss in one year is not carried forward to reduce tax in later years.';
-
 export const INDICATIVE_NOTE =
   'Indicative only. A formal valuation would test the forecast, normalise earnings, review working capital and debt-like items, and select comparable companies and transactions in detail.';
 
 export const TOOL_DISCLAIMER =
   'This tool gives an indicative range only and is not a valuation opinion, financial or investment advice. PaceMakers Business Consultants LLP.';
+
+export const RELIANCE_STATEMENT =
+  'The figures in this report were calculated from the inputs entered and published market data. They have not been reviewed by PaceMakers and should not be relied on for a transaction, a financing, or a tax or accounting purpose.';

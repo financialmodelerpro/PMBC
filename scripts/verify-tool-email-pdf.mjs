@@ -12,7 +12,7 @@
 //   3. The defaults in code match the rows seeded by migration 078, so a
 //      database without the rows sends the same email as one with them.
 //   4. PDF: renders for the minimal example, Pakistan with every version 2
-//      feature, and a distressed case; is a PDF; has ten pages; embeds both
+//      feature, and a distressed case; is a PDF; has eight pages; embeds both
 //      site typefaces. The text is extracted with pdfjs and each page is
 //      checked for its section title, the page footer and the market data
 //      label, with no ligature glyph drawn (read from the operator list, since
@@ -20,6 +20,9 @@
 //      em or en dash. The full case shows its stake, weighted value, bridge
 //      items, normalised EBITDA and every warning it raised; the minimal case
 //      shows none of those. The QR code encodes the tracked booking link.
+//      Version 3 wording: every renamed label, every disclosure line, the
+//      "Powered by" line, pre-money and post-money, and none of the retired
+//      phrases. A report whose result does not reconcile is refused.
 //   5. Brevo payload: the attachment decodes to that PDF, the tags and the
 //      X-Mailin-custom header are present, and a plain send (the contact form)
 //      carries none of the new fields.
@@ -37,7 +40,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createJiti } from 'jiti';
 
-import { REPORT_META, fullFeatureCase, minimalCase } from './lib/valuationCases.mjs';
+import { REPORT_META, VALUATION_DATE, fullFeatureCase, minimalCase } from './lib/valuationCases.mjs';
 
 // The email shell reads branding from Supabase when it can. Without these it
 // uses its built-in defaults, which is what this verifier checks, and it can
@@ -73,7 +76,7 @@ function check(label, ok, detail = '') {
 /* ------------------------------------------------------------------------ */
 
 function fromState(s) {
-  const out = engine.runValuation(state.toInputs(s));
+  const out = engine.runValuation(state.toInputs(s, VALUATION_DATE));
   if (!out.ok) throw new Error('case did not run: ' + JSON.stringify(out.errors));
   return out.result;
 }
@@ -90,7 +93,7 @@ const pakistan = fromState(state.onEnterWacc(state.resetWacc(pk)));
 
 let ae = state.initialState();
 ae = state.applyIndustryDefaults({ ...ae, industry: 'Engineering/Construction' });
-ae = state.applyCountryDefaults({ ...ae, country: 'United Arab Emirates', netDebt: '400', financialYear: '2024' });
+ae = state.applyCountryDefaults({ ...ae, country: 'United Arab Emirates', netDebt: '700', financialYear: '2025' });
 ae = withFin(ae, { rev: [300, 280, 250, 260, 275, 290, 305, 320], ebitda: [12, 4, -6, 2, 8, 14, 20, 24], da: [10, 10, 9, 9, 9, 9, 10, 10], capex: [8, 6, 5, 5, 6, 6, 7, 7], nwc: [60, 58, 55, 56, 58, 60, 62, 64] });
 const distressed = fromState(state.onEnterWacc(state.resetWacc(ae)));
 
@@ -186,8 +189,8 @@ async function ligatureGlyphs(buf) {
   }
   return [...found];
 }
-const DATA_LABEL = data.dataVersionLabel('2026-09-16');
-check('market data label', DATA_LABEL === 'Damodaran January 2026, risk-free September 2026', DATA_LABEL);
+const DATA_LABEL = data.dataVersionLabel('2026-09-17');
+check('market data label', DATA_LABEL === 'Market data: Damodaran 2026, risk-free 15 September 2026', DATA_LABEL);
 const pdfs = {};
 const texts = {};
 for (const [label, result] of [['Saudi', saudi], ['full', full], ['Pakistan', pakistan], ['distressed', distressed]]) {
@@ -203,16 +206,18 @@ for (const [label, result] of [['Saudi', saudi], ['full', full], ['Pakistan', pa
   const text = buf.toString('latin1');
   const pages = (text.match(/\/Type\s*\/Page[^s]/g) ?? []).length;
   check(`${label}: is a PDF`, buf.subarray(0, 5).toString() === '%PDF-');
-  check(`${label}: ten pages`, pages === 10 && pdfModule.REPORT_PAGE_TITLES.length === 10, String(pages));
+  check(`${label}: eight pages`, pages === 8 && pdfModule.REPORT_PAGE_TITLES.length === 8, String(pages));
   const t = await pageTexts(buf);
   texts[label] = t;
   pdfModule.REPORT_PAGE_TITLES.forEach((title, i) => {
     // The cover eyebrow is letter-spaced, which pdfjs extracts as spaced letters.
     const squash = (x) => x.toLowerCase().replace(/\s+/g, '');
-    check(`${label}: page ${i + 1} is "${title}"`, squash(t[i] ?? '').includes(squash(title)), (t[i] ?? '').slice(0, 120));
+    // Pages 6 and 7 flow as one section, so the methodology title can start at the foot of page 6.
+    const onPage = squash(t[i] ?? '').includes(squash(title)) || (i === 6 && squash(t[5] ?? '').includes(squash(title)));
+    check(`${label}: page ${i + 1} is "${title}"`, onPage, (t[i] ?? '').slice(0, 120));
   });
   check(`${label}: page 1 names the market data`, t[0].includes(DATA_LABEL));
-  check(`${label}: pages 2 to 10 carry the footer with page number and market data`, t.slice(1).every((pt, i) => pt.includes(`Page ${i + 2} of 10`) && pt.includes(DATA_LABEL) && pt.includes('Indicative only')));
+  check(`${label}: pages 2 to 8 carry the footer with page number and market data`, t.slice(1).every((pt, i) => pt.includes(`Page ${i + 2} of 8`) && pt.includes(DATA_LABEL) && pt.includes('Indicative only')));
   const all = t.join(' ');
   const ligs = await ligatureGlyphs(buf);
   check(`${label}: no ligature glyphs drawn`, ligs.length === 0, ligs.join(', '));
@@ -233,18 +238,80 @@ for (const [label, result] of [['Saudi', saudi], ['full', full], ['Pakistan', pa
   check('full: weighted value on the report', f.includes('Probability-weighted') && f.includes(hf.weighted));
   check('full: bridge items on the report', ['end of service benefits', 'lease liabilities', 'minority interest', 'surplus assets'].every((x) => f.toLowerCase().includes(x)));
   check('full: normalised EBITDA on the report', f.includes('Normalised EBITDA'));
-  check('full: raised at least one warning', full.warnings.length > 0);
+  check('full: raised at least one warning', format.warningTexts(full).length > 0);
   for (const w of format.warningTexts(full)) check(`full: warning "${w.title}" on the report`, f.includes(w.title));
-  check('full: no "none raised" line', !f.includes('None of the checks raised a warning.'));
-  check('minimal: no warnings, and says so', saudi.warnings.length === 0 && m.includes('None of the checks raised a warning.'));
+  for (const [label, r, text] of [['full', full, f], ['minimal', saudi, m]]) {
+    const items = format.checkItems(r);
+    check(`${label}: every check listed, Pass or Warning`, items.every((x) => text.includes(x.label)) && (text.match(/\bPASS\b/g) ?? []).length === items.filter((x) => x.status === 'pass').length && (text.match(/\bWARNING\b/g) ?? []).length === items.filter((x) => x.status === 'warning').length);
+  }
+
+  // Version 3 wording, on the reports.
+  const all = [f, m, texts.Pakistan.join(' '), texts.distressed.join(' ')].join(' ');
+  for (const phrase of [
+    'Implied EV / LTM EBITDA',
+    'Implied terminal multiple (perpetuity method)',
+    'Factors that could support a higher valuation',
+    'DCF (average of perpetuity and exit multiple)',
+    'Equity value, perpetuity growth DCF',
+    'Terminal cash flow reflects reinvestment at long-term growth.',
+    'Scenarios flex the DCF; comparables use the last actual year.',
+    'Exit multiple applies current comparable multiples to the final forecast year.',
+    'EV / Revenue shown for reference; not used in the blend.',
+    'A size premium and a private company discount are both applied.',
+    'Powered by PaceMakers Business Valuation',
+    'Net debt at 31 December 2025, as entered, less free cash flow earned from then to 16 September 2026, plus after-tax interest on it for that period, gives net debt at the valuation date.',
+    'Less after-tax interest on net debt for that period',
+    'uses forecast free cash flow, not actual results',
+    'Add free cash flow from 31 December 2025 to the valuation date',
+    'Financial years are assumed to end on 31 December.',
+    'Implied terminal ROIC',
+    'Terminal reinvestment rate',
+    'have not been reviewed by PaceMakers and should not be relied on for a transaction, a financing, or a tax or accounting purpose',
+    'Base case',
+  ]) {
+    // Case-insensitive: the cover sets its labels in capitals.
+    check(`reports say "${phrase}"`, all.replace(/\s+/g, ' ').toLowerCase().includes(phrase.toLowerCase()));
+  }
+  check('Saudi report: tax and zakat row and zakat note', m.includes('Less tax and zakat') && m.replace(/\s+/g, ' ').includes('Cash was not entered, so the base is working capital alone and may be understated.'));
+  check('Saudi report: equity value as at the valuation date', m.includes('as at 16 September 2026'));
+  check('full report: selected comparable companies by name', f.includes('Selected comparable companies (2)') && f.includes('Listed peer one'));
+  check('risk-free yield printed to two decimals with its exact date', m.includes('5.00%') && m.replace(/\s+/g, ' ').includes('15 September 2026'));
+  {
+    const zb = engine.runValuation({ ...state.toInputs(minimalCase(state), VALUATION_DATE), cash: 30 }).result;
+    const zt = (await pageTexts(await pdfModule.renderValuationReport(zb, { ...REPORT_META, company: 'Example Co', industry: 'I', country: 'C', bookingHref: BOOK }))).join(' ').replace(/\s+/g, ' ');
+    check('zakat base on the report: working capital, cash, base, amounts and the method note', zt.includes('Zakat base (approximate)') && zt.includes('Working capital, year end') && zt.includes('Add cash, year end') && zt.includes('Zakat, FY2026 to FY2030') && zt.includes('working capital plus cash') && !zt.includes('Cash was not entered') && zt.includes('Less tax and zakat '));
+  }
+  for (const retired of ['Your 2 peers', 'What would increase your value', 'Implied exit multiple', 'about 5.0%', 'Midpoint', 'midpoint', 'losses not carried forward', 'is not carried forward']) {
+    check(`reports no longer say "${retired}"`, !all.includes(retired));
+  }
+  check('WACC to two decimals on every page it appears', [...all.matchAll(/WACC,? (?:SAR |PKR |AED )?(\d+\.\d+)%/g)].every((x) => /\.\d{2}$/.test(x[1])));
   check('minimal: whole equity, no stake line', m.includes('The valuation is for 100% of the equity') && !m.includes('stake with a'));
   check('minimal: no bridge rows beyond net debt', !m.includes('Less lease liabilities') && !m.includes('Add surplus assets') && !m.includes('Less end of service benefits'));
-  check('minimal: assumptions say no other claims entered', /Other claims and surplus assets\s+None entered/.test(m));
+  check('minimal: assumptions say no other claims entered', /Other claims, surplus assets\s+None entered/.test(m));
   check('full: bridge rows on the report', f.includes('Less lease liabilities') && f.includes('Add surplus assets and investments'));
-  check('closing page offers the booking link', texts.full[9].toLowerCase().includes('book'));
+  check('closing page offers the booking link', texts.full[7].toLowerCase().includes('book'));
   const code = qr.qrMatrix(BOOK);
   const decoded = (await import('qrcode')).default.create(BOOK, { errorCorrectionLevel: 'M' }).segments.map((sg) => Buffer.from(sg.data).toString('utf8')).join('');
   check('QR code encodes the tracked booking link', code.size >= 21 && decoded === BOOK, decoded);
+}
+{
+  const raiseInputs = { ...state.toInputs(minimalCase(state), VALUATION_DATE), purpose: 'raise', raiseAmount: 100 };
+  const raised = engine.runValuation(raiseInputs).result;
+  const rt = (await pageTexts(await pdfModule.renderValuationReport(raised, { ...REPORT_META, purpose: 'raise', company: 'Example Co', industry: 'I', country: 'C', bookingHref: BOOK }))).join(' ');
+  check('raising equity with an amount: pre-money and post-money on the report', rt.includes('Pre-money and post-money') && rt.includes('Post-money equity value') && rt.includes('Investor stake after the raise'));
+  const noAmount = engine.runValuation({ ...raiseInputs, raiseAmount: null }).result;
+  const nt = (await pageTexts(await pdfModule.renderValuationReport(noAmount, { ...REPORT_META, purpose: 'raise', company: 'Example Co', industry: 'I', country: 'C', bookingHref: BOOK }))).join(' ');
+  check('raising equity without an amount: values shown are pre-money', nt.includes('Values shown are pre-money.') && !nt.includes('Post-money equity value'));
+  check('not raising equity: no pre-money section', !texts.Saudi.join(' ').includes('Pre-money'));
+  const tampered = JSON.parse(JSON.stringify(saudi));
+  tampered.ev[1] += 5;
+  let refused = false;
+  try {
+    await pdfModule.renderValuationReport(tampered, { ...REPORT_META, company: 'X', industry: 'I', country: 'C', bookingHref: BOOK });
+  } catch (err) {
+    refused = /reconciliation failed/.test(String(err));
+  }
+  check('a result that does not reconcile is refused before rendering', refused);
 }
 check('file name is tidy', pdfModule.reportFileName('Acme & Sons / KSA', 'x', new Date('2026-09-16')) === 'PaceMakers valuation Acme  Sons  KSA 2026-09-16.pdf');
 
@@ -347,8 +414,9 @@ console.log('Narrative and cover');
     const cover = t[0].replace(/ +/g, ' ');
     const squash = cover.split(' ').join('').toLowerCase();
     check(`${label}: cover KPI row carries WACC, terminal value share and EV / LTM EBITDA`, squash.includes('wacc') && squash.includes('terminalvalueshare') && squash.includes('ev/ltmebitda') && [h.wacc, h.tvShare, h.ltmMultiple].every((v) => squash.includes(v.split(" ").join("").toLowerCase())), cover.slice(0, 400));
-    check(`${label}: fourth KPI is the weighted value when scenarios ran`, h.weighted ? squash.includes('probability-weighted') && cover.includes(h.weighted) : squash.includes('impliedexitmultiple'));
-    check(`${label}: still ten pages with the KPI row`, t.length === 10);
+    check(`${label}: fourth KPI is the weighted value`, squash.includes('probability-weighted') && cover.includes(h.weighted));
+    check(`${label}: the cover carries the low, base case and high bar`, squash.includes('low') && squash.includes('basecase') && squash.includes('high'));
+    check(`${label}: still eight pages with the KPI row`, t.length === 8);
   }
 }
 
@@ -366,7 +434,7 @@ console.log('Company profile on the report');
   for (const [label, result] of [['full', full], ['distressed', distressed], ['Saudi', saudi]]) {
     const buf = await pdfModule.renderValuationReport(result, { ...REPORT_META, company: maxName, industry: 'Industry', country: 'Country', bookingHref: BOOK, description: maxDescription });
     const t = await pageTexts(buf);
-    check(`${label}, longest name and description: still ten pages`, t.length === 10, String(t.length));
+    check(`${label}, longest name and description: still eight pages`, t.length === 8, String(t.length));
     // The cover carries it: the one page with room for the longest description in every case.
     const squashed = t[0].replace(/\s+/g, '');
     check(`${label}: cover carries About the business`, /aboutthebusiness/i.test(squashed), t[0].slice(-300));
@@ -405,18 +473,11 @@ console.log('Report branding and partner');
   check('partner: no name means no card', partnerModule.partnerFromHero({ intro: 'x' }) === null);
   check('partner: slug matches founderProfile.ts', founderProfileSrc.includes(`FOUNDER_PAGE_SLUG = '${partnerModule.PARTNER_PAGE_SLUG}'`));
 
-  // Navy and gold: green lettering becomes gold, navy and transparency stay.
+  // The closing page logo: the Header Settings colour logo, never recoloured.
   {
-    const brandFetch = await jiti.import(path.join(root, 'src/lib/tools/brand/fetch.ts'));
-    const sharpMod = (await import('sharp')).default;
-    const px = Buffer.from([0x3f, 0xa6, 0x63, 255, 0x1b, 0x3a, 0x5f, 255, 0xc6, 0x9c, 0x3e, 255, 0x3f, 0xa6, 0x63, 0]);
-    const png = await sharpMod(px, { raw: { width: 4, height: 1, channels: 4 } }).png().toBuffer();
-    const out = await sharpMod(await brandFetch.recolourGreenToGold(png)).raw().toBuffer();
-    check('navy and gold logo: brand green becomes gold', out[0] === 0xc6 && out[1] === 0x9c && out[2] === 0x3e && out[3] === 255, [...out.subarray(0, 4)].join());
-    check('navy and gold logo: navy unchanged', out[4] === 0x1b && out[5] === 0x3a && out[6] === 0x5f);
-    check('navy and gold logo: gold unchanged', out[8] === 0xc6 && out[9] === 0x9c && out[10] === 0x3e);
-    check('navy and gold logo: transparent pixel untouched', out[15] === 0);
-    check('page 10 uses the navy and gold treatment', fs.readFileSync(path.join(root, 'src/lib/tools/brand/fetch.ts'), 'utf8').includes("processedImage(onLightSrc, 'logo-navy-gold')"));
+    const src = fs.readFileSync(path.join(root, 'src/lib/tools/brand/fetch.ts'), 'utf8');
+    check('closing page logo is the header logo, same treatment as any logo', src.includes("const onLightSrc = branding?.logo_url || null;") && src.includes("processedImage(onLightSrc, 'logo')"));
+    check('no recolouring of the logo anywhere', !/recolourGreenToGold|logo-navy-gold/.test(src));
   }
 
   // Real images from the repository stand in for the CMS files.
@@ -428,10 +489,10 @@ console.log('Report branding and partner');
   const withBrand = await render(branding);
   const raw = withBrand.toString('latin1');
   const t = await pageTexts(withBrand);
-  check('branded: still ten pages', t.length === 10, String(t.length));
+  check('branded: still eight pages', t.length === 8, String(t.length));
   check('branded: logo and portrait embedded as images', (raw.match(/\/Subtype\s*\/Image/g) ?? []).length >= 2);
   check('branded: cover uses the logo, not the typeset name', !t[0].includes('PaceMakers Business Consultants ADVISORY') && !/^PaceMakers Business Consultants/.test(t[0]));
-  const last = t[9];
+  const last = t[7];
   check('branded: closing page names the partner and role', last.includes('Test Partner') && last.includes('Founding Partner, Corporate Finance Specialist'));
   check('branded: closing page carries credentials, intro and every highlight', last.includes('ACCA | FMVA | AFM | 12+ Years Experience') && last.includes('An introduction over two lines.') && card.highlights.every((h) => last.includes(h)));
   check('branded: highlights attributed to the partner, not the firm', last.includes(partnerModule.PARTNER_RECORD_NOTE));
@@ -439,12 +500,12 @@ console.log('Report branding and partner');
 
   const bare = await render(null);
   const tb = await pageTexts(bare);
-  check('no branding: still ten pages', tb.length === 10);
+  check('no branding: still eight pages', tb.length === 8);
   check('no branding: cover sets the name in type', tb[0].startsWith('PaceMakers Business Consultants'));
-  check('no branding: no partner block, full service summaries', !tb[9].includes('Who you will work with') && tb[9].includes('Institutional-grade'));
+  check('no branding: no partner block, full service summaries', !tb[7].includes('Who you will work with') && tb[7].includes('Institutional-grade'));
   check('no branding: no images embedded', !/\/Subtype\s*\/Image/.test(bare.toString('latin1')));
   const noPhoto = await pageTexts(await render({ ...branding, partnerPhoto: null, logoOnDark: null }));
-  check('partner without photo or logo: ten pages, block kept', noPhoto.length === 10 && noPhoto[9].includes('Test Partner'));
+  check('partner without photo or logo: eight pages, block kept', noPhoto.length === 8 && noPhoto[7].includes('Test Partner'));
 }
 
 console.log('Booking links');

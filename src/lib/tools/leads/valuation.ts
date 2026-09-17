@@ -24,7 +24,7 @@
 import { z } from 'zod';
 
 import { BELOW_MINIMUM_BAND, DEAL_BANDS_SAR, DEAL_BAND_UNSURE, PURPOSES, VALUATION_DATA_VERSION } from '../valuation/data';
-import { INPUT_SCHEMA_VERSION, runValuation, TOTAL_YEARS, type ValuationInputs, type ValuationResult } from '../valuation/engine';
+import { INPUT_SCHEMA_VERSION, isoDate, runValuation, TOTAL_YEARS, type ValuationInputs, type ValuationResult } from '../valuation/engine';
 import { cleanProfile } from '../valuation/profile';
 import { serializeResult } from '../valuation/serialize';
 import { CONSENT_TEXT, FOLLOW_UP_TEXT } from '../consent';
@@ -86,19 +86,36 @@ const inputsSchema = z.object({
     .object({ companyName: z.string().max(1000).nullable().optional(), description: z.string().max(10000).nullable().optional() })
     .optional()
     .transform((p) => cleanProfile(p)),
+  // Version 3. The valuation date is accepted for shape only: the server always
+  // replaces it with its own date (`stampServerFields`).
+  gccOwnership: cell.optional(),
+  cash: cell.optional(),
+  raiseAmount: cell.optional(),
+  purpose: z.string().max(40).nullable().optional(),
+  valuationDate: z.string().max(20).nullable().optional(),
 });
 
 export type SubmittedInputs = z.infer<typeof inputsSchema>;
 
+/**
+ * What the server decides rather than the browser: the schema version, and the
+ * valuation date, which is the day the server computes the valuation.
+ */
+export function stampServerFields<T extends SubmittedInputs>(inputs: T, now: Date): T {
+  return { ...inputs, schemaVersion: INPUT_SCHEMA_VERSION, valuationDate: isoDate(now) };
+}
+
 /** Validates and recomputes inputs alone. Shared by the lead, version and PDF endpoints. */
 export function recomputeInputs(
   raw: unknown,
+  now: Date = new Date(),
 ): { ok: true; inputs: SubmittedInputs; result: ValuationResult } | { ok: false; issues: { path: string; message: string }[] } {
   const parsed = inputsSchema.safeParse(raw);
   if (!parsed.success) {
     return { ok: false, issues: parsed.error.issues.map((i) => ({ path: `inputs.${i.path.join('.')}`, message: i.message })) };
   }
-  const outcome = runValuation(parsed.data as ValuationInputs);
+  const stamped = stampServerFields(parsed.data, now);
+  const outcome = runValuation(stamped as ValuationInputs);
   if (!outcome.ok) {
     const errors = outcome.errors;
     return {
@@ -109,7 +126,7 @@ export function recomputeInputs(
           : Object.entries(errors).map(([path, message]) => ({ path: `inputs.${path}`, message })),
     };
   }
-  return { ok: true, inputs: { ...parsed.data, schemaVersion: INPUT_SCHEMA_VERSION }, result: outcome.result };
+  return { ok: true, inputs: stamped, result: outcome.result };
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
@@ -209,8 +226,17 @@ export async function processValuationSubmission(
     };
   }
   const data = parsed.data;
+  // The purpose is the gate's, and a raise amount means something only when raising equity.
+  const inputs = stampServerFields(
+    {
+      ...data.inputs,
+      purpose: data.gate.purpose,
+      raiseAmount: data.gate.purpose === 'raise' ? (data.inputs.raiseAmount ?? null) : null,
+    },
+    ctx.now,
+  );
 
-  const outcome = runValuation(data.inputs as ValuationInputs);
+  const outcome = runValuation(inputs as ValuationInputs);
   if (!outcome.ok) {
     const errors = outcome.errors;
     const issues =
@@ -257,14 +283,14 @@ export async function processValuationSubmission(
     data_version: VALUATION_DATA_VERSION,
     name: g.name,
     email: g.email.toLowerCase(),
-    company: g.company || data.inputs.profile?.companyName || null,
+    company: g.company || inputs.profile?.companyName || null,
     purpose: g.purpose,
     deal_size_band: g.dealSize,
     below_minimum: g.dealSize === BELOW_MINIMUM_BAND,
-    country: data.inputs.country,
+    country: inputs.country,
     currency: result.currency.code,
-    industry: data.inputs.industry,
-    inputs: { ...data.inputs, schemaVersion: INPUT_SCHEMA_VERSION },
+    industry: inputs.industry,
+    inputs,
     results: serialized,
     equity_low: result.equityDisplay[0],
     equity_mid: result.equityDisplay[1],

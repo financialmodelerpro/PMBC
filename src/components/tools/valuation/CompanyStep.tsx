@@ -1,6 +1,6 @@
 'use client';
 
-import { COUNTRIES, INDUSTRIES } from '@/lib/tools/valuation/data';
+import { COUNTRIES, INDUSTRIES, TAX } from '@/lib/tools/valuation/data';
 import { PROFILE_LIMITS } from '@/lib/tools/valuation/profile';
 import type { FieldErrors } from '@/lib/tools/valuation/engine';
 
@@ -110,7 +110,7 @@ export function CompanyStep({
         </Field>
       </div>
       <div className="grid gap-x-5 sm:grid-cols-2">
-        <Field label="Last completed financial year" hint="Valuation date is taken as the end of this year." error={errors.financialYear ?? ''}>
+        <Field label="Last completed financial year" hint="The latest full year of actuals, assumed to end on 31 December. The valuation is dated today." error={errors.financialYear ?? ''}>
           {({ id, describedBy, invalid }) => (
             <NumberInput
               id={id}
@@ -124,7 +124,11 @@ export function CompanyStep({
             />
           )}
         </Field>
-        <Field label="Net debt at valuation date" hint="Borrowings and leases less cash. Negative if cash is higher." error={errors.netDebt ?? ''}>
+        <Field
+          label={`Net debt at 31 December ${/^\d{4}$/.test(state.financialYear.trim()) ? state.financialYear.trim() : 'of that year'}`}
+          hint="Borrowings and leases less cash, at the year end. Negative if cash is higher. The valuation rolls it forward to today using the cash flow since."
+          error={errors.netDebt ?? ''}
+        >
           {({ id, describedBy, invalid }) => (
             <NumberInput
               id={id}
@@ -139,6 +143,49 @@ export function CompanyStep({
           )}
         </Field>
       </div>
+
+      {state.country === TAX.zakatCountry && (
+        <div className="grid gap-x-5 sm:grid-cols-2">
+          <Field
+            label="Saudi / GCC ownership %"
+            hint={`Required. Share of the company owned by Saudi or GCC nationals, 0 to 100. Zakat of ${TAX.zakatRate}% of the zakat base applies to that share, corporate income tax to the rest.`}
+            error={errors.gccOwnership ?? ''}
+          >
+            {({ id, describedBy, invalid }) => (
+              <NumberInput
+                id={id}
+                min={0}
+                max={100}
+                step={1}
+                suffix="%"
+                value={state.gccOwnership}
+                onValue={(v) => onChange({ gccOwnership: v })}
+                aria-describedby={describedBy}
+                aria-invalid={invalid}
+              />
+            )}
+          </Field>
+          <Field
+            label={`Cash at 31 December ${/^\d{4}$/.test(state.financialYear.trim()) ? state.financialYear.trim() : 'of that year'} (optional)`}
+            hint="Used only to estimate the zakat base (working capital plus cash). Leave blank and the base is working capital alone."
+            error={errors.cash ?? ''}
+          >
+            {({ id, describedBy, invalid }) => (
+              <NumberInput
+                id={id}
+                min={0}
+                step={0.1}
+                placeholder="0"
+                suffix={`${currencyCode} m`}
+                value={state.cash}
+                onValue={(v) => onChange({ cash: v })}
+                aria-describedby={describedBy}
+                aria-invalid={invalid}
+              />
+            )}
+          </Field>
+        </div>
+      )}
 
       <Collapsible
         title="Other balance sheet items"
