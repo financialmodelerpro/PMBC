@@ -252,6 +252,30 @@ console.log('Surfaces ask visibility.ts and nothing else');
   check('stored tool CTA filtered, other CTAs kept', kept.length === 2 && kept.every((s) => s.content.cta_primary_href !== '/tools/business-valuation'));
 }
 
+console.log('Other tools on each tool page');
+{
+  const other = await jiti.import(path.join(root, 'src/lib/tools/otherTools.ts'));
+  const registry = [
+    { ...READY, slug: 'one', name: 'One', build: 'ready' },
+    { ...READY, slug: 'two', name: 'Two', build: 'ready' },
+    { ...READY, slug: 'three', name: 'Three', build: 'ready' },
+    { ...READY, slug: 'draft', name: 'Draft', build: 'draft' },
+  ];
+  const snap = vis.resolveVisibility({ ok: true, rows: [row('one', 'live'), row('two', 'live'), row('three', 'hidden'), row('draft', 'live')] }, registry);
+  const pub = other.otherToolsFor(snap, 'one', { staff: false }).map((t) => t.slug);
+  check('public: other Live tools, in registry order, never the current one', JSON.stringify(pub) === JSON.stringify(['two']), JSON.stringify(pub));
+  const staff = other.otherToolsFor(snap, 'one', { staff: true }).map((t) => t.slug);
+  check('staff preview: Hidden ready tools too, never drafts', JSON.stringify(staff) === JSON.stringify(['two', 'three']), JSON.stringify(staff));
+  check('a newly Live tool is offered with no other change', other.otherToolsFor(vis.resolveVisibility({ ok: true, rows: [row('one', 'live'), row('two', 'live'), row('three', 'live')] }, registry), 'one', { staff: false }).length === 2);
+  check('nothing else Live: nothing offered', other.otherToolsFor(vis.resolveVisibility({ ok: true, rows: [row('one', 'live')] }, registry), 'one', { staff: false }).length === 0);
+  check('a failed visibility read offers nothing', other.otherToolsFor(vis.resolveVisibility({ ok: false, reason: 'error' }, registry), 'one', { staff: false }).length === 0);
+  const page = src('src/app/(public)/tools/[slug]/page.tsx');
+  check('every tool page renders the section from otherToolsFor', page.includes('<OtherTools tools={otherToolsFor(snapshot, slug, { staff: Boolean(staff) })} preview={preview} />'));
+  const section = src('src/components/tools/OtherTools.tsx');
+  check('the section renders nothing when there is nothing to offer', section.includes('if (tools.length === 0) return null;'));
+  check('the hub and the section draw the same card', section.includes('<ToolCard') && src('src/app/(public)/tools/page.tsx').includes('<ToolCard'));
+}
+
 const BASE = process.env.VERIFY_BASE?.replace(/\/+$/, '');
 if (BASE) {
   const expectLive = new Set((process.env.EXPECT_LIVE ?? '').split(',').map((s) => s.trim()).filter(Boolean));

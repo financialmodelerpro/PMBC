@@ -1,12 +1,11 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ArrowRight } from 'lucide-react';
 
-import { TOOLS_HUB_HERO, toolPath } from '@/config/tools';
+import { TOOLS_HUB_HERO } from '@/config/tools';
 import { FirmPageBody } from '@/components/public/FirmPageBody';
 import { ToolsHubJsonLd } from '@/components/seo/ToolJsonLd';
 import { AdminPreviewBanner } from '@/components/tools/AdminPreviewBanner';
+import { ToolCard } from '@/components/tools/ToolCard';
 import { getAdminSession } from '@/lib/auth/requireAdmin';
 import { fetchPage, fetchPageSections } from '@/lib/cms/pages';
 import { PAGE_GUTTER, PAGE_INNER, SECTION_PADDING } from '@/lib/public/layout';
@@ -66,33 +65,7 @@ export default async function ToolsHubPage(props: {
           <ul className="grid gap-6 md:grid-cols-2">
             {cards.map((t) => (
               <li key={t.slug}>
-                <Link
-                  href={toolPath(t.slug)}
-                  className="group flex h-full flex-col rounded-[2px] border border-[color:var(--pmbc-border-warm)] bg-white p-8 transition-colors duration-200 hover:border-[#C69C3E] sm:p-10"
-                >
-                  <div aria-hidden className="h-px w-[48px]" style={{ background: '#C69C3E' }} />
-                  <p
-                    className="mt-5 text-[11px] font-semibold uppercase text-[color:var(--pmbc-accent-muted)]"
-                    style={{ letterSpacing: '0.18em' }}
-                  >
-                    {t.eyebrow}
-                    {preview && !t.live && <span className="ml-2 text-[#92400E]">Hidden</span>}
-                  </p>
-                  <h2 className="pmbc-display mt-3 text-[28px] leading-[1.15] text-[color:var(--pmbc-text)] sm:text-[32px]">
-                    {t.name}
-                  </h2>
-                  <p className="mt-4 flex-1 text-[16px] leading-[1.7] text-[#52606B]">{t.summary}</p>
-                  <div className="mt-7 flex flex-wrap items-center justify-between gap-3">
-                    <span className="text-[13px] text-[color:var(--pmbc-muted)]">{t.duration}, free</span>
-                    <span
-                      className="inline-flex items-center gap-2 text-[12px] font-semibold uppercase text-[color:var(--pmbc-primary)]"
-                      style={{ letterSpacing: '0.12em' }}
-                    >
-                      Open the tool
-                      <ArrowRight size={14} className="transition-transform group-hover:translate-x-0.5" />
-                    </span>
-                  </div>
-                </Link>
+                <ToolCard tool={t} showHidden={preview} />
               </li>
             ))}
           </ul>
