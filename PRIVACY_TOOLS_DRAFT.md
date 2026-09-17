@@ -99,9 +99,17 @@ paragraphs; nothing existing is removed except where noted.
 > Our results emails contain a small tracking image and tracked links, provided
 > by our email provider, which tell us whether an email was opened and whether a
 > link was clicked. You can prevent open tracking by disabling automatic image
-> loading in your email client. The free tools themselves do not set cookies;
-> they keep a note of the link you arrived from in your browser's session
-> storage, which is cleared when you close the tab.
+> loading in your email client. The free tools keep a note of the link you
+> arrived from in your browser's session storage, which is cleared when you
+> close the tab.
+>
+> When you follow a "Book a free call" link from a tool's results, email or
+> report, or arrive at our booking page from a link carrying campaign tags, we
+> set one first-party cookie, `pmbc_booking`, for 30 days. It records where the
+> booking came from (the campaign tags and, for a tool link, a short reference
+> to your submission) so a booking can be matched to the results you received.
+> It contains no name, email address or password, is not shared with other
+> websites, and is used only to pass that attribution to our booking calendar.
 
 ### 8. Your Choices (add)
 
@@ -111,6 +119,11 @@ paragraphs; nothing existing is removed except where noted.
 > to any email we send you.
 
 ## Questions for counsel
+
+0. **The booking attribution cookie** (`pmbc_booking`, added 2026-09-17). It is
+   first-party, holds campaign tags and a short submission reference, and lasts
+   30 days. Confirm whether it needs consent before it is set, or whether the
+   notice above is enough for the audiences the site serves.
 
 1. **Retention period** for tool submissions. The data is commercially
    sensitive and most submissions will never become a mandate. A short period

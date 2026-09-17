@@ -313,7 +313,8 @@ console.log('Engagement');
   // Wiring, read from source.
   const read = (f) => fs.readFileSync(path.join(root, f), 'utf8');
   check('alert emails carry their own tag', read('src/lib/tools/leads/deliver.ts').includes("tags: [ALERT_TAG, lead.tool_slug, 'alert'") && eng.ALERT_TAG !== eng.RESULTS_TAG);
-  check('booking redirect does not count a likely automated click', read('src/app/api/tools/book/route.ts').includes('automated ? Promise.resolve(true) : updateLead(lead.id, { booking_clicks'));
+  // Both booking links (the short /b/ link and the long tracked link) record clicks through one function.
+  check('booking redirect does not count a likely automated click', read('src/lib/tools/leads/bookingLinkStore.ts').includes('automated ? Promise.resolve(true) : updateLead(lead.id, { booking_clicks') && read('src/app/api/tools/book/route.ts').includes('bookingRedirectDeps') && read('src/app/b/[slug]/route.ts').includes('bookingRedirectDeps'));
   check('webhook status write skipped for a flagged click', read('src/lib/tools/webhook.ts').includes("if (kind === 'results' && to && !automated)"));
   const detail = read('src/app/admin/tool-leads/[id]/page.tsx');
   check('lead detail shows the flag, labels alerts, and says clicks were not counted', detail.includes('AUTOMATED_REASON_TEXT[automatedReasonOf(e.payload)!]') && detail.includes('Internal alert, not visitor engagement') && detail.includes('likely automated'));

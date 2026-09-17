@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 
 import { getAdminSession } from '@/lib/auth/requireAdmin';
-import { bookingRedirectUrl } from '@/lib/tools/leads/deliver';
+import { bookingLinkFor } from '@/lib/tools/leads/bookingLinkStore';
 import { getLead } from '@/lib/tools/leads/store';
 import { renderValuationReport, reportFileName } from '@/lib/tools/pdf/ValuationReport';
 import { fetchReportBranding } from '@/lib/tools/brand/fetch';
@@ -28,7 +28,7 @@ export async function GET(_req: Request, props: { params: Promise<{ id: string }
     purpose: lead.purpose,
     generatedAt: created,
     dataVersion: lead.data_version,
-    bookingHref: bookingRedirectUrl(lead.access_token, 'pdf'),
+    bookingHref: await bookingLinkFor(lead, 'pdf'),
     branding: await fetchReportBranding(),
     description: (lead.inputs as { profile?: { description?: string | null } } | null)?.profile?.description ?? null,
   });

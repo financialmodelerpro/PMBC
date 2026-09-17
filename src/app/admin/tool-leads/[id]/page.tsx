@@ -103,6 +103,7 @@ const EVENT_LABELS: Record<string, string> = {
   alert_sent: 'Internal alert sent',
   alert_failed: 'Internal alert failed',
   booking_click: 'Book a call clicked',
+  booking_link: 'Booking link created',
   version_saved: 'Visitor emailed an updated version',
   sent: 'Accepted by Brevo',
   delivered: 'Delivered',

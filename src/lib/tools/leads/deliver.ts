@@ -14,6 +14,7 @@ import { fetchSiteSettings } from '@/lib/cms/settings';
 import { sendEmail, type SendEmailResult } from '@/lib/email/send';
 import { baseLayoutBranded } from '@/lib/email/templates/_base';
 import { siteUrl } from '@/lib/seo/metadata';
+import { bookingLinkFor } from './bookingLinkStore';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 
 import type { EmailStatus, ToolLeadRow } from '../db';
@@ -65,9 +66,6 @@ export async function loadToolTemplate(key: string): Promise<EmailTemplate> {
   return DEFAULT_TEMPLATES[key];
 }
 
-export function bookingRedirectUrl(token: string, src: 'email' | 'results' | 'pdf'): string {
-  return `${siteUrl()}/api/tools/book?t=${encodeURIComponent(token)}&src=${src}`;
-}
 
 function statusFrom(r: SendEmailResult): EmailStatus {
   if (r.ok) return 'sent';
@@ -100,7 +98,7 @@ export async function sendResultsEmail(
     email: lead.email,
     company: lead.company,
     result,
-    bookingHref: bookingRedirectUrl(lead.access_token, 'email'),
+    bookingHref: await bookingLinkFor(lead, 'email'),
   });
 
   // A resend is a new message, so its status starts again. Set before the send,
@@ -117,7 +115,7 @@ export async function sendResultsEmail(
       purpose: lead.purpose,
       generatedAt: now,
       dataVersion: lead.data_version,
-      bookingHref: bookingRedirectUrl(lead.access_token, 'pdf'),
+      bookingHref: await bookingLinkFor(lead, 'pdf'),
       branding: await fetchReportBranding(),
       description: (lead.inputs as { profile?: { description?: string | null } } | null)?.profile?.description ?? null,
     });

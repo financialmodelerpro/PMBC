@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { cookies } from 'next/headers';
 
 import { fetchPage, fetchPageSections } from '@/lib/cms/pages';
 import { fetchSiteSettings } from '@/lib/cms/settings';
@@ -7,6 +8,9 @@ import { BookingBody } from '@/components/public/sections/BookingBody';
 import { buildPageMetadata } from '@/lib/seo/metadata';
 import type { SectionContext } from '@/lib/public/sectionContext';
 import { withBookingPrefill } from '@/lib/tools/booking';
+import { ATTRIBUTION_COOKIE, attributionFromSearch, calendarParams, decodeAttribution } from '@/lib/tools/bookingLinks';
+import { personForBookingRef } from '@/lib/tools/leads/bookingLinkStore';
+import { BookingUrlCleaner } from '@/components/public/BookingUrlCleaner';
 
 export const dynamic = 'force-dynamic';
 
@@ -30,10 +34,20 @@ export default async function BookPage(props: {
   const search = await props.searchParams;
   const isPreview = search.preview === '1';
 
-  const [sections, settings] = await Promise.all([
+  const [sections, settings, cookieStore] = await Promise.all([
     fetchPageSections('book', { onlyVisible: !isPreview }),
     safe(fetchSiteSettings(), {}),
+    cookies(),
   ]);
+
+  // Attribution: tracking parameters on this request win, otherwise the
+  // first-party cookie set by a booking link (src/lib/tools/bookingLinks.ts).
+  // The name and email come from the query when given, otherwise from the lead
+  // the cookie's reference points to.
+  const attribution = attributionFromSearch(search) ?? decodeAttribution(cookieStore.get(ATTRIBUTION_COOKIE)?.value);
+  const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
+  const queryPerson = { name: one(search.name), email: one(search.email) };
+  const person = queryPerson.name || queryPerson.email ? queryPerson : await safe(personForBookingRef(attribution?.ref), null);
 
   // Everything this page says is now section content, edited in the page
   // builder (migration 066). The calendar URL is not copy: it is admin-editable
@@ -41,9 +55,9 @@ export default async function BookPage(props: {
   // supported state that leads with the direct contact routes instead.
   const context: SectionContext = {
     settings,
-    // Name, email and UTM tags from a tool's booking link are passed into the
-    // calendar, so its form arrives prefilled. See src/lib/tools/booking.ts.
-    bookingUrl: withBookingPrefill((settings.booking_url ?? '').trim(), search),
+    // Name, email and UTM tags are passed into the calendar, so its form
+    // arrives prefilled and the booking is attributed to the lead and channel.
+    bookingUrl: withBookingPrefill((settings.booking_url ?? '').trim(), calendarParams(attribution, person)),
   };
 
   // A database that has not run migration 066 has no `booking_body` row. Same
@@ -52,6 +66,7 @@ export default async function BookPage(props: {
 
   return (
     <>
+      <BookingUrlCleaner />
       <FirmPageBody
         sections={sections}
         context={context}
