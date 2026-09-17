@@ -4,7 +4,8 @@ import { getAdminSession } from '@/lib/auth/requireAdmin';
 import { bookingRedirectUrl } from '@/lib/tools/leads/deliver';
 import { getLead } from '@/lib/tools/leads/store';
 import { renderValuationReport, reportFileName } from '@/lib/tools/pdf/ValuationReport';
-import { reviveResult } from '@/lib/tools/valuation/serialize';
+import { fetchReportBranding } from '@/lib/tools/brand/fetch';
+import { resultForReport } from '@/lib/tools/leads/reportResult';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -19,7 +20,7 @@ export async function GET(_req: Request, props: { params: Promise<{ id: string }
   if (!lead) return NextResponse.json({ error: 'Lead not found' }, { status: 404 });
 
   const created = new Date(lead.created_at);
-  const pdf = await renderValuationReport(reviveResult(lead.results), {
+  const pdf = await renderValuationReport(resultForReport(lead), {
     preparedFor: lead.name,
     company: lead.company,
     industry: lead.industry ?? '',
@@ -28,6 +29,8 @@ export async function GET(_req: Request, props: { params: Promise<{ id: string }
     generatedAt: created,
     dataVersion: lead.data_version,
     bookingHref: bookingRedirectUrl(lead.access_token, 'pdf'),
+    branding: await fetchReportBranding(),
+    description: (lead.inputs as { profile?: { description?: string | null } } | null)?.profile?.description ?? null,
   });
   return new NextResponse(new Uint8Array(pdf), {
     headers: {

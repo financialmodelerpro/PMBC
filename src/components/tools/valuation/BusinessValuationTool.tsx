@@ -17,7 +17,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import {
-  computeWacc,
   currencyFor,
   dealBandOptions,
   financialYears,
@@ -26,6 +25,7 @@ import {
   validateCompany,
   validateFinancials,
   validateTerminal,
+  waccFor,
   type FieldErrors,
   type ValuationInputs,
   type ValuationResult,
@@ -96,7 +96,8 @@ export function BusinessValuationTool({ preview, partner }: ToolComponentProps) 
 
   const currency = useMemo(() => currencyFor(s.country), [s.country]);
   const years = financialYears(parseInt(s.financialYear, 10) || null);
-  const wacc = useMemo(() => computeWacc(parseWacc(s.wacc), currency), [s.wacc, currency]);
+  // With the effective tax rate, so the WACC shown on step 3 is the one the valuation uses.
+  const wacc = useMemo(() => waccFor(toInputs(s, null)), [s]);
   const dealBands = useMemo(() => dealBandOptions(currency), [currency]);
 
   const update = (fn: (prev: FormState) => FormState) => setS(fn);
@@ -141,7 +142,7 @@ export function BusinessValuationTool({ preview, partner }: ToolComponentProps) 
 
   function onRun() {
     const inputs = toInputs(s);
-    const e = validateTerminal(inputs, computeWacc(inputs.wacc, currency, inputs.waccAdjustment ?? 0).wacc);
+    const e = validateTerminal(inputs, waccFor(inputs, inputs.waccAdjustment ?? 0).wacc);
     if (e) {
       setTermError(e);
       return;
@@ -167,7 +168,11 @@ export function BusinessValuationTool({ preview, partner }: ToolComponentProps) 
     setGateErrors(errors);
     if (Object.keys(errors).length || !pending) return;
     setSubmitting(true);
-    const inputs = toInputs(s);
+    // What the valuation is for, and any amount to raise, travel with the inputs:
+    // the report reads both from the result.
+    const raise = gate.purpose === 'raise' ? num(gate.raiseAmount) : null;
+    const inputs = { ...toInputs(s), purpose: gate.purpose, raiseAmount: raise };
+    const local = runValuation(inputs);
     setLead({ name: gate.name.trim(), email: gate.email.trim(), token: null });
     try {
       const response = await submitLead({
@@ -187,7 +192,7 @@ export function BusinessValuationTool({ preview, partner }: ToolComponentProps) 
       });
       // The server's recomputation is what was saved and emailed, so it is what
       // the visitor sees. The browser's own run is the fallback, never the source.
-      setSaved({ inputs, result: response?.result ?? pending });
+      setSaved({ inputs, result: response?.result ?? (local.ok ? local.result : pending) });
       if (response?.token) setLead((l) => (l ? { ...l, token: response.token } : l));
     } finally {
       setSubmitting(false);
@@ -324,6 +329,7 @@ export function BusinessValuationTool({ preview, partner }: ToolComponentProps) 
                 values={gate}
                 errors={gateErrors}
                 dealBands={dealBands}
+                currencyCode={currency.code}
                 submitting={submitting}
                 onChange={(p) => setGate((g) => ({ ...g, ...p }))}
                 onBack={() => go(3)}

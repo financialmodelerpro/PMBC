@@ -17,7 +17,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createJiti } from 'jiti';
 
-import { REPORT_META, fullFeatureCase, minimalCase } from './lib/valuationCases.mjs';
+import { REPORT_META, VALUATION_DATE, fullFeatureCase, minimalCase } from './lib/valuationCases.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const out = path.resolve(process.argv[2] ?? path.join(root, '.valuation-examples'));
@@ -46,10 +46,11 @@ for (const [name, build, meta] of [
   ['minimal', minimalCase, { company: 'Example Healthcare Co', industry: 'Healthcare Support Services', country: 'Saudi Arabia' }],
   ['full', fullFeatureCase, { company: 'Example Foods Pakistan', industry: 'Food Processing', country: 'Pakistan' }],
 ]) {
-  const outcome = engine.runValuation(state.toInputs(build(state)));
+  const inputs = state.toInputs(build(state), VALUATION_DATE);
+  const outcome = engine.runValuation(inputs);
   if (!outcome.ok) throw new Error(`${name} did not run: ${JSON.stringify(outcome.errors)}`);
-  const buf = await pdf.renderValuationReport(outcome.result, { ...REPORT_META, ...meta, branding, description: outcome.result && state.toInputs(build(state)).profile?.description });
+  const buf = await pdf.renderValuationReport(outcome.result, { ...REPORT_META, ...meta, branding, description: inputs.profile?.description });
   const file = path.join(out, `valuation-example-${name}.pdf`);
   fs.writeFileSync(file, buf);
-  console.log(`${file}  ${(buf.length / 1024).toFixed(0)} KB, warnings: ${outcome.result.warnings.map((w) => w.code).join(', ') || 'none'}`);
+  console.log(`${file}  ${(buf.length / 1024).toFixed(0)} KB, warnings: ${outcome.result.checks.filter((c) => c.status === 'warning').map((c) => c.id).join(', ') || 'none'}`);
 }

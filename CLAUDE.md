@@ -1077,11 +1077,39 @@ executive summary says the forecast carries most of the answer only when the DCF
 weight is above 50%.
 
 **Input schema versioning.** Stored inputs carry `schemaVersion`
-(`INPUT_SCHEMA_VERSION`, now 2) inside the `inputs` JSONB, stamped by the server
+(`INPUT_SCHEMA_VERSION`, now 3) inside the `inputs` JSONB, stamped by the server
 whatever the browser sends. No migration: every version 2 block is optional and
 `resolveExtras` fills an absent one with its neutral default, so a version 1
 lead revives and formats unchanged. Bump the version when a stored input changes
 meaning, and branch on it in `resolveExtras`, never by guessing from shape.
+Version 3: Saudi / GCC ownership is required for Saudi Arabia with no default
+(the example company fills it); older inputs without it mean 0% (corporate tax,
+as they were valued).
+
+**Version 3 method (2026-09-17).** `engine.ts` returns one canonical result
+(`forecast`, `terminal`, `dcfBlock`, `comparables`, `blend`, `raise`, `checks`,
+`recommendations`, `meta`) that the page, PDF, emails and admin all read; nothing
+downstream computes. Changes from the reference, all marked CHANGED: the
+perpetuity TV rests on a normalised terminal cash flow (`terminalCashFlow`);
+the valuation date is the server's date and year one is cut by the stub period
+(`stubPeriod`; a last actual year 12 months or more old is refused); tax losses
+carry forward with a per-country cap (`lossOffsetCap`); in Saudi Arabia zakat
+applies to the GCC-owned share (`taxProfile`): 2.5% of an approximate zakat base
+(`zakatBase`: invested capital less fixed assets, fixed assets taken as
+invested capital less working capital, rolled forward each year) when invested
+capital is entered, otherwise 2.5% of profit with a disclosure. Net debt is
+entered at the financial year end (assumed 31 December) and rolled forward to
+the valuation date by the elapsed part of year one free cash flow, the same
+figure in every scenario, so the cash flow cut from the DCF is not lost. `REFERENCE_METHOD` exists only for
+`verify-valuation-engine`. Checks are `checks.ts` (every check, Pass or Warning),
+factors are `recommendations.ts`, and `reconcile.ts` asserts the pages cannot
+contradict each other before a PDF renders (throws outside production, logs in
+it). Stored leads from before version 3 get their report through
+`leads/reportResult.ts`, which reruns them under `REFERENCE_METHOD` and so
+reproduces the figures they were sent. Market data dates live in
+`MARKET.usTreasury10yAsOf` (5.00% is the 15 September 2026 close) and
+`IMPLIED_ERP_BY_MONTH` (still January 2026, 4.23%; Damodaran published 4.14% for
+1 September 2026, not adopted pending the firm's confirmation).
 
 **Exploration and versions.** The sliders recompute in the browser and save
 nothing. **Email me this version** posts the explored inputs; the server
@@ -1093,17 +1121,19 @@ screen and writes nothing. Both need the lead's access token. The admin lead
 detail shows the version 2 inputs, the warnings the visitor saw, and the version
 history.
 
-**The PDF is ten fixed pages** (`REPORT_PAGE_TITLES`): cover (the headline, a KPI row of WACC, terminal value share, EV / LTM EBITDA and the weighted value, and the visitor's company name and description when given; the cover is the one page with room for the longest description in every case, and long names step the title size down), executive summary
-(rule-based, so the same inputs read the same), valuation summary with the
-football field and value bridge, financial profile, free cash flow and
-sensitivity heatmap, scenarios stake and checks, value levers, assumptions,
-methodology and sources, and working with PaceMakers (partner card, services,
-booking button and QR code). A section with nothing to say says so, so the page
-count never depends on the inputs. Every serif style sets
+**The PDF is eight pages** (`REPORT_PAGE_TITLES`): valuation at a glance (cover with
+range bar and KPI row), executive summary with financial profile, valuation
+summary (value by method, bridge, pre and post-money when raising), FCFF with
+the terminal column and sensitivity, scenarios and the factors that could
+support a higher valuation, then checks and key assumptions flowing into
+methodology, sources and disclaimer (pages 6 and 7 are one flowing section, so a
+long check list moves text rather than adding a page), and working with
+PaceMakers. Amounts print in thousands when enterprise value and revenue are
+both under 10 million (`amountUnit`). Every serif style sets
 `fontFeatureSettings: NO_LIGATURES`; a unitless `lineHeight` needs `fontSize` on
-the same element. The logo (from Header Settings) and the partner card (from the
-founder profile sections) come through `meta.branding`, fetched and resized by
-`brand/fetch.ts` and optional at every point.
+the same element. The logo and partner card come through `meta.branding`,
+optional at every point. `npm run render-valuation-qa -- <dir>` renders ten test
+cases and rasterises every page to PNG for inspection.
 
 **Adding a scenario input or a bridge item.**
 1. The type and its neutral default in `engine.ts` (`BridgeInputs` or `ScenarioInputs`, `defaultExtras`) and, for defaults a person tunes, `V2_DEFAULTS` in `data.ts`.
@@ -1112,9 +1142,11 @@ founder profile sections) come through `meta.branding`, fetched and resized by
 4. The rows in `format.ts` (`bridgeTable`, `bridgeSteps`, `scenariosTable`), which the page, the PDF, the email and the admin detail all read.
 5. Checks in `verify-valuation-v2` for the item on its own and absent, then `verify-valuation-engine` to prove the neutral path.
 
-**Verifiers.** `verify-valuation-engine` (493, reference parity),
-`verify-valuation-v2` (199), `verify-tool-lead-api` (116),
-`verify-tool-email-pdf` (235, pdfjs text and operator list, so a ligature glyph is
+**Verifiers.** `verify-valuation-engine` (514, reference parity),
+`verify-valuation-v2` (332), `verify-tool-lead-api` (124),
+`verify-valuation-dashboard` (136, the results page end to end at 1440 and 390
+against a local `next start`, every /api/ request intercepted so nothing is
+written), `verify-tool-email-pdf` (269, pdfjs text and operator list, so a ligature glyph is
 caught even though extracted text maps it back to letters),
 `verify-tools-visibility` (89), `verify-brevo-webhook` (168) and
 `verify-production-guard` (34). Each was

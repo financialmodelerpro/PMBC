@@ -67,6 +67,8 @@
     "verify-valuation-engine": "node scripts/verify-valuation-engine.mjs",
     "verify-valuation-v2": "node scripts/verify-valuation-v2.mjs",
     "render-valuation-examples": "node scripts/render-valuation-examples.mjs",
+    "render-valuation-qa": "node scripts/render-valuation-qa.mjs",
+    "verify-valuation-dashboard": "node scripts/verify-valuation-dashboard.mjs",
     "verify-tools-visibility": "node scripts/verify-tools-visibility.mjs",
     "verify-tool-lead-api": "node scripts/verify-tool-lead-api.mjs",
     "verify-tool-email-pdf": "node scripts/verify-tool-email-pdf.mjs",

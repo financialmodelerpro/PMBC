@@ -16,7 +16,9 @@
 //      below-minimum flag, attribution, IP hash, a fresh access token.
 //   8. Result serialisation round-trips NaN, which JSON cannot carry.
 //   9. Version 2 inputs: every optional block accepted and stored, inputs from
-//      before version 2 still accepted, schemaVersion stamped by the server
+//      before version 2 still accepted, schemaVersion stamped by the server;
+//      version 3: the valuation date is the server's, a stale last actual year
+//      is refused, a raise amount counts only when raising equity
 //      whatever the browser claims, and the new validation refused with 400.
 //  11. Company profile: the name and description are cleaned by the schema
 //      itself (control characters, whitespace, two paragraphs, length caps),
@@ -38,7 +40,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createJiti } from 'jiti';
 
-import { fullFeatureCase } from './lib/valuationCases.mjs';
+import { VALUATION_DATE, fullFeatureCase } from './lib/valuationCases.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -63,7 +65,16 @@ function check(label, ok, detail = '') {
 }
 
 function exampleInputs() {
-  return state.toInputs(state.onEnterWacc(state.onLeaveCompany(state.exampleState())));
+  return state.toInputs(state.onEnterWacc(state.onLeaveCompany(state.exampleState())), VALUATION_DATE);
+}
+
+/**
+ * The inputs as the server runs them: its own schema version and valuation date
+ * (the context's clock is 2026-09-16), the gate's purpose, and a raise amount
+ * only when raising equity.
+ */
+function asServer(inputs, purpose = 'sale') {
+  return { ...inputs, schemaVersion: 3, valuationDate: '2026-09-16', purpose, raiseAmount: purpose === 'raise' ? (inputs.raiseAmount ?? null) : null };
 }
 
 function body(overrides = {}) {
@@ -105,7 +116,7 @@ const ctx = (over = {}) => ({
   ...over,
 });
 
-const expected = engine.runValuation(exampleInputs()).result;
+const expected = engine.runValuation(asServer(exampleInputs())).result;
 const expectedJson = JSON.stringify(serialize.serializeResult(expected));
 
 console.log('Saved lead');
@@ -214,7 +225,7 @@ console.log('Serialisation');
   s = state.applyIndustryDefaults({ ...s, industry: 'Engineering/Construction' });
   s = state.applyCountryDefaults({ ...s, country: 'United Arab Emirates', netDebt: '400' });
   s = state.onEnterWacc(state.resetWacc({ ...s, fin: Object.fromEntries(Object.entries(fin).map(([k, v]) => [k, v.map(String)])) }));
-  const r = engine.runValuation(state.toInputs(s)).result;
+  const r = engine.runValuation(state.toInputs(s, VALUATION_DATE)).result;
   const back = serialize.reviveResult(JSON.parse(JSON.stringify(serialize.serializeResult(r))));
   check('NaN survives the round trip', Number.isNaN(r.base.evX) && Number.isNaN(back.base.evX));
   check('compsEbitda null stays null', r.compsEbitda === null && back.compsEbitda === null);
@@ -224,7 +235,7 @@ console.log('Serialisation');
 
 console.log('Version 2 inputs');
 {
-  const full = state.toInputs(fullFeatureCase(state));
+  const full = state.toInputs(fullFeatureCase(state), VALUATION_DATE);
   const store = memoryStore();
   const out = await leads.processValuationSubmission(body({ inputs: full }), ctx(), store);
   check('full feature inputs: saved', out.kind === 'saved', out.kind);
@@ -232,10 +243,10 @@ console.log('Version 2 inputs');
   check('stored inputs keep every version 2 block', ['normalisation', 'bridge', 'stake', 'scenarios', 'investedCapital'].every((k) => row.inputs[k] !== undefined));
   check('stored bridge as submitted', JSON.stringify(row.inputs.bridge) === JSON.stringify(full.bridge));
   check('stored stake as submitted', JSON.stringify(row.inputs.stake) === JSON.stringify(full.stake));
-  check('stored inputs carry schemaVersion 2', row.inputs.schemaVersion === 2);
-  const fullResult = engine.runValuation(full).result;
-  check('stored results are the version 2 recomputation', JSON.stringify(row.results) === JSON.stringify(serialize.serializeResult(fullResult)));
-  check('stored results carry scenarios, stake and warnings', row.results.scenarios.length === 3 && row.results.stake.used === true && Array.isArray(row.results.warnings));
+  check('stored inputs carry schemaVersion 3', row.inputs.schemaVersion === 3);
+  const fullResult = engine.runValuation(asServer(full)).result;
+  check('stored results are the server recomputation', JSON.stringify(row.results) === JSON.stringify(serialize.serializeResult(fullResult)));
+  check('stored results carry scenarios, stake and checks', row.results.scenarios.length === 3 && row.results.stake.used === true && Array.isArray(row.results.checks) && row.results.checks.length >= 11);
 
   const v1 = exampleInputs();
   for (const k of ['normalisation', 'bridge', 'stake', 'scenarios', 'investedCapital', 'waccAdjustment', 'schemaVersion']) delete v1[k];
@@ -243,11 +254,37 @@ console.log('Version 2 inputs');
   const legacy = await leads.processValuationSubmission(body({ inputs: v1 }), ctx(), legacyStore);
   check('inputs from before version 2: saved', legacy.kind === 'saved', legacy.kind);
   check('... with the same result as today', JSON.stringify(legacy.body.result) === expectedJson);
-  check('... stamped schemaVersion 2', legacyStore.inserted[0]?.inputs.schemaVersion === 2);
+  check('... stamped schemaVersion 3', legacyStore.inserted[0]?.inputs.schemaVersion === 3);
 
   const claimed = memoryStore();
   await leads.processValuationSubmission(body({ inputs: { ...exampleInputs(), schemaVersion: 1 } }), ctx(), claimed);
-  check('a browser claiming schemaVersion 1 is stored as 2', claimed.inserted[0]?.inputs.schemaVersion === 2);
+  check('a browser claiming schemaVersion 1 is stored as 3', claimed.inserted[0]?.inputs.schemaVersion === 3);
+
+  // Version 3: what the server decides.
+  const dated = memoryStore();
+  await leads.processValuationSubmission(body({ inputs: { ...exampleInputs(), valuationDate: '2020-01-01' } }), ctx(), dated);
+  check('a browser valuation date is replaced by the server date', dated.inserted[0]?.inputs.valuationDate === '2026-09-16' && dated.inserted[0]?.results.meta.valuationDate === '2026-09-16');
+  const stale = memoryStore();
+  const staleOut = await leads.processValuationSubmission(body({ inputs: { ...exampleInputs(), financialYear: 2024 } }), ctx(), stale);
+  check('a last actual year more than 12 months before the server date is refused', staleOut.status === 400 && stale.inserted.length === 0 && JSON.stringify(staleOut.body).includes('more than 12 months old'), JSON.stringify(staleOut.body).slice(0, 200));
+  const raiseSale = memoryStore();
+  await leads.processValuationSubmission(body({ inputs: { ...exampleInputs(), raiseAmount: 80 } }), ctx(), raiseSale);
+  check('a raise amount is dropped unless the purpose is raising equity', raiseSale.inserted[0]?.inputs.raiseAmount === null && raiseSale.inserted[0]?.results.raise === null && raiseSale.inserted[0]?.inputs.purpose === 'sale');
+  const raising = memoryStore();
+  await leads.processValuationSubmission(body({ inputs: { ...exampleInputs(), raiseAmount: 80 }, gate: { ...body().gate, purpose: 'raise' } }), ctx(), raising);
+  const rr = raising.inserted[0]?.results;
+  check('raising equity: pre-money and post-money stored', rr?.raise?.amount === 80 && Math.abs(rr.raise.postMoney[1] - rr.raise.preMoney[1] - 80) < 1e-9 && Math.abs(rr.raise.investorStake[1] - 80 / rr.raise.postMoney[1]) < 1e-12);
+  const gcc = memoryStore();
+  await leads.processValuationSubmission(body({ inputs: { ...exampleInputs(), gccOwnership: 0 } }), ctx(), gcc);
+  check('Saudi / GCC ownership accepted and applied', gcc.inserted[0]?.inputs.gccOwnership === 0 && gcc.inserted[0]?.results.wacc.t === 0.2);
+  const missing = memoryStore();
+  const missingOut = await leads.processValuationSubmission(body({ inputs: { ...exampleInputs(), gccOwnership: null } }), ctx(), missing);
+  check('Saudi / GCC ownership is required: a Saudi submission without it is refused', missingOut.status === 400 && missing.inserted.length === 0 && JSON.stringify(missingOut.body).includes('Saudi / GCC ownership'));
+  const zakatBase = memoryStore();
+  await leads.processValuationSubmission(body({ inputs: { ...exampleInputs(), investedCapital: 60 } }), ctx(), zakatBase);
+  check('with invested capital the stored result uses the zakat base method', zakatBase.inserted[0]?.results.tax.zakatMethod === 'base' && zakatBase.inserted[0]?.results.tax.zakatBaseLtm.base >= 0);
+  const badGcc = await leads.processValuationSubmission(body({ inputs: { ...exampleInputs(), gccOwnership: 140 } }), ctx(), memoryStore());
+  check('an ownership share above 100% is refused', badGcc.status === 400);
 
   const refuse = [
     ['negative lease liability', { ...full, bridge: { ...full.bridge, leases: -5 } }],
@@ -278,7 +315,9 @@ console.log('Company profile');
   check('profile: company name cleaned', stored?.companyName === 'Acme Foods Ltd', JSON.stringify(stored?.companyName));
   check('profile: two paragraphs kept, cleaned, the third dropped', stored?.description === 'First paragraph here.\n\nSecond paragraph.', JSON.stringify(stored?.description));
   check('profile: the gate had no company, so the lead takes the profile name', st.inserted[0]?.company === 'Acme Foods Ltd');
-  check('profile: figures unchanged', JSON.stringify(out.body.result) === expectedJson);
+  // The profile reaches the result's meta block only; every figure is unchanged.
+  const withoutCompany = (x) => JSON.stringify({ ...x, meta: { ...x.meta, company: null } });
+  check('profile: figures unchanged', withoutCompany(out.body.result) === withoutCompany(JSON.parse(expectedJson)) && out.body.result.meta.company === 'Acme Foods Ltd');
 
   const gateWins = memoryStore();
   await leads.processValuationSubmission(body({ inputs: profileInputs(messy) }), ctx(), gateWins);
@@ -327,7 +366,7 @@ console.log('Email me this version');
   }
   const vctx = (over = {}) => ({ now: new Date('2026-09-16T12:00:00Z'), toolLive: true, isStaff: false, ...over });
   const changed = { ...exampleInputs(), growth: 3, exitMultiple: 9, waccAdjustment: 1 };
-  const changedResult = engine.runValuation(changed).result;
+  const changedResult = engine.runValuation({ ...changed, schemaVersion: 3, valuationDate: '2026-09-16' }).result;
   const changedJson = JSON.stringify(serialize.serializeResult(changedResult));
 
   const st = versionStore();
@@ -335,7 +374,7 @@ console.log('Email me this version');
   check('version: 200 saved', out.status === 200 && out.kind === 'saved', out.kind);
   check('version: result is the server recomputation', JSON.stringify(out.body.result) === changedJson);
   check('version: the lead now holds the new inputs and results', st.lead.inputs.growth === 3 && JSON.stringify(st.lead.results) === changedJson);
-  check('version: stamped schemaVersion 2 and the current data version', st.saves[0].inputs.schemaVersion === 2 && st.saves[0].data_version === data.VALUATION_DATA_VERSION);
+  check('version: stamped schemaVersion 3, the server date and the current data version', st.saves[0].inputs.schemaVersion === 3 && st.saves[0].inputs.valuationDate === '2026-09-16' && st.saves[0].data_version === data.VALUATION_DATA_VERSION);
   check('version: headline columns updated', st.saves[0].equity_mid === changedResult.equityDisplay[1] && st.saves[0].wacc === changedResult.wacc.wacc);
   check('version: previous inputs and results kept in the event', st.events.length === 1 && st.events[0].payload.previous.inputs.growth === original.inputs.growth && JSON.stringify(st.events[0].payload.previous.results) === expectedJson);
   check('version: previous data version kept', st.events[0].payload.previous.data_version === '2026-01-01');
@@ -343,7 +382,7 @@ console.log('Email me this version');
 
   const claimedStore = versionStore();
   await version.processVersionUpdate({ token: TOKEN, inputs: { ...changed, schemaVersion: 1 } }, vctx(), claimedStore);
-  check('version: inputs claiming schemaVersion 1 stored as 2', claimedStore.saves[0]?.inputs.schemaVersion === 2, String(claimedStore.saves[0]?.inputs.schemaVersion));
+  check('version: inputs claiming schemaVersion 1 stored as 3', claimedStore.saves[0]?.inputs.schemaVersion === 3, String(claimedStore.saves[0]?.inputs.schemaVersion));
 
   const at = async (hour, day, over = {}) => version.processVersionUpdate({ token: TOKEN, inputs: changed }, vctx(over), versionStore({ hour, day }));
   const L = version.VERSION_RATE_LIMIT;

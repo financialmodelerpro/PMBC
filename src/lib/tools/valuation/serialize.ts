@@ -6,10 +6,13 @@
  * JSON has no NaN: `JSON.stringify` silently turns it into null, which then
  * multiplies as zero. So the conversion is explicit in both directions. Every
  * non-finite number is stored as null, and every null is read back as NaN,
- * except `compsEbitda`, whose null means "not used" rather than "not a number".
+ * except the fields in `NULL_MEANS_ABSENT`, whose null means "not used" or
+ * "not given" rather than "not a number".
  */
 
 import type { ValuationResult } from './engine';
+
+const NULL_MEANS_ABSENT = new Set(['compsEbitda', 'exit', 'ebitdaValue', 'raise', 'valuationDate', 'company', 'purpose']);
 
 export function serializeResult(result: ValuationResult): unknown {
   return JSON.parse(
@@ -19,7 +22,7 @@ export function serializeResult(result: ValuationResult): unknown {
 
 export function reviveResult(stored: unknown): ValuationResult {
   const walk = (value: unknown, key: string): unknown => {
-    if (value === null) return key === 'compsEbitda' ? null : NaN;
+    if (value === null) return NULL_MEANS_ABSENT.has(key) ? null : NaN;
     if (Array.isArray(value)) return value.map((v) => walk(v, ''));
     if (typeof value === 'object') {
       const out: Record<string, unknown> = {};

@@ -29,6 +29,14 @@
 //      invested capital, WACC adjustment) left at its neutral default, which
 //      is what keeps these figures identical to the reference. The version 2
 //      features themselves are proved by verify-valuation-v2.
+//   6. Version 3 changed the method on purpose: the normalised terminal cash
+//      flow, the stub period from the valuation date, zakat and loss
+//      carry-forward. The engine is run here with `REFERENCE_METHOD`, no
+//      valuation date and 0% Saudi / GCC ownership, which must reproduce the
+//      reference exactly; verify-valuation-v2 proves the new method against
+//      independent arithmetic. Tables are compared by value, since version 3
+//      relabelled them (base case, 2dp WACC) and added rows the reference
+//      never had.
 //
 // CASES
 //   A. The reference's own example: Healthcare Support Services, Saudi Arabia,
@@ -375,6 +383,36 @@ function tableCells(t) {
   return [...t.head, ...t.rows.flatMap((r) => [r.label, ...r.values])];
 }
 
+/** The value cells of a reference table read as header then rows of `width` cells, skipping each row's label. */
+function valueCells(cells, width, valuesPerRow) {
+  const out = [];
+  for (let i = width; i < cells.length; i += width) out.push(...cells.slice(i + 1, i + 1 + valuesPerRow));
+  return out;
+}
+
+/**
+ * The free cash flow table as the reference printed it. Version 3's table adds
+ * a terminal column, the valuation date row and discount periods, so the
+ * reference's own layout is rebuilt here from the same result fields.
+ */
+function legacyFcfCells(r) {
+  const m = (arr) => arr.map(format.fmtMillions);
+  const rows = [
+    ['Revenue', m(r.rows.map((x) => x.rev))],
+    ['EBITDA', m(r.rows.map((x) => x.ebitda))],
+    ['Less depreciation and amortisation', m(r.rows.map((x) => -x.da))],
+    ['EBIT', m(r.rows.map((x) => x.ebit))],
+    [format.taxRowLabel(r), m(r.rows.map((x) => -x.tax))],
+    ['Add back depreciation and amortisation', m(r.rows.map((x) => x.da))],
+    ['Less capital expenditure', m(r.rows.map((x) => -x.capex))],
+    ['Less increase in working capital', m(r.rows.map((x) => -x.dnwc))],
+    ['Free cash flow to firm', m(r.rows.map((x) => x.fcf))],
+    ['Discount factor', r.base.dfs.map((v) => v.toFixed(3))],
+    ['Present value', m(r.rows.map((x, i) => x.fcf * r.base.dfs[i]))],
+  ];
+  return [format.currencyMillions(r.currency), ...r.years.forecast.map((y) => `FY${y} F`), ...rows.flatMap(([label, values]) => [label, ...values])];
+}
+
 /**
  * The one known display difference, and it is a fix. Tax on a loss-making year
  * is `Math.max(0, ebit) * t` negated, which is -0, and the reference printed
@@ -382,7 +420,7 @@ function tableCells(t) {
  * compared separately above; only the reference's text is normalised here.
  */
 function normaliseNegativeZero(cells) {
-  return cells.map((c) => (c === '-0.0' ? '0.0' : c));
+  return cells.map((c) => (c === '-0.0' || c === '(0.0)' ? '0.0' : c));
 }
 
 /* ------------------------------------------------------------------------ */
@@ -444,7 +482,8 @@ async function runCase(page, c) {
   if (refOut.error) return fail(`reference run failed: ${refOut.error}`);
   const ref = revive(refOut.calc);
 
-  const outcome = engine.runValuation(state.toInputs(s));
+  // The reference's method, with every version 3 input neutral.
+  const outcome = engine.runValuation({ ...state.toInputs(s, null), gccOwnership: 0 }, engine.REFERENCE_METHOD);
   if (!outcome.ok) return fail(`engine refused the case at step ${outcome.step}: ${JSON.stringify(outcome.errors)}`);
   const r = outcome.result;
 
@@ -476,15 +515,29 @@ async function runCase(page, c) {
   same('valuation date', h.valuationDate, t.rFy);
   same('KPI WACC', h.wacc, t.kW);
   same('KPI terminal value share', h.tvShare, t.kTv);
-  same('KPI implied exit multiple', h.impliedExitMultiple, t.kIm);
+  same('KPI implied terminal multiple (perpetuity method)', h.impliedExitMultiple, t.kIm);
   same('KPI EV / LTM EBITDA', h.ltmMultiple, t.kLtm);
   // The reference's five rows. Version 2 adds a scenarios row it never had.
   const rows = format.footballFieldRows(r).filter((x) => format.REFERENCE_FOOTBALL_KEYS.includes(x.key));
   same('football field values', rows.map((x) => (x.range ? `${format.fmtMillions(x.range[0])} to ${format.fmtMillions(x.range[2])}` : '')), t.ffVals);
   same('football field scale', format.footballFieldScale(rows).ticks, t.ffScale);
-  same('FCF table', tableCells(format.fcfTable(r)), normaliseNegativeZero(t.fcf));
-  same('sensitivity table', tableCells(format.sensitivityTable(r)), normaliseNegativeZero(t.sens));
-  same('bridge table', tableCells(format.bridgeTable(r)), normaliseNegativeZero(t.bridge));
+  same('FCF table', legacyFcfCells(r), normaliseNegativeZero(t.fcf));
+  // Sensitivity: every value cell as printed; the axis labels as numbers, since
+  // version 3 prints WACC and growth to two decimals where the reference used one.
+  const sens = format.sensitivityTable(r);
+  same('sensitivity values', sens.rows.flatMap((row) => row.values), valueCells(normaliseNegativeZero(t.sens), 6, 5));
+  const refSens = normaliseNegativeZero(t.sens);
+  sens.rows.forEach((row, i) => {
+    const ours = parseFloat(row.label), ref = parseFloat(refSens[6 + i * 6]);
+    if (Math.abs(ours - ref) <= 0.05 + 1e-9) pass();
+    else fail(`sensitivity WACC label ${i}: ours ${row.label}, reference ${refSens[6 + i * 6]}`);
+  });
+  if (/^\d+\.\d{2}%$/.test(sens.rows[2].label)) pass();
+  else fail(`CHANGED sensitivity WACC labels to two decimals: ${sens.rows[2].label}`);
+  // Bridge: values only. Version 3 labels the middle column "Base case".
+  const bridge = format.bridgeTable(r);
+  same('bridge table values', bridge.rows.flatMap((row) => row.values), valueCells(normaliseNegativeZero(t.bridge), 4, 3));
+  same('CHANGED bridge column is the base case', bridge.head[2], 'Base case');
 
   // CHANGED 2: negative equity. The reference floored the low and high only.
   same('equity floor', r.equityFloor, c.expectFloor);

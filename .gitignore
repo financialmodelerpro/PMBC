@@ -49,3 +49,7 @@ supabase/.branches/
 next-env.d.ts
 
 .vercel
+
+# Local valuation report renders (npm run render-valuation-examples / render-valuation-qa)
+.valuation-examples/
+.valuation-qa/

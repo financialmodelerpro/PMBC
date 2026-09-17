@@ -56,7 +56,7 @@ export function ChartSvg({ chart, className }: { chart: Chart; className?: strin
             case 'line':
               return <line key={i} x1={p.x1} y1={p.y1} x2={p.x2} y2={p.y2} stroke={p.stroke} strokeWidth={p.width} strokeDasharray={p.dash} />;
             case 'path':
-              return <path key={i} d={p.d} stroke={p.stroke} fill={p.fill ?? 'none'} strokeWidth={p.width} strokeLinejoin="round" strokeLinecap="round" />;
+              return <path key={i} d={p.d} stroke={p.stroke} fill={p.fill ?? 'none'} strokeWidth={p.width} strokeDasharray={p.dash} strokeLinejoin="round" strokeLinecap="round" />;
             case 'circle':
               return <circle key={i} cx={p.cx} cy={p.cy} r={p.r} fill={p.fill} stroke={p.stroke} strokeWidth={p.strokeWidth} />;
             case 'text':

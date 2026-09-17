@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { CONSENT_TEXT, FOLLOW_UP_TEXT } from '@/lib/tools/consent';
 import { DEAL_BAND_UNSURE, PURPOSES } from '@/lib/tools/valuation/data';
 
-import { Field, Panel, PanelTitle, Select, StepNav, inputClass } from './ui';
+import { Field, NumberInput, Panel, PanelTitle, Select, StepNav, inputClass } from './ui';
 
 export type GateValues = {
   name: string;
@@ -15,6 +15,8 @@ export type GateValues = {
   dealSize: string;
   consent: boolean;
   followUp: boolean;
+  /** Optional, and only asked when raising equity. Millions of the local currency. */
+  raiseAmount: string;
   /** Honeypot. A person never sees it. */
   website: string;
 };
@@ -27,10 +29,11 @@ export const EMPTY_GATE: GateValues = {
   dealSize: '',
   consent: false,
   followUp: false,
+  raiseAmount: '',
   website: '',
 };
 
-export type GateErrors = Partial<Record<'name' | 'email' | 'purpose' | 'dealSize' | 'consent', string>>;
+export type GateErrors = Partial<Record<'name' | 'email' | 'purpose' | 'dealSize' | 'consent' | 'raiseAmount', string>>;
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
@@ -41,6 +44,9 @@ export function validateGate(g: GateValues): GateErrors {
   if (!g.purpose) e.purpose = 'Select what the valuation is for.';
   if (!g.dealSize) e.dealSize = 'Select a transaction size range.';
   if (!g.consent) e.consent = 'Tick the box to agree before we show your results.';
+  if (g.purpose === 'raise' && g.raiseAmount.trim() !== '' && !(parseFloat(g.raiseAmount) >= 0)) {
+    e.raiseAmount = 'Enter the amount to raise as a positive number, or leave it blank.';
+  }
   return e;
 }
 
@@ -48,6 +54,7 @@ export function LeadGate({
   values,
   errors,
   dealBands,
+  currencyCode,
   submitting,
   onChange,
   onBack,
@@ -56,6 +63,7 @@ export function LeadGate({
   values: GateValues;
   errors: GateErrors;
   dealBands: { value: string; label: string }[];
+  currencyCode: string;
   submitting: boolean;
   onChange: (patch: Partial<GateValues>) => void;
   onBack: () => void;
@@ -153,6 +161,26 @@ export function LeadGate({
             )}
           </Field>
         </div>
+        {values.purpose === 'raise' && (
+          <Field
+            label="Amount you plan to raise (optional)"
+            hint="Adds pre-money and post-money values to your report. Leave blank and the values shown are pre-money."
+            error={errors.raiseAmount ?? ''}
+          >
+            {({ id, describedBy, invalid }) => (
+              <NumberInput
+                id={id}
+                min={0}
+                step={0.1}
+                suffix={`${currencyCode} m`}
+                value={values.raiseAmount}
+                onValue={(v) => onChange({ raiseAmount: v })}
+                aria-describedby={describedBy}
+                aria-invalid={invalid}
+              />
+            )}
+          </Field>
+        )}
         <Field label="Planned transaction size" error={errors.dealSize ?? ''}>
           {({ id, describedBy, invalid }) => (
             <Select

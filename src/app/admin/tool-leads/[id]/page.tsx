@@ -23,6 +23,7 @@ import {
   normalisationRows,
   scenariosTable,
   sensitivityTable,
+  sensitivityTitle,
   warningTexts,
   type Table,
 } from '@/lib/tools/valuation/format';
@@ -156,9 +157,9 @@ function versionHistory(events: ToolLeadEventRow[]): VersionEntry[] {
   return out;
 }
 
-/** Whether the stored result carries the version 2 blocks. Leads saved before it do not. */
+/** Whether the stored result carries the version 2 blocks (warnings then, checks from version 3). Leads saved before it do not. */
 function isV2(r: ValuationResult): boolean {
-  return Array.isArray(r.warnings) && Boolean(r.stake);
+  return (Array.isArray(r.warnings) || Array.isArray(r.checks)) && Boolean(r.stake);
 }
 
 function eventTone(e: ToolLeadEventRow): 'neutral' | 'success' | 'warning' | 'danger' {
@@ -262,15 +263,15 @@ export default async function ToolLeadDetailPage(props: { params: Promise<{ id: 
           <Card title="Stored results" span>
             <p style={{ margin: '0 0 4px', fontSize: 22, fontWeight: 700, color: ADMIN_COLORS.textHeading }}>{h.equityRange}</p>
             <p style={{ ...small, margin: '0 0 12px' }}>
-              Midpoint {h.midpoint} as at end of {h.valuationDate}. Enterprise value {h.evRange}. WACC {h.wacc}. Terminal value share {h.tvShare}.
-              Implied EV / LTM EBITDA {h.ltmMultiple}.
+              Base case {h.midpoint}, equity value {h.asAt}. Enterprise value {h.evRange}. WACC {h.wacc}. Terminal value share {h.tvShare}.
+              Implied EV / LTM EBITDA {h.ltmMultiple}. Implied terminal multiple (perpetuity method) {h.impliedExitMultiple}.
             </p>
             {h.floorNote && <p style={{ ...small, margin: '0 0 12px', color: ADMIN_COLORS.warning }}>{h.floorNote}</p>}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))', gap: 16 }}>
               <div>
                 <p style={{ ...muted, margin: '0 0 6px' }}>Enterprise to equity</p>
                 <MiniTable table={bridgeTable(result)} />
-                <p style={{ ...muted, margin: '14px 0 6px' }}>Sensitivity, equity value</p>
+                <p style={{ ...muted, margin: '14px 0 6px' }}>{sensitivityTitle(result)}</p>
                 <MiniTable table={sensitivityTable(result)} />
               </div>
               <div>
@@ -296,7 +297,7 @@ export default async function ToolLeadDetailPage(props: { params: Promise<{ id: 
                   )}
                 </div>
                 <div>
-                  <p style={{ ...muted, margin: '0 0 6px' }}>Warnings shown to the visitor ({warnings.length})</p>
+                  <p style={{ ...muted, margin: '0 0 6px' }}>Checks that raised a warning for the visitor ({warnings.length})</p>
                   {warnings.length === 0 ? (
                     <p style={{ ...small, margin: 0 }}>None triggered.</p>
                   ) : (
@@ -338,7 +339,10 @@ export default async function ToolLeadDetailPage(props: { params: Promise<{ id: 
                   ['Size premium', `${n(w.sp)}%`],
                   ['Default spread', `${n(w.ds)}%`],
                   ['Credit spread', `${n(w.cs)}%`],
-                  ['Tax rate', `${n(w.tax)}%`],
+                  ['Corporate income tax rate', `${n(w.tax)}%`],
+                  ...(inputs.country === 'Saudi Arabia'
+                    ? ([['Saudi / GCC ownership', (inputs.schemaVersion ?? 1) >= 3 ? `${extras.gccOwnership}%` : 'Not asked (saved before version 3); valued on corporate tax']] as [string, string][])
+                    : []),
                   ...(result.currency.pegged
                     ? []
                     : ([
@@ -380,6 +384,8 @@ export default async function ToolLeadDetailPage(props: { params: Promise<{ id: 
                     ),
                   ],
                   ['Input schema version', String(inputs.schemaVersion ?? 1)],
+                  ['Valuation date', inputs.valuationDate ?? 'Not recorded (saved before version 3)'],
+                  ['Amount to raise', inputs.raiseAmount === null || inputs.raiseAmount === undefined ? 'Not entered' : `${inputs.raiseAmount} ${code} m`],
                   ['One-off costs added back', opt(extras.normalisation.oneOff, ` ${code} m`)],
                   ['Owner costs added back', opt(extras.normalisation.ownerCosts, ` ${code} m`)],
                   ['Carry owner costs into forecast', extras.normalisation.carryOwnerCosts ? 'Yes' : 'No'],

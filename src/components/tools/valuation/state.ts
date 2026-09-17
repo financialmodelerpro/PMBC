@@ -10,7 +10,17 @@
  * transitions the page does.
  */
 
-import { ASSUMPTIONS, COUNTRIES, EXAMPLE_COMPANY, MARKET, V2_DEFAULTS, WARNING_RULES } from '@/lib/tools/valuation/data';
+import {
+  ASSUMPTIONS,
+  COUNTRIES,
+  EXAMPLE_COMPANY,
+  MARKET,
+  TAX,
+  V2_DEFAULTS,
+  WARNING_RULES,
+  defaultFinancialYearFor,
+  marketDataInUse,
+} from '@/lib/tools/valuation/data';
 import { cleanProfile } from '@/lib/tools/valuation/profile';
 import {
   INPUT_SCHEMA_VERSION,
@@ -72,6 +82,9 @@ export type FormState = {
   scenarios: Record<ScenarioKey, string>;
   /** Exploration only: percentage points on WACC from the results slider. */
   waccAdjustment: string;
+  /* Version 3 ---------------------------------------------------------- */
+  /** Saudi / GCC ownership, percent. Shown, and sent, for Saudi Arabia only. */
+  gccOwnership: string;
 };
 
 let peerSeq = 0;
@@ -89,7 +102,7 @@ export function initialState(): FormState {
     description: '',
     industry: '',
     country: '',
-    financialYear: String(ASSUMPTIONS.defaultFinancialYear),
+    financialYear: String(defaultFinancialYearFor()),
     netDebt: '',
     fin: { rev: blankLine(), ebitda: blankLine(), da: blankLine(), capex: blankLine(), nwc: blankLine() },
     fill: {
@@ -129,7 +142,15 @@ export function initialState(): FormState {
       weightUpside: String(d.scenarioWeights.upside),
     },
     waccAdjustment: '0',
+    // Required for Saudi Arabia and deliberately blank: no default.
+    gccOwnership: '',
   };
+}
+
+/** Today as YYYY-MM-DD in the visitor's own calendar. The server replaces it with its own date. */
+export function todayIso(now: Date = new Date()): string {
+  const p = (v: number) => String(v).padStart(2, '0');
+  return `${now.getFullYear()}-${p(now.getMonth() + 1)}-${p(now.getDate())}`;
 }
 
 export function num(s: string): number | null {
@@ -171,7 +192,11 @@ export function parseWacc(w: FormState['wacc']): WaccInputs {
   return out;
 }
 
-export function toInputs(s: FormState): ValuationInputs {
+/**
+ * `valuationDate` defaults to today. The verifiers pass a fixed date so a
+ * figure does not move with the day they run.
+ */
+export function toInputs(s: FormState, valuationDate: string | null = todayIso()): ValuationInputs {
   const fy = parseInt(s.financialYear, 10);
   const sc = s.scenarios;
   return {
@@ -214,6 +239,8 @@ export function toInputs(s: FormState): ValuationInputs {
     },
     waccAdjustment: num(s.waccAdjustment) ?? 0,
     profile: cleanProfile({ companyName: s.companyName, description: s.description }),
+    gccOwnership: s.country === TAX.zakatCountry ? num(s.gccOwnership) : null,
+    valuationDate,
   };
 }
 
@@ -298,7 +325,7 @@ export function exampleState(): FormState {
     ...initialState(),
     industry: ex.industry,
     country: ex.country,
-    financialYear: String(ex.financialYear),
+    financialYear: String(defaultFinancialYearFor()),
     netDebt: String(ex.netDebt),
     fill: {
       growth: String(ex.fill.growth),
@@ -308,6 +335,7 @@ export function exampleState(): FormState {
       nwcOfRevenue: String(ex.fill.nwcOfRevenue),
     },
     peers: ex.peers.map((p) => newPeer(p.name, String(p.evEbitda), String(p.evRevenue))),
+    gccOwnership: String(ex.gccOwnership),
   };
   const fin = {} as FormState['fin'];
   for (const k of LINE_KEYS) {
@@ -335,8 +363,8 @@ export function resetWacc(s: FormState): FormState {
     ...s,
     wacc: {
       ...s.wacc,
-      rf: str(+(MARKET.usTreasury10y - MARKET.usDefaultSpread).toFixed(2)),
-      erp: str(MARKET.matureErp),
+      rf: str(+(marketDataInUse().treasury.value - MARKET.usDefaultSpread).toFixed(2)),
+      erp: str(marketDataInUse().erp.value),
       cs: str(ASSUMPTIONS.companyCreditSpread),
     },
   };
@@ -395,5 +423,7 @@ export function stateFromInputs(i: ValuationInputs): FormState {
         }
       : base.scenarios,
     waccAdjustment: d(i.waccAdjustment ?? 0),
+    // Stored inputs from before version 3 were valued on corporate tax alone.
+    gccOwnership: i.gccOwnership === null || i.gccOwnership === undefined ? ((i.schemaVersion ?? 1) >= 3 ? '' : '0') : d(i.gccOwnership),
   };
 }

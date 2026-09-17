@@ -126,13 +126,13 @@ export function buildResultsEmail(i: ResultsEmailInput): { subject: string; body
   const methods = methodsUsed(i.result).join(', ');
   const rows: [string, string][] = [
     ['Indicative equity value', h.equityRange],
-    ['Midpoint', h.midpoint],
+    ['Base case', h.midpoint],
     ...(h.weighted ? ([['Probability-weighted value', h.weighted]] as [string, string][]) : []),
     ...(h.stakeRange && h.stakeLabel ? ([[`Value of ${h.stakeLabel}`, h.stakeRange]] as [string, string][]) : []),
     ['Enterprise value', h.evRange],
     ['WACC', h.wacc],
     ['Methods', methods],
-    ['Valuation date', `End of ${h.valuationDate}`],
+    ['Valuation date', h.asAt.replace(/^as at /, '').replace(/^end of/, 'End of')],
   ];
   const floor = equityFloorNote(i.result.equityFloor);
   const summary =
@@ -197,7 +197,7 @@ export function buildAlertEmail(i: AlertEmailInput): { subject: string; body: st
     ['Country', l.country ?? ''],
     ['Industry', l.industry ?? ''],
     ['Indicative equity value', h.equityRange],
-    ['Midpoint', h.midpoint],
+    ['Base case', h.midpoint],
     ['WACC', h.wacc],
     ['Follow-up email consent', l.followUp ? 'Yes' : 'No'],
   ];

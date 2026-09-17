@@ -5,19 +5,36 @@
  * submitted inputs, so what is stored, emailed and put in the PDF never depends
  * on numbers a browser sent.
  *
- * The version 1 arithmetic is a line-for-line port of the reference
- * implementation at `reference/tools/business-valuation.html`, including its
- * order of operations, so the two agree to floating-point precision.
- * `npm run verify-valuation-engine` holds it to that by running the reference in
- * headless Chrome. Deliberate departures from the reference are marked CHANGED.
+ * ONE RESULT OBJECT. `runValuation` returns a `ValuationResult`, and that object
+ * is the only source for the results page, the PDF report, the emails, the
+ * admin view and the verifiers. Every figure any of them shows is a field on it,
+ * held unrounded; rounding happens only where a figure is formatted
+ * (`format.ts`). Nothing downstream computes a value.
  *
- * VERSION 2 (schema version 2) adds normalised EBITDA, bridge items below net
+ * The version 1 arithmetic is a port of the reference implementation at
+ * `reference/tools/business-valuation.html`, including its order of operations.
+ * `npm run verify-valuation-engine` holds it to that by running the reference in
+ * headless Chrome, with `REFERENCE_METHOD` and the version 3 inputs neutral.
+ * Deliberate departures from the reference are marked CHANGED.
+ *
+ * VERSION 2 (schema version 2) added normalised EBITDA, bridge items below net
  * debt, stake value, scenarios, a WACC adjustment for the exploration sliders,
- * invested capital for ROIC, key ratios and warnings. Every version 2 input is
- * optional and resolves to a neutral default (`resolveExtras`), so a version 1
- * input set, or a version 2 set left at its defaults, produces exactly the
- * version 1 base result. Stored leads with version 1 inputs therefore still
- * compute, and the reference comparison still holds.
+ * invested capital for ROIC and key ratios.
+ *
+ * VERSION 3 (schema version 3, 2026-09-17):
+ *   - CHANGED: the perpetuity terminal value is built on a normalised terminal
+ *     cash flow, with reinvestment sized for long-term growth rather than the
+ *     final forecast year's growth (`terminalCashFlow`).
+ *   - CHANGED: the valuation date is the date the valuation is run, and the
+ *     first forecast year is cut to the part after it (`stubPeriod`).
+ *   - Saudi / GCC ownership: zakat on the GCC-owned share, corporate tax on the
+ *     rest (`taxProfile`).
+ *   - CHANGED: tax losses are carried forward, capped per country.
+ *   - Checks (`checks.ts`) and recommendations (`recommendations.ts`) are
+ *     selected here, from the result, rather than by the report.
+ *   - An optional equity raise, for pre-money and post-money values.
+ * Stored version 2 inputs still run: `resolveExtras` treats an absent ownership
+ * share on them as 0%, which is the corporate tax they were computed with.
  *
  * Units: rates arrive as percent (5 means 5%), exactly as a person types them,
  * and are converted here. Money is in millions of the selected currency. A blank
@@ -26,15 +43,19 @@
  * Relative imports only, so the verifiers can load this file outside Next.
  */
 
+import { buildChecks } from './checks';
 import type { CompanyProfile } from './profile';
+import { buildRecommendations } from './recommendations';
 import {
   ASSUMPTIONS,
   COUNTRIES,
   DEAL_BANDS_SAR,
   INDUSTRIES,
-  MARKET,
+  TAX,
   V2_DEFAULTS,
-  WARNING_RULES,
+  VALUATION_DATA_VERSION,
+  marketDataInUse,
+  type DatedValue,
   type IndustryData,
 } from './data';
 
@@ -42,8 +63,8 @@ export const HISTORY_YEARS = 3;
 export const FORECAST_YEARS = 5;
 export const TOTAL_YEARS = HISTORY_YEARS + FORECAST_YEARS;
 
-/** The inputs schema version written by this code. Stored on every lead's inputs. */
-export const INPUT_SCHEMA_VERSION = 2;
+/** The inputs schema version written by this code. Stored on every lead's inputs and result. */
+export const INPUT_SCHEMA_VERSION = 3;
 
 export type LineKey = 'rev' | 'ebitda' | 'da' | 'capex' | 'nwc';
 export const LINE_KEYS: LineKey[] = ['rev', 'ebitda', 'da', 'capex', 'nwc'];
@@ -61,6 +82,7 @@ export type WaccInputs = {
   sp: number | null;
   ds: number | null;
   cs: number | null;
+  /** Corporate income tax rate, percent. For Saudi Arabia, zakat is blended in by `taxProfile`. */
   tax: number | null;
   inflationLocal: number | null;
   inflationUs: number | null;
@@ -117,6 +139,7 @@ export type ValuationInputs = {
   industry: string;
   country: string;
   financialYear: number | null;
+  /** As at the end of the last actual financial year, as entered. */
   netDebt: number | null;
   financials: Financials;
   wacc: WaccInputs;
@@ -134,11 +157,36 @@ export type ValuationInputs = {
   investedCapital?: number | null;
   /** Percentage points added to the computed WACC. Set by the exploration slider. */
   waccAdjustment?: number | null;
-  /** Company name and a description for the report. Never read by the engine. See `profile.ts`. */
+  /** Company name and a description for the report. Never read by the engine's arithmetic. See `profile.ts`. */
   profile?: CompanyProfile;
+  /* Version 3 ------------------------------------------------------------- */
+  /** Saudi / GCC ownership, percent. Read for Saudi Arabia only. */
+  gccOwnership?: number | null;
+  /**
+   * The valuation date, YYYY-MM-DD. The server stamps its own date on every
+   * input it recomputes. Blank means no stub period (the reference's timing).
+   */
+  valuationDate?: string | null;
+  /** What the valuation is for, one of `PURPOSES`. Only decides wording and the pre-money note. */
+  purpose?: string | null;
+  /** Equity the business plans to raise, millions. Optional, and only asked when raising equity. */
+  raiseAmount?: number | null;
 };
 
 export type Currency = { code: string; pegged: boolean; sarPerUnit: number };
+
+/**
+ * How the engine values, as opposed to what it values. The site always uses
+ * `CURRENT_METHOD`. `REFERENCE_METHOD` reproduces the reference implementation
+ * and exists only so `verify-valuation-engine` can still prove the rest of the
+ * arithmetic against it.
+ */
+export type EngineOptions = {
+  terminalCashFlow: 'normalised' | 'final_year';
+  lossCarryForward: boolean;
+};
+export const CURRENT_METHOD: EngineOptions = { terminalCashFlow: 'normalised', lossCarryForward: true };
+export const REFERENCE_METHOD: EngineOptions = { terminalCashFlow: 'final_year', lossCarryForward: false };
 
 const n = (v: number | null | undefined): number => (v === null || v === undefined ? NaN : v);
 const z = (v: number | null | undefined): number => (Number.isFinite(n(v)) ? (v as number) : 0);
@@ -170,7 +218,7 @@ export function financialYears(fy: number | null): { history: number[]; forecast
 }
 
 /* ------------------------------------------------------------------------ */
-/* Version 2 defaults                                                        */
+/* Version 2 and 3 defaults                                                  */
 /* ------------------------------------------------------------------------ */
 
 export function defaultExtras(): Required<Pick<ValuationInputs, 'normalisation' | 'bridge' | 'stake' | 'scenarios'>> & {
@@ -201,9 +249,11 @@ export function defaultExtras(): Required<Pick<ValuationInputs, 'normalisation' 
   };
 }
 
-/** Fills every absent version 2 block with its neutral default. */
+/** Fills every absent version 2 and 3 field with its default for the inputs' schema version. */
 export function resolveExtras(i: ValuationInputs) {
   const d = defaultExtras();
+  const schema = i.schemaVersion ?? 1;
+  const gcc = i.gccOwnership;
   return {
     normalisation: i.normalisation ?? d.normalisation,
     bridge: i.bridge ?? d.bridge,
@@ -211,8 +261,142 @@ export function resolveExtras(i: ValuationInputs) {
     scenarios: i.scenarios ?? d.scenarios,
     investedCapital: i.investedCapital ?? null,
     waccAdjustment: z(i.waccAdjustment),
+    // Inputs stored before version 3 were computed on corporate tax alone, which
+    // is 0% GCC ownership. From version 3 the field is required for Saudi
+    // Arabia (`validateCompany`), so it has no default: blank stays null.
+    gccOwnership: gcc === null || gcc === undefined ? (schema >= 3 ? null : 0) : gcc,
+    valuationDate: isIsoDate(i.valuationDate) ? (i.valuationDate as string) : null,
+    raiseAmount: i.raiseAmount === null || i.raiseAmount === undefined ? null : i.raiseAmount,
+    purpose: i.purpose ?? null,
   };
 }
+
+/* ------------------------------------------------------------------------ */
+/* Tax, zakat and losses                                                     */
+/* ------------------------------------------------------------------------ */
+
+export type TaxProfile = {
+  /** Corporate income tax rate as entered, ratio. */
+  cit: number;
+  /** True for Saudi Arabia, where zakat applies to the GCC-owned share. */
+  zakatApplies: boolean;
+  /** Saudi / GCC ownership, ratio. 0 outside Saudi Arabia. */
+  gccOwnership: number;
+  zakatRate: number;
+  /**
+   * How zakat is estimated on the GCC-owned share.
+   *   'base'          2.5% of an approximate zakat base (see `zakatBase`), needs invested capital.
+   *   'profit_proxy'  2.5% of positive EBIT, the fallback when invested capital was not entered.
+   *   'none'          no GCC share, or not Saudi Arabia.
+   */
+  zakatMethod: 'base' | 'profit_proxy' | 'none';
+  /**
+   * The rate on positive EBIT, used for FCFF income tax, terminal NOPAT, the
+   * after-tax cost of debt and beta relevering. With the zakat base method it is
+   * corporate tax on the non-GCC share only, (1 - GCC) x CIT, since zakat is then
+   * a charge on the base, not on profit. With the profit proxy it blends zakat
+   * in: (1 - GCC) x CIT + GCC x 2.5%. Equal to CIT outside Saudi Arabia.
+   */
+  rate: number;
+  lossCarryForward: boolean;
+  /** Share of a year's taxable profit that brought-forward losses can offset, ratio. */
+  lossOffsetCap: number;
+};
+
+export function taxProfile(
+  country: string,
+  taxPercent: number | null,
+  gccOwnershipPercent: number | null,
+  opts: EngineOptions = CURRENT_METHOD,
+  investedCapital: number | null = null,
+): TaxProfile {
+  const cit = n(taxPercent) / 100;
+  const c = countryFor(country);
+  const zakatApplies = country === TAX.zakatCountry;
+  const zakatRate = TAX.zakatRate / 100;
+  const share = zakatApplies ? Math.min(1, Math.max(0, z(gccOwnershipPercent) / 100)) : 0;
+  const zakatMethod = !share ? 'none' : n(investedCapital) > 0 ? 'base' : 'profit_proxy';
+  return {
+    cit,
+    zakatApplies,
+    gccOwnership: share,
+    zakatRate,
+    zakatMethod,
+    // With no GCC share the entered rate is kept exactly, as the reference used it.
+    rate: zakatMethod === 'none' ? cit : zakatMethod === 'base' ? (1 - share) * cit : (1 - share) * cit + share * zakatRate,
+    lossCarryForward: opts.lossCarryForward,
+    lossOffsetCap: (c?.lossOffsetCap ?? 100) / 100,
+  };
+}
+
+/**
+ * The approximate zakat base at a year end: invested capital less fixed
+ * assets, floored at zero. The inputs do not include fixed assets, so they are
+ * taken as invested capital less net working capital (the only split of
+ * invested capital the inputs support), floored at zero. The base is therefore
+ * working capital, capped at invested capital. Cash, which the real base
+ * includes, is not an input and is left out, so the estimate errs low.
+ */
+export function zakatBase(investedCapital: number, nwc: number): { fixedAssets: number; base: number } {
+  const fixedAssets = Math.max(0, investedCapital - nwc);
+  return { fixedAssets, base: Math.max(0, investedCapital - fixedAssets) };
+}
+
+/* ------------------------------------------------------------------------ */
+/* Valuation date and stub period                                            */
+/* ------------------------------------------------------------------------ */
+
+function isIsoDate(v: unknown): boolean {
+  if (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return false;
+  const d = new Date(`${v}T00:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === v;
+}
+
+/** A date as YYYY-MM-DD in UTC. What the server stamps on inputs it recomputes. */
+export function isoDate(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+
+/** Financial years are taken to end on 31 December: the form asks for a year, not a month. */
+export function financialYearEnd(fy: number | null): string {
+  const y = fy && Number.isFinite(fy) ? Math.trunc(fy) : ASSUMPTIONS.defaultFinancialYear;
+  return `${y}-12-31`;
+}
+
+/** Months from one date to another, with the part month as days over that month's length. */
+export function monthsBetween(fromIso: string, toIso: string): number {
+  const pos = (iso: string) => {
+    const [y, m, d] = iso.split('-').map((x) => parseInt(x, 10));
+    const dim = new Date(Date.UTC(y, m, 0)).getUTCDate();
+    return y * 12 + (m - 1) + d / dim;
+  };
+  return pos(toIso) - pos(fromIso);
+}
+
+export type StubPeriod = {
+  lastFyEnd: string;
+  valuationDate: string | null;
+  /** Months from the last financial year end to the valuation date. 0 without a valuation date. */
+  months: number;
+  /** The share of the first forecast year already elapsed at the valuation date, 0 to below 1. */
+  fraction: number;
+  /** The last actual year ended twelve months or more before the valuation date. The run is refused. */
+  tooOld: boolean;
+};
+
+export function stubPeriod(financialYear: number | null, valuationDate: string | null): StubPeriod {
+  const lastFyEnd = financialYearEnd(financialYear);
+  if (!valuationDate) return { lastFyEnd, valuationDate: null, months: 0, fraction: 0, tooOld: false };
+  const months = monthsBetween(lastFyEnd, valuationDate);
+  // A year still in progress (the date before its end) takes no stub.
+  const fraction = Math.min(1, Math.max(0, months / 12));
+  return { lastFyEnd, valuationDate, months, fraction, tooOld: months / 12 >= 1 };
+}
+
+export const GCC_REQUIRED_MESSAGE = 'Enter the Saudi / GCC ownership share, from 0% to 100%.';
+
+export const STUB_TOO_OLD_MESSAGE =
+  'Your latest actual year is more than 12 months old. Please enter the latest full year as actuals.';
 
 /* ------------------------------------------------------------------------ */
 /* Cost of capital                                                           */
@@ -220,17 +404,27 @@ export function resolveExtras(i: ValuationInputs) {
 
 export type WaccBreakdown = {
   rf: number; erp: number; crp: number; bu: number; de: number; sp: number;
-  ds: number; cs: number; t: number;
+  ds: number; cs: number;
+  /** The tax rate used throughout: relevering, cost of debt, FCFF and terminal NOPAT. Effective rate for Saudi Arabia. */
+  t: number;
+  /** Corporate income tax as entered. Equal to `t` unless zakat is blended in. Absent on results stored before version 3. */
+  cit?: number;
   bl: number; ke: number; kd: number; kdt: number; we: number; wd: number;
   waccUsd: number; wacc: number;
   /** Percentage points added by the exploration slider, as a ratio. 0 unless adjusted. */
   adjustment: number;
 };
 
-export function computeWacc(w: WaccInputs, currency: Currency, adjustmentPoints = 0): WaccBreakdown {
+/**
+ * `taxRate` overrides the entered tax rate with an effective one (zakat blended
+ * in). The one tax rate is used for relevering beta as well as the cost of
+ * debt, so a business's interest shield is valued the same way in both.
+ */
+export function computeWacc(w: WaccInputs, currency: Currency, adjustmentPoints = 0, taxRate?: number): WaccBreakdown {
   const rf = n(w.rf) / 100, erp = n(w.erp) / 100, crp = n(w.crp) / 100, bu = n(w.bu),
     de = n(w.de) / 100, sp = n(w.sp) / 100, ds = n(w.ds) / 100, cs = n(w.cs) / 100,
-    t = n(w.tax) / 100;
+    cit = n(w.tax) / 100;
+  const t = taxRate === undefined ? cit : taxRate;
   const bl = bu * (1 + (1 - t) * de);
   const ke = rf + bl * erp + crp + sp;
   const kd = rf + ds + cs, kdt = kd * (1 - t);
@@ -240,12 +434,18 @@ export function computeWacc(w: WaccInputs, currency: Currency, adjustmentPoints 
   const base = (1 + waccUsd) * conv - 1;
   const adjustment = adjustmentPoints / 100;
   return {
-    rf, erp, crp, bu, de, sp, ds, cs, t, bl, ke, kd, kdt, we, wd, waccUsd,
+    rf, erp, crp, bu, de, sp, ds, cs, t, cit, bl, ke, kd, kdt, we, wd, waccUsd,
     // Adding a literal 0 would still be exact, but the branch keeps the
     // unadjusted value bit-for-bit identical to the reference's.
     wacc: adjustment ? base + adjustment : base,
     adjustment,
   };
+}
+
+/** The WACC for a set of inputs, with the effective tax rate. What the form and the engine both use. */
+export function waccFor(i: ValuationInputs, adjustmentPoints = 0): WaccBreakdown {
+  const x = resolveExtras(i);
+  return computeWacc(i.wacc, currencyFor(i.country), adjustmentPoints, taxProfile(i.country, i.wacc.tax, x.gccOwnership, CURRENT_METHOD, x.investedCapital).rate);
 }
 
 /** Size and company premium from last actual revenue, thresholds in SAR millions. */
@@ -381,7 +581,7 @@ function finiteOrNull(v: number | null | undefined): boolean {
 }
 
 export function validateCompany(
-  i: Pick<ValuationInputs, 'industry' | 'country' | 'financialYear' | 'netDebt' | 'bridge'>,
+  i: Pick<ValuationInputs, 'industry' | 'country' | 'financialYear' | 'netDebt' | 'bridge' | 'gccOwnership' | 'valuationDate' | 'raiseAmount' | 'schemaVersion'>,
 ): FieldErrors {
   const e: FieldErrors = {};
   if (!industryFor(i.industry)) e.industry = 'Select an industry.';
@@ -389,6 +589,8 @@ export function validateCompany(
   const fy = n(i.financialYear);
   if (!(fy >= ASSUMPTIONS.minFinancialYear && fy <= ASSUMPTIONS.maxFinancialYear)) {
     e.financialYear = `Enter a year between ${ASSUMPTIONS.minFinancialYear} and ${ASSUMPTIONS.maxFinancialYear}.`;
+  } else if (stubPeriod(fy, isIsoDate(i.valuationDate) ? (i.valuationDate as string) : null).tooOld) {
+    e.financialYear = STUB_TOO_OLD_MESSAGE;
   }
   if (!Number.isFinite(n(i.netDebt))) e.netDebt = 'Enter net debt. Use 0 if none.';
   const b = i.bridge;
@@ -396,6 +598,15 @@ export function validateCompany(
     for (const k of ['eosb', 'leases', 'minorityInterest', 'surplusAssets'] as const) {
       if (!finiteOrNull(b[k]) || z(b[k]) < 0) e[k] = 'Enter a positive amount, or leave blank.';
     }
+  }
+  if (i.country === TAX.zakatCountry) {
+    const g = i.gccOwnership;
+    // Required from version 3; inputs stored earlier were valued without it.
+    if ((g === null || g === undefined) && (i.schemaVersion ?? 1) >= 3) e.gccOwnership = GCC_REQUIRED_MESSAGE;
+    else if (g !== null && g !== undefined && !(g >= 0 && g <= 100)) e.gccOwnership = GCC_REQUIRED_MESSAGE;
+  }
+  if (i.raiseAmount !== null && i.raiseAmount !== undefined && !(i.raiseAmount >= 0)) {
+    e.raiseAmount = 'Enter the amount to raise as a positive number, or leave it blank.';
   }
   return e;
 }
@@ -460,38 +671,191 @@ function pct(v: number, d = 2): string {
 export type ProjectionRow = {
   rev: number; ebitda: number; da: number; ebit: number; tax: number;
   capex: number; dnwc: number; fcf: number;
+  /** Net working capital at the year end. Absent on results stored before version 3. */
+  nwc?: number;
+  /** Brought-forward losses used against this year's profit. */
+  lossUsed?: number;
+  /** Losses still available after this year. */
+  lossPool?: number;
+  /** Corporate income tax, after losses. `tax` is this plus `zakat`. */
+  incomeTax?: number;
+  /** Zakat on the approximate base, when the zakat base method is used. */
+  zakat?: number;
+  /** The approximate zakat base at the year end (see `zakatBase`). */
+  zakatBase?: number;
+  /** Invested capital rolled forward: last year's plus capex less D&A plus the increase in working capital. */
+  investedCapital?: number;
 };
 
-export function projections(fin: Financials, t: number): ProjectionRow[] {
+export type LossRule = { carryForward: boolean; cap: number };
+
+/** Zakat on the base: GCC share times the zakat rate, and the invested capital the base rolls from. */
+export type ZakatRule = { shareRate: number; investedCapital: number };
+
+/**
+ * Forecast free cash flow to the firm. Tax is charged on positive EBIT only.
+ * CHANGED from the reference: losses are carried forward. The pool opens with
+ * the losses in the three actual years (net of what their own later profits
+ * used) and each profitable year may offset up to `cap` of its profit.
+ */
+export function projections(fin: Financials, t: number, loss: LossRule = { carryForward: false, cap: 1 }, zakat: ZakatRule | null = null): ProjectionRow[] {
   const zz = (v: number | null) => (Number.isFinite(n(v)) ? (v as number) : 0);
+  let pool = 0;
+  const useLosses = (ebit: number): number => {
+    if (!loss.carryForward) return 0;
+    if (ebit < 0) {
+      pool += -ebit;
+      return 0;
+    }
+    const used = Math.min(pool, loss.cap * ebit);
+    pool -= used;
+    return used;
+  };
+  for (let i = 0; i < HISTORY_YEARS; i++) useLosses(n(fin.ebitda[i]) - zz(fin.da[i]));
+
   const rows: ProjectionRow[] = [];
+  let ic = zakat ? zakat.investedCapital : NaN;
   for (let i = HISTORY_YEARS; i < TOTAL_YEARS; i++) {
     const ebitda = n(fin.ebitda[i]), da = zz(fin.da[i]), capex = zz(fin.capex[i]);
     const nwcPrev = i === HISTORY_YEARS ? zz(fin.nwc[HISTORY_YEARS - 1]) : zz(fin.nwc[i - 1]);
-    const dnwc = zz(fin.nwc[i]) - nwcPrev;
+    const nwc = zz(fin.nwc[i]);
+    const dnwc = nwc - nwcPrev;
     const ebit = ebitda - da;
-    const tax = Math.max(0, ebit) * t;
-    rows.push({ rev: n(fin.rev[i]), ebitda, da, ebit, tax, capex, dnwc, fcf: ebit - tax + da - capex - dnwc });
+    const lossUsed = useLosses(ebit);
+    const incomeTax = lossUsed ? (Math.max(0, ebit) - lossUsed) * t : Math.max(0, ebit) * t;
+    if (!zakat) {
+      rows.push({ rev: n(fin.rev[i]), ebitda, da, ebit, tax: incomeTax, capex, dnwc, fcf: ebit - incomeTax + da - capex - dnwc, nwc, lossUsed, lossPool: pool, incomeTax });
+      continue;
+    }
+    // Zakat is due on the base whether or not the year makes a profit.
+    ic = ic + capex - da + dnwc;
+    const base = zakatBase(ic, nwc).base;
+    const zakatAmount = base * zakat.shareRate;
+    const tax = incomeTax + zakatAmount;
+    rows.push({ rev: n(fin.rev[i]), ebitda, da, ebit, tax, capex, dnwc, fcf: ebit - tax + da - capex - dnwc, nwc, lossUsed, lossPool: pool, incomeTax, zakat: zakatAmount, zakatBase: base, investedCapital: ic });
   }
   return rows;
 }
 
-export type DcfResult = {
-  pv: number; dfs: number[]; dfN: number; tvG: number; tvX: number; evG: number; evX: number;
+export type TerminalCashFlow = {
+  /** Final forecast year EBIT, floored at zero, grown one year and taxed at the effective rate. */
+  nopat: number;
+  /** Revenue growth in the final forecast year. */
+  growthFinalYear: number;
+  /** Capex less D&A in the final forecast year. */
+  netCapexFinalYear: number;
+  /** Net capex scaled to long-term growth. */
+  netCapex: number;
+  /** Working capital over revenue in the final forecast year. */
+  wcIntensity: number;
+  /** Working capital investment at long-term growth. */
+  dWc: number;
+  fcf: number;
+  /** Revenue in the first year after the forecast, for display. */
+  revenue: number;
+  /** EBIT in the first year after the forecast, floored at zero, for display. */
+  ebit: number;
+  /** Income tax on that EBIT plus, with the zakat base method, zakat on the base grown one year. */
+  tax: number;
+  zakat: number;
+  /** Net capex plus working capital investment at long-term growth. */
+  reinvestment: number;
+  /** Reinvestment over NOPAT. NaN when NOPAT is not positive. */
+  reinvestmentRate: number;
+  /**
+   * The return on new capital the terminal value implies: g over the
+   * reinvestment rate. NaN when reinvestment is not positive, when the
+   * perpetuity assumes growth without investment and the implied return is not
+   * meaningful.
+   */
+  impliedRoic: number;
 };
 
-export function dcf(rows: ProjectionRow[], wacc: number, g: number, mult: number, mid: boolean): DcfResult {
+/**
+ * CHANGED from the reference, which grew the final forecast year's free cash
+ * flow at `g` for ever. That year's reinvestment is sized for the forecast's
+ * growth, not for `g`, so the perpetuity understated value whenever the
+ * forecast grew faster than `g`. Reinvestment is rescaled to `g` here:
+ *
+ *   NOPAT       = max(EBIT_T, 0) x (1 + g) x (1 - t)
+ *   Net capex   = (Capex_T - D&A_T) x g / growth_T   when growth_T > g (and positive)
+ *               = (Capex_T - D&A_T) x (1 + g)        otherwise
+ *   Working cap = (NWC_T / Rev_T) x Rev_T x g
+ *   FCF         = NOPAT - Net capex - Working cap
+ */
+export function terminalCashFlow(rows: ProjectionRow[], g: number, t: number, zakatShareRate = 0): TerminalCashFlow {
+  const last = rows[rows.length - 1], prev = rows[rows.length - 2];
+  const ebit = Math.max(last.ebit, 0) * (1 + g);
+  const zakat = zakatShareRate ? (last.zakatBase ?? 0) * (1 + g) * zakatShareRate : 0;
+  const tax = zakat ? ebit * t + zakat : ebit * t;
+  const nopat = ebit - tax;
+  const growthFinalYear = last.rev / prev.rev - 1;
+  const netCapexFinalYear = last.capex - last.da;
+  const netCapex = growthFinalYear > g && growthFinalYear > 0 ? netCapexFinalYear * (g / growthFinalYear) : netCapexFinalYear * (1 + g);
+  const nwc = last.nwc ?? 0;
+  const wcIntensity = nwc / last.rev;
+  const dWc = wcIntensity * last.rev * g;
+  const reinvestment = netCapex + dWc;
+  const reinvestmentRate = nopat > 0 ? reinvestment / nopat : NaN;
+  return {
+    nopat, growthFinalYear, netCapexFinalYear, netCapex, wcIntensity, dWc,
+    fcf: nopat - netCapex - dWc,
+    revenue: last.rev * (1 + g),
+    ebit,
+    tax,
+    zakat,
+    reinvestment,
+    reinvestmentRate,
+    impliedRoic: reinvestmentRate > 0 ? g / reinvestmentRate : NaN,
+  };
+}
+
+export type TerminalBasis = { mode: EngineOptions['terminalCashFlow']; taxRate: number; zakatShareRate?: number };
+
+export type DcfResult = {
+  pv: number; dfs: number[]; dfN: number; tvG: number; tvX: number; evG: number; evX: number;
+  /** Discount period of each forecast year, and of the terminal value. Absent on results stored before version 3. */
+  periods?: number[];
+  periodN?: number;
+  /** Each year's free cash flow after the stub cut. */
+  fcfValued?: number[];
+  /** The cash flow the perpetuity was built on. */
+  tvFcf?: number;
+};
+
+/**
+ * `stub` is the share of the first forecast year already gone at the valuation
+ * date. Year 1 keeps (1 - stub) of its cash flow, discounted at (1 - stub) / 2
+ * mid-year; later years at (i - 0.5) - stub; the terminal value at N - stub.
+ * With a stub of 0 every period is the reference's exactly.
+ */
+export function dcf(
+  rows: ProjectionRow[],
+  wacc: number,
+  g: number,
+  mult: number,
+  mid: boolean,
+  stub = 0,
+  basis: TerminalBasis = { mode: 'final_year', taxRate: 0 },
+): DcfResult {
   let pv = 0;
-  const dfs: number[] = [];
+  const dfs: number[] = [], periods: number[] = [], fcfValued: number[] = [];
   rows.forEach((r, k) => {
-    const df = 1 / Math.pow(1 + wacc, k + 1 - (mid ? 0.5 : 0));
+    const period = k === 0 ? (mid ? (1 - stub) / 2 : 1 - stub) : k + 1 - (mid ? 0.5 : 0) - stub;
+    const df = 1 / Math.pow(1 + wacc, period);
+    const cf = k === 0 && stub ? r.fcf * (1 - stub) : r.fcf;
+    periods.push(period);
     dfs.push(df);
-    pv += r.fcf * df;
+    fcfValued.push(cf);
+    pv += cf * df;
   });
-  const last = rows[rows.length - 1], dfN = 1 / Math.pow(1 + wacc, rows.length);
-  const tvG = wacc > g ? (last.fcf * (1 + g)) / (wacc - g) : NaN;
+  const last = rows[rows.length - 1];
+  const periodN = rows.length - stub;
+  const dfN = 1 / Math.pow(1 + wacc, periodN);
+  const tvFcf = basis.mode === 'normalised' ? terminalCashFlow(rows, g, basis.taxRate, basis.zakatShareRate ?? 0).fcf : last.fcf * (1 + g);
+  const tvG = wacc > g ? tvFcf / (wacc - g) : NaN;
   const tvX = last.ebitda > 0 ? last.ebitda * mult : NaN;
-  return { pv, dfs, dfN, tvG, tvX, evG: pv + tvG * dfN, evX: pv + tvX * dfN };
+  return { pv, dfs, dfN, tvG, tvX, evG: pv + tvG * dfN, evX: pv + tvX * dfN, periods, periodN, fcfValued, tvFcf };
 }
 
 /* ------------------------------------------------------------------------ */
@@ -549,6 +913,7 @@ export type Range3 = [number, number, number];
 /** How much of the headline equity range was floored at zero. */
 export type EquityFloor = 'none' | 'low' | 'low_and_mid' | 'all';
 
+/** Version 2 warning codes. Results from version 3 carry `checks` instead; these format stored leads. */
 export type WarningCode =
   | 'terminal_value_share'
   | 'growth_ceiling'
@@ -561,6 +926,45 @@ export type WarningCode =
   | 'premium_on_minority_stake';
 
 export type Warning = { code: WarningCode; values: Record<string, number> };
+
+export type CheckId =
+  | 'method_divergence'
+  | 'terminal_gap'
+  | 'tv_share'
+  | 'peer_count'
+  | 'capital_structure'
+  | 'margin_step'
+  | 'no_normalisation'
+  | 'negative_ebitda'
+  | 'growth_ceiling'
+  | 'growth_vs_inflation'
+  | 'terminal_fcf'
+  | 'roic_below_wacc'
+  | 'reinvestment'
+  | 'stake_premium';
+
+export type Check = {
+  id: CheckId;
+  label: string;
+  status: 'pass' | 'warning';
+  message: string;
+  /** Set on the terminal value share check above its strong threshold. */
+  strong?: boolean;
+  values: Record<string, number>;
+};
+
+export type RecommendationId =
+  | 'reduce_risk'
+  | 'review_normalisation'
+  | 'evidence_normalisation'
+  | 'cash_conversion'
+  | 'forecast_credibility'
+  | 'returns'
+  | 'margin'
+  | 'diligence';
+
+/** Chosen by rule. The wording is `format.ts`'s. */
+export type Recommendation = { id: RecommendationId; values: Record<string, number> };
 
 export type KeyRatios = {
   /** Compound annual revenue growth over the two historical years. */
@@ -599,6 +1003,10 @@ export type ScenarioResult = {
 };
 
 export type BridgeResult = {
+  /** Free cash flow in the part of year one before the valuation date. Absent before version 3. */
+  elapsedFcf?: number;
+  /** Net debt at the valuation date: as entered, less `elapsedFcf`. Absent before version 3. */
+  netDebtAtValuationDate?: number;
   eosb: number;
   leases: number;
   minorityInterest: number;
@@ -616,6 +1024,86 @@ export type StakeResult = {
   value: Range3;
   /** False at 100% with no adjustment, when there is nothing extra to show. */
   used: boolean;
+};
+
+/** One forecast year of the DCF, everything the FCFF table prints. */
+export type ForecastLine = ProjectionRow & {
+  year: number;
+  fcfValued: number;
+  period: number;
+  df: number;
+  pv: number;
+};
+
+export type TerminalResult = TerminalCashFlow & {
+  method: EngineOptions['terminalCashFlow'];
+  tvPerpetuity: number;
+  tvExit: number;
+  period: number;
+  df: number;
+  pvPerpetuity: number;
+  pvExit: number;
+  /** Perpetuity terminal value over final year EBITDA, undiscounted. */
+  impliedMultiple: number;
+  /** Present value of the perpetuity terminal value over the perpetuity DCF. */
+  tvShare: number;
+};
+
+export type DcfBlock = {
+  pvForecast: number;
+  perpetuity: Range3;
+  /** Null when final year EBITDA is not positive. */
+  exit: Range3 | null;
+  /** The DCF used in the blend. */
+  combined: Range3;
+  /** How `combined` is formed: the simple average of the two, or perpetuity alone. */
+  combination: 'average' | 'perpetuity_only';
+  /** Combined DCF enterprise value to equity. */
+  equity: Range3;
+  /** Perpetuity DCF base case to equity. The sensitivity table's centre cell. */
+  perpetuityEquityBase: number;
+};
+
+export type ComparablesBlock = {
+  ebitdaMultiplesPre: Range3;
+  ebitdaMultiplesPost: Range3;
+  revenueMultiplesPre: Range3;
+  revenueMultiplesPost: Range3;
+  /** Null when last actual EBITDA is not positive. */
+  ebitdaValue: Range3 | null;
+  revenueValue: Range3;
+  /** The one used in the blend. */
+  basis: 'ebitda' | 'revenue';
+  value: Range3;
+  discount: number;
+  source: 'peers' | 'preset';
+  /** Peers entered with at least one multiple. */
+  peerCount: number;
+  peerNames: string[];
+};
+
+export type RaiseResult = {
+  amount: number;
+  preMoney: Range3;
+  postMoney: Range3;
+  /** The investor's share of post-money equity, ratio. */
+  investorStake: Range3;
+};
+
+export type ResultMeta = {
+  valuationDate: string | null;
+  lastFyEnd: string;
+  stubMonths: number;
+  stubFraction: number;
+  treasury: DatedValue;
+  erp: DatedValue;
+  erpAligned: boolean;
+  dataVersion: string;
+  currency: string;
+  company: string | null;
+  sector: string;
+  country: string;
+  purpose: string | null;
 };
 
 /* ------------------------------------------------------------------------ */
@@ -651,6 +1139,7 @@ export type ValuationResult = {
   /** Comparables EV from EV / EBITDA, null when LTM EBITDA is not positive. */
   compsEbitda: Range3 | null;
   compsRevenue: Range3;
+  /** Combined DCF: the average of perpetuity and exit multiple, or perpetuity alone. */
   dcfRange: Range3;
   compRange: Range3;
   /** Blended enterprise value. */
@@ -665,16 +1154,46 @@ export type ValuationResult = {
   equityDisplay: Range3;
   equityFloor: EquityFloor;
   tvShare: number;
+  /** Implied terminal multiple (perpetuity method). */
   impliedExitMultiple: number;
+  /** Implied EV / LTM EBITDA: blended base EV over last actual EBITDA. */
   ltmMultiple: number;
-  sensitivity: { waccs: number[]; growths: number[]; grid: number[][] };
+  sensitivity: {
+    waccs: number[];
+    growths: number[];
+    grid: number[][];
+    /** Absent on results stored before version 3, which were equity from the perpetuity DCF too. */
+    basis?: 'equity';
+    method?: 'perpetuity';
+  };
   /** Empty when computed inside a scenario run. */
   scenarios: ScenarioResult[];
-  /** Probability-weighted equity midpoint, floored at zero. NaN inside a scenario run. */
+  /** Probability-weighted equity base case, floored at zero. NaN inside a scenario run. */
   weightedEquity: number;
   stake: StakeResult;
   ratios: KeyRatios;
-  warnings: Warning[];
+  /** Version 2 results only. */
+  warnings?: Warning[];
+
+  /* Version 3: the canonical blocks. Absent on stored results before it. */
+  tax: TaxProfile & {
+    lossesUsed: number;
+    /** Zakat base method only: invested capital, fixed assets and base at the last actual year end, and zakat in each forecast year. */
+    zakatBaseLtm: { investedCapital: number; fixedAssets: number; base: number } | null;
+    zakatByYear: number[];
+  };
+  forecast: ForecastLine[];
+  terminal: TerminalResult;
+  dcfBlock: DcfBlock;
+  comparables: ComparablesBlock;
+  blend: { dcfWeight: number; compsWeight: number; ev: Range3; equity: Range3 };
+  /** Unfloored probability-weighted equity, which the scenario table reconciles to. */
+  weightedEquityRaw: number;
+  weightsTotal: number;
+  raise: RaiseResult | null;
+  checks: Check[];
+  recommendations: Recommendation[];
+  meta: ResultMeta;
 };
 
 export type RunOutcome =
@@ -684,43 +1203,51 @@ export type RunOutcome =
 export const SENSITIVITY_WACC_STEPS = [-0.02, -0.01, 0, 0.01, 0.02];
 export const SENSITIVITY_GROWTH_STEPS = [-0.01, -0.005, 0, 0.005, 0.01];
 
-export function runValuation(i: ValuationInputs): RunOutcome {
+export function runValuation(i: ValuationInputs, opts: EngineOptions = CURRENT_METHOD): RunOutcome {
   const companyErrors = validateCompany(i);
   if (Object.keys(companyErrors).length) return { ok: false, step: 0, errors: companyErrors };
   const finError = validateFinancials(i.financials, i);
   if (finError) return { ok: false, step: 1, errors: finError };
 
-  const currency = currencyFor(i.country);
-  const x = resolveExtras(i);
-  const w = computeWacc(i.wacc, currency, x.waccAdjustment);
+  const w = waccFor(i, resolveExtras(i).waccAdjustment);
   if (!Number.isFinite(w.wacc)) return { ok: false, step: 2, errors: 'Complete every cost of capital input.' };
   const termError = validateTerminal(i, w.wacc);
   if (termError) return { ok: false, step: 3, errors: termError };
 
-  return { ok: true, result: compute(i, true) };
+  return { ok: true, result: compute(i, true, opts) };
 }
 
 /** The valuation itself, on inputs already validated. `withScenarios` is false inside a scenario run. */
-function compute(i: ValuationInputs, withScenarios: boolean): ValuationResult {
+/**
+ * `netDebtAtDate` is passed into scenario runs: net debt at the valuation date
+ * is one estimate, from the base forecast, whichever scenario is being valued.
+ */
+function compute(i: ValuationInputs, withScenarios: boolean, opts: EngineOptions, netDebtAtDate?: number): ValuationResult {
   const currency = currencyFor(i.country);
   const x = resolveExtras(i);
-  const w = computeWacc(i.wacc, currency, x.waccAdjustment);
+  const tax = taxProfile(i.country, i.wacc.tax, x.gccOwnership, opts, x.investedCapital);
+  const w = computeWacc(i.wacc, currency, x.waccAdjustment, tax.rate);
   const g = n(i.growth) / 100, xm = n(i.exitMultiple), wD = n(i.dcfWeight);
   const mid = i.midYear, nd = n(i.netDebt);
   const disc = (n(i.privateDiscount) || 0) / 100;
   // CHANGED: the discount applies to the exit multiple too. With no discount
   // this is the entered multiple exactly.
   const xmApplied = disc ? xm * (1 - disc) : xm;
+  const stub = stubPeriod(i.financialYear, x.valuationDate);
+  const f = stub.fraction;
+  const zakatShareRate = tax.zakatMethod === 'base' ? tax.gccOwnership * tax.zakatRate : 0;
+  const basis: TerminalBasis = { mode: opts.terminalCashFlow, taxRate: w.t, zakatShareRate };
 
   const reported = i.financials;
   const fin = normalisedFinancials(reported, x.normalisation);
-  const rows = projections(fin, w.t);
+  const zakatRule: ZakatRule | null = zakatShareRate ? { shareRate: zakatShareRate, investedCapital: n(x.investedCapital) } : null;
+  const rows = projections(fin, w.t, { carryForward: tax.lossCarryForward, cap: tax.lossOffsetCap }, zakatRule);
 
-  const base = dcf(rows, w.wacc, g, xmApplied, mid);
-  const loG = dcf(rows, w.wacc + 0.01, g - 0.005, xmApplied, mid).evG;
-  const hiG = dcf(rows, w.wacc - 0.01, g + 0.005, xmApplied, mid).evG;
-  const loX = dcf(rows, w.wacc + 0.01, g, xmApplied - 1, mid).evX;
-  const hiX = dcf(rows, w.wacc - 0.01, g, xmApplied + 1, mid).evX;
+  const base = dcf(rows, w.wacc, g, xmApplied, mid, f, basis);
+  const loG = dcf(rows, w.wacc + 0.01, g - 0.005, xmApplied, mid, f, basis).evG;
+  const hiG = dcf(rows, w.wacc - 0.01, g + 0.005, xmApplied, mid, f, basis).evG;
+  const loX = dcf(rows, w.wacc + 0.01, g, xmApplied - 1, mid, f, basis).evX;
+  const hiX = dcf(rows, w.wacc - 0.01, g, xmApplied + 1, mid, f, basis).evX;
 
   const cm = compsMultiples(i.industry, i.peers);
   const ltmReported = n(reported.ebitda[HISTORY_YEARS - 1]);
@@ -747,8 +1274,20 @@ function compute(i: ValuationInputs, withScenarios: boolean): ValuationResult {
     otherClaims: z(b.eosb) + z(b.leases) + z(b.minorityInterest) - z(b.surplusAssets),
   };
   const claims = bridge.otherClaims;
+  // THE VALUATION DATE AND NET DEBT, made consistent. Net debt is entered at the
+  // last financial year end. The DCF values cash flow from the valuation date,
+  // so the part of the first forecast year already gone is not in enterprise
+  // value; that cash is taken to have stayed in the business (no distributions)
+  // and so reduces net debt. Net debt at the valuation date is therefore net
+  // debt at the year end less the elapsed share of year one free cash flow.
+  // With no stub it is the entered figure exactly, as the reference used it.
+  const ndAtDate = netDebtAtDate !== undefined ? netDebtAtDate : f ? nd - rows[0].fcf * f : nd;
+  const elapsedFcf = nd - ndAtDate;
+  bridge.elapsedFcf = elapsedFcf;
+  bridge.netDebtAtValuationDate = ndAtDate;
   // With no other claims the reference's `ev - netDebt` is kept exactly.
-  const equity = ev.map((v) => (claims ? v - nd - claims : v - nd)) as Range3;
+  const toEquity = (v: number) => (claims ? v - ndAtDate - claims : v - ndAtDate);
+  const equity = ev.map(toEquity) as Range3;
   const equityDisplay = equity.map((v) => Math.max(0, v)) as Range3;
   const equityFloor: EquityFloor =
     equity[2] < 0 ? 'all' : equity[1] < 0 ? 'low_and_mid' : equity[0] < 0 ? 'low' : 'none';
@@ -764,8 +1303,7 @@ function compute(i: ValuationInputs, withScenarios: boolean): ValuationResult {
     SENSITIVITY_GROWTH_STEPS.map((dg) => {
       const W2 = w.wacc + dw, G2 = g + dg;
       if (!(W2 > G2 + 0.005)) return NaN;
-      const evG = dcf(rows, W2, G2, xmApplied, mid).evG;
-      return claims ? evG - nd - claims : evG - nd;
+      return toEquity(dcf(rows, W2, G2, xmApplied, mid, f, basis).evG);
     }),
   );
 
@@ -809,59 +1347,13 @@ function compute(i: ValuationInputs, withScenarios: boolean): ValuationResult {
     reinvestmentRate,
   };
 
-  /* Warnings ------------------------------------------------------------- */
-  const warnings: Warning[] = [];
-  const rule = WARNING_RULES;
-  if (Number.isFinite(tvShare) && tvShare > rule.terminalValueShare) {
-    warnings.push({ code: 'terminal_value_share', values: { share: tvShare, threshold: rule.terminalValueShare } });
-  }
-  const ceiling = countryFor(i.country)?.growthCeiling;
-  if (ceiling !== undefined && g * 100 > ceiling) {
-    warnings.push({ code: 'growth_ceiling', values: { growth: g, ceiling: ceiling / 100 } });
-  }
-  if (Number.isFinite(impliedExitMultiple) && xmApplied > 0 && Math.abs(impliedExitMultiple - xmApplied) / xmApplied > rule.exitMultipleMismatch) {
-    warnings.push({ code: 'exit_multiple_mismatch', values: { applied: xmApplied, implied: impliedExitMultiple, threshold: rule.exitMultipleMismatch } });
-  }
-  if (last.fcf < 0) warnings.push({ code: 'terminal_fcf_negative', values: { fcf: last.fcf } });
-  const marginLtm = ltmE / ltmR, marginF1 = rows[0].ebitda / rows[0].rev;
-  if (Number.isFinite(marginLtm) && Number.isFinite(marginF1) && Math.abs(marginF1 - marginLtm) * 100 > rule.marginJumpPoints) {
-    warnings.push({ code: 'margin_jump', values: { from: marginLtm, to: marginF1, threshold: rule.marginJumpPoints / 100 } });
-  }
-  if (Number.isFinite(roic) && roic < w.wacc) warnings.push({ code: 'roic_below_wacc', values: { roic, wacc: w.wacc } });
-  // Terminal growth against expected local inflation. Pegged currencies take
-  // long-run US inflation; the others the inflation entered on step 3.
-  const inflationPct = currency.pegged ? MARKET.usInflationLongRun : n(i.wacc.inflationLocal);
-  if (Number.isFinite(inflationPct)) {
-    const lowPct = inflationPct - rule.inflationBelowPoints, highPct = inflationPct + rule.inflationAbovePoints;
-    const gPct = g * 100;
-    if (gPct < lowPct - 1e-9 || gPct > highPct + 1e-9) {
-      warnings.push({ code: 'growth_vs_inflation', values: { growth: g, inflation: inflationPct / 100, low: lowPct / 100, high: highPct / 100 } });
-    }
-  }
-  if (st.adjustment === 'control_premium' && stakePct <= rule.controlStakeAbovePercent) {
-    warnings.push({ code: 'premium_on_minority_stake', values: { percent: stakePct, threshold: rule.controlStakeAbovePercent, premium: adjustmentRate } });
-  }
-  if (
-    Number.isFinite(ratios.impliedGrowthFromReinvestment) &&
-    Math.abs(ratios.impliedGrowthFromReinvestment - g) * 100 > rule.reinvestmentGapPoints
-  ) {
-    warnings.push({
-      code: 'reinvestment_inconsistent',
-      values: { implied: ratios.impliedGrowthFromReinvestment, growth: g, reinvestmentRate, roic, threshold: rule.reinvestmentGapPoints / 100 },
-    });
-  }
-
   /* Scenarios ------------------------------------------------------------ */
   const sc = x.scenarios;
   let scenarios: ScenarioResult[] = [];
-  let weightedEquity = NaN;
-  const partial = {
-    ev, equity, equityDisplay,
-    terminalRevenue: last.rev, terminalEbitda: last.ebitda,
-  };
+  let weightedEquity = NaN, weightedEquityRaw = NaN, weightsTotal = NaN;
   if (withScenarios) {
     const run = (key: 'downside' | 'upside', gp: number, mp: number, weight: number): ScenarioResult => {
-      const r = compute({ ...i, financials: scenarioFinancials(reported, gp, mp) }, false);
+      const r = compute({ ...i, financials: scenarioFinancials(reported, gp, mp) }, false, opts, ndAtDate);
       const lastRow = r.rows[r.rows.length - 1];
       return {
         key, weight, growthPoints: gp, marginPoints: mp,
@@ -871,16 +1363,94 @@ function compute(i: ValuationInputs, withScenarios: boolean): ValuationResult {
     };
     scenarios = [
       run('downside', n(sc.downsideGrowth), n(sc.downsideMargin), n(sc.weightDownside) / 100),
-      { key: 'base', weight: n(sc.weightBase) / 100, growthPoints: 0, marginPoints: 0, ...partial },
+      {
+        key: 'base', weight: n(sc.weightBase) / 100, growthPoints: 0, marginPoints: 0,
+        ev, equity, equityDisplay, terminalRevenue: last.rev, terminalEbitda: last.ebitda,
+      },
       run('upside', n(sc.upsideGrowth), n(sc.upsideMargin), n(sc.weightUpside) / 100),
     ];
-    weightedEquity = Math.max(0, scenarios.reduce((a, s) => a + s.weight * s.equity[1], 0));
+    weightedEquityRaw = scenarios.reduce((a, s) => a + s.weight * s.equity[1], 0);
+    weightedEquity = Math.max(0, weightedEquityRaw);
+    weightsTotal = scenarios.reduce((a, s) => a + s.weight, 0);
   }
 
-  return {
+  /* Canonical blocks ----------------------------------------------------- */
+  const years = financialYears(i.financialYear);
+  const forecast: ForecastLine[] = rows.map((r, k) => {
+    const cf = (base.fcfValued as number[])[k];
+    return { ...r, year: years.forecast[k], fcfValued: cf, period: (base.periods as number[])[k], df: base.dfs[k], pv: cf * base.dfs[k] };
+  });
+  const tcf = terminalCashFlow(rows, g, w.t, zakatShareRate);
+  const terminal: TerminalResult = {
+    ...tcf,
+    // In the reference's method the perpetuity rests on the final year's cash flow instead.
+    fcf: base.tvFcf as number,
+    method: opts.terminalCashFlow,
+    tvPerpetuity: base.tvG,
+    tvExit: base.tvX,
+    period: base.periodN as number,
+    df: base.dfN,
+    pvPerpetuity: base.tvG * base.dfN,
+    pvExit: base.tvX * base.dfN,
+    impliedMultiple: impliedExitMultiple,
+    tvShare,
+  };
+  const exitAvailable = Number.isFinite(base.evX);
+  const dcfBlock: DcfBlock = {
+    pvForecast: base.pv,
+    perpetuity: [loG, base.evG, hiG],
+    exit: exitAvailable ? [loX, base.evX, hiX] : null,
+    combined: dcfRange,
+    combination: exitAvailable ? 'average' : 'perpetuity_only',
+    equity: dcfRange.map(toEquity) as Range3,
+    perpetuityEquityBase: toEquity(base.evG),
+  };
+  const entered = i.peers.filter((p) => Number.isFinite(n(p.evEbitda)) || Number.isFinite(n(p.evRevenue)));
+  const comparables: ComparablesBlock = {
+    ebitdaMultiplesPre: cm.ebitda,
+    ebitdaMultiplesPost: cm.ebitda.map((m) => m * (1 - disc)) as Range3,
+    revenueMultiplesPre: cm.revenue,
+    revenueMultiplesPost: cm.revenue.map((m) => m * (1 - disc)) as Range3,
+    ebitdaValue: cE,
+    revenueValue: cR,
+    basis: cE ? 'ebitda' : 'revenue',
+    value: compRange,
+    discount: disc,
+    source: cm.peersE || cm.peersR ? 'peers' : 'preset',
+    peerCount: entered.length,
+    peerNames: entered.map((p, k) => p.name || `Comparable ${k + 1}`),
+  };
+  const raiseAmount = x.raiseAmount;
+  const raise: RaiseResult | null =
+    raiseAmount !== null && raiseAmount > 0
+      ? {
+          amount: raiseAmount,
+          preMoney: equityDisplay,
+          postMoney: equityDisplay.map((v) => v + raiseAmount) as Range3,
+          investorStake: equityDisplay.map((v) => raiseAmount / (v + raiseAmount)) as Range3,
+        }
+      : null;
+  const market = marketDataInUse();
+  const meta: ResultMeta = {
+    valuationDate: stub.valuationDate,
+    lastFyEnd: stub.lastFyEnd,
+    stubMonths: stub.months,
+    stubFraction: f,
+    treasury: market.treasury,
+    erp: market.erp,
+    erpAligned: market.aligned,
+    dataVersion: VALUATION_DATA_VERSION,
+    currency: currency.code,
+    company: i.profile?.companyName ?? null,
+    sector: i.industry,
+    country: i.country,
+    purpose: x.purpose,
+  };
+
+  const result: ValuationResult = {
     schemaVersion: INPUT_SCHEMA_VERSION,
     currency,
-    years: financialYears(i.financialYear),
+    years,
     wacc: w,
     growth: g,
     exitMultiple: xm,
@@ -911,13 +1481,41 @@ function compute(i: ValuationInputs, withScenarios: boolean): ValuationResult {
     tvShare,
     impliedExitMultiple,
     ltmMultiple,
-    sensitivity: { waccs, growths, grid },
+    sensitivity: { waccs, growths, grid, basis: 'equity', method: 'perpetuity' },
     scenarios,
     weightedEquity,
     stake,
     ratios,
-    warnings,
+    tax: {
+      ...tax,
+      lossesUsed: sum(rows.map((r) => r.lossUsed ?? 0)),
+      zakatBaseLtm: zakatRule
+        ? { investedCapital: zakatRule.investedCapital, ...zakatBase(zakatRule.investedCapital, z(reported.nwc[HISTORY_YEARS - 1])) }
+        : null,
+      zakatByYear: rows.map((r) => r.zakat ?? 0),
+    },
+    forecast,
+    terminal,
+    dcfBlock,
+    comparables,
+    blend: { dcfWeight: wD / 100, compsWeight: 1 - wD / 100, ev, equity },
+    weightedEquityRaw,
+    weightsTotal,
+    raise,
+    checks: [],
+    recommendations: [],
+    meta,
   };
+  if (withScenarios) {
+    result.checks = buildChecks(result, { inflationLocal: n(i.wacc.inflationLocal) });
+    result.recommendations = buildRecommendations(result);
+  }
+  return result;
+}
+
+/** True when a result carries the version 3 blocks. Leads stored before 2026-09-17 do not. */
+export function isCanonicalResult(r: ValuationResult): boolean {
+  return (r.schemaVersion ?? 0) >= 3 && Array.isArray(r.checks) && Boolean(r.dcfBlock && r.terminal && r.meta);
 }
 
 /* ------------------------------------------------------------------------ */

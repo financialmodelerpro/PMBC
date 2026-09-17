@@ -38,10 +38,12 @@ export async function POST(req: Request, props: { params: Promise<{ slug: string
   const lead = typeof body.token === 'string' ? await getLeadByToken(body.token) : null;
   if (!lead) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  const recomputed = recomputeInputs(body.inputs);
+  const now = new Date();
+  // The purpose is the lead's; a raise amount only counts when raising equity.
+  const raw = body.inputs && typeof body.inputs === 'object' ? (body.inputs as Record<string, unknown>) : {};
+  const recomputed = recomputeInputs({ ...raw, purpose: lead.purpose, raiseAmount: lead.purpose === 'raise' ? (raw.raiseAmount ?? null) : null }, now);
   if (!recomputed.ok) return NextResponse.json({ error: 'Validation failed', issues: recomputed.issues }, { status: 400 });
 
-  const now = new Date();
   const pdf = await renderValuationReport(recomputed.result, {
     preparedFor: lead.name,
     company: lead.company || recomputed.inputs.profile?.companyName || null,

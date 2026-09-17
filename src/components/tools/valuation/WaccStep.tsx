@@ -29,8 +29,8 @@ const DEBT: Spec[] = [
   { k: 'cs', label: 'Company credit spread', hint: 'Your borrowing margin over the base rate', step: 0.1, suffix: '%' },
   {
     k: 'tax',
-    label: 'Tax rate',
-    hint: 'Marginal corporate rate. KSA companies paying zakat may use 2.5%.',
+    label: 'Corporate income tax rate',
+    hint: 'Marginal corporate rate. In Saudi Arabia zakat is blended in from the ownership share on step 1.',
     step: 0.5,
     suffix: '%',
   },
@@ -71,6 +71,7 @@ export function WaccStep({
     ['Levered beta', bl],
     ['Cost of equity', fmtPct(wacc.ke)],
     ['Pre-tax cost of debt', fmtPct(wacc.kd)],
+    ...(wacc.cit !== undefined && Number.isFinite(wacc.t) && wacc.t !== wacc.cit ? ([['Tax rate used, after Saudi / GCC ownership', fmtPct(wacc.t)]] as [string, string][]) : []),
     ['After-tax cost of debt', fmtPct(wacc.kdt)],
     ['Equity weight', fmtPct(wacc.we, 1)],
     ['Debt weight', fmtPct(wacc.wd, 1)],
