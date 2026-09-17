@@ -323,7 +323,13 @@ export default async function ToolLeadDetailPage(props: { params: Promise<{ id: 
                 ['Industry', inputs.industry],
                 ['Country', `${inputs.country} (${result.currency.code})`],
                 ['Last financial year', n(inputs.financialYear)],
-                ['Net debt', `${n(inputs.netDebt)} ${result.currency.code} m`],
+                ...(inputs.debt !== null && inputs.debt !== undefined
+                  ? ([
+                      ['Borrowings', `${n(inputs.debt)} ${result.currency.code} m`],
+                      ['Cash', `${n(inputs.cash ?? null)} ${result.currency.code} m`],
+                      ['Net debt (borrowings less cash)', `${n(inputs.debt - (inputs.cash ?? 0))} ${result.currency.code} m`],
+                    ] as [string, string][])
+                  : ([['Net debt', `${n(inputs.netDebt)} ${result.currency.code} m`]] as [string, string][])),
               ]}
             />
             <div style={{ marginTop: 12 }}>

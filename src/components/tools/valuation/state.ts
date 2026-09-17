@@ -58,7 +58,8 @@ export type FormState = {
   industry: string;
   country: string;
   financialYear: string;
-  netDebt: string;
+  /** Borrowings at the year end (version 4). Net debt is borrowings less cash. */
+  debt: string;
   fin: Record<LineKey, string[]>;
   fill: Record<FillKey, string>;
   wacc: Record<WaccKey, string>;
@@ -85,7 +86,7 @@ export type FormState = {
   /* Version 3 ---------------------------------------------------------- */
   /** Saudi / GCC ownership, percent. Shown, and sent, for Saudi Arabia only. */
   gccOwnership: string;
-  /** Cash at the year end, for the zakat base only. Optional; Saudi Arabia only. */
+  /** Cash at the year end. Required in every country: it nets off borrowings, and in Saudi Arabia adds to the zakat base. */
   cash: string;
 };
 
@@ -105,7 +106,7 @@ export function initialState(): FormState {
     industry: '',
     country: '',
     financialYear: String(defaultFinancialYearFor()),
-    netDebt: '',
+    debt: '',
     fin: { rev: blankLine(), ebitda: blankLine(), da: blankLine(), capex: blankLine(), nwc: blankLine() },
     fill: {
       growth: String(fill.growth),
@@ -207,7 +208,9 @@ export function toInputs(s: FormState, valuationDate: string | null = todayIso()
     industry: s.industry,
     country: s.country,
     financialYear: Number.isNaN(fy) ? null : fy,
-    netDebt: num(s.netDebt),
+    debt: num(s.debt),
+    // The engine derives net debt from these two on every run; this is the same figure, for the form's own checks.
+    netDebt: netDebtOf(s),
     financials: parseFinancials(s.fin),
     wacc: parseWacc(s.wacc),
     growth: num(s.growth),
@@ -243,7 +246,7 @@ export function toInputs(s: FormState, valuationDate: string | null = todayIso()
     waccAdjustment: num(s.waccAdjustment) ?? 0,
     profile: cleanProfile({ companyName: s.companyName, description: s.description }),
     gccOwnership: s.country === TAX.zakatCountry ? num(s.gccOwnership) : null,
-    cash: s.country === TAX.zakatCountry ? num(s.cash) : null,
+    cash: num(s.cash),
     valuationDate,
   };
 }
@@ -330,7 +333,8 @@ export function exampleState(): FormState {
     industry: ex.industry,
     country: ex.country,
     financialYear: String(defaultFinancialYearFor()),
-    netDebt: String(ex.netDebt),
+    debt: String(ex.debt),
+    cash: String(ex.cash),
     fill: {
       growth: String(ex.fill.growth),
       ebitdaMargin: String(ex.fill.ebitdaMargin),
@@ -392,7 +396,7 @@ export function stateFromInputs(i: ValuationInputs): FormState {
     industry: i.industry,
     country: i.country,
     financialYear: d(i.financialYear),
-    netDebt: d(i.netDebt),
+    ...balancesFromInputs(i),
     fin,
     wacc,
     spTouched: true,
@@ -429,6 +433,26 @@ export function stateFromInputs(i: ValuationInputs): FormState {
     waccAdjustment: d(i.waccAdjustment ?? 0),
     // Stored inputs from before version 3 were valued on corporate tax alone.
     gccOwnership: i.gccOwnership === null || i.gccOwnership === undefined ? ((i.schemaVersion ?? 1) >= 3 ? '' : '0') : d(i.gccOwnership),
-    cash: d(i.cash),
   };
+}
+
+/**
+ * Borrowings and cash for the form. Version 4 inputs carry both. Earlier inputs
+ * entered net debt, with cash (Saudi Arabia only) used for the zakat base alone,
+ * so they are split to give the same net debt and the same zakat base:
+ * borrowings are the positive net debt plus that cash, and cash is that cash
+ * plus any net cash.
+ */
+export function balancesFromInputs(i: ValuationInputs): { debt: string; cash: string } {
+  const d = (v: number | null | undefined) => str(v ?? null);
+  if (i.debt !== null && i.debt !== undefined) return { debt: d(i.debt), cash: d(i.cash) };
+  if (i.netDebt === null || i.netDebt === undefined) return { debt: '', cash: d(i.cash) };
+  const zakatCash = i.cash ?? 0;
+  return { debt: d(Math.max(i.netDebt, 0) + zakatCash), cash: d(zakatCash + Math.max(-i.netDebt, 0)) };
+}
+
+/** Net debt from the form's borrowings and cash, or null until both are numbers. */
+export function netDebtOf(s: Pick<FormState, 'debt' | 'cash'>): number | null {
+  const debt = num(s.debt), cash = num(s.cash);
+  return debt === null || cash === null ? null : debt - cash;
 }

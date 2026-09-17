@@ -102,13 +102,13 @@ const full = fromState(fullFeatureCase(state));
 
 let pk = state.initialState();
 pk = state.applyIndustryDefaults({ ...pk, industry: 'Food Processing' });
-pk = state.applyCountryDefaults({ ...pk, country: 'Pakistan', netDebt: '1200' });
+pk = state.applyCountryDefaults({ ...pk, country: 'Pakistan', debt: '1200', cash: '0' });
 pk = withFin(pk, { rev: [8500, 9800, 11200, 12768, 14556, 16594, 18917, 21565], ebitda: [1250, 1480, 1720, 2043, 2329, 2655, 3027, 3450], da: [300, 340, 390, 383, 437, 498, 568, 647], capex: [450, 520, 600, 638, 728, 830, 946, 1078], nwc: [1500, 1700, 1950, 2298, 2620, 2987, 3405, 3882] });
 const pakistan = fromState(state.onEnterWacc(state.resetWacc(pk)));
 
 let ae = state.initialState();
 ae = state.applyIndustryDefaults({ ...ae, industry: 'Engineering/Construction' });
-ae = state.applyCountryDefaults({ ...ae, country: 'United Arab Emirates', netDebt: '700', financialYear: '2025' });
+ae = state.applyCountryDefaults({ ...ae, country: 'United Arab Emirates', debt: '700', cash: '0', financialYear: '2025' });
 ae = withFin(ae, { rev: [300, 280, 250, 260, 275, 290, 305, 320], ebitda: [12, 4, -6, 2, 8, 14, 20, 24], da: [10, 10, 9, 9, 9, 9, 10, 10], capex: [8, 6, 5, 5, 6, 6, 7, 7], nwc: [60, 58, 55, 56, 58, 60, 62, 64] });
 const distressed = fromState(state.onEnterWacc(state.resetWacc(ae)));
 
@@ -349,7 +349,9 @@ for (const [label, result] of [['Saudi', saudi], ['full', full], ['Pakistan', pa
     'EV / Revenue shown for reference; not used in the blend.',
     'A size premium and a private company discount are both applied.',
     'Powered by PaceMakers Business Valuation',
-    'Net debt at 31 December 2025, as entered, less free cash flow earned from then to 16 September 2026, plus after-tax interest on it for that period, gives net debt at the valuation date.',
+    'Net debt at 31 December 2025, borrowings less cash, less free cash flow earned from then to 16 September 2026, plus after-tax interest on it for that period, gives net debt at the valuation date.',
+    'Borrowings, year end',
+    'Net debt at year end (borrowings less cash)',
     'Less after-tax interest on net debt for that period',
     'uses forecast free cash flow, not actual results',
     'Add free cash flow from 31 December 2025 to the valuation date',
@@ -362,7 +364,13 @@ for (const [label, result] of [['Saudi', saudi], ['full', full], ['Pakistan', pa
     // Case-insensitive: the cover sets its labels in capitals.
     check(`reports say "${phrase}"`, all.replace(/\s+/g, ' ').toLowerCase().includes(phrase.toLowerCase()));
   }
-  check('Saudi report: tax and zakat row and zakat note', m.includes('Less tax and zakat') && m.replace(/\s+/g, ' ').includes('Cash was not entered, so the base is working capital alone and may be understated.'));
+  check('Saudi report: tax and zakat row, and no missing-cash note now cash is always entered', m.includes('Less tax and zakat') && !m.replace(/\s+/g, ' ').includes('Cash was not entered'));
+  {
+    // A stored version 3 lead without zakat cash still carries its disclosure.
+    const v3 = engine.runValuation({ ...state.toInputs(minimalCase(state), VALUATION_DATE), schemaVersion: 3, debt: undefined, cash: undefined, netDebt: 45 }).result;
+    const v3t = (await pageTexts(await pdfModule.renderValuationReport(v3, { ...REPORT_META, company: 'Example Co', industry: 'I', country: 'C', bookingHref: BOOK }))).join(' ').replace(/\s+/g, ' ');
+    check('version 3 report: net debt as entered, and the missing-cash zakat note', v3t.includes('Cash was not entered, so the base is working capital alone and may be understated.') && v3t.includes('Net debt at year end (entered)') && !v3t.includes('Borrowings, year end'));
+  }
   check('Saudi report: equity value as at the valuation date', m.includes('as at 16 September 2026'));
   check('full report: selected comparable companies by name', f.includes('Selected comparable companies (2)') && f.includes('Listed peer one'));
   check('risk-free yield printed to two decimals with its exact date', m.includes('5.00%') && m.replace(/\s+/g, ' ').includes('15 September 2026'));

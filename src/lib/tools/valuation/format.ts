@@ -197,10 +197,15 @@ export function headline(r: ValuationResult) {
   };
 }
 
+/** How year end net debt was entered: as borrowings less cash from version 4, as a single figure before. */
+export function enteredAs(r: ValuationResult): string {
+  return r.debt !== null && r.debt !== undefined ? 'borrowings less cash' : 'as entered';
+}
+
 /** Where net debt comes from and the date it is at. The same sentence on the results, in the email and in the report. */
 export function netDebtSentence(r: ValuationResult): string {
   const m = r.meta;
-  const entered = `Net debt at ${fmtDate(m.lastFyEnd)}, as entered`;
+  const entered = `Net debt at ${fmtDate(m.lastFyEnd)}, ${enteredAs(r)}`;
   if (!(m.stubFraction > 0) || !m.valuationDate) return `${entered}.`;
   const interest = r.bridge.elapsedInterest ? ', plus after-tax interest on it for that period,' : '';
   return `${entered}, less free cash flow earned from then to ${fmtDate(m.valuationDate)}${interest} gives net debt at the valuation date.`;
@@ -436,7 +441,7 @@ export function bridgeTable(r: ValuationResult): Table {
     { label: canonical(r) ? compsLabel : 'Comparables enterprise value', values: m(r.compRange) },
     { label: `Blended enterprise value (${r.dcfWeight}% DCF, ${100 - r.dcfWeight}% comparables)`, values: m(r.ev), tone: 'strong' },
     {
-      label: canonical(r) ? `${nd >= 0 ? 'Less net debt' : 'Add net cash'} at ${fmtDate(r.meta.lastFyEnd)}, as entered` : nd >= 0 ? 'Less net debt' : 'Add net cash',
+      label: canonical(r) ? `${nd >= 0 ? 'Less net debt' : 'Add net cash'} at ${fmtDate(r.meta.lastFyEnd)}, ${enteredAs(r)}` : nd >= 0 ? 'Less net debt' : 'Add net cash',
       values: m([-nd, -nd, -nd]),
       tone: 'muted',
     },
@@ -663,7 +668,13 @@ export function timingRows(r: ValuationResult): [string, string][] {
     ['Valuation date', m.valuationDate ? fmtDate(m.valuationDate) : 'End of the last actual year'],
     ['Last actual year end (assumed)', fmtDate(m.lastFyEnd)],
     ['Stub period', m.stubFraction > 0 ? `${m.stubMonths.toFixed(1)} months elapsed` : 'None'],
-    ['Net debt at year end (entered)', `${amt(r, r.netDebt)} ${unitShort(r)}`],
+    ...(r.debt !== null && r.debt !== undefined
+      ? ([
+          ['Borrowings, year end', `${amt(r, r.debt)} ${unitShort(r)}`],
+          ['Cash, year end', `${amt(r, r.cash ?? 0)} ${unitShort(r)}`],
+          ['Net debt at year end (borrowings less cash)', `${amt(r, r.netDebt)} ${unitShort(r)}`],
+        ] as [string, string][])
+      : ([['Net debt at year end (entered)', `${amt(r, r.netDebt)} ${unitShort(r)}`]] as [string, string][])),
     ...(m.stubFraction > 0
       ? ([
           ['Cash flow since year end', `${amt(r, r.bridge.elapsedFcf ?? 0)} ${unitShort(r)}`],

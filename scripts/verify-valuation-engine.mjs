@@ -238,7 +238,7 @@ const CASES = [
       let s = state.initialState();
       s = state.applyIndustryDefaults({ ...s, industry: 'Food Processing' });
       s = state.applyCountryDefaults({ ...s, country: 'Pakistan' });
-      s = { ...s, financialYear: '2025', netDebt: '1200' };
+      s = { ...s, financialYear: '2025', debt: '1200', cash: '0' };
       s = state.onLeaveCompany(s);
       s = withHistory(s, PK_HISTORY());
       s = { ...s, fill: { growth: '14', ebitdaMargin: '16', daOfRevenue: '3', capexOfRevenue: '5', nwcOfRevenue: '18' } };
@@ -272,7 +272,7 @@ const CASES = [
       let s = state.initialState();
       s = state.applyIndustryDefaults({ ...s, industry: 'Engineering/Construction' });
       s = state.applyCountryDefaults({ ...s, country: 'United Arab Emirates' });
-      s = { ...s, financialYear: '2024', netDebt: '400' };
+      s = { ...s, financialYear: '2024', debt: '400', cash: '0' };
       s = state.onLeaveCompany(s);
       const fin = UAE_FIN();
       s = { ...s, fin: Object.fromEntries(Object.entries(fin).map(([k, v]) => [k, v.map(String)])) };
