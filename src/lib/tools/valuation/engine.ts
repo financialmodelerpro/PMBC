@@ -64,7 +64,7 @@ export const FORECAST_YEARS = 5;
 export const TOTAL_YEARS = HISTORY_YEARS + FORECAST_YEARS;
 
 /** The inputs schema version written by this code. Stored on every lead's inputs and result. */
-export const INPUT_SCHEMA_VERSION = 3;
+export const INPUT_SCHEMA_VERSION = 4;
 
 export type LineKey = 'rev' | 'ebitda' | 'da' | 'capex' | 'nwc';
 export const LINE_KEYS: LineKey[] = ['rev', 'ebitda', 'da', 'capex', 'nwc'];
@@ -139,8 +139,14 @@ export type ValuationInputs = {
   industry: string;
   country: string;
   financialYear: number | null;
-  /** As at the end of the last actual financial year, as entered. */
+  /**
+   * Net debt at the end of the last actual financial year. Entered directly
+   * before version 4; from version 4 it is borrowings less cash, derived by
+   * `withNetDebtFromBalances` on every run, so the two can never disagree.
+   */
   netDebt: number | null;
+  /** Version 4. Borrowings at the end of the last actual financial year: loans, overdrafts and other interest-bearing debt. */
+  debt?: number | null;
   financials: Financials;
   wacc: WaccInputs;
   growth: number | null;
@@ -172,8 +178,10 @@ export type ValuationInputs = {
   /** Equity the business plans to raise, millions. Optional, and only asked when raising equity. */
   raiseAmount?: number | null;
   /**
-   * Cash at the last financial year end, millions. Optional, Saudi Arabia only,
-   * and used for nothing but the zakat base: net debt already nets cash.
+   * Cash at the last financial year end, millions. From version 4 it is
+   * required in every country: it nets off borrowings to give net debt, and in
+   * Saudi Arabia it also adds to the zakat base. Before version 4 it was
+   * optional, Saudi Arabia only, and used for the zakat base alone.
    */
   cash?: number | null;
 };
@@ -395,6 +403,8 @@ export function stubPeriod(financialYear: number | null, valuationDate: string |
   return { lastFyEnd, valuationDate, months, fraction, tooOld: months / 12 >= 1 };
 }
 
+export const DEBT_REQUIRED_MESSAGE = 'Enter borrowings. Use 0 if none.';
+export const CASH_REQUIRED_MESSAGE = 'Enter cash. Use 0 if none.';
 export const GCC_REQUIRED_MESSAGE = 'Enter the Saudi / GCC ownership share, from 0% to 100%.';
 
 export const STUB_TOO_OLD_MESSAGE =
@@ -582,8 +592,24 @@ function finiteOrNull(v: number | null | undefined): boolean {
   return v === null || v === undefined || Number.isFinite(v);
 }
 
+/** Whether these inputs enter borrowings and cash separately (version 4 on). */
+export function entersDebtAndCash(i: Pick<ValuationInputs, 'schemaVersion' | 'debt'>): boolean {
+  return (i.schemaVersion ?? 1) >= 4 || (i.debt !== null && i.debt !== undefined);
+}
+
+/**
+ * Net debt from borrowings and cash, for inputs that enter them separately.
+ * Earlier inputs keep the net debt they were entered with.
+ */
+export function withNetDebtFromBalances<T extends ValuationInputs>(i: T): T {
+  if (!entersDebtAndCash(i)) return i;
+  const debt = i.debt, cash = i.cash;
+  const complete = typeof debt === 'number' && Number.isFinite(debt) && typeof cash === 'number' && Number.isFinite(cash);
+  return { ...i, netDebt: complete ? debt - cash : null };
+}
+
 export function validateCompany(
-  i: Pick<ValuationInputs, 'industry' | 'country' | 'financialYear' | 'netDebt' | 'bridge' | 'gccOwnership' | 'valuationDate' | 'raiseAmount' | 'schemaVersion' | 'cash'>,
+  i: Pick<ValuationInputs, 'industry' | 'country' | 'financialYear' | 'netDebt' | 'bridge' | 'gccOwnership' | 'valuationDate' | 'raiseAmount' | 'schemaVersion' | 'cash' | 'debt'>,
 ): FieldErrors {
   const e: FieldErrors = {};
   if (!industryFor(i.industry)) e.industry = 'Select an industry.';
@@ -594,7 +620,10 @@ export function validateCompany(
   } else if (stubPeriod(fy, isIsoDate(i.valuationDate) ? (i.valuationDate as string) : null).tooOld) {
     e.financialYear = STUB_TOO_OLD_MESSAGE;
   }
-  if (!Number.isFinite(n(i.netDebt))) e.netDebt = 'Enter net debt. Use 0 if none.';
+  if (entersDebtAndCash(i)) {
+    if (!(typeof i.debt === 'number' && i.debt >= 0)) e.debt = DEBT_REQUIRED_MESSAGE;
+    if (!(typeof i.cash === 'number' && i.cash >= 0)) e.cash = CASH_REQUIRED_MESSAGE;
+  } else if (!Number.isFinite(n(i.netDebt))) e.netDebt = 'Enter net debt. Use 0 if none.';
   const b = i.bridge;
   if (b) {
     for (const k of ['eosb', 'leases', 'minorityInterest', 'surplusAssets'] as const) {
@@ -607,7 +636,7 @@ export function validateCompany(
     if ((g === null || g === undefined) && (i.schemaVersion ?? 1) >= 3) e.gccOwnership = GCC_REQUIRED_MESSAGE;
     else if (g !== null && g !== undefined && !(g >= 0 && g <= 100)) e.gccOwnership = GCC_REQUIRED_MESSAGE;
   }
-  if (i.cash !== null && i.cash !== undefined && !(i.cash >= 0)) e.cash = 'Enter cash as a positive amount, or leave it blank.';
+  if (!entersDebtAndCash(i) && i.cash !== null && i.cash !== undefined && !(i.cash >= 0)) e.cash = 'Enter cash as a positive amount, or leave it blank.';
   if (i.raiseAmount !== null && i.raiseAmount !== undefined && !(i.raiseAmount >= 0)) {
     e.raiseAmount = 'Enter the amount to raise as a positive number, or leave it blank.';
   }
@@ -1124,6 +1153,9 @@ export type ValuationResult = {
   exitMultipleApplied: number;
   midYear: boolean;
   netDebt: number;
+  /** Borrowings and cash as entered, from version 4; null for inputs that entered net debt directly. */
+  debt: number | null;
+  cash: number | null;
   privateDiscount: number;
   dcfWeight: number;
   /** All eight years, for the charts. Forecast EBITDA includes carried add-backs. */
@@ -1205,7 +1237,8 @@ export type RunOutcome =
 export const SENSITIVITY_WACC_STEPS = [-0.02, -0.01, 0, 0.01, 0.02];
 export const SENSITIVITY_GROWTH_STEPS = [-0.01, -0.005, 0, 0.005, 0.01];
 
-export function runValuation(i: ValuationInputs, opts: EngineOptions = CURRENT_METHOD): RunOutcome {
+export function runValuation(entered: ValuationInputs, opts: EngineOptions = CURRENT_METHOD): RunOutcome {
+  const i = withNetDebtFromBalances(entered);
   const companyErrors = validateCompany(i);
   if (Object.keys(companyErrors).length) return { ok: false, step: 0, errors: companyErrors };
   const finError = validateFinancials(i.financials, i);
@@ -1465,6 +1498,8 @@ function compute(i: ValuationInputs, withScenarios: boolean, opts: EngineOptions
     exitMultipleApplied: xmApplied,
     midYear: mid,
     netDebt: nd,
+    debt: entersDebtAndCash(i) ? n(i.debt) : null,
+    cash: entersDebtAndCash(i) ? n(i.cash) : null,
     privateDiscount: disc,
     dcfWeight: wD,
     revenue: revs,

@@ -97,7 +97,7 @@ const CASES = [
         da: [18, 20, 22, 24, 26, 28, 30, 32],
         capex: [24, 26, 28, 30, 32, 34, 36, 38],
         nwc: [40, 44, 48, 53, 58, 63, 68, 73],
-      }, { netDebt: '60', gccOwnership: '60' });
+      }, { debt: '105', cash: '45', gccOwnership: '60' });
       s = {
         ...s,
         companyName: LONG_NAME,
@@ -124,7 +124,7 @@ const CASES = [
         da: [10, 10, 9, 9, 9, 10, 10, 11],
         capex: [8, 6, 5, 5, 6, 7, 8, 9],
         nwc: [60, 58, 55, 56, 58, 60, 62, 64],
-      }, { netDebt: '40' });
+      }, { debt: '40', cash: '0' });
       return state.toInputs({ ...s, gccOwnership: '0' }, VALUATION_DATE);
     },
   },
@@ -138,7 +138,7 @@ const CASES = [
         da: [30, 32, 34, 36, 38, 40, 42, 44],
         capex: [36, 38, 40, 42, 44, 46, 48, 50],
         nwc: [50, 54, 58, 62, 66, 70, 74, 78],
-      }, { netDebt: '420', gccOwnership: '100' });
+      }, { debt: '420', cash: '0', gccOwnership: '100' });
       return state.toInputs(s, VALUATION_DATE);
     },
   },
@@ -152,7 +152,7 @@ const CASES = [
         da: [0.02, 0.02, 0.03, 0.03, 0.03, 0.03, 0.04, 0.04],
         capex: [0.03, 0.03, 0.03, 0.04, 0.04, 0.04, 0.05, 0.05],
         nwc: [0.05, 0.05, 0.06, 0.06, 0.07, 0.07, 0.08, 0.08],
-      }, { netDebt: '0.02', gccOwnership: '100' });
+      }, { debt: '0.02', cash: '0', gccOwnership: '100' });
       return state.toInputs(s, VALUATION_DATE);
     },
   },
@@ -166,7 +166,7 @@ const CASES = [
         da: [3000, 3200, 3400, 3600, 3800, 4000, 4200, 4400],
         capex: [4200, 4400, 4600, 4800, 5000, 5200, 5400, 5600],
         nwc: [2000, 2150, 2300, 2450, 2600, 2750, 2900, 3050],
-      }, { netDebt: '52000', gccOwnership: '0' });
+      }, { debt: '52000', cash: '0', gccOwnership: '0' });
       return state.toInputs(s, VALUATION_DATE);
     },
   },
@@ -176,7 +176,7 @@ const CASES = [
     inputs: () => {
       let s = state.initialState();
       s = state.applyIndustryDefaults({ ...s, industry: 'Software (System & Application)' });
-      s = state.applyCountryDefaults({ ...s, country: 'United Arab Emirates', financialYear: '2025', netDebt: '-15' });
+      s = state.applyCountryDefaults({ ...s, country: 'United Arab Emirates', financialYear: '2025', debt: '0', cash: '15' });
       s = withFin(s, {
         rev: [60, 75, 92, 112, 134, 158, 182, 205],
         ebitda: [9, 13, 18, 24, 31, 38, 45, 52],
@@ -197,7 +197,7 @@ const CASES = [
         da: [7, 8, 9, 11, 13, 15, 17, 19],
         capex: [15, 18, 22, 26, 30, 32, 34, 36],
         nwc: [15, 17, 20, 24, 28, 32, 36, 40],
-      }, { netDebt: '25', gccOwnership: '100', investedCapital: '180', cash: '30' });
+      }, { debt: '55', cash: '30', gccOwnership: '100', investedCapital: '180' });
       return { ...state.toInputs(s, VALUATION_DATE), purpose: 'raise', raiseAmount: 120 };
     },
   },

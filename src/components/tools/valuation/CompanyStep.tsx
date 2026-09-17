@@ -5,22 +5,25 @@ import { PROFILE_LIMITS } from '@/lib/tools/valuation/profile';
 import type { FieldErrors } from '@/lib/tools/valuation/engine';
 
 import { SearchSelect } from './SearchSelect';
-import type { BridgeKey, FormState } from './state';
+import { netDebtOf, type BridgeKey, type FormState } from './state';
 import { Collapsible, Field, NumberInput, Panel, PanelTitle, StepNav, inputClass } from './ui';
 
 const INDUSTRY_OPTIONS = Object.keys(INDUSTRIES).map((name) => ({ value: name, label: name }));
+/** A million figure for the net debt line: up to one decimal, grouped. */
+const millions = (v: number) => v.toLocaleString('en-US', { maximumFractionDigits: 1 });
+
 const COUNTRY_OPTIONS = Object.entries(COUNTRIES).map(([name, c]) => ({ value: name, label: name, tag: c.code }));
 
 const BRIDGE_FIELDS: { k: BridgeKey; label: string; hint: string }[] = [
   {
     k: 'eosb',
     label: 'End of service benefits provision',
-    hint: 'The accrued liability for staff gratuity, common in KSA and the GCC. Leave blank if it is already inside net debt.',
+    hint: 'The accrued liability for staff gratuity, common in KSA and the GCC. Leave blank if it is already inside borrowings.',
   },
   {
     k: 'leases',
     label: 'Lease liabilities',
-    hint: 'Only if not already counted in net debt above. Entering them in both places deducts them twice.',
+    hint: 'Only if not already counted in borrowings above. Entering them in both places deducts them twice.',
   },
   {
     k: 'minorityInterest',
@@ -30,7 +33,7 @@ const BRIDGE_FIELDS: { k: BridgeKey; label: string; hint: string }[] = [
   {
     k: 'surplusAssets',
     label: 'Surplus assets and investments',
-    hint: 'Assets the business does not need to operate, such as spare land or investments. Added to equity. Not cash already in net debt.',
+    hint: 'Assets the business does not need to operate, such as spare land or investments. Added to equity. Not cash already entered above.',
   },
 ];
 
@@ -56,6 +59,8 @@ export function CompanyStep({
   onNext: () => void;
 }) {
   const bridgeCount = BRIDGE_FIELDS.filter((f) => state.bridge[f.k].trim() !== '').length;
+  const yearEnd = /^\d{4}$/.test(state.financialYear.trim()) ? state.financialYear.trim() : 'of that year';
+  const netDebt = netDebtOf(state);
   return (
     <Panel eyebrow="Step 1 of 4">
       <PanelTitle
@@ -124,25 +129,60 @@ export function CompanyStep({
             />
           )}
         </Field>
+      </div>
+
+      {/* Borrowings and cash, entered separately; net debt is worked out from them. */}
+      <div className="grid gap-x-5 sm:grid-cols-2">
         <Field
-          label={`Net debt at 31 December ${/^\d{4}$/.test(state.financialYear.trim()) ? state.financialYear.trim() : 'of that year'}`}
-          hint="Borrowings and leases less cash, at the year end. Negative if cash is higher. The valuation rolls it forward to today using the cash flow since."
-          error={errors.netDebt ?? ''}
+          label={`Borrowings at 31 December ${yearEnd}`}
+          hint="Bank loans, overdrafts and other interest-bearing debt at the year end. Use 0 if none. Enter lease liabilities under Other balance sheet items."
+          error={errors.debt ?? ''}
         >
           {({ id, describedBy, invalid }) => (
             <NumberInput
               id={id}
+              min={0}
               step={0.1}
               placeholder="0"
               suffix={`${currencyCode} m`}
-              value={state.netDebt}
-              onValue={(v) => onChange({ netDebt: v })}
+              value={state.debt}
+              onValue={(v) => onChange({ debt: v })}
+              aria-describedby={describedBy}
+              aria-invalid={invalid}
+            />
+          )}
+        </Field>
+        <Field
+          label={`Cash at 31 December ${yearEnd}`}
+          hint={
+            state.country === TAX.zakatCountry
+              ? 'Cash and bank balances at the year end. Use 0 if none. Also adds to the zakat base.'
+              : 'Cash and bank balances at the year end. Use 0 if none.'
+          }
+          error={errors.cash ?? ''}
+        >
+          {({ id, describedBy, invalid }) => (
+            <NumberInput
+              id={id}
+              min={0}
+              step={0.1}
+              placeholder="0"
+              suffix={`${currencyCode} m`}
+              value={state.cash}
+              onValue={(v) => onChange({ cash: v })}
               aria-describedby={describedBy}
               aria-invalid={invalid}
             />
           )}
         </Field>
       </div>
+      <p className="-mt-1 mb-5 text-[13px] leading-[1.5] text-[#52606B]" aria-live="polite" data-net-debt-readout="">
+        {netDebt === null
+          ? 'Net debt is borrowings less cash. The valuation rolls it forward to today using the cash flow since.'
+          : netDebt >= 0
+            ? `Net debt: ${millions(netDebt)} ${currencyCode} m (borrowings less cash). The valuation rolls it forward to today using the cash flow since.`
+            : `Net cash: ${millions(-netDebt)} ${currencyCode} m (cash above borrowings). The valuation rolls it forward to today using the cash flow since.`}
+      </p>
 
       {state.country === TAX.zakatCountry && (
         <div className="grid gap-x-5 sm:grid-cols-2">
@@ -160,25 +200,6 @@ export function CompanyStep({
                 suffix="%"
                 value={state.gccOwnership}
                 onValue={(v) => onChange({ gccOwnership: v })}
-                aria-describedby={describedBy}
-                aria-invalid={invalid}
-              />
-            )}
-          </Field>
-          <Field
-            label={`Cash at 31 December ${/^\d{4}$/.test(state.financialYear.trim()) ? state.financialYear.trim() : 'of that year'} (optional)`}
-            hint="Used only to estimate the zakat base (working capital plus cash). Leave blank and the base is working capital alone."
-            error={errors.cash ?? ''}
-          >
-            {({ id, describedBy, invalid }) => (
-              <NumberInput
-                id={id}
-                min={0}
-                step={0.1}
-                placeholder="0"
-                suffix={`${currencyCode} m`}
-                value={state.cash}
-                onValue={(v) => onChange({ cash: v })}
                 aria-describedby={describedBy}
                 aria-invalid={invalid}
               />

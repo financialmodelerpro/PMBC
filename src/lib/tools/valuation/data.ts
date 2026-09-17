@@ -369,7 +369,9 @@ export const EXAMPLE_COMPANY = {
   industry: 'Healthcare Support Services',
   country: 'Saudi Arabia',
   financialYear: 2025,
-  netDebt: 45,
+  /** Borrowings and cash at the year end: net debt of 45. */
+  debt: 65,
+  cash: 20,
   history: {
     rev: [180, 205, 232],
     ebitda: [29, 34, 40],

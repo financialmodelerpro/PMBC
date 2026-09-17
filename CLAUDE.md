@@ -1077,14 +1077,21 @@ executive summary says the forecast carries most of the answer only when the DCF
 weight is above 50%.
 
 **Input schema versioning.** Stored inputs carry `schemaVersion`
-(`INPUT_SCHEMA_VERSION`, now 3) inside the `inputs` JSONB, stamped by the server
+(`INPUT_SCHEMA_VERSION`, now 4) inside the `inputs` JSONB, stamped by the server
 whatever the browser sends. No migration: every version 2 block is optional and
 `resolveExtras` fills an absent one with its neutral default, so a version 1
 lead revives and formats unchanged. Bump the version when a stored input changes
 meaning, and branch on it in `resolveExtras`, never by guessing from shape.
 Version 3: Saudi / GCC ownership is required for Saudi Arabia with no default
 (the example company fills it); older inputs without it mean 0% (corporate tax,
-as they were valued).
+as they were valued). Version 4: borrowings (`debt`) and cash are entered
+separately, both required (0 allowed) in every country, and the engine derives
+net debt as borrowings less cash on every run (`withNetDebtFromBalances`), so
+a net debt figure the browser sends is ignored; cash also adds to the Saudi
+zakat base. The server stamps version 4 only when borrowings are sent, so a
+page from before the change still saves, as version 3 with net debt as entered.
+`balancesFromInputs` splits version 3 inputs into borrowings and cash with the
+same net debt and zakat cash.
 
 ### Business Valuation version 3
 
@@ -1102,7 +1109,7 @@ downstream computes a value; rounding happens only in `format.ts`.
 |---|---|
 | Terminal value | Perpetuity on a normalised terminal cash flow (`terminalCashFlow`): NOPAT at g, net capex scaled to g over final year growth, working capital at g. Implied terminal multiple, reinvestment rate and implied terminal ROIC (g over reinvestment rate) are reported. |
 | Valuation date | The server's date. Year one keeps (1 - f) of its cash flow, periods (1 - f) / 2 then (i - 0.5) - f, terminal at N - f (`stubPeriod`). A last actual year 12 months or more old is refused. Financial years are assumed to end 31 December. |
-| Net debt | Entered at the year end, rolled forward to the valuation date: less the elapsed year one forecast cash flow, plus after-tax interest on positive net debt at the pre-tax cost of debt. One figure for every scenario. |
+| Net debt | Borrowings less cash at the year end (both entered, from input version 4), rolled forward to the valuation date: less the elapsed year one forecast cash flow, plus after-tax interest on positive net debt at the pre-tax cost of debt. One figure for every scenario. |
 | Tax and zakat | Saudi / GCC ownership is required for Saudi Arabia, no default (the example company fills 100%). Income tax on the non-GCC share only; zakat 2.5% of an approximate base, working capital plus optional year end cash (`zakatBase`, cash held flat, floored at zero), disclosed as possibly understated when cash is blank. The same income tax rate is used for FCFF, terminal NOPAT, cost of debt and beta relevering. |
 | Losses | Carried forward from the actual years, offset capped per country (`lossOffsetCap`: Saudi Arabia 25%, UAE 75%, else 100%). |
 | Raise | Optional amount when raising equity: pre-money, post-money, investor stake. |
@@ -1166,10 +1173,10 @@ cases and rasterises every page to PNG for inspection.
 5. Checks in `verify-valuation-v2` for the item on its own and absent, then `verify-valuation-engine` to prove the neutral path.
 
 **Verifiers.** `verify-valuation-engine` (518: 514 reference parity plus 4 on the market data passed into the reference),
-`verify-valuation-v2` (359), `verify-tool-lead-api` (125),
-`verify-valuation-dashboard` (243, the results page end to end at 1440, 1024 and 390, including the partner portrait's 4:5 frame and source ratio,
+`verify-valuation-v2` (378), `verify-tool-lead-api` (130),
+`verify-valuation-dashboard` (258, the results page end to end at 1440, 1024 and 390, including the partner portrait's 4:5 frame and source ratio,
 against a local `next start`, every /api/ request intercepted so nothing is
-written), `verify-tool-email-pdf` (351, pdfjs text and operator list, including the report theme's footer, colour and logo rules, so a ligature glyph is
+written), `verify-tool-email-pdf` (354, pdfjs text and operator list, including the report theme's footer, colour and logo rules, so a ligature glyph is
 caught even though extracted text maps it back to letters),
 `verify-tools-visibility` (89), `verify-brevo-webhook` (168), `verify-booking-links` (61) and
 `verify-production-guard` (34). Each was

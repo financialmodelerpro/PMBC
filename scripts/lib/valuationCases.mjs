@@ -26,7 +26,7 @@ export function minimalCase(state) {
 export function fullFeatureCase(state) {
   let s = state.initialState();
   s = state.applyIndustryDefaults({ ...s, industry: 'Food Processing' });
-  s = state.applyCountryDefaults({ ...s, country: 'Pakistan', netDebt: '1200', financialYear: '2025' });
+  s = state.applyCountryDefaults({ ...s, country: 'Pakistan', debt: '1200', cash: '0', financialYear: '2025' });
   s = withFin(s, {
     rev: [8500, 9800, 11200, 12768, 14556, 16594, 18917, 21565],
     ebitda: [1250, 1480, 1720, 2043, 2329, 2655, 3027, 3450],

@@ -490,7 +490,7 @@ console.log('10. Lever, stake rule and inflation band');
 
 console.log('9. Schema version and WACC adjustment');
 {
-  check('schema version is 3', engine.INPUT_SCHEMA_VERSION === 3 && B.schemaVersion === 3 && BASE.schemaVersion === 3);
+  check('schema version is 4', engine.INPUT_SCHEMA_VERSION === 4 && B.schemaVersion === 4 && BASE.schemaVersion === 4);
   const w0 = engine.computeWacc(BASE.wacc, B.currency, 0).wacc;
   const w1 = engine.computeWacc(BASE.wacc, B.currency, 1.5).wacc;
   near('adjustment of 1.5 points adds 0.015', w1, w0 + 0.015);
@@ -504,7 +504,8 @@ console.log('11. Version 3');
   const fin = BASE.financials;
   // The old report's inputs, including its 4.23% January 2026 ERP, so the
   // before and after comparison is like for like after the September ERP.
-  const REG = { ...BASE, gccOwnership: 0, valuationDate: null, wacc: { ...BASE.wacc, erp: 4.23 } };
+  // Version 3 inputs: net debt entered as one figure (45), cash for the zakat base only.
+  const REG = { ...BASE, schemaVersion: 3, debt: undefined, cash: undefined, netDebt: 45, gccOwnership: 0, valuationDate: null, wacc: { ...BASE.wacc, erp: 4.23 } };
   check('the form now prefills the 1 September 2026 ERP of 4.14%', BASE.wacc.erp === 4.14 && data.MARKET.matureErp === 4.14);
   const reg = run(REG);
   const T = 7, P = 6;
@@ -628,7 +629,6 @@ console.log('11. Version 3');
     check('zakat is charged in a loss year', (() => { const lf = clone(fin); lf.ebitda[3] = -20; const r0 = run({ ...REG, financials: lf, gccOwnership: 100, cash: 5 }); return r0.rows[0].incomeTax === 0 && r0.rows[0].zakat > 0; })());
     check('cash changes nothing but zakat', (() => { const a = run({ ...REG, gccOwnership: 0, cash: 500 }); return a.equity.every((v, k) => v === reg.equity[k]); })());
     check('negative cash is refused', engine.validateCompany({ ...REG, cash: -1 }).cash === 'Enter cash as a positive amount, or leave it blank.');
-    check('form: cash is sent for Saudi Arabia only', state.toInputs({ ...minimalCase(state), cash: '9' }, VALUATION_DATE).cash === 9 && state.toInputs({ ...minimalCase(state), country: 'Qatar', cash: '9' }, VALUATION_DATE).cash === null);
     check('Saudi / GCC ownership is required from version 3, with no default', engine.validateCompany({ ...REG, gccOwnership: undefined }).gccOwnership === engine.GCC_REQUIRED_MESSAGE && engine.validateCompany({ ...REG, gccOwnership: null }).gccOwnership === engine.GCC_REQUIRED_MESSAGE);
     check('form: a new form leaves ownership blank; the example company fills it', state.initialState().gccOwnership === '' && state.exampleState().gccOwnership === '100');
     check('not required outside Saudi Arabia', !engine.validateCompany({ ...REG, country: 'Qatar', gccOwnership: null }).gccOwnership);
@@ -740,7 +740,7 @@ console.log('11. Version 3');
     const distressed = (() => {
       let s0 = state.initialState();
       s0 = state.applyIndustryDefaults({ ...s0, industry: 'Engineering/Construction' });
-      s0 = state.applyCountryDefaults({ ...s0, country: 'United Arab Emirates', netDebt: '400', financialYear: '2025' });
+      s0 = state.applyCountryDefaults({ ...s0, country: 'United Arab Emirates', debt: '400', cash: '0', financialYear: '2025' });
       s0 = withFin(s0, { rev: [300, 280, 250, 260, 275, 290, 305, 320], ebitda: [12, 4, -6, 2, 8, 14, 20, 24], da: [10, 10, 9, 9, 9, 9, 10, 10], capex: [8, 6, 5, 5, 6, 6, 7, 7], nwc: [60, 58, 55, 56, 58, 60, 62, 64] });
       return run(state.toInputs(state.onEnterWacc(state.resetWacc(s0)), VALUATION_DATE));
     })();
@@ -791,13 +791,46 @@ console.log('11. Version 3');
 
     let small = state.initialState();
     small = state.applyIndustryDefaults({ ...small, industry: 'Restaurant/Dining' });
-    small = state.applyCountryDefaults({ ...small, country: 'Saudi Arabia', netDebt: '0.02', financialYear: '2025', gccOwnership: '100' });
+    small = state.applyCountryDefaults({ ...small, country: 'Saudi Arabia', debt: '0.02', cash: '0', financialYear: '2025', gccOwnership: '100' });
     small = withFin(small, { rev: [0.8, 0.9, 1, 1.1, 1.2, 1.3, 1.4, 1.5], ebitda: [0.1, 0.12, 0.14, 0.16, 0.18, 0.2, 0.22, 0.24], da: [0.02, 0.02, 0.03, 0.03, 0.03, 0.03, 0.04, 0.04], capex: [0.03, 0.03, 0.03, 0.04, 0.04, 0.04, 0.05, 0.05], nwc: [0.05, 0.05, 0.06, 0.06, 0.07, 0.07, 0.08, 0.08] });
     const sm = run(state.toInputs(state.onEnterWacc(state.resetWacc(small)), VALUATION_DATE));
     check('a small business prints in thousands', format.amountUnit(sm).label === 'SAR thousands' && format.bridgeTable(sm).head[0] === 'SAR thousands' && format.amountUnit(B).label === 'SAR millions');
     check('thousands reconcile', reconcileModule.reconcile(sm).length === 0, JSON.stringify(reconcileModule.reconcile(sm).slice(0, 2)));
     check('sub-million headline in thousands, zero stays in millions', format.fmtBig(0.45, sm.currency) === 'SAR 450 thousand' && format.fmtBig(0, sm.currency) === 'SAR 0.0 million');
   }
+}
+
+console.log('12. Version 4: borrowings and cash');
+{
+  check('the example company enters borrowings 65 and cash 20 (net debt 45)', BASE.debt === 65 && BASE.cash === 20 && BASE.netDebt === 45 && data.EXAMPLE_COMPANY.debt === 65 && data.EXAMPLE_COMPANY.cash === 20);
+  const b = run(BASE);
+  check('net debt is borrowings less cash', b.netDebt === 45 && b.debt === 65 && b.cash === 20);
+  check('a net debt figure sent alongside borrowings is ignored', run({ ...BASE, netDebt: 9999 }).equity.every((v, k) => v === b.equity[k]));
+  const asV3 = run({ ...BASE, schemaVersion: 3, debt: undefined, netDebt: 45, cash: 20 });
+  check('the same valuation as version 3 inputs with net debt 45 and zakat cash 20', asV3.equity.every((v, k) => close(v, b.equity[k])) && asV3.debt === null);
+  const netCash = run({ ...BASE, debt: 0, cash: 30 });
+  check('cash above borrowings is net cash', netCash.netDebt === -30 && netCash.equity[1] > b.equity[1]);
+  check('blank cash is refused', engine.validateCompany({ ...BASE, cash: null }).cash === engine.CASH_REQUIRED_MESSAGE);
+  check('blank borrowings are refused', engine.validateCompany({ ...BASE, debt: null }).debt === engine.DEBT_REQUIRED_MESSAGE);
+  check('negative borrowings or cash are refused', Boolean(engine.validateCompany({ ...BASE, debt: -1 }).debt) && Boolean(engine.validateCompany({ ...BASE, cash: -1 }).cash));
+  check('zero borrowings and zero cash are accepted', !engine.validateCompany({ ...BASE, debt: 0, cash: 0 }).debt && !engine.validateCompany({ ...BASE, debt: 0, cash: 0 }).cash);
+  check('runValuation refuses blank cash at step 1', engine.runValuation({ ...BASE, cash: null }).ok === false);
+  const qatar = state.toInputs({ ...minimalCase(state), country: 'Qatar' }, VALUATION_DATE);
+  check('outside Saudi Arabia cash is sent and required too', qatar.cash === 20 && engine.validateCompany({ ...qatar, cash: null }).cash === engine.CASH_REQUIRED_MESSAGE);
+  check('in Saudi Arabia cash also adds to the zakat base, with no missing-cash note', b.tax.zakatBaseLtm?.cash === 20 && !format.disclosures(b).zakat.includes('Cash was not entered'));
+  const t = format.timingRows(b);
+  check('assumptions list borrowings, cash and net debt', t.some(([k]) => k === 'Borrowings, year end') && t.some(([k]) => k === 'Cash, year end') && t.some(([k]) => k === 'Net debt at year end (borrowings less cash)'));
+  check('the bridge and the net debt sentence say borrowings less cash', format.bridgeTable(b).rows.some((row) => row.label === 'Less net debt at 31 December 2025, borrowings less cash') && format.netDebtSentence(b).startsWith('Net debt at 31 December 2025, borrowings less cash'));
+  const v3 = run({ ...BASE, schemaVersion: 3, debt: undefined, cash: undefined, netDebt: 45 });
+  check('version 3 results keep the as entered wording', format.netDebtSentence(v3).startsWith('Net debt at 31 December 2025, as entered') && format.timingRows(v3).some(([k]) => k === 'Net debt at year end (entered)'));
+  check('form: net debt is worked out as the fields are typed', state.netDebtOf({ debt: '65', cash: '20' }) === 45 && state.netDebtOf({ debt: '', cash: '20' }) === null && state.netDebtOf({ debt: '0', cash: '12.5' }) === -12.5);
+  // Stored version 3 inputs split into borrowings and cash with the same net debt and zakat cash.
+  const split = (netDebt, cash) => state.balancesFromInputs({ ...BASE, schemaVersion: 3, debt: undefined, netDebt, cash });
+  check('version 3, net debt 45 with zakat cash 20: borrowings 65, cash 20', JSON.stringify(split(45, 20)) === JSON.stringify({ debt: '65', cash: '20' }), JSON.stringify(split(45, 20)));
+  check('version 3, net debt 45 with no cash: borrowings 45, cash 0', JSON.stringify(split(45, null)) === JSON.stringify({ debt: '45', cash: '0' }), JSON.stringify(split(45, null)));
+  check('version 3, net cash 30: borrowings 0, cash 30', JSON.stringify(split(-30, null)) === JSON.stringify({ debt: '0', cash: '30' }), JSON.stringify(split(-30, null)));
+  const revived = run(state.toInputs(state.stateFromInputs({ ...BASE, schemaVersion: 3, debt: undefined, netDebt: 45, cash: 20 }), VALUATION_DATE));
+  check('a revived version 3 input values the same after the split', revived.equity.every((v, k) => close(v, asV3.equity[k])));
 }
 
 console.log(`\n${checks - failures} of ${checks} checks passed.`);

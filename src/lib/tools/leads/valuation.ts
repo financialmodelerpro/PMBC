@@ -45,6 +45,8 @@ const inputsSchema = z.object({
   country: z.string().max(100),
   financialYear: z.number().int().nullable(),
   netDebt: cell,
+  // Version 4: borrowings and cash (below) are entered separately and the engine derives net debt from them.
+  debt: cell.optional(),
   financials: z.object({ rev: line, ebitda: line, da: line, capex: line, nwc: line }),
   wacc: z.object({
     rf: cell, erp: cell, crp: cell, bu: cell, de: cell, sp: cell, ds: cell, cs: cell, tax: cell,
@@ -102,7 +104,10 @@ export type SubmittedInputs = z.infer<typeof inputsSchema>;
  * valuation date, which is the day the server computes the valuation.
  */
 export function stampServerFields<T extends SubmittedInputs>(inputs: T, now: Date): T {
-  return { ...inputs, schemaVersion: INPUT_SCHEMA_VERSION, valuationDate: isoDate(now) };
+  // A page from before version 4 (still open in a browser across a deploy) sends
+  // net debt with no borrowings: it is stamped version 3 and valued as entered.
+  const version = inputs.debt === null || inputs.debt === undefined ? Math.min(INPUT_SCHEMA_VERSION, 3) : INPUT_SCHEMA_VERSION;
+  return { ...inputs, schemaVersion: version, valuationDate: isoDate(now) };
 }
 
 /** Validates and recomputes inputs alone. Shared by the lead, version and PDF endpoints. */
