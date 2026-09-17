@@ -48,7 +48,7 @@ export function readAttribution(): Attribution {
   return { landing_path: typeof window !== 'undefined' ? window.location.pathname : undefined };
 }
 
-export async function submitLead(body: unknown): Promise<{ result: ValuationResult; token: string | null } | null> {
+export async function submitLead(body: unknown): Promise<{ result: ValuationResult; token: string | null; booking: string | null } | null> {
   try {
     const res = await fetch('/api/tools/business-valuation/lead', {
       method: 'POST',
@@ -60,9 +60,9 @@ export async function submitLead(body: unknown): Promise<{ result: ValuationResu
       console.error('[valuation] lead API responded', res.status, await res.text().catch(() => ''));
       return null;
     }
-    const data = (await res.json()) as { ok?: boolean; result?: unknown; lead?: { token?: string } | null };
+    const data = (await res.json()) as { ok?: boolean; result?: unknown; lead?: { token?: string; booking?: string | null } | null };
     if (!data.ok || !data.result) return null;
-    return { result: reviveResult(data.result), token: data.lead?.token ?? null };
+    return { result: reviveResult(data.result), token: data.lead?.token ?? null, booking: data.lead?.booking ?? null };
   } catch (err) {
     console.error('[valuation] lead API request failed', err);
     return null;

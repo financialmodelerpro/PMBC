@@ -85,7 +85,7 @@ export function BusinessValuationTool({ preview, partner }: ToolComponentProps) 
 
   const [pending, setPending] = useState<ValuationResult | null>(null);
   const [saved, setSaved] = useState<{ inputs: ValuationInputs; result: ValuationResult } | null>(null);
-  const [lead, setLead] = useState<{ name: string; email: string; token: string | null } | null>(null);
+  const [lead, setLead] = useState<{ name: string; email: string; token: string | null; booking: string | null } | null>(null);
 
   const topRef = useRef<HTMLDivElement>(null);
   const mountedAt = useRef(Date.now());
@@ -173,7 +173,7 @@ export function BusinessValuationTool({ preview, partner }: ToolComponentProps) 
     const raise = gate.purpose === 'raise' ? num(gate.raiseAmount) : null;
     const inputs = { ...toInputs(s), purpose: gate.purpose, raiseAmount: raise };
     const local = runValuation(inputs);
-    setLead({ name: gate.name.trim(), email: gate.email.trim(), token: null });
+    setLead({ name: gate.name.trim(), email: gate.email.trim(), token: null, booking: null });
     try {
       const response = await submitLead({
         inputs,
@@ -193,7 +193,7 @@ export function BusinessValuationTool({ preview, partner }: ToolComponentProps) 
       // The server's recomputation is what was saved and emailed, so it is what
       // the visitor sees. The browser's own run is the fallback, never the source.
       setSaved({ inputs, result: response?.result ?? (local.ok ? local.result : pending) });
-      if (response?.token) setLead((l) => (l ? { ...l, token: response.token } : l));
+      if (response?.token) setLead((l) => (l ? { ...l, token: response.token, booking: response.booking } : l));
     } finally {
       setSubmitting(false);
       setMaxReached(3);

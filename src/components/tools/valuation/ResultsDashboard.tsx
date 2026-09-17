@@ -65,6 +65,7 @@ import {
 import { reviveResult } from '@/lib/tools/valuation/serialize';
 import type { PartnerCard as PartnerCardData } from '@/lib/tools/brand/partner';
 import { bookingPageLink } from '@/lib/tools/booking';
+import { bookingLinkPath } from '@/lib/tools/bookingLinks';
 
 import { ChartSvg } from '../charts/ChartSvg';
 import { PartnerCard } from '../PartnerCard';
@@ -160,7 +161,7 @@ export function ResultsDashboard({
 }: {
   baseInputs: ValuationInputs;
   baseResult: ValuationResult;
-  lead: { name: string; email: string; token: string | null };
+  lead: { name: string; email: string; token: string | null; booking?: string | null };
   preview: boolean;
   partner?: PartnerCardData | null;
   onEdit: () => void;
@@ -245,9 +246,12 @@ export function ResultsDashboard({
     }
   }
 
-  const bookingHref = lead.token
-    ? `/api/tools/book?t=${encodeURIComponent(lead.token)}&src=results`
-    : bookingPageLink({ name: lead.name, email: lead.email, toolSlug: TOOL_SLUG, placement: 'results' });
+  // The short link opens the booking page only; it is not the lead's access token.
+  const bookingHref = lead.booking
+    ? bookingLinkPath(lead.booking, 'results')
+    : lead.token
+      ? `/api/tools/book?t=${encodeURIComponent(lead.token)}&src=results`
+      : bookingPageLink({ name: lead.name, email: lead.email, toolSlug: TOOL_SLUG, placement: 'results' });
 
   /* Headline --------------------------------------------------------------- */
   const h = headline(r);

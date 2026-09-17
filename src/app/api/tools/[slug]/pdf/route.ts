@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 
 import { findTool } from '@/config/tools';
 import { getAdminSession } from '@/lib/auth/requireAdmin';
-import { bookingRedirectUrl } from '@/lib/tools/leads/deliver';
+import { bookingLinkFor } from '@/lib/tools/leads/bookingLinkStore';
 import { getLeadByToken } from '@/lib/tools/leads/store';
 import { recomputeInputs } from '@/lib/tools/leads/valuation';
 import { fetchReportBranding } from '@/lib/tools/brand/fetch';
@@ -52,7 +52,7 @@ export async function POST(req: Request, props: { params: Promise<{ slug: string
     purpose: lead.purpose,
     generatedAt: now,
     dataVersion: VALUATION_DATA_VERSION,
-    bookingHref: bookingRedirectUrl(lead.access_token, 'pdf'),
+    bookingHref: await bookingLinkFor(lead, 'pdf'),
     branding: await fetchReportBranding(),
     description: recomputed.inputs.profile?.description ?? null,
   });

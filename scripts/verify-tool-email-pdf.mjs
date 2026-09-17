@@ -112,7 +112,8 @@ ae = state.applyCountryDefaults({ ...ae, country: 'United Arab Emirates', netDeb
 ae = withFin(ae, { rev: [300, 280, 250, 260, 275, 290, 305, 320], ebitda: [12, 4, -6, 2, 8, 14, 20, 24], da: [10, 10, 9, 9, 9, 9, 10, 10], capex: [8, 6, 5, 5, 6, 6, 7, 7], nwc: [60, 58, 55, 56, 58, 60, 62, 64] });
 const distressed = fromState(state.onEnterWacc(state.resetWacc(ae)));
 
-const BOOK = 'https://www.pacemakersglobal.com/api/tools/book?t=abc&src=email';
+// A short booking link, the form results, emails and PDFs carry (src/lib/tools/bookingLinks.ts).
+const BOOK = 'https://www.pacemakersglobal.com/b/Fq7mKx2RtWp9e';
 
 console.log('Results email');
 for (const [label, result] of [['Saudi', saudi], ['Pakistan', pakistan], ['distressed', distressed]]) {
@@ -662,7 +663,7 @@ console.log('Booking links');
   check('/book caps values at 200 characters', new URL(booking.withBookingPrefill('https://calendly.com/x', { name: 'n'.repeat(500) })).searchParams.get('name').length === 200);
   check('blank calendar URL unchanged', booking.withBookingPrefill('', { name: 'N' }) === '');
   const routeSrc = fs.readFileSync(path.join(root, 'src/app/api/tools/book/route.ts'), 'utf8');
-  check('tracked redirect builds its destination from bookingPageLink only', routeSrc.includes('bookingPageLink(') && !/booking_url|calendly/i.test(routeSrc.replace(/\/\*[\s\S]*?\*\//g, '')));
+  check('long tracked link redirects through the shared booking redirect to /book only', routeSrc.includes('resolveLegacyLink(') && routeSrc.includes('bookingRedirectResponse(') &&!/booking_url|calendly/i.test(routeSrc.replace(/\/\*[\s\S]*?\*\//g, '')));
 }
 
 console.log(`\n${checks - failures} of ${checks} checks passed.`);

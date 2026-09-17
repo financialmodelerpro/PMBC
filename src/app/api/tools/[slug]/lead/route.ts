@@ -3,6 +3,7 @@ import { NextResponse, after } from 'next/server';
 import { findTool } from '@/config/tools';
 import { getAdminSession } from '@/lib/auth/requireAdmin';
 import { deliverNewLead } from '@/lib/tools/leads/deliver';
+import { issueBookingLink } from '@/lib/tools/leads/bookingLinkStore';
 import { clientIp, hashIp, newAccessToken } from '@/lib/tools/leads/request';
 import { supabaseLeadStore } from '@/lib/tools/leads/store';
 import { processValuationSubmission } from '@/lib/tools/leads/valuation';
@@ -61,11 +62,16 @@ export async function POST(req: Request, props: { params: Promise<{ slug: string
   if (outcome.status === 200 && outcome.saved) {
     const { id, row } = outcome.saved;
     const result = outcome.result;
+    // The short booking link for this lead, issued before the emails so they carry it.
+    const booking = await issueBookingLink(id);
     after(() =>
       deliverNewLead({ ...(row as unknown as ToolLeadRow), id }, result).catch((err) =>
         console.error('[tool-leads] delivery failed:', err),
       ),
     );
+    if (outcome.body.lead) {
+      return NextResponse.json({ ...outcome.body, lead: { ...outcome.body.lead, booking } }, { status: outcome.status });
+    }
   }
 
   return NextResponse.json(outcome.body, { status: outcome.status });
