@@ -174,7 +174,7 @@ export function ValuationReport({ result, meta }: { result: ValuationResult; met
   return (
     <Document title={`Indicative valuation, ${who}`} author={brand.brandName} subject="Indicative business valuation">
       {/* 1. Valuation at a glance: the letterhead cover */}
-      <ReportCover brand={brand}>
+      <ReportCover brand={brand} details={details}>
         <View style={{ flex: 1 }}>
           <Eyebrow>{REPORT_PAGE_TITLES[0]}</Eyebrow>
           <Text style={{ fontFamily: 'SourceSerif', fontFeatureSettings: NO_LIGATURES, fontWeight: 600, fontSize: titleSize, lineHeight: 1.1, color: RC.navy, marginTop: 10 }}>{who}</Text>
@@ -210,10 +210,6 @@ export function ValuationReport({ result, meta }: { result: ValuationResult; met
           )}
         </View>
         <View>
-          <View style={{ flexDirection: 'row', alignItems: 'flex-end', marginBottom: 8 }}>
-            <View style={{ width: 36, height: 2.2, backgroundColor: RC.green }} />
-            <View style={{ flex: 1, height: 0.75, backgroundColor: RC.navy }} />
-          </View>
           <Text style={{ fontSize: 7.5, color: RC.muted, lineHeight: 1.5 }}>
             Prepared for {meta.preparedFor}. {dataVersionLabel(meta.dataVersion)}. {TOOL_DISCLAIMER}
           </Text>

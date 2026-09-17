@@ -30,16 +30,17 @@
 //      the file itself at the size those attributes assume, the button padding
 //      on the cell (which Outlook honours) rather than the link, the weighted
 //      and stake rows only when used, and the follow-up consent as submitted.
-//   7. Report theme (the shared theme in src/lib/tools/pdf): no footer on the
-//      cover; on every inner page the footer carries the LLP name, the tagline,
-//      the tool name, the company, the date and "Page X of 8"; the closing page
-//      carries the same details, and the legal line and contact details appear
-//      exactly once in the report. Read from the operator list: the letterhead
+//   7. Report theme (the shared theme in src/lib/tools/pdf): the same footer on
+//      every page, cover and closing page included, carrying the LLP name, the
+//      tagline, the tool name, the company, the date and "Page X of 8", and no
+//      letterhead footer band; the legal line and contact details appear exactly
+//      once in the report, on the closing page. Read from the operator list: the letterhead
 //      navy and green are drawn on every page, none of the website colours is,
 //      gold is never a large fill and appears as text only in the tagline, and
 //      each inner page has at most one small gold highlight. The colour logo is
-//      drawn on the cover and the closing page, and a logo on a dark background
-//      uses the white file. The report email shell uses the colour logo, the
+//      drawn on the cover and the closing page, from Header Settings or, without
+//      branding, the bundled copies of the same files (never the name in type),
+//      and a logo on a dark background uses the white file. The report email shell uses the colour logo, the
 //      letterhead colours and the legal line, and the site shell is unchanged.
 //   8. Booking links: always the site's /book page with name, email and UTM
 //      tags, and /book forwarding only known keys onto the calendar URL.
@@ -284,12 +285,14 @@ for (const [label, result] of [['Saudi', saudi], ['full', full], ['Pakistan', pa
     const details = collapse(components.detailsLine({ toolName: pdfModule.TOOL_NAME, subject, dateLabel: format.headline(result).valuationDate }));
     const tagline = theme.DEFAULT_TAGLINE;
     const footerOn = (pt, n) => pt.includes(details) && pt.includes(`Page ${n} of 8`);
-    check(`${label}: no footer on the cover`, !/Page \d+ of \d+/.test(t[0]) && !t[0].includes(details), t[0].slice(-200));
-    for (let n = 2; n <= 7; n++) {
+    for (let n = 1; n <= 8; n++) {
       const pt = t[n - 1];
       check(`${label}: page ${n} footer carries the LLP name, tagline, tool, company, date and page number`, footerOn(pt, n) && pt.includes('PaceMakers Business Consultants LLP') && pt.includes(tagline), pt.slice(-260));
     }
-    check(`${label}: closing page carries the report details and page number`, footerOn(t[7], 8), t[7].slice(-400));
+    {
+      const src = fs.readFileSync(path.join(root, 'src/lib/tools/pdf/components.tsx'), 'utf8');
+      check(`${label}: cover, inner and closing pages all draw ReportFooter, and no letterhead footer band exists`, (src.match(/<ReportFooter brand=\{brand\} details=\{details\} \/>/g) ?? []).length === 3 && !/LetterheadFooter|footRuleTop/.test(src));
+    }
     const all = collapse(t.join(' '));
     check(`${label}: legal line stated exactly once, on the closing page`, all.split(collapse(theme.LEGAL_LINE)).length === 2 && collapse(t[7]).includes(collapse(theme.LEGAL_LINE)));
     check(`${label}: contact details on the closing page only`, /Web\s*:/.test(t[7]) && t[7].includes('www.pacemakersglobal.com') && t.slice(0, 7).every((pt) => !/Web\s*:/.test(pt)), t[7].slice(-300));
@@ -585,7 +588,7 @@ console.log('Report branding and partner');
   {
     const src = fs.readFileSync(path.join(root, 'src/lib/tools/brand/fetch.ts'), 'utf8');
     check('report logo is the header colour logo, same treatment as any logo', src.includes("processedImage(branding?.logo_url || null, 'logo')"));
-    check('report white logo is the header dark logo', src.includes("processedImage(branding?.logo_dark_url || null, 'logo')"));
+    check('report white logo is the header dark logo', src.includes("processedImage(branding?.logo_dark_url || null, 'logo-dark')"));
     check('no recolouring of the logo anywhere', !/recolourGreenToGold|logo-navy-gold/.test(src));
   }
 
@@ -616,8 +619,8 @@ console.log('Report branding and partner');
     const darkRaw = dark.toString('latin1');
     check('a logo on a dark background uses the white file', darkRaw.includes('/Width 624') && !darkRaw.includes('/Width 520'));
     const darkNoFile = await (await import('@react-pdf/renderer')).renderToBuffer(h(Document, null, h(Page, { size: 'A4' }, h(View, { style: { backgroundColor: theme.RC.navy, padding: 20 } }, h(components.BrandLogo, { brand: theme.withBrandDefaults({ ...branding, logoOnDark: null }), height: 20, onDark: true })))));
-    const wordmark = await pageTexts(darkNoFile);
-    check('without a white file, a dark background gets the wordmark in white, never the colour logo', wordmark[0].includes('PaceMakers Business Consultants') && !darkNoFile.toString('latin1').includes('/Width 520'));
+    const darkNoFileRaw = darkNoFile.toString('latin1');
+    check('without a live white file, a dark background gets the bundled white logo, never the colour logo', /\/Width 900/.test(darkNoFileRaw) && !darkNoFileRaw.includes('/Width 520') && (await pageTexts(darkNoFile))[0].trim() === '');
   }
   const last = t[7];
   check('branded: closing page names the partner and role', last.includes('Test Partner') && last.includes('Founding Partner, Corporate Finance Specialist'));
@@ -628,10 +631,18 @@ console.log('Report branding and partner');
   const bare = await render(null);
   const tb = await pageTexts(bare);
   check('no branding: still eight pages', tb.length === 8);
-  check('no branding: cover sets the name in type in place of the logo', tb[0].startsWith('PaceMakers Business Consultants'));
+  {
+    const bareColours = await pageColours(bare);
+    check('no branding: the bundled Header Settings logo is drawn in the cover and closing page headers', bareColours[0].images >= 2 && bareColours[7].images >= 2, `${bareColours[0].images}, ${bareColours[7].images}`);
+    check('no branding: the brand name is never set in type in place of the logo', !tb[0].startsWith('PaceMakers Business Consultants'));
+    const sharpMeta = async (f) => (await import('sharp')).default(fs.readFileSync(path.join(root, 'src/lib/tools/pdf/brand', f))).metadata();
+    const [colourMeta, whiteMeta] = await Promise.all([sharpMeta('logo.png'), sharpMeta('logo-white.png')]);
+    check('bundled logos: colour flattened on white, white kept transparent, both 900 wide', colourMeta.width === 900 && !colourMeta.hasAlpha && whiteMeta.width === 900 && whiteMeta.hasAlpha);
+    const nextConfig = fs.readFileSync(path.join(root, 'next.config.ts'), 'utf8');
+    check('bundled logos are traced into every PDF route', (nextConfig.match(/'\.\/src\/lib\/tools\/pdf\/brand\/\*\*'/g) ?? []).length === (nextConfig.match(/'\.\/src\/lib\/tools\/pdf\/fonts\/\*\*'/g) ?? []).length);
+  }
   check('no branding: closing page still carries the legal line and the site address', tb[7].replace(/\s+/g, ' ').includes(theme.LEGAL_LINE) && tb[7].includes('www.pacemakersglobal.com'));
   check('no branding: no partner block, full service summaries', !tb[7].includes('Who you will work with') && tb[7].includes('Institutional-grade'));
-  check('no branding: no images embedded', !/\/Subtype\s*\/Image/.test(bare.toString('latin1')));
   const noPhoto = await pageTexts(await render({ ...branding, partnerPhoto: null, logo: null }));
   check('partner without photo or logo: eight pages, block kept', noPhoto.length === 8 && noPhoto[7].includes('Test Partner'));
 }

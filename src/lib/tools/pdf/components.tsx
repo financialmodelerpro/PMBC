@@ -7,18 +7,20 @@
  *
  * THE THREE PAGE KINDS
  *   ReportCover    the letterhead header (colour logo top left, gold tagline
- *                  top right, green swoosh over a navy rule), then the tool's
- *                  cover content. No footer.
+ *                  top right, green swoosh over a navy rule), the tool's cover
+ *                  content, and the report footer.
  *   ReportPage     every inner page: a thin navy rule with a small green accent
  *                  at the top, content starting high, and the report footer.
- *                  Never the letterhead.
- *   ClosingPage    the letterhead header and footer bands, with the legal line
- *                  and the contact details, stated once in the report, plus the
- *                  report details and page number above the footer band.
+ *   ClosingPage    the letterhead header, the closing content, the legal line
+ *                  and contact details (stated once in the report), and the
+ *                  report footer.
+ * The footer is the same on every page. No page carries the letterhead's
+ * footer band.
  *
  * LOGOS. `BrandLogo` picks the colour logo on white and the white logo on any
- * dark background, falling back to a text wordmark, so a logo is always
- * visible. The letterhead geometry is measured from the letterhead PDF, see
+ * dark background. Both come from Header Settings, with bundled copies of the
+ * same files as the fallback (`withBrandDefaults`), so the logo is drawn even
+ * when the live files cannot be fetched. The letterhead geometry is measured from the letterhead PDF, see
  * `LETTERHEAD` in the theme.
  *
  * Relative imports only, so the verifiers can load this file outside Next.
@@ -114,56 +116,6 @@ export function LetterheadHeader({ brand }: { brand: ResolvedBrand }) {
   );
 }
 
-/** Where the closing page's footer band starts on A4, leaving room for the legal line and contact details below it. */
-const FOOT_BAND_TOP = 748;
-
-/** The letterhead footer: navy rule and green swoosh, the legal line beneath the swoosh, the contact details to the right. */
-export function LetterheadFooter({ brand }: { brand: ResolvedBrand }) {
-  const L = LETTERHEAD;
-  const bandH = L.footBandBottom - L.footRuleTop;
-  const [a, b, solid] = L.footerShapes;
-  const shape = (xe: number) => `M0 ${L.footRuleTop} L${xe} ${L.footRuleTop} ${swooshPoints(xe, L.footRuleTop, -1)} L0 ${L.footRuleTop + 45.6} Z`;
-  const contact: [string, string][] = [
-    ...(brand.contact.advisoryEmail || brand.contact.email ? ([['Email', (brand.contact.advisoryEmail || brand.contact.email) as string]] as [string, string][]) : []),
-    ['Web', brand.contact.website],
-    ...(brand.contact.location ? ([['Office', brand.contact.location]] as [string, string][]) : []),
-  ];
-  const swooshW = pt(Math.max(...L.footerShapes));
-  return (
-    <View fixed style={{ position: 'absolute', left: 0, top: FOOT_BAND_TOP, width: PAGE.width, height: PAGE.height - FOOT_BAND_TOP }}>
-      <Svg width={PAGE.width} height={pt(bandH)} viewBox={`0 ${L.footRuleTop} ${L.width} ${bandH}`}>
-        <Defs>
-          <LinearGradient id="lfShadeA" x1="1" y1="0" x2="0.7" y2="0">
-            <Stop offset="0" stopColor={RC.green} />
-            <Stop offset="1" stopColor={L.shade} />
-          </LinearGradient>
-          <LinearGradient id="lfShadeB" x1="1" y1="0" x2="0.65" y2="0">
-            <Stop offset="0" stopColor={RC.green} />
-            <Stop offset="1" stopColor={L.shade} />
-          </LinearGradient>
-        </Defs>
-        <Path d={shape(a)} fill="url(#lfShadeA)" />
-        <Path d={shape(b)} fill="url(#lfShadeB)" />
-        <Path d={shape(solid)} fill={RC.green} />
-        <Rect x={0} y={L.footRuleTop} width={L.width} height={L.footRuleBottom - L.footRuleTop} fill={RC.navy} />
-      </Svg>
-      <View style={{ flexDirection: 'row', paddingTop: 6 }}>
-        <View style={{ width: swooshW + 20, paddingLeft: 30, paddingRight: 14 }}>
-          <Text style={{ fontSize: 7, lineHeight: 1.4, color: RC.grey, textAlign: 'center' }}>{LEGAL_LINE}</Text>
-        </View>
-        <View style={{ flex: 1, paddingLeft: 24 }}>
-          {contact.map(([k, v]) => (
-            <Text key={k} style={{ fontSize: 7.5, lineHeight: 1.45, color: RC.grey }}>
-              <Text style={{ fontWeight: 600, color: RC.navy }}>{k}: </Text>
-              {v}
-            </Text>
-          ))}
-        </View>
-      </View>
-    </View>
-  );
-}
-
 /* ------------------------------------------------------------------------ */
 /* Page frames                                                               */
 /* ------------------------------------------------------------------------ */
@@ -225,32 +177,53 @@ export function ReportPage({ title, brand, details, children }: { title?: string
 /** Where cover content starts: under the letterhead header, with room to breathe. */
 export const COVER_CONTENT_TOP = Math.round(pt(LETTERHEAD.bandBottom)) + 44;
 
-/** The cover: the letterhead header over a clean white page. No footer. */
-export function ReportCover({ brand, children }: { brand: ResolvedBrand; children: ReactNode }) {
+/** The cover: the letterhead header over a clean white page, and the report footer. */
+export function ReportCover({ brand, details, children }: { brand: ResolvedBrand; details: ReportDetails; children: ReactNode }) {
   return (
-    <Page size="A4" style={{ ...s.page, paddingTop: COVER_CONTENT_TOP, paddingBottom: 34, paddingHorizontal: 56 }}>
+    <Page size="A4" style={{ ...s.page, paddingTop: COVER_CONTENT_TOP, paddingHorizontal: 56 }}>
       <LetterheadHeader brand={brand} />
       {children}
+      <ReportFooter brand={brand} details={details} />
     </Page>
   );
 }
 
+/** The legal line and the contact details from Site Settings, stated once in a report, on its closing page. */
+export function LegalAndContact({ brand }: { brand: ResolvedBrand }) {
+  const email = brand.contact.advisoryEmail || brand.contact.email;
+  const contact: [string, string][] = [
+    ...(email ? ([['Email', email]] as [string, string][]) : []),
+    ['Web', brand.contact.website],
+    ...(brand.contact.location ? ([['Office', brand.contact.location]] as [string, string][]) : []),
+  ];
+  return (
+    <View wrap={false} style={{ marginTop: 16, paddingTop: 10, borderTopWidth: 0.5, borderTopColor: RC.border }}>
+      <Text style={{ fontSize: TYPE.small, color: RC.grey, lineHeight: 1.5 }}>
+        {contact.map(([k, v], i) => (
+          <Text key={k}>
+            {i ? '    ' : ''}
+            <Text style={{ fontWeight: 600, color: RC.navy }}>{k}: </Text>
+            {v}
+          </Text>
+        ))}
+      </Text>
+      <Text style={{ fontSize: TYPE.caption, color: RC.grey, lineHeight: 1.45, marginTop: 4 }}>{LEGAL_LINE}</Text>
+    </View>
+  );
+}
+
 /**
- * The closing page, in the letterhead style: header and footer bands, the legal
- * line and contact details (once in the report), and the report details with
- * the page number just above the footer band.
+ * The closing page: the letterhead header, the closing content, the legal line
+ * and contact details, and the same report footer as every other page.
  */
 export function ClosingPage({ title, brand, details, children }: { title: string; brand: ResolvedBrand; details: ReportDetails; children: ReactNode }) {
   return (
-    <Page size="A4" style={{ ...s.page, paddingTop: Math.round(pt(LETTERHEAD.bandBottom)) + 30, paddingBottom: PAGE.height - FOOT_BAND_TOP + 30 }}>
+    <Page size="A4" style={{ ...s.page, paddingTop: Math.round(pt(LETTERHEAD.bandBottom)) + 30 }}>
       <LetterheadHeader brand={brand} />
       <PageTitle>{title}</PageTitle>
       {children}
-      <View fixed style={{ position: 'absolute', left: PAGE.marginX, right: PAGE.marginX, top: FOOT_BAND_TOP - 17, flexDirection: 'row', justifyContent: 'flex-end' }}>
-        <Text style={{ fontSize: 7, color: RC.muted }}>{detailsLine(details)}  |  </Text>
-        <Text style={{ fontSize: 7, fontWeight: 600, color: RC.navy }} render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`} />
-      </View>
-      <LetterheadFooter brand={brand} />
+      <LegalAndContact brand={brand} />
+      <ReportFooter brand={brand} details={details} />
     </Page>
   );
 }

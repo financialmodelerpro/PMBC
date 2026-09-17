@@ -28,6 +28,7 @@
  * Relative imports only, so the verifiers can load this file outside Next.
  */
 
+import fs from 'node:fs';
 import path from 'node:path';
 
 import { Font, StyleSheet } from '@react-pdf/renderer';
@@ -171,11 +172,6 @@ export const LETTERHEAD = {
     [0, 0], [35.2, -31.2], [38.56, -33.92], [41.92, -36.32], [45.44, -38.4], [49.12, -40.32], [52.96, -41.92],
     [56.96, -43.2], [60.8, -44.32], [64.96, -44.96], [69.28, -45.44], [73.44, -45.6],
   ] as [number, number][],
-  /** Footer: the navy rule's top and bottom, the green band's bottom, and each shape's trailing edge at the band's top. */
-  footRuleTop: 959.36,
-  footRuleBottom: 968,
-  footBandBottom: 1005.12,
-  footerShapes: [415.04, 338.72, 255.84],
   /** The logo's ink box and the tagline's right edge and baseline. */
   logo: { x: 43.5, y: 38, height: 54.5 },
   tagline: { right: 777, baseline: 69.8, size: 15 },
@@ -215,11 +211,32 @@ export type ReportDetails = {
   dateLabel: string;
 };
 
+/**
+ * The Header Settings logos, as bundled copies: `brand/logo.png` (the colour
+ * logo, trimmed, 900 wide, flattened on white) and `brand/logo-white.png` (the
+ * white logo, trimmed, 900 wide). A report draws the live files from Header
+ * Settings when `fetchReportBranding` supplies them, and these otherwise, so a
+ * failed fetch or a render without branding still shows the logo rather than
+ * the brand name in type. Refresh them when Header Settings changes the logo.
+ */
+const bundledLogos: { logo?: Buffer | null; logoOnDark?: Buffer | null } = {};
+export function bundledLogo(kind: 'logo' | 'logoOnDark'): Buffer | null {
+  if (bundledLogos[kind] === undefined) {
+    const file = path.join(process.cwd(), 'src', 'lib', 'tools', 'pdf', 'brand', kind === 'logo' ? 'logo.png' : 'logo-white.png');
+    try {
+      bundledLogos[kind] = fs.readFileSync(file);
+    } catch {
+      bundledLogos[kind] = null;
+    }
+  }
+  return bundledLogos[kind] ?? null;
+}
+
 export function withBrandDefaults(b: ReportBranding | null | undefined, siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.pacemakersglobal.com') {
   const website = (b?.contact?.website || siteUrl).replace(/^https?:\/\//, '').replace(/\/$/, '');
   return {
-    logo: b?.logo ?? null,
-    logoOnDark: b?.logoOnDark ?? null,
+    logo: b?.logo ?? bundledLogo('logo'),
+    logoOnDark: b?.logoOnDark ?? bundledLogo('logoOnDark'),
     partner: b?.partner ?? null,
     partnerPhoto: b?.partnerPhoto ?? null,
     brandName: b?.brandName || DEFAULT_BRAND_NAME,

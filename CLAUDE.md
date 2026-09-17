@@ -1169,7 +1169,7 @@ cases and rasterises every page to PNG for inspection.
 `verify-valuation-v2` (359), `verify-tool-lead-api` (125),
 `verify-valuation-dashboard` (243, the results page end to end at 1440, 1024 and 390, including the partner portrait's 4:5 frame and source ratio,
 against a local `next start`, every /api/ request intercepted so nothing is
-written), `verify-tool-email-pdf` (345, pdfjs text and operator list, including the report theme's footer, colour and logo rules, so a ligature glyph is
+written), `verify-tool-email-pdf` (351, pdfjs text and operator list, including the report theme's footer, colour and logo rules, so a ligature glyph is
 caught even though extracted text maps it back to letters),
 `verify-tools-visibility` (89), `verify-brevo-webhook` (168) and
 `verify-production-guard` (34). Each was
@@ -1201,11 +1201,11 @@ the results dashboard charts use `SITE_CHART_PALETTE` (the default in
 - White pages, light neutral table shading, warnings in `#B3412F`.
 
 **Pages.**
-- **Cover** (`ReportCover`): the letterhead header, measured from the letterhead PDF (colour logo top left, gold tagline top right, green swoosh over the navy rule), then company, report title, headline range and date. No footer.
+- **Cover** (`ReportCover`): the letterhead header, measured from the letterhead PDF (colour logo top left, gold tagline top right, green swoosh over the navy rule), then company, report title, headline range and date, and the report footer.
 - **Inner pages** (`ReportPage`): never the letterhead. A thin navy rule with a short green accent at the top, content starting high, and the footer.
-- **Footer**, every inner page: small logo, "PaceMakers Business Consultants LLP" and the tagline on the left; tool name, company, date and "Page X of Y" on the right; the same navy rule with a green accent above it. Long company names are shortened.
-- **Closing page** (`ClosingPage`): letterhead header and footer bands, the report details and page number above the footer band, and the **legal line and contact details, stated once in the report**. The contact details come from Site Settings (advisory email, site, office location); the letterhead's phone number is not in Site Settings and is not printed.
-- **Logos**: `BrandLogo` uses the colour file on white and the white file on a dark background, and falls back to a text wordmark, so a logo is always visible.
+- **Footer**, the same on every page, cover and closing page included (no page carries the letterhead's footer band): small logo, "PaceMakers Business Consultants LLP" and the tagline on the left; tool name, company, date and "Page X of Y" on the right; the same navy rule with a green accent above it. Long company names are shortened.
+- **Closing page** (`ClosingPage`): the letterhead header, the closing content, the **legal line and contact details, stated once in the report** (`LegalAndContact`), and the report footer. The contact details come from Site Settings (advisory email, site, office location); the letterhead's phone number is not in Site Settings and is not printed.
+- **Logos**: `BrandLogo` uses the colour file on white and the white file on a dark background. Both are fetched from Header Settings (the colour logo flattened on white), with bundled copies of the same files in `src/lib/tools/pdf/brand/` as the fallback, so a failed fetch or a render without branding still draws the logo, never the name in type. **Refresh the bundled copies when Header Settings changes the logo.** They are traced into the PDF routes next to the fonts (`next.config.ts`).
 - An absolutely positioned block that reaches into the page's bottom padding must be `fixed`, or react-pdf keeps moving it to a new page and never finishes the render.
 
 **Adding a tool report.**

@@ -75,7 +75,7 @@ async function portrait(input: Buffer): Promise<Buffer> {
 export const PORTRAIT_OUT = { width: 360, height: Math.round(360 / PORTRAIT_RATIO) };
 
 /** Fetches an image and resizes it, cached by URL and treatment. Null on any failure. */
-async function processedImage(src: string | null, kind: 'logo' | 'portrait'): Promise<Buffer | null> {
+async function processedImage(src: string | null, kind: 'logo' | 'logo-dark' | 'portrait'): Promise<Buffer | null> {
   if (!src || !/^https:\/\//i.test(src)) return null;
   const key = `${kind}:${src}`;
   const hit = cache.get(key);
@@ -85,8 +85,12 @@ async function processedImage(src: string | null, kind: 'logo' | 'portrait'): Pr
     const res = await fetch(src, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
     if (res.ok) {
       const input = Buffer.from(await res.arrayBuffer());
-      const logo = async () => sharp(input).trim().resize({ width: 900, withoutEnlargement: true }).png({ compressionLevel: 9 }).toBuffer();
-      value = kind === 'logo' ? await logo() : await portrait(input);
+      // The colour logo is flattened on white, the page it is drawn on, so every PDF viewer shows it the same way.
+      const logo = async (flatten: boolean) => {
+        const img = sharp(input).trim().resize({ width: 900, withoutEnlargement: true });
+        return (flatten ? img.flatten({ background: '#FFFFFF' }) : img).png({ compressionLevel: 9 }).toBuffer();
+      };
+      value = kind === 'logo' ? await logo(true) : kind === 'logo-dark' ? await logo(false) : await portrait(input);
     }
   } catch (err) {
     console.error(`[tool-brand] ${kind} image unavailable:`, err instanceof Error ? err.message : err);
@@ -110,7 +114,7 @@ export async function fetchReportBranding(): Promise<ReportBranding> {
   ]);
   const [logo, logoOnDark, partnerPhoto] = await Promise.all([
     processedImage(branding?.logo_url || null, 'logo'),
-    processedImage(branding?.logo_dark_url || null, 'logo'),
+    processedImage(branding?.logo_dark_url || null, 'logo-dark'),
     processedImage(partner?.photoUrl ?? null, 'portrait'),
   ]);
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.pacemakersglobal.com';
