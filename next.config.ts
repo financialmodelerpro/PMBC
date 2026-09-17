@@ -53,11 +53,11 @@ const nextConfig: NextConfig = {
   // The PDF report reads its fonts from disk. A Vercel function only contains
   // files it is traced to, so the routes that render a report name them here.
   outputFileTracingIncludes: {
-    '/api/tools/[slug]/lead': ['./src/lib/tools/pdf/fonts/**'],
-    '/api/admin/tool-leads/[id]/resend': ['./src/lib/tools/pdf/fonts/**'],
-    '/api/admin/tool-leads/[id]/pdf': ['./src/lib/tools/pdf/fonts/**'],
-    '/api/tools/[slug]/lead/version': ['./src/lib/tools/pdf/fonts/**'],
-    '/api/tools/[slug]/pdf': ['./src/lib/tools/pdf/fonts/**'],
+    '/api/tools/[slug]/lead': ['./src/lib/tools/pdf/fonts/**', './src/lib/tools/pdf/brand/**'],
+    '/api/admin/tool-leads/[id]/resend': ['./src/lib/tools/pdf/fonts/**', './src/lib/tools/pdf/brand/**'],
+    '/api/admin/tool-leads/[id]/pdf': ['./src/lib/tools/pdf/fonts/**', './src/lib/tools/pdf/brand/**'],
+    '/api/tools/[slug]/lead/version': ['./src/lib/tools/pdf/fonts/**', './src/lib/tools/pdf/brand/**'],
+    '/api/tools/[slug]/pdf': ['./src/lib/tools/pdf/fonts/**', './src/lib/tools/pdf/brand/**'],
   },
   images: {
     remotePatterns,

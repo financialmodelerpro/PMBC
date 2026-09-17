@@ -137,7 +137,7 @@ export async function sendResultsEmail(
   const sent = await sendEmail({
     to: lead.email,
     subject,
-    html: await baseLayoutBranded(body),
+    html: await baseLayoutBranded(body, { variant: 'report' }),
     from: process.env.EMAIL_FROM_CONTACT || undefined,
     attachments,
     tags: [RESULTS_TAG, lead.tool_slug, 'results', ...(lead.is_test ? ['test'] : [])],
@@ -198,7 +198,7 @@ export async function sendLeadAlert(lead: LeadForDelivery, result: ValuationResu
   const sent = await sendEmail({
     to,
     subject,
-    html: await baseLayoutBranded(body),
+    html: await baseLayoutBranded(body, { variant: 'report' }),
     replyTo: lead.email,
     // Its own first tag, so Brevo reporting and the webhook never mix staff
     // opening the alert with the visitor's engagement (src/lib/tools/engagement.ts).

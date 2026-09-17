@@ -918,7 +918,7 @@ recorded reversal that allows them.
 | Email me this version | `src/lib/tools/leads/version.ts` (pure), route `src/app/api/tools/[slug]/lead/version/route.ts` |
 | Download PDF for what is on screen | `src/app/api/tools/[slug]/pdf/route.ts`, writes nothing |
 | Company name and description a visitor adds to their report | `src/lib/tools/valuation/profile.ts` (cleaning and limits, shared by the form, the API and the PDF) |
-| Logo and partner card in the report and on the results | `src/lib/tools/brand/partner.ts` (pure), `src/lib/tools/brand/fetch.ts` (server), `src/components/tools/PartnerCard.tsx`. **The partner card reads only the founder profile's `founder_hero`**; its career highlights are that section's **Report highlights** field (one per line, up to five), which the profile page itself does not show and which ships empty. Home's founder card is never read, so editing it cannot change a report. The closing page logo is the Header Settings colour logo exactly as the header uses it (trimmed and resized, never recoloured; changed 2026-09-17). **The founder portrait is framed by one rule everywhere** (home founder card, profile hero, results partner card, PDF): `src/lib/public/portrait.ts`, a fixed 4:5 frame with the image cropped to cover it at a face-anchored focus (50% 30%), never stretched. On the results card the frame carries `self-start`: in a flex row it otherwise stretches to the text beside it, which drew the portrait as a 150 by 244 strip until 2026-09-17 |
+| Logo and partner card in the report and on the results | `src/lib/tools/brand/partner.ts` (pure), `src/lib/tools/brand/fetch.ts` (server), `src/components/tools/PartnerCard.tsx`. **The partner card reads only the founder profile's `founder_hero`**; its career highlights are that section's **Report highlights** field (one per line, up to five), which the profile page itself does not show and which ships empty. Home's founder card is never read, so editing it cannot change a report. Reports draw the Header Settings colour logo on white and its white logo on any dark background (trimmed and resized, never recoloured), with the brand name, tagline and Site Settings contact details (`fetchReportBranding`). **The founder portrait is framed by one rule everywhere** (home founder card, profile hero, results partner card, PDF): `src/lib/public/portrait.ts`, a fixed 4:5 frame with the image cropped to cover it at a face-anchored focus (50% 30%), never stretched. On the results card the frame carries `self-start`: in a flex row it otherwise stretches to the text beside it, which drew the portrait as a 150 by 244 strip until 2026-09-17 |
 | Booking link | `src/lib/tools/booking.ts`, always the site's `/book` |
 | **Every tunable number** (Damodaran data, FX, market rates, presets, deal bands) | `src/lib/tools/valuation/data.ts`, and nowhere else |
 | The valuation arithmetic | `src/lib/tools/valuation/engine.ts`, pure, no UI |
@@ -926,7 +926,7 @@ recorded reversal that allows them.
 | Whether a tool is public | `tool_visibility` table, switched at `/admin/tools`, read only through `src/lib/tools/visibility.ts` |
 | Lead submission rules | `src/lib/tools/leads/valuation.ts` (pure), route `src/app/api/tools/[slug]/lead/route.ts` |
 | Results email and alert | `src/lib/tools/email/templates.ts`, sent by `src/lib/tools/leads/deliver.ts`, editable at `/admin/email-templates` |
-| PDF report | `src/lib/tools/pdf/ValuationReport.tsx`, fonts in `src/lib/tools/pdf/fonts/` |
+| PDF report | `src/lib/tools/pdf/ValuationReport.tsx` (content only), on the shared report theme `src/lib/tools/pdf/theme.ts` and `components.tsx` (see "Report theme"), fonts in `src/lib/tools/pdf/fonts/` |
 | Brevo webhook | `src/lib/tools/webhook.ts` (pure), route `src/app/api/webhooks/brevo/route.ts` |
 | Booking click tracking | `src/app/api/tools/book/route.ts`, redirecting to `/book` |
 | Admin | `/admin/tools`, `/admin/tools/[slug]`, `/admin/tool-leads`, `/admin/tool-leads/[id]` |
@@ -1169,12 +1169,53 @@ cases and rasterises every page to PNG for inspection.
 `verify-valuation-v2` (359), `verify-tool-lead-api` (125),
 `verify-valuation-dashboard` (243, the results page end to end at 1440, 1024 and 390, including the partner portrait's 4:5 frame and source ratio,
 against a local `next start`, every /api/ request intercepted so nothing is
-written), `verify-tool-email-pdf` (268, pdfjs text and operator list, so a ligature glyph is
+written), `verify-tool-email-pdf` (351, pdfjs text and operator list, including the report theme's footer, colour and logo rules, so a ligature glyph is
 caught even though extracted text maps it back to letters),
 `verify-tools-visibility` (89), `verify-brevo-webhook` (168) and
 `verify-production-guard` (34). Each was
 break-tested. `npm run render-valuation-examples -- <dir>` renders the minimal and
 full-feature reports for review, reading the logo and partner read-only.
+
+### Report theme
+
+Added 2026-09-17 (`feat/report-brand-theme`). **Every tool PDF report uses one
+shared theme**, so the Investor Readiness Scorecard and any later report look
+like the valuation report without copying it.
+
+| What | Where |
+|---|---|
+| Letterhead colours and the legal line, shared with the tool emails | `src/lib/brand/letterhead.ts` |
+| Report colours (`RC`), chart palette (`REPORT_CHART_PALETTE`), type scale, page geometry, fonts, letterhead geometry, branding types | `src/lib/tools/pdf/theme.ts` |
+| Cover, inner page, closing page, footer, section heading, tables, KPI tiles, partner block, services, booking panel | `src/lib/tools/pdf/components.tsx` |
+| The source letterhead | `reference/brand/PMBC_Letterhead.pdf` |
+
+**Colours, sampled from the letterhead** (vector fills and a 3x render, matching
+the Header Settings logo file): navy `#153D64`, green `#2E8B3A`, deep green
+`#1E5825`, gold `#C9A227`, grey `#595959`. The website keeps its own tokens;
+the results dashboard charts use `SITE_CHART_PALETTE` (the default in
+`charts.ts`) and are unchanged, while reports pass `REPORT_CHART_PALETTE`.
+
+- **Navy is primary**: headings, rules, table headers, actual years in charts.
+- **Green is the accent**: forecast series, free cash flow, positive indicators, section markers, small accent shapes, the booking button.
+- **Gold is minimal**: the tagline, the base case marker, at most one small highlight on a page. No gold fills, no large gold text.
+- White pages, light neutral table shading, warnings in `#B3412F`.
+
+**Pages.**
+- **Cover** (`ReportCover`): the letterhead header, measured from the letterhead PDF (colour logo top left, gold tagline top right, green swoosh over the navy rule), then company, report title, headline range and date, and the report footer.
+- **Inner pages** (`ReportPage`): never the letterhead. A thin navy rule with a short green accent at the top, content starting high, and the footer.
+- **Footer**, the same on every page, cover and closing page included (no page carries the letterhead's footer band): small logo, "PaceMakers Business Consultants LLP" and the tagline on the left; tool name, company, date and "Page X of Y" on the right; the same navy rule with a green accent above it. Long company names are shortened.
+- **Closing page** (`ClosingPage`): the letterhead header, the closing content, the **legal line and contact details, stated once in the report** (`LegalAndContact`), and the report footer. The contact details come from Site Settings (advisory email, site, office location); the letterhead's phone number is not in Site Settings and is not printed.
+- **Logos**: `BrandLogo` uses the colour file on white and the white file on a dark background. Both are fetched from Header Settings (the colour logo flattened on white), with bundled copies of the same files in `src/lib/tools/pdf/brand/` as the fallback, so a failed fetch or a render without branding still draws the logo, never the name in type. **Refresh the bundled copies when Header Settings changes the logo.** They are traced into the PDF routes next to the fonts (`next.config.ts`).
+- An absolutely positioned block that reaches into the page's bottom padding must be `fixed`, or react-pdf keeps moving it to a new page and never finishes the render.
+
+**Adding a tool report.**
+1. Fetch branding with `fetchReportBranding()` and resolve it with `withBrandDefaults`.
+2. Build a `ReportDetails` (tool name from the registry, company or person, date).
+3. Compose `ReportCover`, then `ReportPage`s, then `ClosingPage` with `PartnerBlock`, `ServicesGrid` and `BookingPanel`, from `Section`, `DataTable`, `KeyValues`, `Tiles`, `KpiRow`, `Callout` and `PdfChart` with `REPORT_CHART_PALETTE`. No colours or page chrome in the tool's own file.
+4. Emails: `baseLayoutBranded(body, { variant: 'report' })` gives the letterhead shell (colour logo `public/email/pacemakers-logo.png`, green and navy accent, legal line). The contact, password and testimonial emails keep the site shell, and `email_branding` overrides apply to the site shell only.
+5. Add the footer, colour and logo checks for the new report, as `verify-tool-email-pdf` does for the valuation report.
+
+The letterhead's legal line reads "LLP Act, 2007"; reports use the Act's actual year, 2017, as the site's legal pages do.
 
 ### Go-live record
 

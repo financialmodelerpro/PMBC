@@ -40,7 +40,7 @@ if (process.env.BRANDING !== 'none' && process.env.SUPABASE_URL) {
   const brand = await jiti.import(path.join(root, 'src/lib/tools/brand/fetch.ts'));
   branding = await brand.fetchReportBranding();
 }
-console.log(`branding: logo ${branding?.logoOnDark ? 'yes' : 'no'}, partner ${branding?.partner?.name ?? 'none'}, photo ${branding?.partnerPhoto ? 'yes' : 'no'}`);
+console.log(`branding: logo ${branding?.logo ? 'yes' : 'no'}, white logo ${branding?.logoOnDark ? 'yes' : 'no'}, partner ${branding?.partner?.name ?? 'none'}, photo ${branding?.partnerPhoto ? 'yes' : 'no'}`);
 
 for (const [name, build, meta] of [
   ['minimal', minimalCase, { company: 'Example Healthcare Co', industry: 'Healthcare Support Services', country: 'Saudi Arabia' }],
