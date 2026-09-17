@@ -248,6 +248,7 @@ async function walk(width) {
   await wait(500);
   const t1 = await page.evaluate(text());
   check(`${label}: ownership field shown for Saudi Arabia`, t1.includes('Saudi / GCC ownership %'));
+  check(`${label}: zakat rate field shown for Saudi Arabia, 2.5 by default`, t1.includes('Zakat rate %') && (await page.evaluate(`(() => { const l = [...document.querySelectorAll('label')].find((x) => x.textContent.trim().startsWith('Zakat rate')); const i = l && document.getElementById(l.htmlFor); return i ? i.value : null; })()`)) === '2.5');
   check(`${label}: borrowings and cash fields carry the year end date`, t1.includes('Borrowings at 31 December 2025') && t1.includes('Cash at 31 December 2025') && !t1.includes('(optional)Cash'), t1.match(/Borrowings at[^.]{0,40}/)?.[0]);
   check(`${label}: the example shows net debt as borrowings less cash`, t1.includes('Net debt: 45 SAR m (borrowings less cash)'), t1.match(/Net (debt|cash):[^.]{0,60}/)?.[0]);
   check(`${label}: financial year end disclosed on the form`, t1.includes('assumed to end on 31 December'));
@@ -267,10 +268,15 @@ async function walk(width) {
   check(`${label}: net debt updates as the fields are typed`, (await page.evaluate(text())).includes('Net debt: 45 SAR m (borrowings less cash)'));
   check(`${label}: continues once ownership is entered`, await page.evaluate(clickButton('Continue to financials')));
   await wait(400);
+  {
+    const tf = await page.evaluate(text());
+    check(`${label}: invested capital asks for working capital and net fixed assets`, tf.includes('Invested capital') && tf.includes('Working capital plus net fixed assets'));
+  }
   check(`${label}: on financials`, await page.evaluate(clickButton('Continue to cost of capital')));
   await wait(400);
   check(`${label}: on cost of capital`, await page.evaluate(clickButton('Continue to terminal')));
   await wait(400);
+  check(`${label}: peers table offers EV / EBIT as an optional column`, (await page.evaluate(text())).includes('EV / EBIT (x, optional)'));
   check(`${label}: run valuation`, await page.evaluate(clickButton('Run valuation')));
   check(`${label}: gate shown`, Boolean(await waitFor(() => page.evaluate(`document.body.innerText.includes('Your valuation is ready')`))));
 

@@ -183,7 +183,11 @@ export const LETTERHEAD = {
   /** Each shaded shape runs from the brand green at its edge to this darker green, sampled from the render. */
   shadeLight: '#2E8A3A',
   shadeDark: '#23682B',
-  logo: { x: 33, top: 19.3, bottom: 60 },
+  /**
+   * The letterhead draws the logo from 19.3 to 60 points (40.7 tall). Reports draw it 22% smaller,
+   * 31.7 tall from the same top left corner, as the owner chose on 17 September 2026.
+   */
+  logo: { x: 33, top: 19.3, bottom: 51 },
 } as const;
 
 export const LH_SCALE = PAGE_WIDTH / LETTERHEAD.width;

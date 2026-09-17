@@ -833,6 +833,56 @@ console.log('12. Version 4: borrowings and cash');
   check('a revived version 3 input values the same after the split', revived.equity.every((v, k) => close(v, asV3.equity[k])));
 }
 
+console.log('13. Zakat rate, invested capital in parts, EV / EBIT');
+{
+  // Zakat rate: 2.5% by default, editable for Saudi Arabia, 0 to 10%.
+  const saudi = { ...BASE, gccOwnership: 100 };
+  const def = run(saudi);
+  check('no zakat rate entered means 2.5%', close(def.tax.zakatRate, 0.025) && run({ ...saudi, zakatRate: null }).equity.every((v, k) => v === def.equity[k]));
+  check('2.5% entered is the same valuation as the default', run({ ...saudi, zakatRate: 2.5 }).equity.every((v, k) => v === def.equity[k]));
+  const three = run({ ...saudi, zakatRate: 3 });
+  check('a 3% rate charges 3% of the zakat base on the GCC share', three.rows.every((row) => close(row.zakat, row.zakatBase * 0.03)), JSON.stringify(three.rows.map((x) => [x.zakat, x.zakatBase])));
+  check('a higher zakat rate lowers equity', three.equity[1] < def.equity[1]);
+  check('the notes and assumptions state the rate used', format.disclosures(three).zakat.startsWith('Zakat is 3% of an approximate zakat base') && format.taxRows(three).some(([k, v]) => k === 'Zakat' && v.startsWith('3.0%')));
+  check('zero is accepted, above 10% is refused', !engine.validateCompany({ ...saudi, zakatRate: 0 }).zakatRate && engine.validateCompany({ ...saudi, zakatRate: 10.5 }).zakatRate === engine.ZAKAT_RATE_MESSAGE && Boolean(engine.validateCompany({ ...saudi, zakatRate: -1 }).zakatRate));
+  check('outside Saudi Arabia the rate is not sent and not checked', state.toInputs({ ...minimalCase(state), country: 'Qatar' }, VALUATION_DATE).zakatRate === null && !engine.validateCompany({ ...BASE, country: 'Qatar', zakatRate: 50 }).zakatRate);
+  check('form: the rate starts at 2.5 and is sent for Saudi Arabia', state.initialState().zakatRate === '2.5' && BASE.zakatRate === 2.5);
+
+  // Invested capital from working capital plus net fixed assets.
+  const lastNwc = BASE.financials.nwc[2];
+  const partsBlank = run({ ...BASE, investedCapitalParts: { workingCapital: null, fixedAssets: 150 } });
+  check('blank working capital takes the last actual year from the financials', close(partsBlank.investedCapital.total, lastNwc + 150) && partsBlank.investedCapital.workingCapital === lastNwc && partsBlank.investedCapital.fixedAssets === 150, JSON.stringify(partsBlank.investedCapital));
+  const partsTyped = run({ ...BASE, investedCapitalParts: { workingCapital: 50, fixedAssets: 150 } });
+  check('typed working capital is used', close(partsTyped.investedCapital.total, 200));
+  const single = run({ ...BASE, investedCapital: lastNwc + 150 });
+  check('the parts value exactly as the same total entered as one figure', close(partsBlank.ratios.roic, single.ratios.roic) && partsBlank.equity.every((v, k) => v === single.equity[k]));
+  check('the parts win over a single figure sent alongside', close(run({ ...BASE, investedCapital: 9999, investedCapitalParts: { workingCapital: null, fixedAssets: 150 } }).investedCapital.total, lastNwc + 150));
+  check('no fixed assets means no invested capital from the parts', run({ ...BASE, investedCapitalParts: { workingCapital: 40, fixedAssets: null } }).investedCapital === null);
+  check('negative fixed assets are refused', engine.validateFinancials(BASE.financials, { investedCapitalParts: { workingCapital: null, fixedAssets: -1 } }) === engine.FIXED_ASSETS_MESSAGE);
+  check('the ratios show invested capital and its parts', format.keyRatiosTable(partsBlank).rows.some((row) => row.label === 'Invested capital, last actual year' && row.values[0].includes('working capital') && row.values[0].includes('plus fixed assets')));
+  check('form: invested capital is worked out from the two boxes', state.investedCapitalOf({ icWorkingCapital: '', icFixedAssets: '150', fin: minimalCase(state).fin }) === lastNwc + 150 && state.investedCapitalOf({ icWorkingCapital: '10', icFixedAssets: '', fin: minimalCase(state).fin }) === null);
+  const sent = state.toInputs({ ...minimalCase(state), icFixedAssets: '150' }, VALUATION_DATE);
+  check('form: the parts are sent and the total matches', sent.investedCapitalParts?.fixedAssets === 150 && sent.investedCapitalParts?.workingCapital === null && sent.investedCapital === lastNwc + 150);
+  const back = state.stateFromInputs(sent);
+  check('form: stored parts restore into the two boxes', back.icFixedAssets === '150' && back.icWorkingCapital === '' && back.investedCapital === '');
+
+  // EV / EBIT from peers: a cross-check that never changes the blend.
+  const peers = [{ name: 'A', evEbitda: 9, evRevenue: 1.2, evEbit: 12 }, { name: 'B', evEbitda: 11, evRevenue: 1.6, evEbit: 15 }, { name: 'C', evEbitda: 10, evRevenue: 1.4, evEbit: 14 }];
+  const withEbit = run({ ...BASE, peers });
+  const without = run({ ...BASE, peers: peers.map(({ evEbit, ...rest }) => rest) });
+  const ltmEbit = withEbit.ltmEbitda - BASE.financials.da[2];
+  const disc = withEbit.comparables.discount;
+  check('EV / EBIT uses the low, median and high of the peers', JSON.stringify(withEbit.comparables.ebitMultiplesPre) === JSON.stringify([12, 14, 15]));
+  check('EV / EBIT value is last actual EBIT times the multiples after the discount', withEbit.comparables.ebitValue.every((v, k) => close(v, ltmEbit * [12, 14, 15][k] * (1 - disc))));
+  check('EV / EBIT never changes the blend or equity', withEbit.ev.every((v, k) => v === without.ev[k]) && withEbit.equity.every((v, k) => v === without.equity[k]));
+  check('value by method shows EV / EBIT as a reference row', format.footballFieldRows(withEbit).some((row) => row.key === 'comps_ebit' && row.sub.includes('not used in the blend')) && !format.footballFieldRows(without).some((row) => row.key === 'comps_ebit'));
+  check('comparables list the EV / EBIT multiples after discount', format.comparablesRows(withEbit).some(([k]) => k === 'After discount, EV / EBIT (reference)'));
+  check('one peer with EV / EBIT is not enough', run({ ...BASE, peers: [peers[0], { ...peers[1], evEbit: null }] }).comparables.ebitValue === null);
+  const lossEbit = clone(BASE.financials); lossEbit.da[2] = lossEbit.ebitda[2] + 1;
+  check('no EV / EBIT value when last actual EBIT is not positive', run({ ...BASE, financials: lossEbit, peers }).comparables.ebitValue === null);
+  check('form: EV / EBIT travels with the peer rows', state.toInputs({ ...minimalCase(state), peers: [state.newPeer('X', '9', '1', '12')] }, VALUATION_DATE).peers[0].evEbit === 12);
+}
+
 console.log(`\n${checks - failures} of ${checks} checks passed.`);
 if (failures) {
   console.log(`${failures} FAILED`);

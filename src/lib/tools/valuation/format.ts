@@ -241,7 +241,7 @@ export function equityFloorNote(floor: EquityFloor): string | null {
 /* ------------------------------------------------------------------------ */
 
 export type FootballFieldRow = {
-  key: 'dcf_growth' | 'dcf_exit' | 'dcf_combined' | 'comps_ebitda' | 'comps_revenue' | 'blended' | 'scenarios';
+  key: 'dcf_growth' | 'dcf_exit' | 'dcf_combined' | 'comps_ebit' | 'comps_ebitda' | 'comps_revenue' | 'blended' | 'scenarios';
   label: string;
   sub: string;
   /** Low, base case, high. The marker is always drawn at the base case. */
@@ -274,6 +274,17 @@ export function footballFieldRows(r: ValuationResult): FootballFieldRow[] {
     rows.push({ key: 'dcf_combined', label: dcfCombinedLabel(r), sub: 'Used in the blend', range: r.dcfRange, blend: false });
   }
   rows.push(
+    ...(canonical(r) && r.comparables.ebitValue
+      ? ([
+          {
+            key: 'comps_ebit',
+            label: 'Comparables, EV / EBIT',
+            sub: `Selected comparable companies (${r.comparables.ebitPeerCount}); for reference, not used in the blend`,
+            range: r.comparables.ebitValue,
+            blend: false,
+          },
+        ] as FootballFieldRow[])
+      : []),
     { key: 'comps_ebitda', label: 'Comparables, EV / EBITDA', sub: `${comparablesSource(r, 'ebitda')}${discount}`, range: r.compsEbitda, blend: false },
     {
       key: 'comps_revenue',
@@ -510,6 +521,13 @@ export function keyRatiosTable(r: ValuationResult): Table {
     { label: 'Free cash flow conversion of EBITDA', values: [fmtPct(q.fcfConversion, 0)] },
     { label: 'Return on invested capital, last actual year', values: [Number.isFinite(q.roic) ? fmtPct(q.roic, 1) : 'Not provided'] },
   ];
+  const ic = r.investedCapital;
+  if (ic) {
+    rows.push({
+      label: 'Invested capital, last actual year',
+      values: [ic.fixedAssets !== null ? `${amt(r, ic.total)} ${unitShort(r)} (working capital ${amt(r, ic.workingCapital ?? 0)} plus fixed assets ${amt(r, ic.fixedAssets)})` : `${amt(r, ic.total)} ${unitShort(r)}`],
+    });
+  }
   return { head: ['Ratio', 'Value'], rows };
 }
 
@@ -617,6 +635,7 @@ export function comparablesRows(r: ValuationResult): [string, string][] {
       ['After discount, EV / EBITDA', list(cp.ebitdaMultiplesPost)],
       ['After discount, EV / Revenue', list(cp.revenueMultiplesPost)],
     );
+    if (cp.ebitMultiplesPost) rows.push(['After discount, EV / EBIT (reference)', list(cp.ebitMultiplesPost)]);
     if (cp.peerNames.length) rows.push([`Companies (${cp.peerNames.length})`, cp.peerNames.join(', ')]);
   } else {
     rows.push(['EV / EBITDA used', list(r.comps.ebitda)], ['EV / Revenue used', list(r.comps.revenue)]);
@@ -698,6 +717,19 @@ export function terminalNote(r: ValuationResult): string {
     : 'Terminal value grows the final forecast year’s free cash flow at long-term growth, the method used for valuations before 17 September 2026.';
 }
 export const TERMINAL_COLUMN_NOTE = 'In the terminal column, capital expenditure is shown net of depreciation and amortisation.';
+/** A zakat rate for prose: "2.5%", or "3%" for a whole number. */
+const zakatPct = (ratio: number) => `${Number((ratio * 100).toFixed(2))}%`;
+
+/** The zakat base note at the rate used. */
+export function zakatBaseNote(r: ValuationResult): string {
+  return ZAKAT_BASE_NOTE.replace(`${TAX.zakatRate}%`, zakatPct(r.tax.zakatRate));
+}
+
+/** The zakat fallback note at the rate used. */
+export function zakatFallbackNote(r: ValuationResult): string {
+  return ZAKAT_FALLBACK_NOTE.replace(`${TAX.zakatRate}%`, zakatPct(r.tax.zakatRate));
+}
+
 export const ZAKAT_BASE_NOTE = `Zakat is ${TAX.zakatRate}% of an approximate zakat base on the Saudi / GCC owned share: working capital plus cash, floored at zero, with cash held at its year end level through the forecast.`;
 export const ZAKAT_NO_CASH_NOTE = 'Cash was not entered, so the base is working capital alone and may be understated.';
 export const ZAKAT_FALLBACK_NOTE = `Invested capital was not entered, so the zakat base cannot be estimated; zakat is instead approximated as ${TAX.zakatRate}% of profit on the Saudi / GCC owned share.`;
@@ -710,7 +742,7 @@ export function taxNote(r: ValuationResult): string {
   const t = r.tax;
   const losses = `Income tax is applied to positive EBIT. Losses are carried forward and offset up to ${fmtPct(t.lossOffsetCap, 0)} of each later year’s taxable profit.`;
   if (t.zakatMethod === 'base') return `${losses} Zakat is charged on an approximate zakat base; see the assumptions.`;
-  if (t.zakatMethod === 'profit_proxy') return `${losses} ${ZAKAT_FALLBACK_NOTE}`;
+  if (t.zakatMethod === 'profit_proxy') return `${losses} ${zakatFallbackNote(r)}`;
   return losses;
 }
 
@@ -727,7 +759,7 @@ export function disclosures(r: ValuationResult): {
   const method = canonical(r) ? r.tax.zakatMethod : 'none';
   return {
     financialYearEnd: FINANCIAL_YEAR_END_NOTE,
-    zakat: method === 'base' ? (r.tax.zakatBaseLtm?.cash === null ? `${ZAKAT_BASE_NOTE} ${ZAKAT_NO_CASH_NOTE}` : ZAKAT_BASE_NOTE) : method === 'profit_proxy' ? ZAKAT_FALLBACK_NOTE : null,
+    zakat: method === 'base' ? (r.tax.zakatBaseLtm?.cash === null ? `${zakatBaseNote(r)} ${ZAKAT_NO_CASH_NOTE}` : zakatBaseNote(r)) : method === 'profit_proxy' ? zakatFallbackNote(r) : null,
     valuationDate: canonical(r) && r.meta.stubFraction > 0 ? VALUATION_DATE_NOTE : null,
     evRevenue: r.ltmEbitda > 0 ? 'EV / Revenue shown for reference; not used in the blend.' : null,
     scenarios: 'Scenarios flex the DCF; comparables use the last actual year.',

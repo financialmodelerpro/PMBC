@@ -5,7 +5,7 @@ import { HISTORY_YEARS, TOTAL_YEARS, type LineKey } from '@/lib/tools/valuation/
 import { fmtMillions } from '@/lib/tools/valuation/format';
 
 import { ChartSvg } from '../charts/ChartSvg';
-import { num, type FillKey, type FormState } from './state';
+import { investedCapitalOf, num, type FillKey, type FormState } from './state';
 import { Collapsible, ErrorText, Field, Hint, INPUT_BLUE, NumberInput, Panel, PanelTitle, StepNav, TRACKING, buttonSmall } from './ui';
 
 const LINES: { k: LineKey; n: string; s?: string }[] = [
@@ -49,6 +49,7 @@ export function FinancialsStep({
   onBack: () => void;
   onNext: () => void;
 }) {
+  const investedCapital = investedCapitalOf(state);
   const cols = Array.from({ length: TOTAL_YEARS }, (_, i) =>
     i < HISTORY_YEARS
       ? { label: `FY${years.history[i]}`, kind: 'A', aria: `FY${years.history[i]} actual`, forecast: false }
@@ -208,19 +209,40 @@ export function FinancialsStep({
 
       <Collapsible
         title="Invested capital"
-        badge={state.investedCapital.trim() ? 'In use' : 'Optional'}
-        summary="Enables the return on invested capital checks against WACC and growth."
+        badge={state.icFixedAssets.trim() || state.investedCapital.trim() ? 'In use' : 'Optional'}
+        summary="Working capital plus net fixed assets. Enables the return on invested capital checks against WACC and growth."
       >
-        <div className="max-w-sm">
+        <div className="grid gap-x-5 sm:grid-cols-2">
           <Field
-            label={`Invested capital at the end of FY${years.history[HISTORY_YEARS - 1]}`}
-            hint="Net working capital plus net fixed assets, or equity plus net debt. Leave blank to skip the ROIC checks."
+            label={`Net working capital at the end of FY${years.history[HISTORY_YEARS - 1]}`}
+            hint="Taken from the financials table above. Change it only if it should differ here."
           >
             {({ id, describedBy }) => (
-              <NumberInput id={id} step={0.1} min={0} suffix={`${currencyCode} m`} value={state.investedCapital} onValue={(v) => onChange({ investedCapital: v })} aria-describedby={describedBy} />
+              <NumberInput
+                id={id}
+                step={0.1}
+                suffix={`${currencyCode} m`}
+                placeholder={state.fin.nwc[HISTORY_YEARS - 1] || '0'}
+                value={state.icWorkingCapital}
+                onValue={(v) => onChange({ icWorkingCapital: v })}
+                aria-describedby={describedBy}
+              />
+            )}
+          </Field>
+          <Field
+            label={`Net fixed assets at the end of FY${years.history[HISTORY_YEARS - 1]}`}
+            hint="Property, plant and equipment less depreciation, plus intangible assets used in the business. Leave blank to skip the ROIC checks."
+          >
+            {({ id, describedBy }) => (
+              <NumberInput id={id} step={0.1} min={0} suffix={`${currencyCode} m`} value={state.icFixedAssets} onValue={(v) => onChange({ icFixedAssets: v, investedCapital: '' })} aria-describedby={describedBy} />
             )}
           </Field>
         </div>
+        <p className="text-[13.5px] text-[color:var(--pmbc-text)] tabular-nums" aria-live="polite" data-invested-capital-readout="">
+          {investedCapital === null
+            ? 'Invested capital is working capital plus net fixed assets.'
+            : `Invested capital: ${fmtMillions(investedCapital)} ${currencyCode} m (working capital plus net fixed assets).`}
+        </p>
       </Collapsible>
 
       <StepNav onBack={onBack} onNext={onNext} nextLabel="Continue to cost of capital" />

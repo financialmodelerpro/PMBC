@@ -88,7 +88,8 @@ export type WaccInputs = {
   inflationUs: number | null;
 };
 
-export type Peer = { name: string; evEbitda: number | null; evRevenue: number | null };
+/** A listed comparable company. EV / EBIT is optional: a reference cross-check, never used in the blend. */
+export type Peer = { name: string; evEbitda: number | null; evRevenue: number | null; evEbit?: number | null };
 
 export type StakeAdjustment = 'none' | 'control_premium' | 'minority_discount';
 
@@ -161,6 +162,15 @@ export type ValuationInputs = {
   scenarios?: ScenarioInputs;
   /** Invested capital at the end of the last actual year, millions. Enables the ROIC checks. */
   investedCapital?: number | null;
+  /**
+   * Invested capital entered in two parts: working capital (blank means the
+   * last actual year's net working capital from the financials) plus net fixed
+   * assets. When fixed assets are entered, invested capital is their sum
+   * (`withDerivedInputs`), whatever `investedCapital` says.
+   */
+  investedCapitalParts?: { workingCapital: number | null; fixedAssets: number | null } | null;
+  /** The zakat rate, percent. Saudi Arabia only; blank means `TAX.zakatRate` (2.5%). */
+  zakatRate?: number | null;
   /** Percentage points added to the computed WACC. Set by the exploration slider. */
   waccAdjustment?: number | null;
   /** Company name and a description for the report. Never read by the engine's arithmetic. See `profile.ts`. */
@@ -273,6 +283,7 @@ export function resolveExtras(i: ValuationInputs) {
     stake: i.stake ?? d.stake,
     scenarios: i.scenarios ?? d.scenarios,
     investedCapital: i.investedCapital ?? null,
+    investedCapitalParts: i.investedCapitalParts ?? null,
     waccAdjustment: z(i.waccAdjustment),
     // Inputs stored before version 3 were computed on corporate tax alone, which
     // is 0% GCC ownership. From version 3 the field is required for Saudi
@@ -282,6 +293,7 @@ export function resolveExtras(i: ValuationInputs) {
     raiseAmount: i.raiseAmount === null || i.raiseAmount === undefined ? null : i.raiseAmount,
     purpose: i.purpose ?? null,
     cash: i.cash === null || i.cash === undefined ? null : i.cash,
+    zakatRate: typeof i.zakatRate === 'number' && Number.isFinite(i.zakatRate) ? i.zakatRate : TAX.zakatRate,
   };
 }
 
@@ -322,11 +334,12 @@ export function taxProfile(
   taxPercent: number | null,
   gccOwnershipPercent: number | null,
   opts: EngineOptions = CURRENT_METHOD,
+  zakatRatePercent: number | null = null,
 ): TaxProfile {
   const cit = n(taxPercent) / 100;
   const c = countryFor(country);
   const zakatApplies = country === TAX.zakatCountry;
-  const zakatRate = TAX.zakatRate / 100;
+  const zakatRate = (typeof zakatRatePercent === 'number' && Number.isFinite(zakatRatePercent) ? zakatRatePercent : TAX.zakatRate) / 100;
   const share = zakatApplies ? Math.min(1, Math.max(0, z(gccOwnershipPercent) / 100)) : 0;
   const zakatMethod = share ? 'base' : 'none';
   return {
@@ -403,6 +416,8 @@ export function stubPeriod(financialYear: number | null, valuationDate: string |
   return { lastFyEnd, valuationDate, months, fraction, tooOld: months / 12 >= 1 };
 }
 
+export const ZAKAT_RATE_MESSAGE = 'Enter a zakat rate between 0 and 10%, or leave 2.5%.';
+export const FIXED_ASSETS_MESSAGE = 'Enter net fixed assets of zero or more, or leave both invested capital boxes blank.';
 export const DEBT_REQUIRED_MESSAGE = 'Enter borrowings. Use 0 if none.';
 export const CASH_REQUIRED_MESSAGE = 'Enter cash. Use 0 if none.';
 export const GCC_REQUIRED_MESSAGE = 'Enter the Saudi / GCC ownership share, from 0% to 100%.';
@@ -457,7 +472,7 @@ export function computeWacc(w: WaccInputs, currency: Currency, adjustmentPoints 
 /** The WACC for a set of inputs, with the effective tax rate. What the form and the engine both use. */
 export function waccFor(i: ValuationInputs, adjustmentPoints = 0): WaccBreakdown {
   const x = resolveExtras(i);
-  return computeWacc(i.wacc, currencyFor(i.country), adjustmentPoints, taxProfile(i.country, i.wacc.tax, x.gccOwnership, CURRENT_METHOD).rate);
+  return computeWacc(i.wacc, currencyFor(i.country), adjustmentPoints, taxProfile(i.country, i.wacc.tax, x.gccOwnership, CURRENT_METHOD, x.zakatRate).rate);
 }
 
 /** Size and company premium from last actual revenue, thresholds in SAR millions. */
@@ -489,6 +504,9 @@ export function peersInUse(peers: Peer[]): boolean {
 export type CompsMultiples = {
   ebitda: [number, number, number];
   revenue: [number, number, number];
+  /** EV / EBIT from the visitor's peers when at least two are entered; there is no preset. */
+  ebit: [number, number, number] | null;
+  peersB: number;
   /** Number of peers behind each set, or 0 when the preset was used. */
   peersE: number;
   peersR: number;
@@ -498,6 +516,7 @@ export function compsMultiples(industry: string, peers: Peer[]): CompsMultiples 
   const s = industryFor(industry);
   const se = peerStats(peers.map((p) => p.evEbitda));
   const sr = peerStats(peers.map((p) => p.evRevenue));
+  const sb = peerStats(peers.map((p) => p.evEbit ?? null));
   const presetE = s ? ([...s.ebitdaMultiples] as [number, number, number]) : ([NaN, NaN, NaN] as [number, number, number]);
   const presetR = s ? ([...s.revenueMultiples] as [number, number, number]) : ([NaN, NaN, NaN] as [number, number, number]);
   return {
@@ -505,6 +524,8 @@ export function compsMultiples(industry: string, peers: Peer[]): CompsMultiples 
     revenue: sr || presetR,
     peersE: se ? peers.filter((p) => Number.isFinite(n(p.evEbitda))).length : 0,
     peersR: sr ? peers.filter((p) => Number.isFinite(n(p.evRevenue))).length : 0,
+    ebit: sb,
+    peersB: sb ? peers.filter((p) => Number.isFinite(n(p.evEbit ?? null))).length : 0,
   };
 }
 
@@ -608,8 +629,21 @@ export function withNetDebtFromBalances<T extends ValuationInputs>(i: T): T {
   return { ...i, netDebt: complete ? debt - cash : null };
 }
 
+/** Invested capital from its two parts, when net fixed assets are entered. */
+export function withInvestedCapitalFromParts<T extends ValuationInputs>(i: T): T {
+  const parts = i.investedCapitalParts;
+  if (!parts || parts.fixedAssets === null || parts.fixedAssets === undefined) return i;
+  const wc = parts.workingCapital ?? n(i.financials.nwc[HISTORY_YEARS - 1]);
+  return { ...i, investedCapital: wc + parts.fixedAssets };
+}
+
+/** Every input the engine derives from others: net debt from borrowings and cash, invested capital from its parts. */
+export function withDerivedInputs<T extends ValuationInputs>(i: T): T {
+  return withInvestedCapitalFromParts(withNetDebtFromBalances(i));
+}
+
 export function validateCompany(
-  i: Pick<ValuationInputs, 'industry' | 'country' | 'financialYear' | 'netDebt' | 'bridge' | 'gccOwnership' | 'valuationDate' | 'raiseAmount' | 'schemaVersion' | 'cash' | 'debt'>,
+  i: Pick<ValuationInputs, 'industry' | 'country' | 'financialYear' | 'netDebt' | 'bridge' | 'gccOwnership' | 'valuationDate' | 'raiseAmount' | 'schemaVersion' | 'cash' | 'debt' | 'zakatRate'>,
 ): FieldErrors {
   const e: FieldErrors = {};
   if (!industryFor(i.industry)) e.industry = 'Select an industry.';
@@ -637,13 +671,16 @@ export function validateCompany(
     else if (g !== null && g !== undefined && !(g >= 0 && g <= 100)) e.gccOwnership = GCC_REQUIRED_MESSAGE;
   }
   if (!entersDebtAndCash(i) && i.cash !== null && i.cash !== undefined && !(i.cash >= 0)) e.cash = 'Enter cash as a positive amount, or leave it blank.';
+  if (i.country === TAX.zakatCountry && i.zakatRate !== null && i.zakatRate !== undefined && !(i.zakatRate >= 0 && i.zakatRate <= TAX.maxZakatRate)) {
+    e.zakatRate = ZAKAT_RATE_MESSAGE;
+  }
   if (i.raiseAmount !== null && i.raiseAmount !== undefined && !(i.raiseAmount >= 0)) {
     e.raiseAmount = 'Enter the amount to raise as a positive number, or leave it blank.';
   }
   return e;
 }
 
-export function validateFinancials(fin: Financials, extras?: Pick<ValuationInputs, 'normalisation' | 'investedCapital'>): string | null {
+export function validateFinancials(fin: Financials, extras?: Pick<ValuationInputs, 'normalisation' | 'investedCapital' | 'investedCapitalParts'>): string | null {
   for (let i = 0; i < TOTAL_YEARS; i++) {
     if (!(n(fin.rev[i]) > 0)) return 'Enter revenue above zero for every year.';
     if (!Number.isFinite(n(fin.ebitda[i]))) return 'Enter EBITDA for every year. Use a negative figure for a loss.';
@@ -655,6 +692,9 @@ export function validateFinancials(fin: Financials, extras?: Pick<ValuationInput
   if (norm && (!finiteOrNull(norm.oneOff) || !finiteOrNull(norm.ownerCosts))) {
     return 'Enter add-backs as numbers, or leave them blank.';
   }
+  const parts = extras?.investedCapitalParts;
+  if (parts && parts.fixedAssets !== null && parts.fixedAssets !== undefined && !(parts.fixedAssets >= 0)) return FIXED_ASSETS_MESSAGE;
+  if (parts && parts.workingCapital !== null && parts.workingCapital !== undefined && !Number.isFinite(parts.workingCapital)) return FIXED_ASSETS_MESSAGE;
   const ic = extras?.investedCapital;
   if (ic !== null && ic !== undefined && !(ic > 0)) return 'Enter invested capital above zero, or leave it blank.';
   return null;
@@ -1100,6 +1140,12 @@ export type ComparablesBlock = {
   ebitdaMultiplesPost: Range3;
   revenueMultiplesPre: Range3;
   revenueMultiplesPost: Range3;
+  /** EV / EBIT from at least two of the visitor's peers; null otherwise. A cross-check, never in the blend. */
+  ebitMultiplesPre: Range3 | null;
+  ebitMultiplesPost: Range3 | null;
+  /** Null without EV / EBIT peers, or when last actual EBIT is not positive. */
+  ebitValue: Range3 | null;
+  ebitPeerCount: number;
   /** Null when last actual EBITDA is not positive. */
   ebitdaValue: Range3 | null;
   revenueValue: Range3;
@@ -1155,6 +1201,8 @@ export type ValuationResult = {
   netDebt: number;
   /** Borrowings and cash as entered, from version 4; null for inputs that entered net debt directly. */
   debt: number | null;
+  /** Invested capital used for the ROIC checks, with its two parts when it was entered that way. Null when not entered. Absent on older results. */
+  investedCapital?: { total: number; workingCapital: number | null; fixedAssets: number | null } | null;
   cash: number | null;
   privateDiscount: number;
   dcfWeight: number;
@@ -1238,7 +1286,7 @@ export const SENSITIVITY_WACC_STEPS = [-0.02, -0.01, 0, 0.01, 0.02];
 export const SENSITIVITY_GROWTH_STEPS = [-0.01, -0.005, 0, 0.005, 0.01];
 
 export function runValuation(entered: ValuationInputs, opts: EngineOptions = CURRENT_METHOD): RunOutcome {
-  const i = withNetDebtFromBalances(entered);
+  const i = withDerivedInputs(entered);
   const companyErrors = validateCompany(i);
   if (Object.keys(companyErrors).length) return { ok: false, step: 0, errors: companyErrors };
   const finError = validateFinancials(i.financials, i);
@@ -1260,7 +1308,7 @@ export function runValuation(entered: ValuationInputs, opts: EngineOptions = CUR
 function compute(i: ValuationInputs, withScenarios: boolean, opts: EngineOptions, netDebtAtDate?: number): ValuationResult {
   const currency = currencyFor(i.country);
   const x = resolveExtras(i);
-  const tax = taxProfile(i.country, i.wacc.tax, x.gccOwnership, opts);
+  const tax = taxProfile(i.country, i.wacc.tax, x.gccOwnership, opts, x.zakatRate);
   const w = computeWacc(i.wacc, currency, x.waccAdjustment, tax.rate);
   const g = n(i.growth) / 100, xm = n(i.exitMultiple), wD = n(i.dcfWeight);
   const mid = i.midYear, nd = n(i.netDebt);
@@ -1292,6 +1340,9 @@ function compute(i: ValuationInputs, withScenarios: boolean, opts: EngineOptions
   const ltmR = n(reported.rev[HISTORY_YEARS - 1]);
   const cE = ltmE > 0 ? (cm.ebitda.map((m) => ltmE * m * (1 - disc)) as Range3) : null;
   const cR = cm.revenue.map((m) => ltmR * m * (1 - disc)) as Range3;
+  // EV / EBIT from the visitor's peers, on last actual EBIT (normalised EBITDA less depreciation). Reference only.
+  const ltmEbit = ltmE - n(reported.da[HISTORY_YEARS - 1]);
+  const cB = cm.ebit && ltmEbit > 0 ? (cm.ebit.map((m) => ltmEbit * m * (1 - disc)) as Range3) : null;
 
   const dcfRange = [0, 1, 2].map((k) => {
     const G = [loG, base.evG, hiG][k], X = [loX, base.evX, hiX][k];
@@ -1446,12 +1497,16 @@ function compute(i: ValuationInputs, withScenarios: boolean, opts: EngineOptions
     equity: dcfRange.map(toEquity) as Range3,
     perpetuityEquityBase: toEquity(base.evG),
   };
-  const entered = i.peers.filter((p) => Number.isFinite(n(p.evEbitda)) || Number.isFinite(n(p.evRevenue)));
+  const entered = i.peers.filter((p) => Number.isFinite(n(p.evEbitda)) || Number.isFinite(n(p.evRevenue)) || Number.isFinite(n(p.evEbit ?? null)));
   const comparables: ComparablesBlock = {
     ebitdaMultiplesPre: cm.ebitda,
     ebitdaMultiplesPost: cm.ebitda.map((m) => m * (1 - disc)) as Range3,
     revenueMultiplesPre: cm.revenue,
     revenueMultiplesPost: cm.revenue.map((m) => m * (1 - disc)) as Range3,
+    ebitMultiplesPre: cm.ebit,
+    ebitMultiplesPost: cm.ebit ? (cm.ebit.map((m) => m * (1 - disc)) as Range3) : null,
+    ebitValue: cB,
+    ebitPeerCount: cm.peersB,
     ebitdaValue: cE,
     revenueValue: cR,
     basis: cE ? 'ebitda' : 'revenue',
@@ -1499,6 +1554,14 @@ function compute(i: ValuationInputs, withScenarios: boolean, opts: EngineOptions
     midYear: mid,
     netDebt: nd,
     debt: entersDebtAndCash(i) ? n(i.debt) : null,
+    investedCapital:
+      ic > 0
+        ? {
+            total: ic,
+            workingCapital: x.investedCapitalParts?.fixedAssets !== null && x.investedCapitalParts?.fixedAssets !== undefined ? (x.investedCapitalParts.workingCapital ?? n(fin.nwc[HISTORY_YEARS - 1])) : null,
+            fixedAssets: x.investedCapitalParts?.fixedAssets ?? null,
+          }
+        : null,
     cash: entersDebtAndCash(i) ? n(i.cash) : null,
     privateDiscount: disc,
     dcfWeight: wD,

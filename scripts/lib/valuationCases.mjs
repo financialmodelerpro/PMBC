@@ -37,10 +37,13 @@ export function fullFeatureCase(state) {
   s = state.onEnterWacc(state.resetWacc(s));
   s = {
     ...s,
-    peers: [state.newPeer('Listed peer one', '8.5', '1.1'), state.newPeer('Listed peer two', '10.5', '1.5')],
+    // EV / EBIT is a reference cross-check; it does not change the valuation.
+    peers: [state.newPeer('Listed peer one', '8.5', '1.1', '11.2'), state.newPeer('Listed peer two', '10.5', '1.5', '13.8')],
     norm: { oneOff: '85', ownerCosts: '40', carryOwnerCosts: true },
     bridge: { eosb: '160', leases: '220', minorityInterest: '75', surplusAssets: '300' },
-    investedCapital: '6200',
+    // Invested capital in two parts: working capital left blank (the last actual 1,950) plus fixed assets, 6,200 in all.
+    icWorkingCapital: '',
+    icFixedAssets: '4250',
     stake: { percent: '40', adjustment: 'minority_discount', controlPremium: '25', minorityDiscount: '20' },
     stakeAdjustmentTouched: true,
     scenarios: {
