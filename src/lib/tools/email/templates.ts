@@ -24,6 +24,7 @@
  * checks the rendered HTML without a database.
  */
 
+import { BRAND, NEUTRALS } from '@/lib/brand/letterhead';
 import { renderSubject, renderTemplate } from '@/lib/email/render';
 
 import { PURPOSES } from '../valuation/data';
@@ -55,11 +56,12 @@ export const DEFAULT_TEMPLATES: Record<string, EmailTemplate> = {
   },
 };
 
-const NAVY = '#1B3A5F';
-const GOLD = '#C69C3E';
-const TEXT = '#0F1B2D';
-const MUTED = '#52606B';
-const BORDER = '#E4E7EC';
+// The letterhead palette, as the PDF report uses: navy base, green accent, gold only in the shell's tagline.
+const NAVY = BRAND.navy;
+const GREEN = BRAND.green;
+const TEXT = NEUTRALS.text;
+const MUTED = BRAND.grey;
+const BORDER = NEUTRALS.border;
 const SANS = "-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif";
 
 export function escapeHtml(s: string): string {
@@ -101,9 +103,9 @@ ${rows
  * pressed against the edges of its box. Every client honours cell padding. The
  * link keeps a line height so the cell does not collapse around it.
  */
-export function button(href: string, label: string, tone: 'gold' | 'navy' = 'gold'): string {
-  const bg = tone === 'gold' ? GOLD : NAVY;
-  const fg = tone === 'gold' ? '#14304F' : '#FFFFFF';
+export function button(href: string, label: string, tone: 'green' | 'navy' = 'green'): string {
+  const bg = tone === 'green' ? GREEN : NAVY;
+  const fg = '#FFFFFF';
   return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:8px 0;border-collapse:separate;"><tr><td align="center" bgcolor="${bg}" style="background:${bg};border-radius:2px;padding:13px 26px;mso-padding-alt:13px 26px;">
 <a href="${escapeHtml(href)}" style="display:inline-block;font-family:${SANS};font-size:13px;line-height:18px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:${fg};text-decoration:none;">${escapeHtml(label)}</a>
 </td></tr></table>`;
@@ -138,7 +140,7 @@ export function buildResultsEmail(i: ResultsEmailInput): { subject: string; body
   const summary =
     table(rows) +
     (floor
-      ? `<p style="margin:0 0 16px;padding:10px 14px;border-left:3px solid ${GOLD};background:#FAF7F2;font-family:${SANS};font-size:13px;color:${TEXT};">${escapeHtml(floor)}</p>`
+      ? `<p style="margin:0 0 16px;padding:10px 14px;border-left:3px solid ${NAVY};background:${NEUTRALS.navyTint};font-family:${SANS};font-size:13px;color:${TEXT};">${escapeHtml(floor)}</p>`
       : '');
   const vars = {
     name: i.name,

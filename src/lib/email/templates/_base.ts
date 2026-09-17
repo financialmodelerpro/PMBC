@@ -1,5 +1,7 @@
 import { fetchEmailBranding } from '@/lib/cms/emailBranding';
 import { fetchBranding } from '@/lib/cms/branding';
+import { fetchSiteSettings } from '@/lib/cms/settings';
+import { BRAND, LEGAL_LINE, NEUTRALS } from '@/lib/brand/letterhead';
 
 /**
  * The branded email shell.
@@ -42,6 +44,26 @@ export const EMAIL_LOGO = {
   width: 114,
   height: 22,
 } as const;
+
+/**
+ * The colour logo for the report variant's white header, made from the Header
+ * Settings logo (trimmed, 229 by 44, flattened on white), drawn at half size.
+ */
+export const EMAIL_LOGO_COLOUR = {
+  src: 'https://www.pacemakersglobal.com/email/pacemakers-logo.png',
+  width: 114,
+  height: 22,
+} as const;
+
+/**
+ * Which shell to draw. `site` is the website's: navy header with the white
+ * logo, gold hairline, cream footer, used by the contact, password and
+ * testimonial emails. `report` is the tool report's, in the letterhead colours:
+ * a white header with the colour logo and the gold tagline, a green and navy
+ * accent strip, neutral grounds, and a footer with the legal line and contact
+ * details from Site Settings. The tool results email and lead alert use it.
+ */
+export type EmailVariant = 'site' | 'report';
 
 function escapeHtml(s: string): string {
   return s
@@ -90,7 +112,8 @@ const DEFAULT_FOOTER = `
  * navy. The site's own logo files are not used: they are sized for the web and
  * broke in Outlook (see the note at `headerInner`).
  */
-export async function baseLayoutBranded(content: string): Promise<string> {
+export async function baseLayoutBranded(content: string, options: { variant?: EmailVariant } = {}): Promise<string> {
+  if (options.variant === 'report') return reportLayout(content);
   const [emailBranding, siteBranding] = await Promise.all([
     safe(fetchEmailBranding(), null),
     safe(fetchBranding(), null),
@@ -168,6 +191,86 @@ export async function baseLayoutBranded(content: string): Promise<string> {
             <tr>
               <td style="background:${CREAM};border-top:1px solid ${BORDER};padding:22px 36px;text-align:center;">
                 ${footer}
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`;
+}
+
+/**
+ * The report variant. Its signature and footer are fixed here in the letterhead
+ * colours; `email_branding` overrides apply to the site shell only, since those
+ * stored fragments carry the website palette.
+ */
+async function reportLayout(content: string): Promise<string> {
+  const [siteBranding, settings] = await Promise.all([safe(fetchBranding(), null), safe(fetchSiteSettings(), {} as Awaited<ReturnType<typeof fetchSiteSettings>>)]);
+  const R = { ...BRAND, ...NEUTRALS };
+  const brandName = siteBranding?.brand_name || 'PaceMakers Business Consultants';
+  const tagline = siteBranding?.tagline || 'Advisory from Structure to Exit';
+  const email = settings.contact_email_advisory || settings.contact_email || 'advisory@pacemakersglobal.com';
+  const site = 'www.pacemakersglobal.com';
+  const location = settings.office_location_text || '';
+  const year = new Date().getFullYear();
+  const logo = `<img src="${EMAIL_LOGO_COLOUR.src}" alt="${escapeHtml(brandName)}" width="${EMAIL_LOGO_COLOUR.width}" height="${EMAIL_LOGO_COLOUR.height}" style="display:block;border:0;outline:none;width:${EMAIL_LOGO_COLOUR.width}px;height:${EMAIL_LOGO_COLOUR.height}px;color:${R.navy};font-family:${SERIF};font-size:14px;" />`;
+  return `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <title>${escapeHtml(brandName)}</title>
+  </head>
+  <body style="margin:0;padding:0;background:${R.shade};font-family:${SANS};font-size:14px;color:${R.text};-webkit-font-smoothing:antialiased;">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:${R.shade};padding:32px 16px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" style="max-width:600px;width:100%;background:#ffffff;border:1px solid ${R.border};">
+
+            <!-- Header: colour logo left, gold tagline right, as on the letterhead -->
+            <tr>
+              <td style="background:#ffffff;padding:22px 32px 18px 32px;">
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+                  <tr>
+                    <td align="left" valign="middle">${logo}</td>
+                    <td align="right" valign="middle" style="font-family:${SANS};font-size:12px;font-weight:600;color:${R.gold};">${escapeHtml(tagline)}</td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <!-- Green accent over the navy rule. Cells, not borders, since Outlook drops thin borders. -->
+            <tr>
+              <td style="font-size:0;line-height:0;">
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+                  <tr>
+                    <td width="120" bgcolor="${R.green}" style="background:${R.green};height:4px;font-size:0;line-height:0;">&nbsp;</td>
+                    <td bgcolor="${R.navy}" style="background:${R.navy};height:4px;font-size:0;line-height:0;">&nbsp;</td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+
+            <!-- Body -->
+            <tr>
+              <td style="padding:32px 32px 26px 32px;font-size:14px;line-height:1.7;color:${R.text};">
+                ${content}
+                <div style="margin-top:30px;padding-top:18px;border-top:1px solid ${R.border};">
+                  <p style="margin:0;font-family:${SERIF};font-size:15px;font-weight:600;color:${R.navy};">${escapeHtml(brandName)}</p>
+                  <p style="margin:4px 0 0;font-family:${SANS};font-size:12px;color:${R.grey};">Corporate finance and transaction advisory for family offices, investment offices and corporates across KSA, the GCC and worldwide.</p>
+                </div>
+              </td>
+            </tr>
+
+            <!-- Footer: navy rule, legal line and contact details -->
+            <tr><td bgcolor="${R.navy}" style="background:${R.navy};height:3px;font-size:0;line-height:0;">&nbsp;</td></tr>
+            <tr>
+              <td style="background:${R.shade};padding:20px 32px;text-align:left;">
+                <p style="margin:0 0 6px;font-family:${SANS};font-size:12px;"><strong style="color:${R.navy};">Email:</strong> <a href="mailto:${escapeHtml(email)}" style="color:${R.grey};text-decoration:none;">${escapeHtml(email)}</a>
+                  &nbsp;&nbsp;<strong style="color:${R.navy};">Web:</strong> <a href="${SITE_URL}" style="color:${R.grey};text-decoration:none;">${site}</a>${location ? `&nbsp;&nbsp;<strong style="color:${R.navy};">Office:</strong> <span style="color:${R.grey};">${escapeHtml(location)}</span>` : ''}</p>
+                <p style="margin:0;font-family:${SANS};font-size:11px;color:${R.grey};line-height:1.6;">${escapeHtml(LEGAL_LINE)}<br />&copy; ${year} PaceMakers Business Consultants LLP. All rights reserved.</p>
               </td>
             </tr>
           </table>

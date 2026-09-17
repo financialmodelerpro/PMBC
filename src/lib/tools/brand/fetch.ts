@@ -20,7 +20,9 @@ import { FOUNDER_PAGE_SLUG } from '@/lib/cms/founderProfile';
 import { PORTRAIT_RATIO, portraitCrop } from '@/lib/public/portrait';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 
-import type { ReportBranding } from '../pdf/ValuationReport';
+import { fetchSiteSettings } from '@/lib/cms/settings';
+
+import type { ReportBranding } from '../pdf/theme';
 import { partnerFromHero, type PartnerCard } from './partner';
 
 const TTL_MS = 10 * 60 * 1000;
@@ -94,18 +96,36 @@ async function processedImage(src: string | null, kind: 'logo' | 'portrait'): Pr
   return value;
 }
 
-/** Everything the PDF report draws from the CMS. */
+/**
+ * Everything a tool report draws from the CMS: the colour logo for white pages
+ * and the white logo for dark ones (both from Header Settings, trimmed and
+ * resized, never recoloured), the brand name and tagline, the partner card and
+ * portrait, and the contact details from Site Settings for the closing page.
+ */
 export async function fetchReportBranding(): Promise<ReportBranding> {
-  const [branding, partner] = await Promise.all([fetchBranding().catch(() => null), fetchPartnerCard()]);
-  // The same fallback chain the navbar uses: the on-dark file when there is one.
-  const onDarkSrc = branding?.logo_dark_url || branding?.logo_url || null;
-  // The closing page uses the colour logo exactly as Header Settings stores it
-  // for the header: trimmed and resized only, never recoloured.
-  const onLightSrc = branding?.logo_url || null;
-  const [logoOnDark, logoOnLight, partnerPhoto] = await Promise.all([
-    processedImage(onDarkSrc, 'logo'),
-    processedImage(onLightSrc, 'logo'),
+  const [branding, partner, settings] = await Promise.all([
+    fetchBranding().catch(() => null),
+    fetchPartnerCard(),
+    fetchSiteSettings().catch(() => ({}) as Awaited<ReturnType<typeof fetchSiteSettings>>),
+  ]);
+  const [logo, logoOnDark, partnerPhoto] = await Promise.all([
+    processedImage(branding?.logo_url || null, 'logo'),
+    processedImage(branding?.logo_dark_url || null, 'logo'),
     processedImage(partner?.photoUrl ?? null, 'portrait'),
   ]);
-  return { logoOnDark, logoOnLight, partner, partnerPhoto };
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.pacemakersglobal.com';
+  return {
+    logo,
+    logoOnDark,
+    partner,
+    partnerPhoto,
+    brandName: branding?.brand_name || null,
+    tagline: branding?.tagline || null,
+    contact: {
+      email: settings.contact_email || null,
+      advisoryEmail: settings.contact_email_advisory || null,
+      website: siteUrl,
+      location: settings.office_location_text || null,
+    },
+  };
 }

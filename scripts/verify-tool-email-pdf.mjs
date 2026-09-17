@@ -14,8 +14,8 @@
 //   4. PDF: renders for the minimal example, Pakistan with every version 2
 //      feature, and a distressed case; is a PDF; has eight pages; embeds both
 //      site typefaces. The text is extracted with pdfjs and each page is
-//      checked for its section title, the page footer and the market data
-//      label, with no ligature glyph drawn (read from the operator list, since
+//      checked for its section title and the market data label on the cover,
+//      with no ligature glyph drawn (read from the operator list, since
 //      extracted text maps a ligature back to its letters) and no
 //      em or en dash. The full case shows its stake, weighted value, bridge
 //      items, normalised EBITDA and every warning it raised; the minimal case
@@ -30,7 +30,18 @@
 //      the file itself at the size those attributes assume, the button padding
 //      on the cell (which Outlook honours) rather than the link, the weighted
 //      and stake rows only when used, and the follow-up consent as submitted.
-//   7. Booking links: always the site's /book page with name, email and UTM
+//   7. Report theme (the shared theme in src/lib/tools/pdf): no footer on the
+//      cover; on every inner page the footer carries the LLP name, the tagline,
+//      the tool name, the company, the date and "Page X of 8"; the closing page
+//      carries the same details, and the legal line and contact details appear
+//      exactly once in the report. Read from the operator list: the letterhead
+//      navy and green are drawn on every page, none of the website colours is,
+//      gold is never a large fill and appears as text only in the tagline, and
+//      each inner page has at most one small gold highlight. The colour logo is
+//      drawn on the cover and the closing page, and a logo on a dark background
+//      uses the white file. The report email shell uses the colour logo, the
+//      letterhead colours and the legal line, and the site shell is unchanged.
+//   8. Booking links: always the site's /book page with name, email and UTM
 //      tags, and /book forwarding only known keys onto the calendar URL.
 //
 //   npm run verify-tool-email-pdf
@@ -62,6 +73,9 @@ const qr = await jiti.import(path.join(root, 'src/lib/tools/pdf/QrCode.tsx'));
 const partnerModule = await jiti.import(path.join(root, 'src/lib/tools/brand/partner.ts'));
 const founderProfileSrc = fs.readFileSync(path.join(root, 'src/lib/cms/founderProfile.ts'), 'utf8');
 const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
+const components = await jiti.import(path.join(root, 'src/lib/tools/pdf/components.tsx'));
+const theme = await jiti.import(path.join(root, 'src/lib/tools/pdf/theme.ts'));
+const letterhead = await jiti.import(path.join(root, 'src/lib/brand/letterhead.ts'));
 
 let checks = 0, failures = 0;
 function check(label, ok, detail = '') {
@@ -189,6 +203,53 @@ async function ligatureGlyphs(buf) {
   }
   return [...found];
 }
+/**
+ * Per page: every fill and stroke colour drawn, split into text and graphics,
+ * with the text drawn in gold and the number of gold graphic operations. Colours
+ * are read from the operator list, so this is what a viewer paints.
+ */
+const hexOf = (a) => {
+  const v = a?.[0];
+  if (typeof v === 'string') return v.toUpperCase();
+  const rgb = v && typeof v === 'object' && !Array.isArray(v) && 0 in v ? [v[0], v[1], v[2]] : [a?.[0], a?.[1], a?.[2]];
+  return '#' + rgb.map((x) => Math.round(Number(x)).toString(16).padStart(2, '0')).join('').toUpperCase();
+};
+async function pageColours(buf) {
+  const doc = await pdfjs.getDocument({ data: new Uint8Array(buf), verbosity: 0 }).promise;
+  const O = pdfjs.OPS;
+  const out = [];
+  for (let i = 1; i <= doc.numPages; i++) {
+    const ops = await (await doc.getPage(i)).getOperatorList();
+    let fill = '#000000', stroke = '#000000';
+    const stack = [];
+    const page = { fills: new Set(), strokes: new Set(), goldText: [], goldGraphics: 0, images: 0 };
+    ops.fnArray.forEach((fn, k) => {
+      const a = ops.argsArray[k];
+      if (fn === O.save) stack.push([fill, stroke]);
+      else if (fn === O.restore) [fill, stroke] = stack.pop() ?? [fill, stroke];
+      else if (fn === O.setFillRGBColor) fill = hexOf(a);
+      else if (fn === O.setStrokeRGBColor) stroke = hexOf(a);
+      else if (fn === O.showText) {
+        page.fills.add(fill);
+        if (fill === letterhead.BRAND.gold) page.goldText.push(a[0].map((g) => (g && typeof g === 'object' ? g.unicode ?? '' : '')).join(''));
+      } else if (fn === O.fill || fn === O.eoFill) {
+        page.fills.add(fill);
+        if (fill === letterhead.BRAND.gold) page.goldGraphics++;
+      } else if (fn === O.stroke) {
+        page.strokes.add(stroke);
+        if (stroke === letterhead.BRAND.gold) page.goldGraphics++;
+      } else if (fn === O.constructPath && a?.[0]?.length) {
+        // pdfjs folds the paint into constructPath in newer builds; the first argument is the paint operator.
+        const paint = typeof a[0] === 'number' ? a[0] : null;
+        if (paint === O.fill || paint === O.eoFill) { page.fills.add(fill); if (fill === letterhead.BRAND.gold) page.goldGraphics++; }
+        if (paint === O.stroke) { page.strokes.add(stroke); if (stroke === letterhead.BRAND.gold) page.goldGraphics++; }
+      } else if (fn === O.paintImageXObject) page.images++;
+    });
+    out.push(page);
+  }
+  return out;
+}
+
 const DATA_LABEL = data.dataVersionLabel('2026-09-17');
 check('market data label', DATA_LABEL === 'Market data: Damodaran 2026, risk-free 15 September 2026', DATA_LABEL);
 const pdfs = {};
@@ -217,7 +278,32 @@ for (const [label, result] of [['Saudi', saudi], ['full', full], ['Pakistan', pa
     check(`${label}: page ${i + 1} is "${title}"`, onPage, (t[i] ?? '').slice(0, 120));
   });
   check(`${label}: page 1 names the market data`, t[0].includes(DATA_LABEL));
-  check(`${label}: pages 2 to 8 carry the footer with page number and market data`, t.slice(1).every((pt, i) => pt.includes(`Page ${i + 2} of 8`) && pt.includes(DATA_LABEL) && pt.includes('Indicative only')));
+  {
+    const collapse = (x) => x.replace(/\s+/g, ' ');
+    const subject = label === 'distressed' ? 'Test Person' : 'Example Co';
+    const details = collapse(components.detailsLine({ toolName: pdfModule.TOOL_NAME, subject, dateLabel: format.headline(result).valuationDate }));
+    const tagline = theme.DEFAULT_TAGLINE;
+    const footerOn = (pt, n) => pt.includes(details) && pt.includes(`Page ${n} of 8`);
+    check(`${label}: no footer on the cover`, !/Page \d+ of \d+/.test(t[0]) && !t[0].includes(details), t[0].slice(-200));
+    for (let n = 2; n <= 7; n++) {
+      const pt = t[n - 1];
+      check(`${label}: page ${n} footer carries the LLP name, tagline, tool, company, date and page number`, footerOn(pt, n) && pt.includes('PaceMakers Business Consultants LLP') && pt.includes(tagline), pt.slice(-260));
+    }
+    check(`${label}: closing page carries the report details and page number`, footerOn(t[7], 8), t[7].slice(-400));
+    const all = collapse(t.join(' '));
+    check(`${label}: legal line stated exactly once, on the closing page`, all.split(collapse(theme.LEGAL_LINE)).length === 2 && collapse(t[7]).includes(collapse(theme.LEGAL_LINE)));
+    check(`${label}: contact details on the closing page only`, /Web\s*:/.test(t[7]) && t[7].includes('www.pacemakersglobal.com') && t.slice(0, 7).every((pt) => !/Web\s*:/.test(pt)), t[7].slice(-300));
+    check(`${label}: footer shows the company, not the market data label`, t.slice(1, 7).every((pt) => !pt.includes(`of 8 | ${DATA_LABEL}`)));
+
+    const colours = await pageColours(buf);
+    const siteColours = ['#1B3A5F', '#14304F', '#3FA663', '#C69C3E', '#A88530', '#FAF7F2', '#F6F1E6', '#E8DDC4'];
+    const used = colours.flatMap((c) => [...c.fills, ...c.strokes]);
+    check(`${label}: letterhead navy and green drawn on every page`, colours.every((c) => c.fills.has(letterhead.BRAND.navy) && c.fills.has(letterhead.BRAND.green)), colours.map((c) => [...c.fills].join(' ')).join(' / ').slice(0, 300));
+    check(`${label}: no website colour anywhere in the report`, !used.some((x) => siteColours.includes(x)), used.filter((x) => siteColours.includes(x)).join(', '));
+    check(`${label}: gold text is the tagline only`, colours.every((c) => c.goldText.every((g) => tagline.replace(/\s/g, '').includes(g.replace(/\s/g, '')))), colours.map((c) => c.goldText.join('|')).join(' / '));
+    check(`${label}: at most one small gold highlight on each inner page`, colours.slice(1, 7).every((c) => c.goldGraphics <= 1), colours.map((c) => c.goldGraphics).join(','));
+    check(`${label}: the cover's only gold graphic is the base case marker`, colours[0].goldGraphics <= 1, String(colours[0].goldGraphics));
+  }
   const all = t.join(' ');
   const ligs = await ligatureGlyphs(buf);
   check(`${label}: no ligature glyphs drawn`, ligs.length === 0, ligs.join(', '));
@@ -367,14 +453,36 @@ console.log('Email shell and parts');
   // Drawn at half the file's pixels for sharp high-density screens, within a pixel of rounding.
   check('logo file is twice the drawn size', Math.abs(pw / 2 - base.EMAIL_LOGO.width) <= 1 && Math.abs(ph / 2 - base.EMAIL_LOGO.height) <= 1, `${pw}x${ph}`);
 
+  // The report variant, used by the tool results email and lead alert.
+  const rep = await base.baseLayoutBranded('<p>Body</p>', { variant: 'report' });
+  const rimg = rep.match(/<img[^>]*>/)?.[0] ?? '';
+  check('report email: colour logo PNG with width, height and alt', rimg.includes(`src="${base.EMAIL_LOGO_COLOUR.src}"`) && rimg.includes(`width="${base.EMAIL_LOGO_COLOUR.width}"`) && rimg.includes(`height="${base.EMAIL_LOGO_COLOUR.height}"`) && /alt="PaceMakers Business Consultants"/.test(rimg), rimg);
+  {
+    const cfile = path.join(root, 'public', new URL(base.EMAIL_LOGO_COLOUR.src).pathname);
+    const cpng = fs.existsSync(cfile) ? fs.readFileSync(cfile) : Buffer.alloc(0);
+    const cw = cpng.length > 24 ? cpng.readUInt32BE(16) : 0, chh = cpng.length > 24 ? cpng.readUInt32BE(20) : 0;
+    check('report email: colour logo file is a PNG at twice the drawn size', cpng.subarray(1, 4).toString() === 'PNG' && Math.abs(cw / 2 - base.EMAIL_LOGO_COLOUR.width) <= 1 && Math.abs(chh / 2 - base.EMAIL_LOGO_COLOUR.height) <= 1, `${cw}x${chh}`);
+  }
+  check('report email: navy and green accent strip, gold tagline', rep.includes(`bgcolor="${letterhead.BRAND.green}"`) && rep.includes(`bgcolor="${letterhead.BRAND.navy}"`) && new RegExp(`color:${letterhead.BRAND.gold};">Advisory from Structure to Exit`).test(rep));
+  check('report email: legal line and contact details in the footer', rep.includes(templates.escapeHtml(letterhead.LEGAL_LINE)) && rep.includes('www.pacemakersglobal.com'));
+  check('report email: no website colours', !/#1B3A5F|#C69C3E|#FAF7F2|#14304F|#A88530/i.test(rep));
+  check('report email: gold only in the tagline', (rep.match(new RegExp(letterhead.BRAND.gold, 'g')) ?? []).length === 1);
+  check('site email shell unchanged: navy header, white logo, gold hairline', html.includes('background:#1B3A5F') && html.includes(base.EMAIL_LOGO.src) && html.includes('background:#C69C3E'));
+  {
+    const deliverSrc = fs.readFileSync(path.join(root, 'src/lib/tools/leads/deliver.ts'), 'utf8');
+    check('tool results email and alert use the report shell', (deliverSrc.match(/baseLayoutBranded\(body, \{ variant: 'report' \}\)/g) ?? []).length === 2);
+  }
+
   const btn = templates.button('https://example.com/x', 'Book a free call');
   const td = btn.match(/<td[^>]*>/)?.[0] ?? '';
   const a = btn.match(/<a[^>]*>/)?.[0] ?? '';
   check('button padding is on the cell', /padding:13px 26px/.test(td) && /mso-padding-alt:13px 26px/.test(td) && /bgcolor="#/.test(td), td);
   check('button link carries no padding', !/padding/.test(a), a);
+  check('results button is green, alert button navy', btn.includes(`bgcolor="${letterhead.BRAND.green}"`) && templates.button('https://example.com/x', 'Open the lead', 'navy').includes(`bgcolor="${letterhead.BRAND.navy}"`));
 
   const build = (result) => templates.buildResultsEmail({ template: templates.DEFAULT_TEMPLATES[templates.RESULTS_TEMPLATE_KEY], name: 'A', email: 'a@example.com', company: null, result, bookingHref: BOOK }).body;
   const fb = build(full), mb = build(saudi);
+  check('results email body: no website colours', !/#1B3A5F|#C69C3E|#FAF7F2/i.test(fb + mb));
   const hf = format.headline(full);
   check('results email, full: weighted value row', fb.includes('Probability-weighted value') && fb.includes(templates.escapeHtml(hf.weighted)));
   check('results email, full: stake value row', fb.includes(templates.escapeHtml(`Value of ${hf.stakeLabel}`)) && fb.includes(templates.escapeHtml(hf.stakeRange)));
@@ -473,18 +581,21 @@ console.log('Report branding and partner');
   check('partner: no name means no card', partnerModule.partnerFromHero({ intro: 'x' }) === null);
   check('partner: slug matches founderProfile.ts', founderProfileSrc.includes(`FOUNDER_PAGE_SLUG = '${partnerModule.PARTNER_PAGE_SLUG}'`));
 
-  // The closing page logo: the Header Settings colour logo, never recoloured.
+  // The logos: the Header Settings colour logo on white, the white logo on dark, never recoloured.
   {
     const src = fs.readFileSync(path.join(root, 'src/lib/tools/brand/fetch.ts'), 'utf8');
-    check('closing page logo is the header logo, same treatment as any logo', src.includes("const onLightSrc = branding?.logo_url || null;") && src.includes("processedImage(onLightSrc, 'logo')"));
+    check('report logo is the header colour logo, same treatment as any logo', src.includes("processedImage(branding?.logo_url || null, 'logo')"));
+    check('report white logo is the header dark logo', src.includes("processedImage(branding?.logo_dark_url || null, 'logo')"));
     check('no recolouring of the logo anywhere', !/recolourGreenToGold|logo-navy-gold/.test(src));
   }
 
   // Real images from the repository stand in for the CMS files.
-  const logo = fs.readFileSync(path.join(root, 'public/email/pacemakers-logo-on-navy.png'));
   const sharp = (await import('sharp')).default;
+  // Distinct sizes, so the PDF shows which file was drawn.
+  const logo = await sharp(fs.readFileSync(path.join(root, 'public/email/pacemakers-logo.png'))).resize({ width: 520, height: 100, fit: 'fill' }).png().toBuffer();
+  const logoOnDark = await sharp(fs.readFileSync(path.join(root, 'public/email/pacemakers-logo-on-navy.png'))).resize({ width: 624, height: 120, fit: 'fill' }).png().toBuffer();
   const portrait = await sharp({ create: { width: 360, height: 450, channels: 3, background: '#1B3A5F' } }).jpeg().toBuffer();
-  const branding = { logoOnDark: logo, logoOnLight: logo, partner: card, partnerPhoto: portrait };
+  const branding = { logo, logoOnDark, partner: card, partnerPhoto: portrait };
   const render = (b) => pdfModule.renderValuationReport(full, { ...REPORT_META, company: 'Example Co', industry: 'Industry', country: 'Country', bookingHref: BOOK, branding: b });
   const withBrand = await render(branding);
   const raw = withBrand.toString('latin1');
@@ -492,6 +603,22 @@ console.log('Report branding and partner');
   check('branded: still eight pages', t.length === 8, String(t.length));
   check('branded: logo and portrait embedded as images', (raw.match(/\/Subtype\s*\/Image/g) ?? []).length >= 2);
   check('branded: cover uses the logo, not the typeset name', !t[0].includes('PaceMakers Business Consultants ADVISORY') && !/^PaceMakers Business Consultants/.test(t[0]));
+  {
+    const colours = await pageColours(withBrand);
+    check('branded: the logo is drawn on the cover', colours[0].images >= 1, String(colours[0].images));
+    check('branded: the logo is drawn on the closing page', colours[7].images >= 2, String(colours[7].images));
+    check('branded: the colour logo, not the white one, on the white pages', raw.includes('/Width 520') && !raw.includes('/Width 624'));
+    const { Document, Page, View } = await import('@react-pdf/renderer');
+    const React = (await import('react')).default;
+    const h = React.createElement;
+    const resolved = theme.withBrandDefaults(branding);
+    const dark = await (await import('@react-pdf/renderer')).renderToBuffer(h(Document, null, h(Page, { size: 'A4' }, h(View, { style: { backgroundColor: theme.RC.navy, padding: 20 } }, h(components.BrandLogo, { brand: resolved, height: 20, onDark: true })))));
+    const darkRaw = dark.toString('latin1');
+    check('a logo on a dark background uses the white file', darkRaw.includes('/Width 624') && !darkRaw.includes('/Width 520'));
+    const darkNoFile = await (await import('@react-pdf/renderer')).renderToBuffer(h(Document, null, h(Page, { size: 'A4' }, h(View, { style: { backgroundColor: theme.RC.navy, padding: 20 } }, h(components.BrandLogo, { brand: theme.withBrandDefaults({ ...branding, logoOnDark: null }), height: 20, onDark: true })))));
+    const wordmark = await pageTexts(darkNoFile);
+    check('without a white file, a dark background gets the wordmark in white, never the colour logo', wordmark[0].includes('PaceMakers Business Consultants') && !darkNoFile.toString('latin1').includes('/Width 520'));
+  }
   const last = t[7];
   check('branded: closing page names the partner and role', last.includes('Test Partner') && last.includes('Founding Partner, Corporate Finance Specialist'));
   check('branded: closing page carries credentials, intro and every highlight', last.includes('ACCA | FMVA | AFM | 12+ Years Experience') && last.includes('An introduction over two lines.') && card.highlights.every((h) => last.includes(h)));
@@ -501,10 +628,11 @@ console.log('Report branding and partner');
   const bare = await render(null);
   const tb = await pageTexts(bare);
   check('no branding: still eight pages', tb.length === 8);
-  check('no branding: cover sets the name in type', tb[0].startsWith('PaceMakers Business Consultants'));
+  check('no branding: cover sets the name in type in place of the logo', tb[0].startsWith('PaceMakers Business Consultants'));
+  check('no branding: closing page still carries the legal line and the site address', tb[7].replace(/\s+/g, ' ').includes(theme.LEGAL_LINE) && tb[7].includes('www.pacemakersglobal.com'));
   check('no branding: no partner block, full service summaries', !tb[7].includes('Who you will work with') && tb[7].includes('Institutional-grade'));
   check('no branding: no images embedded', !/\/Subtype\s*\/Image/.test(bare.toString('latin1')));
-  const noPhoto = await pageTexts(await render({ ...branding, partnerPhoto: null, logoOnDark: null }));
+  const noPhoto = await pageTexts(await render({ ...branding, partnerPhoto: null, logo: null }));
   check('partner without photo or logo: eight pages, block kept', noPhoto.length === 8 && noPhoto[7].includes('Test Partner'));
 }
 
