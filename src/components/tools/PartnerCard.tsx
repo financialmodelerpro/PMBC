@@ -2,6 +2,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { ArrowUpRight } from 'lucide-react';
 
+import { PORTRAIT_OBJECT_POSITION } from '@/lib/public/portrait';
 import { PARTNER_RECORD_NOTE, type PartnerCard as PartnerCardData } from '@/lib/tools/brand/partner';
 
 /**
@@ -16,8 +17,11 @@ export function PartnerCard({ partner }: { partner: PartnerCardData | null }) {
     <section aria-labelledby="partner-card-name" className="rounded-[2px] border border-[color:var(--pmbc-border-warm)] bg-white p-5 sm:p-7">
       <div className="flex flex-col gap-5 sm:flex-row sm:gap-7">
         {partner.photoUrl && (
-          <div className="relative aspect-[4/5] w-[120px] shrink-0 overflow-hidden rounded-[2px] border border-[#C69C3E]/40 bg-[#F6F1E6] sm:w-[150px]">
-            <Image src={partner.photoUrl} alt={`${partner.name}, ${partner.role}`} fill sizes="150px" className="object-cover object-top" />
+          // self-start: in the row layout a flex item stretches to the height of the
+          // text beside it, which overrode the 4:5 frame and drew the portrait
+          // as a tall narrow strip. The frame now keeps its own proportions.
+          <div className="relative aspect-[4/5] w-[120px] shrink-0 self-start overflow-hidden rounded-[2px] border border-[#C69C3E]/40 bg-[#F6F1E6] sm:w-[150px]">
+            <Image src={partner.photoUrl} alt={`${partner.name}, ${partner.role}`} fill sizes="(min-width: 640px) 150px, 120px" className="object-cover" style={{ objectPosition: PORTRAIT_OBJECT_POSITION }} />
           </div>
         )}
         <div className="min-w-0">

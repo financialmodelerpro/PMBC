@@ -17,6 +17,7 @@ import sharp from 'sharp';
 
 import { fetchBranding } from '@/lib/cms/branding';
 import { FOUNDER_PAGE_SLUG } from '@/lib/cms/founderProfile';
+import { PORTRAIT_RATIO, portraitCrop } from '@/lib/public/portrait';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 
 import type { ReportBranding } from '../pdf/ValuationReport';
@@ -48,6 +49,29 @@ export async function fetchPartnerCard(): Promise<PartnerCard | null> {
   }
 }
 
+/**
+ * The portrait for the PDF, 360 by 450 (4:5): scaled to cover the frame, then
+ * cropped at the shared face-anchored focus (`src/lib/public/portrait.ts`), so it
+ * is never stretched. The report draws it in a box of the same proportions.
+ */
+async function portrait(input: Buffer): Promise<Buffer> {
+  const img = sharp(input).rotate();
+  const meta = await img.metadata();
+  const upright = (meta.orientation ?? 1) >= 5;
+  const w = (upright ? meta.height : meta.width) ?? PORTRAIT_OUT.width;
+  const h = (upright ? meta.width : meta.height) ?? PORTRAIT_OUT.height;
+  const crop = portraitCrop(w, h, PORTRAIT_OUT.width, PORTRAIT_OUT.height);
+  return img
+    .resize({ width: crop.width, height: crop.height, fit: 'fill' })
+    .extract({ left: crop.left, top: crop.top, width: PORTRAIT_OUT.width, height: PORTRAIT_OUT.height })
+    .flatten({ background: '#FFFFFF' })
+    .jpeg({ quality: 84 })
+    .toBuffer();
+}
+
+/** Output size of the report portrait, in pixels. */
+export const PORTRAIT_OUT = { width: 360, height: Math.round(360 / PORTRAIT_RATIO) };
+
 /** Fetches an image and resizes it, cached by URL and treatment. Null on any failure. */
 async function processedImage(src: string | null, kind: 'logo' | 'portrait'): Promise<Buffer | null> {
   if (!src || !/^https:\/\//i.test(src)) return null;
@@ -60,10 +84,7 @@ async function processedImage(src: string | null, kind: 'logo' | 'portrait'): Pr
     if (res.ok) {
       const input = Buffer.from(await res.arrayBuffer());
       const logo = async () => sharp(input).trim().resize({ width: 900, withoutEnlargement: true }).png({ compressionLevel: 9 }).toBuffer();
-      value =
-        kind === 'logo'
-          ? await logo()
-          : await sharp(input).resize({ width: 360, height: 450, fit: 'cover', position: 'top' }).flatten({ background: '#FFFFFF' }).jpeg({ quality: 84 }).toBuffer();
+      value = kind === 'logo' ? await logo() : await portrait(input);
     }
   } catch (err) {
     console.error(`[tool-brand] ${kind} image unavailable:`, err instanceof Error ? err.message : err);

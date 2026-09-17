@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { SectionContainer } from '../SectionContainer';
 import { Media } from '../Media';
 import { readMediaValue } from '@/lib/media';
+import { PORTRAIT_OBJECT_POSITION } from '@/lib/public/portrait';
 import { variantStyles, type PmbcVariant } from '@/lib/public/tokens';
 
 function s(v: unknown): string {
@@ -129,6 +130,7 @@ export function FounderHero({
                   priority
                   sizes="(min-width: 1024px) 400px, 90vw"
                   className="object-cover"
+                  style={{ objectPosition: PORTRAIT_OBJECT_POSITION }}
                 />
               </div>
             ) : (

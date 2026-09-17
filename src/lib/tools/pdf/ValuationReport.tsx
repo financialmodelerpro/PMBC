@@ -78,6 +78,7 @@ import { assertReconciled } from '../valuation/reconcile';
 import { PdfChart } from './PdfChart';
 import { QrCode } from './QrCode';
 import { C, NO_LIGATURES, PAGE, registerFonts, s } from './theme';
+import { PORTRAIT_RATIO } from '../../public/portrait';
 
 export type ReportMeta = {
   preparedFor: string;
@@ -613,7 +614,7 @@ export function ValuationReport({ result, meta }: { result: ValuationResult; met
           <View style={{ borderWidth: 0.75, borderColor: C.border, padding: 14, marginBottom: 14, flexDirection: 'row' }} wrap={false}>
             {brand?.partnerPhoto && (
               // eslint-disable-next-line jsx-a11y/alt-text
-              <Image src={{ data: brand.partnerPhoto, format: 'jpg' }} style={{ width: 76, height: 95, marginRight: 14, objectFit: 'cover' }} />
+              <Image src={{ data: brand.partnerPhoto, format: 'jpg' }} style={{ width: 76, height: 76 / PORTRAIT_RATIO, marginRight: 14, objectFit: 'cover' }} />
             )}
             <View style={{ flex: 1 }}>
               <Text style={s.eyebrow}>Who you will work with</Text>
