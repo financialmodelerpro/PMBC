@@ -53,6 +53,24 @@ const serialize = await jiti.import(path.join(root, 'src/lib/tools/valuation/ser
 const leads = await jiti.import(path.join(root, 'src/lib/tools/leads/valuation.ts'));
 const pdf = await jiti.import(path.join(root, 'src/lib/tools/pdf/ValuationReport.tsx'));
 
+// The founder portrait's own proportions, read from the file the profile uses,
+// so the portrait checks compare against the source rather than a constant.
+// Read only; the Supabase URL and key come from .env.local when not set.
+const envFile = path.join(root, '.env.local');
+if (fs.existsSync(envFile)) {
+  for (const line of fs.readFileSync(envFile, 'utf8').split(/\r?\n/)) {
+    const m = line.match(/^([A-Z0-9_]+)=(.*)$/);
+    if (m && !process.env[m[1]]) process.env[m[1]] = m[2].replace(/^["']|["']$/g, '');
+  }
+}
+const partnerCard = await (await jiti.import(path.join(root, 'src/lib/tools/brand/fetch.ts'))).fetchPartnerCard();
+const SOURCE_PORTRAIT_RATIO = await (async () => {
+  if (!partnerCard?.photoUrl) return NaN;
+  const sharp = (await import('sharp')).default;
+  const meta = await sharp(Buffer.from(await (await fetch(partnerCard.photoUrl)).arrayBuffer())).metadata();
+  return meta.width / meta.height;
+})();
+
 let checks = 0, failures = 0;
 function check(label, ok, detail = '') {
   checks++;
@@ -302,6 +320,25 @@ async function walk(width) {
   check(`${label}: Download PDF`, await page.evaluate(clickButton('Download PDF')));
   check(`${label}: PDF request intercepted, rendered and confirmed`, Boolean(await waitFor(() => page.evaluate(`document.body.innerText.includes('Your report has downloaded.')`), 120)) && log.pdf.length === 1 && log.pdf[0].header === '%PDF-');
 
+  // The partner portrait keeps its proportions: a 4:5 frame, the image cropped
+  // to cover it, and the file itself not distorted on the way.
+  const portrait = await page.evaluate(`(async () => {
+    const img = document.querySelector('[aria-labelledby="partner-card-name"] img');
+    if (!img) return null;
+    img.scrollIntoView({ block: 'center' });
+    await img.decode().catch(() => null);
+    const b = img.getBoundingClientRect(), f = img.parentElement.getBoundingClientRect();
+    return { natural: img.naturalWidth / img.naturalHeight, frame: f.width / f.height, box: b.width / b.height, fit: getComputedStyle(img).objectFit, w: f.width, h: f.height };
+  })()`);
+  check(`${label}: partner portrait shown`, Boolean(portrait));
+  if (portrait) {
+    const detail = JSON.stringify(portrait);
+    check(`${label}: partner portrait frame is 4:5`, Math.abs(portrait.frame - 0.8) < 0.01, detail);
+    check(`${label}: partner portrait fills its frame`, Math.abs(portrait.box - portrait.frame) < 0.01, detail);
+    check(`${label}: partner portrait is cropped, never stretched`, portrait.fit === 'cover', detail);
+    check(`${label}: partner portrait file keeps the source ratio`, Math.abs(portrait.natural - SOURCE_PORTRAIT_RATIO) < 0.01, `${detail}, source ${SOURCE_PORTRAIT_RATIO}`);
+  }
+
   // Layout and hygiene.
   const overflow = await page.evaluate(`document.documentElement.scrollWidth - window.innerWidth`);
   check(`${label}: no horizontal scroll`, overflow <= 1, `${overflow}px wider than the viewport`);
@@ -314,6 +351,7 @@ async function walk(width) {
 
 try {
   await walk(1440);
+  await walk(1024);
   await walk(390);
 } catch (err) {
   failures++;

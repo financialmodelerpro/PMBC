@@ -918,7 +918,7 @@ recorded reversal that allows them.
 | Email me this version | `src/lib/tools/leads/version.ts` (pure), route `src/app/api/tools/[slug]/lead/version/route.ts` |
 | Download PDF for what is on screen | `src/app/api/tools/[slug]/pdf/route.ts`, writes nothing |
 | Company name and description a visitor adds to their report | `src/lib/tools/valuation/profile.ts` (cleaning and limits, shared by the form, the API and the PDF) |
-| Logo and partner card in the report and on the results | `src/lib/tools/brand/partner.ts` (pure), `src/lib/tools/brand/fetch.ts` (server), `src/components/tools/PartnerCard.tsx`. **The partner card reads only the founder profile's `founder_hero`**; its career highlights are that section's **Report highlights** field (one per line, up to five), which the profile page itself does not show and which ships empty. Home's founder card is never read, so editing it cannot change a report. The closing page logo is the Header Settings colour logo exactly as the header uses it (trimmed and resized, never recoloured; changed 2026-09-17) |
+| Logo and partner card in the report and on the results | `src/lib/tools/brand/partner.ts` (pure), `src/lib/tools/brand/fetch.ts` (server), `src/components/tools/PartnerCard.tsx`. **The partner card reads only the founder profile's `founder_hero`**; its career highlights are that section's **Report highlights** field (one per line, up to five), which the profile page itself does not show and which ships empty. Home's founder card is never read, so editing it cannot change a report. The closing page logo is the Header Settings colour logo exactly as the header uses it (trimmed and resized, never recoloured; changed 2026-09-17). **The founder portrait is framed by one rule everywhere** (home founder card, profile hero, results partner card, PDF): `src/lib/public/portrait.ts`, a fixed 4:5 frame with the image cropped to cover it at a face-anchored focus (50% 30%), never stretched. On the results card the frame carries `self-start`: in a flex row it otherwise stretches to the text beside it, which drew the portrait as a 150 by 244 strip until 2026-09-17 |
 | Booking link | `src/lib/tools/booking.ts`, always the site's `/book` |
 | **Every tunable number** (Damodaran data, FX, market rates, presets, deal bands) | `src/lib/tools/valuation/data.ts`, and nowhere else |
 | The valuation arithmetic | `src/lib/tools/valuation/engine.ts`, pure, no UI |
@@ -1167,7 +1167,7 @@ cases and rasterises every page to PNG for inspection.
 
 **Verifiers.** `verify-valuation-engine` (518: 514 reference parity plus 4 on the market data passed into the reference),
 `verify-valuation-v2` (359), `verify-tool-lead-api` (125),
-`verify-valuation-dashboard` (152, the results page end to end at 1440 and 390
+`verify-valuation-dashboard` (243, the results page end to end at 1440, 1024 and 390, including the partner portrait's 4:5 frame and source ratio,
 against a local `next start`, every /api/ request intercepted so nothing is
 written), `verify-tool-email-pdf` (268, pdfjs text and operator list, so a ligature glyph is
 caught even though extracted text maps it back to letters),
