@@ -103,7 +103,8 @@ const CHROME = [process.env.CHROME_PATH, 'C:/Program Files/Google/Chrome/Applica
 if (!CHROME) throw new Error('Chrome not found. Set CHROME_PATH.');
 
 async function openPage() {
-  const port = 9393;
+  // A fresh port for each browser: a closing Chrome can still hold the previous one.
+  const port = 9393 + (openPage.launches = (openPage.launches ?? 0) + 1);
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pmbc-dash-'));
   const proc = spawn(CHROME, ['--headless=new', '--disable-gpu', '--no-first-run', `--remote-debugging-port=${port}`, `--user-data-dir=${dir}`, 'about:blank'], { stdio: 'ignore' });
   const tabs = await waitFor(async () => {
@@ -133,7 +134,9 @@ async function openPage() {
     if (r.result?.exceptionDetails) throw new Error(r.result.exceptionDetails.exception?.description ?? 'evaluate failed');
     return r.result?.result?.value;
   };
-  return { send, evaluate, on: (fn) => listeners.push(fn), close: () => (ws.close(), proc.kill()) };
+  // On Windows, kill the whole Chrome process tree: proc.kill() leaves its children holding the port.
+  const close = () => { ws.close(); if (process.platform === 'win32') spawn('taskkill', ['/PID', String(proc.pid), '/T', '/F'], { stdio: 'ignore' }); else proc.kill(); };
+  return { send, evaluate, on: (fn) => listeners.push(fn), close };
 }
 
 /* ------------------------------------------------------------------------ */

@@ -6,9 +6,10 @@
  * Business Valuation report and the Investor Readiness Scorecard cannot drift.
  *
  * THE THREE PAGE KINDS
- *   ReportCover    the letterhead header (colour logo top left, gold tagline
- *                  top right, green swoosh over a navy rule), the tool's cover
- *                  content, and the report footer.
+ *   ReportCover    the letterhead header (navy bar at the top edge, green
+ *                  swoosh hanging on the right, logo below the bar on the
+ *                  left; no tagline, which is in the footer only), the tool's
+ *                  cover content, and the report footer.
  *   ReportPage     every inner page: a thin navy rule with a small green accent
  *                  at the top, content starting high, and the report footer.
  *   ClosingPage    the letterhead header, the closing content, the legal line
@@ -33,7 +34,7 @@ import type { Table } from '../valuation/format';
 import { PORTRAIT_RATIO } from '../../public/portrait';
 import { PARTNER_RECORD_NOTE, type PartnerCard } from '../brand/partner';
 import { QrCode } from './QrCode';
-import { LETTERHEAD, LEGAL_LINE, LH_SCALE, LOGO_RATIO, NO_LIGATURES, PAGE, RC, TYPE, s, type ReportDetails, type ResolvedBrand } from './theme';
+import { LETTERHEAD, LEGAL_LINE, LH_SCALE, NO_LIGATURES, PAGE, RC, TYPE, imageFormat, imageRatio, s, type ReportDetails, type ResolvedBrand } from './theme';
 
 const serif = { fontFamily: 'SourceSerif', fontFeatureSettings: NO_LIGATURES, fontWeight: 600 } as const;
 
@@ -44,9 +45,11 @@ const serif = { fontFamily: 'SourceSerif', fontFeatureSettings: NO_LIGATURES, fo
 /** The logo at a given height: colour on white, white on dark, a wordmark when no file is available. */
 export function BrandLogo({ brand, height, onDark = false }: { brand: ResolvedBrand; height: number; onDark?: boolean }) {
   const file = onDark ? brand.logoOnDark : brand.logo;
-  if (file) {
+  const format = imageFormat(file);
+  if (file && format) {
+    // The file as Header Settings stores it, drawn at its own proportions.
     // eslint-disable-next-line jsx-a11y/alt-text
-    return <Image src={{ data: file, format: 'png' }} style={{ height, width: height * LOGO_RATIO }} />;
+    return <Image src={{ data: file, format }} style={{ height, width: height * imageRatio(file) }} />;
   }
   return (
     <View style={{ height, justifyContent: 'center' }}>
@@ -67,51 +70,79 @@ export function AccentRule({ width = PAGE.contentWidth }: { width?: number }) {
 
 const pt = (u: number) => u * LH_SCALE;
 
-function swooshPoints(edge: number, baseline: number, direction: 1 | -1): string {
-  // direction 1: the header, rising from the bottom point up and to the right.
-  // direction -1: the footer, the same curve turned half a circle.
-  return LETTERHEAD.curve.map(([dx, dy]) => `L${edge + direction * dx} ${baseline + direction * dy}`).join(' ');
+/** One swoosh shape, starting at x on the top edge, in letterhead points. */
+function swooshPath(x: number): string {
+  const L = LETTERHEAD;
+  const pts = L.edge.map(([dx, dy]) => `${x + dx} ${dy}`);
+  return `M${pts.join(' L')} L${L.width + 8} ${L.swooshBottom} L${L.width + 8} 0 Z`;
 }
 
-/** The letterhead header: colour logo top left, gold tagline top right, green swoosh over the navy rule. */
+/**
+ * The swoosh group and the navy bar, in letterhead points, drawn at `scale`
+ * (1 for the cover and closing page). The same shapes at every size, scaled in
+ * both directions, never stretched, and anchored to the page's right edge.
+ */
+function Swoosh({ scale, barHeight, id }: { scale: number; barHeight: number; id: string }) {
+  const L = LETTERHEAD;
+  const left = L.shapeStarts[0] - 4;
+  const w = L.width - left;
+  const h = L.swooshBottom;
+  const [a, b, solid] = L.shapeStarts;
+  return (
+    <Svg
+      fixed
+      width={w * LH_SCALE * scale}
+      height={h * LH_SCALE * scale}
+      viewBox={`${left} 0 ${w} ${h}`}
+      style={{ position: 'absolute', top: 0, right: 0 }}
+    >
+      <Defs>
+        <LinearGradient id={`${id}A`} x1="0" y1="0" x2="0.35" y2="1">
+          <Stop offset="0" stopColor={L.shadeLight} />
+          <Stop offset="1" stopColor={L.shadeDark} />
+        </LinearGradient>
+        <LinearGradient id={`${id}B`} x1="0" y1="0" x2="0.4" y2="1">
+          <Stop offset="0" stopColor={L.shadeLight} />
+          <Stop offset="1" stopColor={L.shadeDark} />
+        </LinearGradient>
+      </Defs>
+      <Path d={swooshPath(a)} fill={`url(#${id}A)`} />
+      <Path d={swooshPath(b)} fill={`url(#${id}B)`} />
+      <Path d={swooshPath(solid)} fill={RC.green} />
+      <Rect x={left} y={0} width={w} height={barHeight / scale} fill={RC.navy} />
+    </Svg>
+  );
+}
+
+/**
+ * The letterhead header for the cover and the closing page: the navy bar at the
+ * very top edge, the green swoosh hanging from it on the right, and the logo on
+ * the left below the bar. No tagline in the header: it appears in the footer only.
+ */
 export function LetterheadHeader({ brand }: { brand: ResolvedBrand }) {
   const L = LETTERHEAD;
-  const top = L.bandTop - 0.16;
-  const [a, b, solid] = L.headerShapes;
-  const shape = (x0: number) => `M${x0} ${L.bandBottom} ${swooshPoints(x0, L.bandBottom, 1)} L${L.width} ${top} L${L.width} ${L.bandBottom} Z`;
+  const logoHeight = pt(L.logo.bottom - L.logo.top);
   return (
-    <View fixed style={{ position: 'absolute', top: 0, left: 0, width: PAGE.width, height: pt(L.bandBottom) }}>
-      <View style={{ position: 'absolute', left: pt(L.logo.x), top: pt(L.logo.y) }}>
-        <BrandLogo brand={brand} height={pt(L.logo.height)} />
+    <View fixed style={{ position: 'absolute', top: 0, left: 0, width: PAGE.width, height: pt(L.logo.bottom) + 6 }}>
+      <View style={{ position: 'absolute', top: 0, left: 0, width: PAGE.width, height: pt(L.barHeight), backgroundColor: RC.navy }} />
+      <Swoosh scale={1} barHeight={L.barHeight} id="lhHead" />
+      <View style={{ position: 'absolute', left: pt(L.logo.x), top: pt(L.logo.top) }}>
+        <BrandLogo brand={brand} height={logoHeight} />
       </View>
-      <Text
-        style={{
-          position: 'absolute',
-          right: pt(L.width - L.tagline.right),
-          top: pt(L.tagline.baseline) - pt(L.tagline.size) * 0.95,
-          fontSize: pt(L.tagline.size),
-          fontWeight: 600,
-          color: RC.gold,
-        }}
-      >
-        {brand.tagline}
-      </Text>
-      <Svg width={PAGE.width} height={pt(L.bandBottom - top)} viewBox={`0 ${top} ${L.width} ${L.bandBottom - top}`} style={{ position: 'absolute', left: 0, top: pt(top) }}>
-        <Defs>
-          <LinearGradient id="lhShadeA" x1="0" y1="0" x2="0.3" y2="0">
-            <Stop offset="0" stopColor={RC.green} />
-            <Stop offset="1" stopColor={L.shade} />
-          </LinearGradient>
-          <LinearGradient id="lhShadeB" x1="0" y1="0" x2="0.35" y2="0">
-            <Stop offset="0" stopColor={RC.green} />
-            <Stop offset="1" stopColor={L.shade} />
-          </LinearGradient>
-        </Defs>
-        <Path d={shape(a)} fill="url(#lhShadeA)" />
-        <Path d={shape(b)} fill="url(#lhShadeB)" />
-        <Path d={shape(solid)} fill={RC.green} />
-        <Rect x={0} y={L.ruleTop} width={L.width} height={L.bandBottom - L.ruleTop} fill={RC.navy} />
-      </Svg>
+    </View>
+  );
+}
+
+/** Scale of the small swoosh on inner pages. */
+const INNER_SWOOSH_SCALE = 0.42;
+
+/** Inner pages: a thin navy bar at the top edge and a small green swoosh. No logo or tagline. */
+export function InnerHeader() {
+  const barHeight = 3.2;
+  return (
+    <View fixed style={{ position: 'absolute', top: 0, left: 0, width: PAGE.width, height: pt(LETTERHEAD.swooshBottom) * INNER_SWOOSH_SCALE }}>
+      <View style={{ position: 'absolute', top: 0, left: 0, width: PAGE.width, height: barHeight, backgroundColor: RC.navy }} />
+      <Swoosh scale={INNER_SWOOSH_SCALE} barHeight={barHeight / LH_SCALE} id="lhInner" />
     </View>
   );
 }
@@ -164,9 +195,7 @@ export function ReportFooter({ brand, details }: { brand: ResolvedBrand; details
 export function ReportPage({ title, brand, details, children }: { title?: string; brand: ResolvedBrand; details: ReportDetails; children: ReactNode }) {
   return (
     <Page size="A4" style={s.page}>
-      <View fixed style={{ position: 'absolute', top: PAGE.ruleTop, left: PAGE.marginX }}>
-        <AccentRule />
-      </View>
+      <InnerHeader />
       {title ? <PageTitle>{title}</PageTitle> : null}
       {children}
       <ReportFooter brand={brand} details={details} />
@@ -175,7 +204,7 @@ export function ReportPage({ title, brand, details, children }: { title?: string
 }
 
 /** Where cover content starts: under the letterhead header, with room to breathe. */
-export const COVER_CONTENT_TOP = Math.round(pt(LETTERHEAD.bandBottom)) + 44;
+export const COVER_CONTENT_TOP = Math.round(pt(LETTERHEAD.logo.bottom)) + 60;
 
 /** The cover: the letterhead header over a clean white page, and the report footer. */
 export function ReportCover({ brand, details, children }: { brand: ResolvedBrand; details: ReportDetails; children: ReactNode }) {
@@ -218,7 +247,7 @@ export function LegalAndContact({ brand }: { brand: ResolvedBrand }) {
  */
 export function ClosingPage({ title, brand, details, children }: { title: string; brand: ResolvedBrand; details: ReportDetails; children: ReactNode }) {
   return (
-    <Page size="A4" style={{ ...s.page, paddingTop: Math.round(pt(LETTERHEAD.bandBottom)) + 30 }}>
+    <Page size="A4" style={{ ...s.page, paddingTop: Math.round(pt(LETTERHEAD.logo.bottom)) + 32 }}>
       <LetterheadHeader brand={brand} />
       <PageTitle>{title}</PageTitle>
       {children}

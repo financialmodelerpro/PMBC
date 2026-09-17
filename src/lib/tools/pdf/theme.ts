@@ -33,7 +33,7 @@ import path from 'node:path';
 
 import { Font, StyleSheet } from '@react-pdf/renderer';
 
-import { BRAND, DEFAULT_BRAND_NAME, DEFAULT_TAGLINE, LEGAL_LINE, NEUTRALS } from '../../brand/letterhead';
+import { BRAND, DEFAULT_BRAND_NAME, DEFAULT_TAGLINE, LEGAL_LINE, NEUTRALS, SITE_ADDRESS } from '../../brand/letterhead';
 import type { PartnerCard } from '../brand/partner';
 import type { ChartPalette } from '../valuation/charts';
 
@@ -152,43 +152,83 @@ export const TYPE = {
 } as const;
 
 /**
- * The letterhead's header and footer bands, measured from the vector paths in
- * `reference/brand/PMBC_Letterhead.pdf`. The letterhead is drawn in an 816 by
- * 1056 unit space (US Letter at 0.75 points a unit); these are its numbers, and
- * `LH_SCALE` maps them onto an A4 page width. Used by the cover and the closing
- * page only. Inner pages never carry the letterhead.
+ * The letterhead header, measured from the vector paths and a 3x render of
+ * `reference/brand/PMBC Letterhead 09172026.pdf` (US Letter, 612 by 792 points).
+ * Distances here are in the letterhead's points, from the top of the page;
+ * `LH_SCALE` maps them onto A4 width, applied to both directions so nothing is
+ * stretched.
+ *
+ *   navy bar     full width at the very top edge
+ *   swoosh       three copies of one shape hanging from the bar on the right:
+ *                two shaded, then solid green, each shifted right
+ *   logo         top left, below the bar (its visible ink box)
+ * The letterhead file also prints the tagline below the swoosh; reports do not.
+ * The tagline appears in the report footer only.
  */
 export const LETTERHEAD = {
-  width: 816,
-  height: 1056,
-  /** Header: the green band's top, the navy rule's top and bottom. */
-  bandTop: 81.76,
-  ruleTop: 118.88,
-  bandBottom: 127.52,
-  /** Leading edge of each header shape at the band's bottom: two shaded swooshes, then solid green. */
-  headerShapes: [399.52, 476, 558.72],
-  /** The curve each swoosh rises along, from its bottom point to the band's top, as offsets. */
-  curve: [
-    [0, 0], [35.2, -31.2], [38.56, -33.92], [41.92, -36.32], [45.44, -38.4], [49.12, -40.32], [52.96, -41.92],
-    [56.96, -43.2], [60.8, -44.32], [64.96, -44.96], [69.28, -45.44], [73.44, -45.6],
+  width: 612,
+  barHeight: 7.07,
+  swooshBottom: 37.2,
+  /** Where each shape's diagonal edge meets the top of the page. */
+  shapeStarts: [304.85, 362.71, 425.25],
+  /**
+   * One shape's outline from its top left corner, as offsets: down the diagonal
+   * edge to the curve, around the curve to the bottom edge. The shape then runs
+   * right, past the page edge, and back to the top.
+   */
+  edge: [
+    [0, 0], [26.67, 25.4], [29.11, 27.57], [31.71, 29.53], [34.36, 31.27], [37.17, 32.79], [40.08, 34.15],
+    [43.04, 35.19], [46.11, 36.06], [49.23, 36.66], [52.4, 37.04], [55.62, 37.2],
   ] as [number, number][],
-  /** The logo's ink box and the tagline's right edge and baseline. */
-  logo: { x: 43.5, y: 38, height: 54.5 },
-  tagline: { right: 777, baseline: 69.8, size: 15 },
-  /** The shaded swooshes run from the brand green to this darker green, sampled from a 3x render. */
-  shade: '#24702E',
+  /** Each shaded shape runs from the brand green at its edge to this darker green, sampled from the render. */
+  shadeLight: '#2E8A3A',
+  shadeDark: '#23682B',
+  logo: { x: 33, top: 19.3, bottom: 60 },
 } as const;
 
 export const LH_SCALE = PAGE_WIDTH / LETTERHEAD.width;
 
-/** Logo files are trimmed and about 5.2 to 1. Height is set, width follows. */
-export const LOGO_RATIO = 6113 / 1176;
+/**
+ * Width over height of a PNG or JPEG, read from the file itself, so a logo is
+ * always drawn at its own proportions. Falls back to the Header Settings
+ * logo's proportions when the file cannot be read.
+ */
+export function imageRatio(file: Buffer | null | undefined): number {
+  const fallback = 6123 / 1175;
+  if (!file || file.length < 24) return fallback;
+  if (file[0] === 0x89 && file.toString('latin1', 1, 4) === 'PNG') {
+    const w = file.readUInt32BE(16), h = file.readUInt32BE(20);
+    return w > 0 && h > 0 ? w / h : fallback;
+  }
+  if (file[0] === 0xff && file[1] === 0xd8) {
+    let i = 2;
+    while (i + 9 < file.length) {
+      if (file[i] !== 0xff) return fallback;
+      const marker = file[i + 1];
+      const len = file.readUInt16BE(i + 2);
+      if (marker >= 0xc0 && marker <= 0xc3) {
+        const h = file.readUInt16BE(i + 5), w = file.readUInt16BE(i + 7);
+        return w > 0 && h > 0 ? w / h : fallback;
+      }
+      i += 2 + len;
+    }
+  }
+  return fallback;
+}
+
+/** The image format react-pdf needs, or null when the file is neither PNG nor JPEG. */
+export function imageFormat(file: Buffer | null | undefined): 'png' | 'jpg' | null {
+  if (!file || file.length < 4) return null;
+  if (file[0] === 0x89 && file.toString('latin1', 1, 4) === 'PNG') return 'png';
+  if (file[0] === 0xff && file[1] === 0xd8) return 'jpg';
+  return null;
+}
 
 /** Everything a report draws from the CMS and site settings. Every piece is optional. */
 export type ReportBranding = {
-  /** The colour logo from Header Settings, trimmed and resized, never recoloured. PNG. For white pages. */
+  /** The colour logo file from Header Settings, exactly as stored: not resized, traced or recoloured. For white pages. */
   logo: Buffer | null;
-  /** The white logo from Header Settings, for any dark background, so the logo is always visible. PNG. */
+  /** The white logo file from Header Settings, exactly as stored, for any dark background. */
   logoOnDark?: Buffer | null;
   partner: PartnerCard | null;
   /** The partner portrait, resized to 360 by 450. JPEG. */
@@ -212,9 +252,9 @@ export type ReportDetails = {
 };
 
 /**
- * The Header Settings logos, as bundled copies: `brand/logo.png` (the colour
- * logo, trimmed, 900 wide, flattened on white) and `brand/logo-white.png` (the
- * white logo, trimmed, 900 wide). A report draws the live files from Header
+ * The Header Settings logos, as bundled byte-for-byte copies of the stored
+ * files: `brand/logo.png` (the colour logo) and `brand/logo-white.png` (the
+ * white logo), not resized or altered. A report draws the live files from Header
  * Settings when `fetchReportBranding` supplies them, and these otherwise, so a
  * failed fetch or a render without branding still shows the logo rather than
  * the brand name in type. Refresh them when Header Settings changes the logo.
@@ -232,8 +272,7 @@ export function bundledLogo(kind: 'logo' | 'logoOnDark'): Buffer | null {
   return bundledLogos[kind] ?? null;
 }
 
-export function withBrandDefaults(b: ReportBranding | null | undefined, siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.pacemakersglobal.com') {
-  const website = (b?.contact?.website || siteUrl).replace(/^https?:\/\//, '').replace(/\/$/, '');
+export function withBrandDefaults(b: ReportBranding | null | undefined) {
   return {
     logo: b?.logo ?? bundledLogo('logo'),
     logoOnDark: b?.logoOnDark ?? bundledLogo('logoOnDark'),
@@ -244,7 +283,8 @@ export function withBrandDefaults(b: ReportBranding | null | undefined, siteUrl 
     contact: {
       email: b?.contact?.email ?? null,
       advisoryEmail: b?.contact?.advisoryEmail ?? null,
-      website: website.startsWith('www.') ? website : `www.${website}`,
+      // Always the live address: a local or preview render must not print its own host.
+      website: SITE_ADDRESS,
       location: b?.contact?.location ?? null,
     },
   };

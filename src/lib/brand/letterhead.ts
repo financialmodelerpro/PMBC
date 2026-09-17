@@ -46,5 +46,9 @@ export const NEUTRALS = {
 export const LEGAL_LINE =
   'PaceMakers Business Consultants LLP, a Limited Liability Partnership registered with the SECP under section 7 of the Limited Liability Partnership Act, 2017.';
 
+/** The live website address, as reports and report emails print it. Never taken from the environment, so a local render cannot print localhost. */
+export const SITE_ADDRESS = 'www.pacemakersglobal.com';
+export const SITE_HREF = 'https://www.pacemakersglobal.com';
+
 export const DEFAULT_BRAND_NAME = 'PaceMakers Business Consultants';
 export const DEFAULT_TAGLINE = 'Advisory from Structure to Exit';
