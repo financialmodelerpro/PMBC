@@ -113,7 +113,11 @@ export type ReportMeta = {
   dataVersion: string;
   /** Tracked booking link, which lands on the site's /book page. Also encoded in the QR code. */
   bookingHref: string;
-  /** Logos and the partner card. Optional: every piece has a fallback. */
+  /**
+   * Logos, the partner card and contact details. Left out, the report fetches
+   * them itself (`fetchReportBranding`), so a render never silently drops the
+   * founder block or the logo. `null` means render without any.
+   */
   branding?: ReportBranding | null;
   /** The visitor's own description of the business, already cleaned. Shown on the cover. */
   description?: string | null;
@@ -211,7 +215,7 @@ export function ValuationReport({ result, meta }: { result: ValuationResult; met
         </View>
         <View>
           <Text style={{ fontSize: 7.5, color: RC.muted, lineHeight: 1.5 }}>
-            Prepared for {meta.preparedFor}. {dataVersionLabel(meta.dataVersion)}. {TOOL_DISCLAIMER}
+            Prepared for {meta.preparedFor}. {dataVersionLabel(r.meta.dataVersion || meta.dataVersion)}. {TOOL_DISCLAIMER}
           </Text>
           <Text style={{ fontSize: 7, color: RC.navy, fontWeight: 600, marginTop: 5, letterSpacing: 0.4 }}>Powered by {PRODUCT_NAME}</Text>
         </View>
@@ -362,7 +366,7 @@ export function ValuationReport({ result, meta }: { result: ValuationResult; met
           </View>
           <View style={{ width: '50%', paddingLeft: 10 }}>
             <SubHead>Terminal value</SubHead>
-            <KeyValues rows={terminalRows(r)} labelWidth="66%" />
+            <KeyValues rows={terminalRows(r)} labelWidth="72%" />
             <SubHead>Comparables</SubHead>
             <KeyValues rows={comparablesRows(r).filter(([k]) => !k.startsWith('Companies'))} labelWidth="52%" />
           </View>
@@ -376,6 +380,9 @@ export function ValuationReport({ result, meta }: { result: ValuationResult; met
         {/* Row by row, so it can break across the page rather than moving whole. */}
         <View style={{ marginBottom: 10 }}>
           <PairedColumns
+            // Wide label columns: a wrapped label costs a line on the tightest page.
+            leftLabelWidth="55%"
+            rightLabelWidth="64%"
             left={{ title: r.tax.zakatApplies ? 'Tax and zakat' : 'Tax', rows: taxRows(r), note: notes.premiumAndDiscount }}
             right={{
               title: 'Balance sheet, EBITDA and timing',
@@ -467,7 +474,8 @@ export async function renderValuationReport(result: ValuationResult, meta: Repor
   if (!isCanonicalResult(result)) throw new Error('This result predates the current report. Build it with resultForReport.');
   assertReconciled(result);
   registerFonts();
-  return renderToBuffer(<ValuationReport result={result} meta={meta} />);
+  const branding = meta.branding !== undefined ? meta.branding : await import('../brand/fetch').then((m) => m.fetchReportBranding()).catch(() => null);
+  return renderToBuffer(<ValuationReport result={result} meta={{ ...meta, branding }} />);
 }
 
 /** A tidy attachment name: "PaceMakers valuation Acme 2026-09-16.pdf" without awkward characters. */

@@ -35,8 +35,8 @@ const SANS = "-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif";
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://pacemakersglobal.com';
 
 /**
- * The email header logo in `public/`, and the size it is drawn at (the file is
- * twice this). Always the `www` host: the apex answers with a redirect, and some
+ * The email header logo in `public/` (the Header Settings white logo file, byte
+ * for byte) and the size it is drawn at. Always the `www` host: the apex answers with a redirect, and some
  * email image proxies do not follow one.
  */
 export const EMAIL_LOGO = {
@@ -46,12 +46,12 @@ export const EMAIL_LOGO = {
 } as const;
 
 /**
- * The colour logo for the report variant's white header, made from the Header
- * Settings logo (trimmed, 229 by 44, flattened on white), drawn at half size.
+ * The colour logo for the report variant's white header: the Header Settings
+ * colour logo file byte for byte (6123x1175), drawn at 115x22 at its own proportions.
  */
 export const EMAIL_LOGO_COLOUR = {
   src: 'https://www.pacemakersglobal.com/email/pacemakers-logo.png',
-  width: 114,
+  width: 115,
   height: 22,
 } as const;
 
@@ -130,20 +130,16 @@ export async function baseLayoutBranded(content: string, options: { variant?: Em
   );
 
   /*
-   * The logo is a PNG made for email, hosted on the site: 229x44, 12 KB,
-   * flattened onto the header navy, drawn at 114x22 so it is sharp on high
-   * density screens.
+   * The logo is the white logo file from Header Settings, byte for byte
+   * (6113x1176), hosted on the site and drawn at 114x22. A reduced copy made
+   * for email looked blurry on high density screens, so since 2026-09-17 the
+   * original artwork is used and the client scales it down.
    *
-   * It replaced `branding_config.logo_dark_url` on 2026-09-16. That file is
-   * 6113x1176 and 255 KB, and the tag carried only `height="22"`: Outlook
-   * desktop ignores `max-height`, and with no `width` attribute it drew the
-   * image at its native size or not at all, which read as a broken logo. Every
-   * client honours explicit width and height attributes, so both are set, and
-   * the alt text stands in when images are blocked, which Outlook does by
-   * default.
-   *
-   * Flattened rather than transparent so the white mark keeps its navy ground
-   * when a dark mode client repaints the header band.
+   * The tag carries explicit width and height attributes: Outlook desktop
+   * ignores `max-height`, and without `width` it drew the file at its native
+   * size or not at all, which is what went wrong with this file on 2026-09-16.
+   * Every client honours the attributes, and the alt text stands in when images
+   * are blocked, which Outlook does by default.
    *
    * `email_branding.logo_url` still wins when an operator sets one. Its size is
    * unknown here, so only the height is fixed: upload an email-sized file.

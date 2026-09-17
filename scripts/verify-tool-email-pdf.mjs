@@ -462,8 +462,9 @@ console.log('Email shell and parts');
   const png = fs.existsSync(file) ? fs.readFileSync(file) : Buffer.alloc(0);
   const pw = png.length > 24 ? png.readUInt32BE(16) : 0, ph = png.length > 24 ? png.readUInt32BE(20) : 0;
   check('logo file is in public/ and is a PNG', png.subarray(1, 4).toString() === 'PNG', file);
-  // Drawn at half the file's pixels for sharp high-density screens, within a pixel of rounding.
-  check('logo file is twice the drawn size', Math.abs(pw / 2 - base.EMAIL_LOGO.width) <= 1 && Math.abs(ph / 2 - base.EMAIL_LOGO.height) <= 1, `${pw}x${ph}`);
+  // The original Header Settings white logo, byte for byte, drawn at its own proportions.
+  check('logo file is the Header Settings white logo, byte for byte', png.equals(fs.readFileSync(path.join(root, 'src/lib/tools/pdf/brand/logo-white.png'))) && pw > 2000, `${pw}x${ph}`);
+  check('logo drawn at the file\'s own proportions', Math.abs(base.EMAIL_LOGO.width - (base.EMAIL_LOGO.height * pw) / ph) <= 1, `${base.EMAIL_LOGO.width}x${base.EMAIL_LOGO.height} for ${pw}x${ph}`);
 
   // The report variant, used by the tool results email and lead alert.
   const rep = await base.baseLayoutBranded('<p>Body</p>', { variant: 'report' });
@@ -473,7 +474,8 @@ console.log('Email shell and parts');
     const cfile = path.join(root, 'public', new URL(base.EMAIL_LOGO_COLOUR.src).pathname);
     const cpng = fs.existsSync(cfile) ? fs.readFileSync(cfile) : Buffer.alloc(0);
     const cw = cpng.length > 24 ? cpng.readUInt32BE(16) : 0, chh = cpng.length > 24 ? cpng.readUInt32BE(20) : 0;
-    check('report email: colour logo file is a PNG at twice the drawn size', cpng.subarray(1, 4).toString() === 'PNG' && Math.abs(cw / 2 - base.EMAIL_LOGO_COLOUR.width) <= 1 && Math.abs(chh / 2 - base.EMAIL_LOGO_COLOUR.height) <= 1, `${cw}x${chh}`);
+    check('report email: colour logo file is the Header Settings colour logo, byte for byte', cpng.equals(fs.readFileSync(path.join(root, 'src/lib/tools/pdf/brand/logo.png'))) && cw > 2000, `${cw}x${chh}`);
+    check('report email: colour logo drawn at the file\'s own proportions', Math.abs(base.EMAIL_LOGO_COLOUR.width - (base.EMAIL_LOGO_COLOUR.height * cw) / chh) <= 1, `${base.EMAIL_LOGO_COLOUR.width}x${base.EMAIL_LOGO_COLOUR.height} for ${cw}x${chh}`);
   }
   check('report email: navy and green accent strip, gold tagline', rep.includes(`bgcolor="${letterhead.BRAND.green}"`) && rep.includes(`bgcolor="${letterhead.BRAND.navy}"`) && new RegExp(`color:${letterhead.BRAND.gold};">Advisory from Structure to Exit`).test(rep));
   check('report email: legal line and contact details in the footer', rep.includes(templates.escapeHtml(letterhead.LEGAL_LINE)) && rep.includes('www.pacemakersglobal.com'));
@@ -629,7 +631,7 @@ console.log('Report branding and partner');
     check('a logo on a dark background uses the white file', darkRaw.includes('/Width 624') && !darkRaw.includes('/Width 520'));
     const darkNoFile = await (await import('@react-pdf/renderer')).renderToBuffer(h(Document, null, h(Page, { size: 'A4' }, h(View, { style: { backgroundColor: theme.RC.navy, padding: 20 } }, h(components.BrandLogo, { brand: theme.withBrandDefaults({ ...branding, logoOnDark: null }), height: 20, onDark: true })))));
     const darkNoFileRaw = darkNoFile.toString('latin1');
-    check('without a live white file, a dark background gets the bundled white logo, never the colour logo', /\/Width 900/.test(darkNoFileRaw) && !darkNoFileRaw.includes('/Width 520') && (await pageTexts(darkNoFile))[0].trim() === '');
+    check('without a live white file, a dark background gets the bundled white logo, never the colour logo', /\/Width 6113/.test(darkNoFileRaw) && !darkNoFileRaw.includes('/Width 520') && (await pageTexts(darkNoFile))[0].trim() === '');
   }
   const last = t[7];
   check('branded: closing page names the partner and role', last.includes('Test Partner') && last.includes('Founding Partner, Corporate Finance Specialist'));
@@ -646,7 +648,29 @@ console.log('Report branding and partner');
     check('no branding: the brand name is never set in type in place of the logo', !tb[0].startsWith('PaceMakers Business Consultants'));
     const sharpMeta = async (f) => (await import('sharp')).default(fs.readFileSync(path.join(root, 'src/lib/tools/pdf/brand', f))).metadata();
     const [colourMeta, whiteMeta] = await Promise.all([sharpMeta('logo.png'), sharpMeta('logo-white.png')]);
-    check('bundled logos: colour flattened on white, white kept transparent, both 900 wide', colourMeta.width === 900 && !colourMeta.hasAlpha && whiteMeta.width === 900 && whiteMeta.hasAlpha);
+    check('bundled logos are the full size Header Settings artwork, not reduced copies', colourMeta.width === 6123 && colourMeta.height === 1175 && whiteMeta.width === 6113 && whiteMeta.height === 1176, `${colourMeta.width}x${colourMeta.height}, ${whiteMeta.width}x${whiteMeta.height}`);
+    check('the report embeds the logo at its original pixel size', /\/Width 6123[\s\S]{0,80}\/Height 1175|\/Height 1175[\s\S]{0,80}\/Width 6123/.test(bare.toString('latin1')));
+    {
+      const src = fs.readFileSync(path.join(root, 'src/lib/tools/brand/fetch.ts'), 'utf8');
+      check('logos are fetched as stored: no resize, trim, flatten or recolour', src.includes("value = kind === 'portrait' ? await portrait(input) : imageFormat(input) ? input : null;") && !/trim\(\)|flatten\(/.test(src.slice(src.indexOf('async function processedImage'))));
+    }
+    const cover = await pageColours(bare);
+    check('logo drawn once in the cover and closing page headers, plus the footer logo', cover[0].images === 2 && cover[7].images >= 2, `${cover[0].images}, ${cover[7].images}`);
+    {
+      // Header layout, read from the text positions pdf.js reports (y from the top of the page).
+      const doc = await pdfjs.getDocument({ data: new Uint8Array(bare), verbosity: 0 }).promise;
+      for (const n of [1, 8]) {
+        const items = (await (await doc.getPage(n)).getTextContent()).items;
+        check(`page ${n}: letterhead header has the logo and no tagline; the tagline is in the footer only`, items.every((it) => !(it.str.includes('Advisory from Structure') && 842 - it.transform[5] < 150)) && items.some((it) => it.str.includes('Advisory from Structure') && 842 - it.transform[5] > 780) && cover[n - 1].images >= 2, String(cover[n - 1].images));
+      }
+      for (let n = 2; n <= 7; n++) {
+        const items = (await (await doc.getPage(n)).getTextContent()).items;
+        check(`page ${n}: inner header has no logo or tagline, only the footer does`, items.every((it) => !(it.str.includes('Advisory from Structure') && 842 - it.transform[5] < 100)) && cover[n - 1].images === 1, String(cover[n - 1].images));
+      }
+    }
+    const coverText = tb[0].replace(/\s+/g, ' ');
+    check('the cover names the same market data label as the data behind the figures', coverText.includes(data.dataVersionLabel(full.meta.dataVersion)));
+    check('the closing page shows the live website address, never a local host', tb[7].includes('www.pacemakersglobal.com') && !/localhost|vercel\.app|127\.0\.0\.1/.test(tb.join(' ')));
     const nextConfig = fs.readFileSync(path.join(root, 'next.config.ts'), 'utf8');
     check('bundled logos are traced into every PDF route', (nextConfig.match(/'\.\/src\/lib\/tools\/pdf\/brand\/\*\*'/g) ?? []).length === (nextConfig.match(/'\.\/src\/lib\/tools\/pdf\/fonts\/\*\*'/g) ?? []).length);
   }

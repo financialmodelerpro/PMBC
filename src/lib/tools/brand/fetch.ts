@@ -21,8 +21,9 @@ import { PORTRAIT_RATIO, portraitCrop } from '@/lib/public/portrait';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 
 import { fetchSiteSettings } from '@/lib/cms/settings';
+import { SITE_ADDRESS } from '@/lib/brand/letterhead';
 
-import type { ReportBranding } from '../pdf/theme';
+import { imageFormat, type ReportBranding } from '../pdf/theme';
 import { partnerFromHero, type PartnerCard } from './partner';
 
 const TTL_MS = 10 * 60 * 1000;
@@ -85,12 +86,10 @@ async function processedImage(src: string | null, kind: 'logo' | 'logo-dark' | '
     const res = await fetch(src, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
     if (res.ok) {
       const input = Buffer.from(await res.arrayBuffer());
-      // The colour logo is flattened on white, the page it is drawn on, so every PDF viewer shows it the same way.
-      const logo = async (flatten: boolean) => {
-        const img = sharp(input).trim().resize({ width: 900, withoutEnlargement: true });
-        return (flatten ? img.flatten({ background: '#FFFFFF' }) : img).png({ compressionLevel: 9 }).toBuffer();
-      };
-      value = kind === 'logo' ? await logo(true) : kind === 'logo-dark' ? await logo(false) : await portrait(input);
+      // Logos are used exactly as Header Settings stores them: not resized, traced,
+      // flattened or recoloured, so the report draws the original artwork sharply.
+      // Only PNG and JPEG can be drawn in a PDF; anything else falls back to the bundled copy.
+      value = kind === 'portrait' ? await portrait(input) : imageFormat(input) ? input : null;
     }
   } catch (err) {
     console.error(`[tool-brand] ${kind} image unavailable:`, err instanceof Error ? err.message : err);
@@ -117,7 +116,6 @@ export async function fetchReportBranding(): Promise<ReportBranding> {
     processedImage(branding?.logo_dark_url || null, 'logo-dark'),
     processedImage(partner?.photoUrl ?? null, 'portrait'),
   ]);
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.pacemakersglobal.com';
   return {
     logo,
     logoOnDark,
@@ -128,7 +126,7 @@ export async function fetchReportBranding(): Promise<ReportBranding> {
     contact: {
       email: settings.contact_email || null,
       advisoryEmail: settings.contact_email_advisory || null,
-      website: siteUrl,
+      website: SITE_ADDRESS,
       location: settings.office_location_text || null,
     },
   };
