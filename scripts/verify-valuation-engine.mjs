@@ -37,6 +37,9 @@
 //      independent arithmetic. Tables are compared by value, since version 3
 //      relabelled them (base case, 2dp WACC) and added rows the reference
 //      never had.
+//   7. The reference file is never edited for a data refresh: the current
+//      Treasury yield, default spread and implied ERP (with their dates, from
+//      `marketDataInUse`) are written into its CONFIG before each case.
 //
 // CASES
 //   A. The reference's own example: Healthcare Support Services, Saudi Arabia,
@@ -66,6 +69,16 @@ const jiti = createJiti(import.meta.url, { alias: { '@': path.join(root, 'src') 
 const engine = await jiti.import(path.join(root, 'src/lib/tools/valuation/engine.ts'));
 const format = await jiti.import(path.join(root, 'src/lib/tools/valuation/format.ts'));
 const state = await jiti.import(path.join(root, 'src/components/tools/valuation/state.ts'));
+const data = await jiti.import(path.join(root, 'src/lib/tools/valuation/data.ts'));
+
+/**
+ * The reference HTML is kept exactly as it was ported (January 2026 ERP of
+ * 4.23%). The market data the engine now uses is passed into the reference's
+ * CONFIG before each case instead, so both sides value on the same inputs and
+ * the reference file never has to be edited on a data refresh.
+ */
+const MARKET_INPUTS = data.marketDataInUse();
+const REFERENCE_MARKET = { US_TBOND: MARKET_INPUTS.treasury.value, US_DEFAULT_SPREAD: data.MARKET.usDefaultSpread, MATURE_ERP: MARKET_INPUTS.erp.value };
 
 let failures = 0;
 let checks = 0;
@@ -429,6 +442,9 @@ async function runCase(page, c) {
   console.log(`\n${c.name}`);
   await page.send('Page.navigate', { url: pathToFileURL(REFERENCE).href });
   await waitFor(() => page.evaluate('document.readyState === "complete" && typeof calc !== "undefined"'));
+  // Current market data into the reference, before anything reads CONFIG.
+  const given = await page.evaluate(`(() => { Object.assign(CONFIG, ${JSON.stringify(REFERENCE_MARKET)}); return { t: CONFIG.US_TBOND, s: CONFIG.US_DEFAULT_SPREAD, e: CONFIG.MATURE_ERP }; })()`);
+  same('reference given the current market data', given, { t: REFERENCE_MARKET.US_TBOND, s: REFERENCE_MARKET.US_DEFAULT_SPREAD, e: REFERENCE_MARKET.MATURE_ERP });
   await page.evaluate(`(() => { ${c.ref} })()`);
 
   const refIn = await page.evaluate(READ_INPUTS);
@@ -559,6 +575,9 @@ async function runCase(page, c) {
 }
 
 async function main() {
+  console.log(`Market data given to the reference: US 10-year Treasury ${MARKET_INPUTS.treasury.value.toFixed(2)}% (${MARKET_INPUTS.treasury.asOf}), implied ERP ${MARKET_INPUTS.erp.value.toFixed(2)}% (${MARKET_INPUTS.erp.asOf}).`);
+  if (MARKET_INPUTS.treasury.asOf === data.MARKET.usTreasury10yAsOf) pass();
+  else fail('Treasury date not the one in data.ts');
   // Registry and visibility rules live in verify-tools-visibility.mjs. This
   // verifier is only about the engine agreeing with the reference.
 

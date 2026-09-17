@@ -98,7 +98,7 @@ export type ReportMeta = {
 export type ReportBranding = {
   /** The logo for the navy cover, already resized. PNG. */
   logoOnDark: Buffer | null;
-  /** The navy and gold logo for white pages (see `recolourGreenToGold`). PNG. */
+  /** The colour header logo from Header Settings, unaltered apart from trim and resize, for the white closing page. PNG. */
   logoOnLight: Buffer | null;
   partner: PartnerCard | null;
   /** The partner portrait, resized to 360 by 450. JPEG. */

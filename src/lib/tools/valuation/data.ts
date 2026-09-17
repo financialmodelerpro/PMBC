@@ -21,7 +21,8 @@
  *      in `usTreasury10yAsOf`.
  *   5. FX to SAR and the inflation expectations for non-pegged currencies.
  *   6. Update every `asOf` below, bump `VALUATION_DATA_VERSION`, run
- *      `npm run verify-valuation-engine`.
+ *      `npm run verify-valuation-engine`. The verifier passes these values into
+ *      the reference HTML itself; do not edit the reference file.
  * Leads store the version they were computed under, so older leads keep
  * showing the numbers their owner was actually given.
  */
@@ -37,7 +38,7 @@ export const VALUATION_DATA_VERSION = '2026-09-17';
  */
 export const DATA_VERSION_LABELS: Record<string, string> = {
   '2026-09-16': 'Damodaran January 2026, risk-free September 2026',
-  '2026-09-17': 'Damodaran January and September 2026, risk-free 15 September 2026',
+  '2026-09-17': 'Market data: Damodaran 2026, risk-free 15 September 2026',
 };
 
 export function dataVersionLabel(version: string): string {

@@ -190,7 +190,7 @@ async function ligatureGlyphs(buf) {
   return [...found];
 }
 const DATA_LABEL = data.dataVersionLabel('2026-09-17');
-check('market data label', DATA_LABEL === 'Damodaran January and September 2026, risk-free 15 September 2026', DATA_LABEL);
+check('market data label', DATA_LABEL === 'Market data: Damodaran 2026, risk-free 15 September 2026', DATA_LABEL);
 const pdfs = {};
 const texts = {};
 for (const [label, result] of [['Saudi', saudi], ['full', full], ['Pakistan', pakistan], ['distressed', distressed]]) {
@@ -473,18 +473,11 @@ console.log('Report branding and partner');
   check('partner: no name means no card', partnerModule.partnerFromHero({ intro: 'x' }) === null);
   check('partner: slug matches founderProfile.ts', founderProfileSrc.includes(`FOUNDER_PAGE_SLUG = '${partnerModule.PARTNER_PAGE_SLUG}'`));
 
-  // Navy and gold: green lettering becomes gold, navy and transparency stay.
+  // The closing page logo: the Header Settings colour logo, never recoloured.
   {
-    const brandFetch = await jiti.import(path.join(root, 'src/lib/tools/brand/fetch.ts'));
-    const sharpMod = (await import('sharp')).default;
-    const px = Buffer.from([0x3f, 0xa6, 0x63, 255, 0x1b, 0x3a, 0x5f, 255, 0xc6, 0x9c, 0x3e, 255, 0x3f, 0xa6, 0x63, 0]);
-    const png = await sharpMod(px, { raw: { width: 4, height: 1, channels: 4 } }).png().toBuffer();
-    const out = await sharpMod(await brandFetch.recolourGreenToGold(png)).raw().toBuffer();
-    check('navy and gold logo: brand green becomes gold', out[0] === 0xc6 && out[1] === 0x9c && out[2] === 0x3e && out[3] === 255, [...out.subarray(0, 4)].join());
-    check('navy and gold logo: navy unchanged', out[4] === 0x1b && out[5] === 0x3a && out[6] === 0x5f);
-    check('navy and gold logo: gold unchanged', out[8] === 0xc6 && out[9] === 0x9c && out[10] === 0x3e);
-    check('navy and gold logo: transparent pixel untouched', out[15] === 0);
-    check('the closing page uses the navy and gold treatment', fs.readFileSync(path.join(root, 'src/lib/tools/brand/fetch.ts'), 'utf8').includes("processedImage(onLightSrc, 'logo-navy-gold')"));
+    const src = fs.readFileSync(path.join(root, 'src/lib/tools/brand/fetch.ts'), 'utf8');
+    check('closing page logo is the header logo, same treatment as any logo', src.includes("const onLightSrc = branding?.logo_url || null;") && src.includes("processedImage(onLightSrc, 'logo')"));
+    check('no recolouring of the logo anywhere', !/recolourGreenToGold|logo-navy-gold/.test(src));
   }
 
   // Real images from the repository stand in for the CMS files.

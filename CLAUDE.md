@@ -73,7 +73,7 @@ When you find an em dash in *existing* content while doing other work, fix it as
 in Phase 9 is review rather than code: read the deployed site end to end, send one
 real contact submission, check the OG cards, clear the Supabase advisor. The
 public site renders on nineteen routes, every page's copy is editable in the page
-builder, and migrations to 081 are applied. **Free tools are live since 2026-09-16**: Business Valuation (version 2) is Live and Tools is in the navbar; see "Go-live record" in section 7b.
+builder, and migrations to 081 are applied. **Free tools are live since 2026-09-16**: Business Valuation is Live and Tools is in the navbar; see "Go-live record" in section 7b. **Engine version 3 and the eight page report shipped 2026-09-17** (see "Business Valuation version 3" in section 7b).
 
 **The per-phase summary index moved to [`PHASE_HISTORY.md`](./PHASE_HISTORY.md) on 2026-08-16**,
 along with the detailed rows that were already there. This file states where the
@@ -918,7 +918,7 @@ recorded reversal that allows them.
 | Email me this version | `src/lib/tools/leads/version.ts` (pure), route `src/app/api/tools/[slug]/lead/version/route.ts` |
 | Download PDF for what is on screen | `src/app/api/tools/[slug]/pdf/route.ts`, writes nothing |
 | Company name and description a visitor adds to their report | `src/lib/tools/valuation/profile.ts` (cleaning and limits, shared by the form, the API and the PDF) |
-| Logo and partner card in the report and on the results | `src/lib/tools/brand/partner.ts` (pure), `src/lib/tools/brand/fetch.ts` (server), `src/components/tools/PartnerCard.tsx`. **The partner card reads only the founder profile's `founder_hero`**; its career highlights are that section's **Report highlights** field (one per line, up to five), which the profile page itself does not show and which ships empty. Home's founder card is never read, so editing it cannot change a report. The closing page logo is the Header Settings logo with its green lettering recoloured to gold (`recolourGreenToGold`), since no navy and gold file is stored |
+| Logo and partner card in the report and on the results | `src/lib/tools/brand/partner.ts` (pure), `src/lib/tools/brand/fetch.ts` (server), `src/components/tools/PartnerCard.tsx`. **The partner card reads only the founder profile's `founder_hero`**; its career highlights are that section's **Report highlights** field (one per line, up to five), which the profile page itself does not show and which ships empty. Home's founder card is never read, so editing it cannot change a report. The closing page logo is the Header Settings colour logo exactly as the header uses it (trimmed and resized, never recoloured; changed 2026-09-17) |
 | Booking link | `src/lib/tools/booking.ts`, always the site's `/book` |
 | **Every tunable number** (Damodaran data, FX, market rates, presets, deal bands) | `src/lib/tools/valuation/data.ts`, and nowhere else |
 | The valuation arithmetic | `src/lib/tools/valuation/engine.ts`, pure, no UI |
@@ -1002,7 +1002,7 @@ Damodaran publishes his annual update in early January. All values are in
 4. `MARKET.usTreasury10y` on the day of the refresh.
 5. FX to SAR (`sarPerUnit`) and the inflation expectations for non-pegged currencies. Review the preset multiples and size premium bands while there.
 6. Update every `asOf` in `SOURCE_NOTES` and the `WACC_SOURCE_SENTENCE`, and bump `VALUATION_DATA_VERSION`.
-7. `npm run verify-valuation-engine`. The reference HTML carries the old values, so after a refresh update the numbers in `reference/tools/business-valuation.html` to match, or the verifier will report the difference (which is the point).
+7. `npm run verify-valuation-engine`. **Do not edit `reference/tools/business-valuation.html`**: it stays exactly as ported, and the verifier writes the current Treasury yield, default spread and implied ERP from `marketDataInUse` into its CONFIG before each case. Add a `DATA_VERSION_LABELS` line for the new version (it is printed in the report footer, so keep it short).
 
 Old leads keep the results they were given: `results` is stored as computed and
 never recomputed, and each lead records its `data_version`.
@@ -1086,32 +1086,53 @@ Version 3: Saudi / GCC ownership is required for Saudi Arabia with no default
 (the example company fills it); older inputs without it mean 0% (corporate tax,
 as they were valued).
 
-**Version 3 method (2026-09-17).** `engine.ts` returns one canonical result
-(`forecast`, `terminal`, `dcfBlock`, `comparables`, `blend`, `raise`, `checks`,
-`recommendations`, `meta`) that the page, PDF, emails and admin all read; nothing
-downstream computes. Changes from the reference, all marked CHANGED: the
-perpetuity TV rests on a normalised terminal cash flow (`terminalCashFlow`);
-the valuation date is the server's date and year one is cut by the stub period
-(`stubPeriod`; a last actual year 12 months or more old is refused); tax losses
-carry forward with a per-country cap (`lossOffsetCap`); in Saudi Arabia zakat
-applies to the GCC-owned share (`taxProfile`): 2.5% of an approximate zakat base
-(`zakatBase`: working capital plus the optional cash at the year end, floored at
-zero, cash held flat), disclosed as possibly understated when cash is blank;
-income tax applies to the non-GCC share only. Net debt is entered at the
-financial year end (assumed 31 December) and rolled forward to the valuation
-date: less the elapsed part of year one forecast free cash flow, plus after-tax
-interest on positive net debt at the pre-tax cost of debt for that period, the
-same figure in every scenario. The terminal returns check warns when the return
-on new capital the terminal value implies is below WACC. `REFERENCE_METHOD` exists only for
-`verify-valuation-engine`. Checks are `checks.ts` (every check, Pass or Warning),
-factors are `recommendations.ts`, and `reconcile.ts` asserts the pages cannot
-contradict each other before a PDF renders (throws outside production, logs in
-it). Stored leads from before version 3 get their report through
-`leads/reportResult.ts`, which reruns them under `REFERENCE_METHOD` and so
-reproduces the figures they were sent. Market data dates live in
-`MARKET.usTreasury10yAsOf` (5.00% is the 15 September 2026 close) and
-`IMPLIED_ERP_BY_MONTH` (4.14%, Damodaran 1 September 2026, adopted 2026-09-17 with
-data version 2026-09-17; the reference HTML carries it too).
+### Business Valuation version 3
+
+Shipped 2026-09-17 (`feat/valuation-engine-report-v3`). Input schema version 3.
+
+**One result object.** `engine.ts` returns a canonical `ValuationResult`
+(`forecast`, `terminal`, `dcfBlock`, `comparables`, `blend`, `bridge`,
+`scenarios`, `raise`, `checks`, `recommendations`, `tax`, `meta`) and the
+results page, PDF, emails, admin view and verifiers all read it. Nothing
+downstream computes a value; rounding happens only in `format.ts`.
+
+**Method changes from the reference** (all marked CHANGED in `engine.ts`):
+
+| Area | Rule |
+|---|---|
+| Terminal value | Perpetuity on a normalised terminal cash flow (`terminalCashFlow`): NOPAT at g, net capex scaled to g over final year growth, working capital at g. Implied terminal multiple, reinvestment rate and implied terminal ROIC (g over reinvestment rate) are reported. |
+| Valuation date | The server's date. Year one keeps (1 - f) of its cash flow, periods (1 - f) / 2 then (i - 0.5) - f, terminal at N - f (`stubPeriod`). A last actual year 12 months or more old is refused. Financial years are assumed to end 31 December. |
+| Net debt | Entered at the year end, rolled forward to the valuation date: less the elapsed year one forecast cash flow, plus after-tax interest on positive net debt at the pre-tax cost of debt. One figure for every scenario. |
+| Tax and zakat | Saudi / GCC ownership is required for Saudi Arabia, no default (the example company fills 100%). Income tax on the non-GCC share only; zakat 2.5% of an approximate base, working capital plus optional year end cash (`zakatBase`, cash held flat, floored at zero), disclosed as possibly understated when cash is blank. The same income tax rate is used for FCFF, terminal NOPAT, cost of debt and beta relevering. |
+| Losses | Carried forward from the actual years, offset capped per country (`lossOffsetCap`: Saudi Arabia 25%, UAE 75%, else 100%). |
+| Raise | Optional amount when raising equity: pre-money, post-money, investor stake. |
+| Market data | Treasury 5.00% dated 15 September 2026 (`usTreasury10yAsOf`), implied ERP 4.14% as at 1 September 2026 (`IMPLIED_ERP_BY_MONTH`), data version 2026-09-17, footer "Market data: Damodaran 2026, risk-free 15 September 2026". |
+
+`REFERENCE_METHOD` (old terminal cash flow, no loss carry-forward) exists only
+for `verify-valuation-engine`, run with no valuation date and 0% ownership.
+
+**Checks** (`checks.ts`) run on every result and report Pass or Warning: DCF
+against comparables, terminal value methods, terminal value share, comparable
+companies, capital structure, year one margin, EBITDA normalisation, last actual
+EBITDA, growth ceiling, growth against inflation, terminal cash flow, terminal
+returns against WACC (whenever implied terminal ROIC is measurable), and, with
+invested capital, returns against WACC and growth against reinvestment; a
+control premium check only when one is chosen. Thresholds are `WARNING_RULES`.
+**Recommendations** (`recommendations.ts`) are chosen by rule and worded in
+`format.ts`, never promising a higher value.
+
+**Reconciliation.** `reconcile.ts` runs before every PDF render: headline and
+bridge equity, blend, equity bridge for blended, DCF and each scenario,
+probability weighting, sensitivity centre, terminal value share, implied EV /
+LTM EBITDA, discount factors, and output hygiene. Throws outside production, logs
+in production.
+
+**Stored leads from before version 3** get their PDF and resend through
+`leads/reportResult.ts`, which reruns their inputs under `REFERENCE_METHOD` and
+so reproduces the figures they were sent.
+
+**Pages.** The PDF is eight pages (below). Amounts print in thousands when
+enterprise value and revenue are both under 10 million (`amountUnit`).
 
 **Exploration and versions.** The sliders recompute in the browser and save
 nothing. **Email me this version** posts the explored inputs; the server
@@ -1144,11 +1165,11 @@ cases and rasterises every page to PNG for inspection.
 4. The rows in `format.ts` (`bridgeTable`, `bridgeSteps`, `scenariosTable`), which the page, the PDF, the email and the admin detail all read.
 5. Checks in `verify-valuation-v2` for the item on its own and absent, then `verify-valuation-engine` to prove the neutral path.
 
-**Verifiers.** `verify-valuation-engine` (514, reference parity),
+**Verifiers.** `verify-valuation-engine` (518: 514 reference parity plus 4 on the market data passed into the reference),
 `verify-valuation-v2` (359), `verify-tool-lead-api` (125),
 `verify-valuation-dashboard` (152, the results page end to end at 1440 and 390
 against a local `next start`, every /api/ request intercepted so nothing is
-written), `verify-tool-email-pdf` (271, pdfjs text and operator list, so a ligature glyph is
+written), `verify-tool-email-pdf` (268, pdfjs text and operator list, so a ligature glyph is
 caught even though extracted text maps it back to letters),
 `verify-tools-visibility` (89), `verify-brevo-webhook` (168) and
 `verify-production-guard` (34). Each was
