@@ -341,7 +341,10 @@ export default async function ToolLeadDetailPage(props: { params: Promise<{ id: 
                   ['Credit spread', `${n(w.cs)}%`],
                   ['Corporate income tax rate', `${n(w.tax)}%`],
                   ...(inputs.country === 'Saudi Arabia'
-                    ? ([['Saudi / GCC ownership', (inputs.schemaVersion ?? 1) >= 3 ? `${extras.gccOwnership}%` : 'Not asked (saved before version 3); valued on corporate tax']] as [string, string][])
+                    ? ([
+                        ['Saudi / GCC ownership', (inputs.schemaVersion ?? 1) >= 3 ? `${extras.gccOwnership}%` : 'Not asked (saved before version 3); valued on corporate tax'],
+                        ['Cash at year end (zakat base only)', inputs.cash === null || inputs.cash === undefined ? 'Not entered' : `${inputs.cash} ${result.currency.code} m`],
+                      ] as [string, string][])
                     : []),
                   ...(result.currency.pegged
                     ? []

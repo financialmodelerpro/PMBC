@@ -61,6 +61,6 @@ export const REPORT_META = {
   preparedFor: 'Example Reader',
   purpose: 'sale',
   generatedAt: new Date('2026-09-16T12:00:00Z'),
-  dataVersion: '2026-09-16',
+  dataVersion: '2026-09-17',
   bookingHref: 'https://www.pacemakersglobal.com/api/tools/book?t=example-token&src=pdf',
 };

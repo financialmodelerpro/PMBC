@@ -281,8 +281,10 @@ console.log('Version 2 inputs');
   const missingOut = await leads.processValuationSubmission(body({ inputs: { ...exampleInputs(), gccOwnership: null } }), ctx(), missing);
   check('Saudi / GCC ownership is required: a Saudi submission without it is refused', missingOut.status === 400 && missing.inserted.length === 0 && JSON.stringify(missingOut.body).includes('Saudi / GCC ownership'));
   const zakatBase = memoryStore();
-  await leads.processValuationSubmission(body({ inputs: { ...exampleInputs(), investedCapital: 60 } }), ctx(), zakatBase);
-  check('with invested capital the stored result uses the zakat base method', zakatBase.inserted[0]?.results.tax.zakatMethod === 'base' && zakatBase.inserted[0]?.results.tax.zakatBaseLtm.base >= 0);
+  await leads.processValuationSubmission(body({ inputs: { ...exampleInputs(), cash: 30 } }), ctx(), zakatBase);
+  check('cash is accepted and stored, and reaches the zakat base', zakatBase.inserted[0]?.inputs.cash === 30 && zakatBase.inserted[0]?.results.tax.zakatBaseLtm.cash === 30 && zakatBase.inserted[0]?.results.tax.zakatBaseLtm.base === 37 + 30);
+  const badCash = await leads.processValuationSubmission(body({ inputs: { ...exampleInputs(), cash: -5 } }), ctx(), memoryStore());
+  check('negative cash is refused', badCash.status === 400);
   const badGcc = await leads.processValuationSubmission(body({ inputs: { ...exampleInputs(), gccOwnership: 140 } }), ctx(), memoryStore());
   check('an ownership share above 100% is refused', badGcc.status === 400);
 

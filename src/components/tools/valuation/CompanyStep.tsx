@@ -148,7 +148,7 @@ export function CompanyStep({
         <div className="grid gap-x-5 sm:grid-cols-2">
           <Field
             label="Saudi / GCC ownership %"
-            hint={`Required. Share of the company owned by Saudi or GCC nationals, 0 to 100. Zakat of ${TAX.zakatRate}% of the zakat base applies to that share, corporate income tax to the rest. Enter invested capital on the next step for a zakat base estimate.`}
+            hint={`Required. Share of the company owned by Saudi or GCC nationals, 0 to 100. Zakat of ${TAX.zakatRate}% of the zakat base applies to that share, corporate income tax to the rest.`}
             error={errors.gccOwnership ?? ''}
           >
             {({ id, describedBy, invalid }) => (
@@ -160,6 +160,25 @@ export function CompanyStep({
                 suffix="%"
                 value={state.gccOwnership}
                 onValue={(v) => onChange({ gccOwnership: v })}
+                aria-describedby={describedBy}
+                aria-invalid={invalid}
+              />
+            )}
+          </Field>
+          <Field
+            label={`Cash at 31 December ${/^\d{4}$/.test(state.financialYear.trim()) ? state.financialYear.trim() : 'of that year'} (optional)`}
+            hint="Used only to estimate the zakat base (working capital plus cash). Leave blank and the base is working capital alone."
+            error={errors.cash ?? ''}
+          >
+            {({ id, describedBy, invalid }) => (
+              <NumberInput
+                id={id}
+                min={0}
+                step={0.1}
+                placeholder="0"
+                suffix={`${currencyCode} m`}
+                value={state.cash}
+                onValue={(v) => onChange({ cash: v })}
                 aria-describedby={describedBy}
                 aria-invalid={invalid}
               />

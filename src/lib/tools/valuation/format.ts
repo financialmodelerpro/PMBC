@@ -202,7 +202,8 @@ export function netDebtSentence(r: ValuationResult): string {
   const m = r.meta;
   const entered = `Net debt at ${fmtDate(m.lastFyEnd)}, as entered`;
   if (!(m.stubFraction > 0) || !m.valuationDate) return `${entered}.`;
-  return `${entered}, less free cash flow earned from then to ${fmtDate(m.valuationDate)}, gives net debt at the valuation date.`;
+  const interest = r.bridge.elapsedInterest ? ', plus after-tax interest on it for that period,' : '';
+  return `${entered}, less free cash flow earned from then to ${fmtDate(m.valuationDate)}${interest} gives net debt at the valuation date.`;
 }
 
 export function stakeLabel(r: ValuationResult): string {
@@ -444,6 +445,10 @@ export function bridgeTable(r: ValuationResult): Table {
   if (canonical(r) && elapsed) {
     rows.push({ label: `${elapsed >= 0 ? 'Add' : 'Less'} free cash flow from ${fmtDate(r.meta.lastFyEnd)} to the valuation date`, values: three(elapsed), tone: 'muted' });
   }
+  const interest = b?.elapsedInterest ?? 0;
+  if (canonical(r) && interest) {
+    rows.push({ label: 'Less after-tax interest on net debt for that period', values: three(-interest), tone: 'muted' });
+  }
   if (b?.eosb) rows.push({ label: 'Less end of service benefits', values: three(-b.eosb), tone: 'muted' });
   if (b?.leases) rows.push({ label: 'Less lease liabilities', values: three(-b.leases), tone: 'muted' });
   if (b?.minorityInterest) rows.push({ label: 'Less minority interest', values: three(-b.minorityInterest), tone: 'muted' });
@@ -478,6 +483,8 @@ export function bridgeSteps(r: ValuationResult): BridgeStep[] {
   steps.push({ label: r.netDebt >= 0 ? 'Net debt' : 'Net cash', value: -r.netDebt, kind: r.netDebt >= 0 ? 'less' : 'add' });
   const elapsed = b?.elapsedFcf ?? 0;
   if (elapsed) steps.push({ label: 'Cash flow since year end', value: elapsed, kind: elapsed >= 0 ? 'add' : 'less' });
+  const interest = b?.elapsedInterest ?? 0;
+  if (interest) steps.push({ label: 'Interest since year end', value: -interest, kind: 'less' });
   if (b?.eosb) steps.push({ label: 'End of service benefits', value: -b.eosb, kind: 'less' });
   if (b?.leases) steps.push({ label: 'Lease liabilities', value: -b.leases, kind: 'less' });
   if (b?.minorityInterest) steps.push({ label: 'Minority interest', value: -b.minorityInterest, kind: 'less' });
@@ -561,7 +568,7 @@ export function waccBuildRows(r: ValuationResult): [string, string][] {
     ['Country default spread', fmtPct(w.ds)],
     ['Company credit spread', fmtPct(w.cs, 1)],
     ['Pre-tax cost of debt', fmtPct(w.kd)],
-    [zakat ? 'Effective tax and zakat rate' : 'Tax rate', fmtPct(w.t, 1)],
+    [zakat ? 'Income tax rate, non-GCC share' : 'Tax rate', fmtPct(w.t, 1)],
     ['After-tax cost of debt', fmtPct(w.kdt)],
     ['Equity weight', fmtPct(w.we, 1)],
     ['Debt weight', fmtPct(w.wd, 1)],
@@ -633,8 +640,8 @@ export function taxRows(r: ValuationResult): [string, string][] {
     const u = unitShort(r);
     rows.push(
       ['Zakat', `${fmtPct(t.zakatRate, 1)} of zakat base`],
-      ['Invested capital', `${amt(r, t.zakatBaseLtm.investedCapital)} ${u}`],
-      ['Less fixed assets', `${amt(r, t.zakatBaseLtm.fixedAssets)} ${u}`],
+      ['Working capital, year end', `${amt(r, t.zakatBaseLtm.workingCapital)} ${u}`],
+      ['Add cash, year end', t.zakatBaseLtm.cash === null ? 'Not entered' : `${amt(r, t.zakatBaseLtm.cash)} ${u}`],
       ['Zakat base (approximate)', `${amt(r, t.zakatBaseLtm.base)} ${u}`],
       [`Zakat, FY${r.years.forecast[0]} to FY${r.years.forecast[4]}`, `${amt(r, t.zakatByYear[0])} to ${amt(r, t.zakatByYear[4])} ${u}`],
       ['Income tax rate, non-GCC share', fmtPct(t.rate, 2)],
@@ -660,6 +667,7 @@ export function timingRows(r: ValuationResult): [string, string][] {
     ...(m.stubFraction > 0
       ? ([
           ['Cash flow since year end', `${amt(r, r.bridge.elapsedFcf ?? 0)} ${unitShort(r)}`],
+          ...(r.bridge.elapsedInterest ? ([['After-tax interest since year end', `${amt(r, r.bridge.elapsedInterest)} ${unitShort(r)}`]] as [string, string][]) : []),
           ['Net debt at valuation date', `${amt(r, r.bridge.netDebtAtValuationDate ?? r.netDebt)} ${unitShort(r)}`],
         ] as [string, string][])
       : []),
@@ -679,17 +687,18 @@ export function terminalNote(r: ValuationResult): string {
     : 'Terminal value grows the final forecast year’s free cash flow at long-term growth, the method used for valuations before 17 September 2026.';
 }
 export const TERMINAL_COLUMN_NOTE = 'In the terminal column, capital expenditure is shown net of depreciation and amortisation.';
-export const ZAKAT_BASE_NOTE = `Zakat is ${TAX.zakatRate}% of an approximate zakat base on the Saudi / GCC owned share: invested capital less fixed assets (taken as invested capital less working capital), floored at zero. Cash is not an input, so the base may be understated.`;
+export const ZAKAT_BASE_NOTE = `Zakat is ${TAX.zakatRate}% of an approximate zakat base on the Saudi / GCC owned share: working capital plus cash, floored at zero, with cash held at its year end level through the forecast.`;
+export const ZAKAT_NO_CASH_NOTE = 'Cash was not entered, so the base is working capital alone and may be understated.';
 export const ZAKAT_FALLBACK_NOTE = `Invested capital was not entered, so the zakat base cannot be estimated; zakat is instead approximated as ${TAX.zakatRate}% of profit on the Saudi / GCC owned share.`;
 export const FINANCIAL_YEAR_END_NOTE = 'Financial years are assumed to end on 31 December.';
-export const VALUATION_DATE_NOTE = 'Cash flow is valued from the valuation date. Free cash flow already earned in the first forecast year is assumed kept in the business, reducing net debt from its year end figure (no distributions).';
+export const VALUATION_DATE_NOTE = 'Cash flow is valued from the valuation date. The elapsed part of the first forecast year uses forecast free cash flow, not actual results, and is assumed kept in the business (no distributions). Net debt at the valuation date is the year end figure, less that cash flow, plus after-tax interest on it at the cost of debt.';
 
 /** Shown under the free cash flow table. */
 export function taxNote(r: ValuationResult): string {
   if (!canonical(r) || !r.tax.lossCarryForward) return 'Tax is applied to positive EBIT only. A loss in one year is not carried forward to reduce tax in later years.';
   const t = r.tax;
   const losses = `Income tax is applied to positive EBIT. Losses are carried forward and offset up to ${fmtPct(t.lossOffsetCap, 0)} of each later year’s taxable profit.`;
-  if (t.zakatMethod === 'base') return `${losses} ${ZAKAT_BASE_NOTE}`;
+  if (t.zakatMethod === 'base') return `${losses} Zakat is charged on an approximate zakat base; see the assumptions.`;
   if (t.zakatMethod === 'profit_proxy') return `${losses} ${ZAKAT_FALLBACK_NOTE}`;
   return losses;
 }
@@ -707,7 +716,7 @@ export function disclosures(r: ValuationResult): {
   const method = canonical(r) ? r.tax.zakatMethod : 'none';
   return {
     financialYearEnd: FINANCIAL_YEAR_END_NOTE,
-    zakat: method === 'base' ? ZAKAT_BASE_NOTE : method === 'profit_proxy' ? ZAKAT_FALLBACK_NOTE : null,
+    zakat: method === 'base' ? (r.tax.zakatBaseLtm?.cash === null ? `${ZAKAT_BASE_NOTE} ${ZAKAT_NO_CASH_NOTE}` : ZAKAT_BASE_NOTE) : method === 'profit_proxy' ? ZAKAT_FALLBACK_NOTE : null,
     valuationDate: canonical(r) && r.meta.stubFraction > 0 ? VALUATION_DATE_NOTE : null,
     evRevenue: r.ltmEbitda > 0 ? 'EV / Revenue shown for reference; not used in the blend.' : null,
     scenarios: 'Scenarios flex the DCF; comparables use the last actual year.',
@@ -877,7 +886,7 @@ export function recommendationText(rec: Recommendation, r: ValuationResult): { t
     case 'returns':
       return {
         title: 'Improve returns before growing',
-        detail: `Return on invested capital of ${fmtPct(v.roic, 1)} is below the WACC of ${fmtWacc(v.wacc)}. Pricing, mix and asset efficiency could support value more than expansion on these terms.`,
+        detail: `${v.terminal ? 'The return on new capital the terminal value implies' : 'Return on invested capital'}, ${fmtPct(v.roic, 1)}, is below the WACC of ${fmtWacc(v.wacc)}. Pricing, mix and asset efficiency could support value more than expansion on these terms.`,
       };
     case 'margin':
       return {

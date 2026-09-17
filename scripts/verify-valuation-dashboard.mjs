@@ -234,6 +234,8 @@ async function walk(width) {
   await wait(400);
   check(`${label}: blank ownership is refused`, (await page.evaluate(text())).includes(engine.GCC_REQUIRED_MESSAGE));
   await page.evaluate(setField('Saudi / GCC ownership', '100'));
+  check(`${label}: optional cash field shown with its date`, (await page.evaluate(text())).includes('Cash at 31 December 2025 (optional)'));
+  check(`${label}: cash entered`, (await page.evaluate(setField('Cash at 31 December 2025', '20'))) === true);
   check(`${label}: continues once ownership is entered`, await page.evaluate(clickButton('Continue to financials')));
   await wait(400);
   check(`${label}: on financials`, await page.evaluate(clickButton('Continue to cost of capital')));
@@ -263,7 +265,7 @@ async function walk(width) {
   // The lead request and the figures on screen.
   const lead = log.lead[0];
   check(`${label}: one lead request, intercepted`, log.lead.length === 1 && lead?.outcome.kind === 'saved', JSON.stringify(lead?.outcome?.body).slice(0, 200));
-  check(`${label}: the request carries the purpose and the raise amount`, lead?.body.inputs.purpose === 'raise' && lead?.body.inputs.raiseAmount === 120 && lead?.body.inputs.gccOwnership === 100);
+  check(`${label}: the request carries the purpose, the raise amount and cash`, lead?.body.inputs.purpose === 'raise' && lead?.body.inputs.raiseAmount === 120 && lead?.body.inputs.gccOwnership === 100 && lead?.body.inputs.cash === 20);
   const result = lead?.outcome.result;
   const h = result ? format.headline(result) : null;
   const tr = await page.evaluate(text());
@@ -274,12 +276,12 @@ async function walk(width) {
 
   // Every tab.
   const tabs = [
-    ['Summary', ['Checks', 'Value by method', 'Less net debt at 31 December 2025, as entered', 'Add free cash flow from 31 December 2025 to the valuation date', 'Pre-money and post-money', 'Post-money equity value']],
+    ['Summary', ['Checks', 'Value by method', 'Less net debt at 31 December 2025, as entered', 'Add free cash flow from 31 December 2025 to the valuation date', 'Less after-tax interest on net debt for that period', 'Pre-money and post-money', 'Post-money equity value']],
     ['DCF', ['Free cash flow to firm', 'Terminal', 'Less tax and zakat', 'Discount period, years']],
     ['Comparables', ['Selected comparable companies (2)', 'DCF exit multiple (after discount)', 'Trading multiples, EV / EBITDA']],
     ['Scenarios', ['Probability-weighted', 'Scenarios flex the DCF; comparables use the last actual year.']],
     ['Sensitivity', ['Equity value, perpetuity growth DCF']],
-    ['Assumptions', ['Valuation date and net debt', 'Net debt at valuation date', 'Financial years are assumed to end on 31 December.', 'Tax and zakat', 'Implied terminal ROIC', 'Terminal reinvestment rate', '15 September 2026']],
+    ['Assumptions', ['Valuation date and net debt', 'Net debt at valuation date', 'Financial years are assumed to end on 31 December.', 'Tax and zakat', 'Implied terminal ROIC', 'Terminal reinvestment rate', '15 September 2026', 'Add cash, year end', 'Zakat base (approximate)', 'After-tax interest since year end', 'uses forecast free cash flow, not actual results', '1 September 2026']],
   ];
   for (const [tab, expects] of tabs) {
     const clicked = await page.evaluate(`(() => { const b = [...document.querySelectorAll('[role=tab]')].find((x) => x.textContent.trim().startsWith(${JSON.stringify(tab)})); if (!b) return false; b.click(); return true; })()`);

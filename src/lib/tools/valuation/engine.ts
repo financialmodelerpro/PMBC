@@ -171,6 +171,11 @@ export type ValuationInputs = {
   purpose?: string | null;
   /** Equity the business plans to raise, millions. Optional, and only asked when raising equity. */
   raiseAmount?: number | null;
+  /**
+   * Cash at the last financial year end, millions. Optional, Saudi Arabia only,
+   * and used for nothing but the zakat base: net debt already nets cash.
+   */
+  cash?: number | null;
 };
 
 export type Currency = { code: string; pegged: boolean; sarPerUnit: number };
@@ -268,6 +273,7 @@ export function resolveExtras(i: ValuationInputs) {
     valuationDate: isIsoDate(i.valuationDate) ? (i.valuationDate as string) : null,
     raiseAmount: i.raiseAmount === null || i.raiseAmount === undefined ? null : i.raiseAmount,
     purpose: i.purpose ?? null,
+    cash: i.cash === null || i.cash === undefined ? null : i.cash,
   };
 }
 
@@ -285,17 +291,17 @@ export type TaxProfile = {
   zakatRate: number;
   /**
    * How zakat is estimated on the GCC-owned share.
-   *   'base'          2.5% of an approximate zakat base (see `zakatBase`), needs invested capital.
-   *   'profit_proxy'  2.5% of positive EBIT, the fallback when invested capital was not entered.
-   *   'none'          no GCC share, or not Saudi Arabia.
+   *   'base'  2.5% of an approximate zakat base (see `zakatBase`).
+   *   'none'  no GCC share, or not Saudi Arabia.
+   * 'profit_proxy' (2.5% of positive EBIT) was used between 2026-09-17 commits
+   * when the base needed invested capital; no result carries it now.
    */
   zakatMethod: 'base' | 'profit_proxy' | 'none';
   /**
    * The rate on positive EBIT, used for FCFF income tax, terminal NOPAT, the
-   * after-tax cost of debt and beta relevering. With the zakat base method it is
-   * corporate tax on the non-GCC share only, (1 - GCC) x CIT, since zakat is then
-   * a charge on the base, not on profit. With the profit proxy it blends zakat
-   * in: (1 - GCC) x CIT + GCC x 2.5%. Equal to CIT outside Saudi Arabia.
+   * after-tax cost of debt and beta relevering: corporate tax on the non-GCC
+   * share only, (1 - GCC) x CIT, since zakat is a charge on the base, not on
+   * profit. Equal to CIT outside Saudi Arabia.
    */
   rate: number;
   lossCarryForward: boolean;
@@ -308,14 +314,13 @@ export function taxProfile(
   taxPercent: number | null,
   gccOwnershipPercent: number | null,
   opts: EngineOptions = CURRENT_METHOD,
-  investedCapital: number | null = null,
 ): TaxProfile {
   const cit = n(taxPercent) / 100;
   const c = countryFor(country);
   const zakatApplies = country === TAX.zakatCountry;
   const zakatRate = TAX.zakatRate / 100;
   const share = zakatApplies ? Math.min(1, Math.max(0, z(gccOwnershipPercent) / 100)) : 0;
-  const zakatMethod = !share ? 'none' : n(investedCapital) > 0 ? 'base' : 'profit_proxy';
+  const zakatMethod = share ? 'base' : 'none';
   return {
     cit,
     zakatApplies,
@@ -323,23 +328,20 @@ export function taxProfile(
     zakatRate,
     zakatMethod,
     // With no GCC share the entered rate is kept exactly, as the reference used it.
-    rate: zakatMethod === 'none' ? cit : zakatMethod === 'base' ? (1 - share) * cit : (1 - share) * cit + share * zakatRate,
+    rate: zakatMethod === 'none' ? cit : (1 - share) * cit,
     lossCarryForward: opts.lossCarryForward,
     lossOffsetCap: (c?.lossOffsetCap ?? 100) / 100,
   };
 }
 
 /**
- * The approximate zakat base at a year end: invested capital less fixed
- * assets, floored at zero. The inputs do not include fixed assets, so they are
- * taken as invested capital less net working capital (the only split of
- * invested capital the inputs support), floored at zero. The base is therefore
- * working capital, capped at invested capital. Cash, which the real base
- * includes, is not an input and is left out, so the estimate errs low.
+ * The approximate zakat base at a year end: net working capital plus cash,
+ * floored at zero. Cash is optional; without it the base is working capital
+ * alone and the report says it may be understated. Cash is held at its
+ * entered year end level through the forecast.
  */
-export function zakatBase(investedCapital: number, nwc: number): { fixedAssets: number; base: number } {
-  const fixedAssets = Math.max(0, investedCapital - nwc);
-  return { fixedAssets, base: Math.max(0, investedCapital - fixedAssets) };
+export function zakatBase(nwc: number, cash: number | null): number {
+  return Math.max(0, nwc + (cash ?? 0));
 }
 
 /* ------------------------------------------------------------------------ */
@@ -445,7 +447,7 @@ export function computeWacc(w: WaccInputs, currency: Currency, adjustmentPoints 
 /** The WACC for a set of inputs, with the effective tax rate. What the form and the engine both use. */
 export function waccFor(i: ValuationInputs, adjustmentPoints = 0): WaccBreakdown {
   const x = resolveExtras(i);
-  return computeWacc(i.wacc, currencyFor(i.country), adjustmentPoints, taxProfile(i.country, i.wacc.tax, x.gccOwnership, CURRENT_METHOD, x.investedCapital).rate);
+  return computeWacc(i.wacc, currencyFor(i.country), adjustmentPoints, taxProfile(i.country, i.wacc.tax, x.gccOwnership, CURRENT_METHOD).rate);
 }
 
 /** Size and company premium from last actual revenue, thresholds in SAR millions. */
@@ -581,7 +583,7 @@ function finiteOrNull(v: number | null | undefined): boolean {
 }
 
 export function validateCompany(
-  i: Pick<ValuationInputs, 'industry' | 'country' | 'financialYear' | 'netDebt' | 'bridge' | 'gccOwnership' | 'valuationDate' | 'raiseAmount' | 'schemaVersion'>,
+  i: Pick<ValuationInputs, 'industry' | 'country' | 'financialYear' | 'netDebt' | 'bridge' | 'gccOwnership' | 'valuationDate' | 'raiseAmount' | 'schemaVersion' | 'cash'>,
 ): FieldErrors {
   const e: FieldErrors = {};
   if (!industryFor(i.industry)) e.industry = 'Select an industry.';
@@ -605,6 +607,7 @@ export function validateCompany(
     if ((g === null || g === undefined) && (i.schemaVersion ?? 1) >= 3) e.gccOwnership = GCC_REQUIRED_MESSAGE;
     else if (g !== null && g !== undefined && !(g >= 0 && g <= 100)) e.gccOwnership = GCC_REQUIRED_MESSAGE;
   }
+  if (i.cash !== null && i.cash !== undefined && !(i.cash >= 0)) e.cash = 'Enter cash as a positive amount, or leave it blank.';
   if (i.raiseAmount !== null && i.raiseAmount !== undefined && !(i.raiseAmount >= 0)) {
     e.raiseAmount = 'Enter the amount to raise as a positive number, or leave it blank.';
   }
@@ -683,14 +686,12 @@ export type ProjectionRow = {
   zakat?: number;
   /** The approximate zakat base at the year end (see `zakatBase`). */
   zakatBase?: number;
-  /** Invested capital rolled forward: last year's plus capex less D&A plus the increase in working capital. */
-  investedCapital?: number;
 };
 
 export type LossRule = { carryForward: boolean; cap: number };
 
-/** Zakat on the base: GCC share times the zakat rate, and the invested capital the base rolls from. */
-export type ZakatRule = { shareRate: number; investedCapital: number };
+/** Zakat on the base: GCC share times the zakat rate, and the cash held in the base. */
+export type ZakatRule = { shareRate: number; cash: number | null };
 
 /**
  * Forecast free cash flow to the firm. Tax is charged on positive EBIT only.
@@ -714,7 +715,6 @@ export function projections(fin: Financials, t: number, loss: LossRule = { carry
   for (let i = 0; i < HISTORY_YEARS; i++) useLosses(n(fin.ebitda[i]) - zz(fin.da[i]));
 
   const rows: ProjectionRow[] = [];
-  let ic = zakat ? zakat.investedCapital : NaN;
   for (let i = HISTORY_YEARS; i < TOTAL_YEARS; i++) {
     const ebitda = n(fin.ebitda[i]), da = zz(fin.da[i]), capex = zz(fin.capex[i]);
     const nwcPrev = i === HISTORY_YEARS ? zz(fin.nwc[HISTORY_YEARS - 1]) : zz(fin.nwc[i - 1]);
@@ -728,11 +728,10 @@ export function projections(fin: Financials, t: number, loss: LossRule = { carry
       continue;
     }
     // Zakat is due on the base whether or not the year makes a profit.
-    ic = ic + capex - da + dnwc;
-    const base = zakatBase(ic, nwc).base;
+    const base = zakatBase(nwc, zakat.cash);
     const zakatAmount = base * zakat.shareRate;
     const tax = incomeTax + zakatAmount;
-    rows.push({ rev: n(fin.rev[i]), ebitda, da, ebit, tax, capex, dnwc, fcf: ebit - tax + da - capex - dnwc, nwc, lossUsed, lossPool: pool, incomeTax, zakat: zakatAmount, zakatBase: base, investedCapital: ic });
+    rows.push({ rev: n(fin.rev[i]), ebitda, da, ebit, tax, capex, dnwc, fcf: ebit - tax + da - capex - dnwc, nwc, lossUsed, lossPool: pool, incomeTax, zakat: zakatAmount, zakatBase: base });
   }
   return rows;
 }
@@ -940,6 +939,7 @@ export type CheckId =
   | 'growth_vs_inflation'
   | 'terminal_fcf'
   | 'roic_below_wacc'
+  | 'terminal_roic'
   | 'reinvestment'
   | 'stake_premium';
 
@@ -1005,7 +1005,9 @@ export type ScenarioResult = {
 export type BridgeResult = {
   /** Free cash flow in the part of year one before the valuation date. Absent before version 3. */
   elapsedFcf?: number;
-  /** Net debt at the valuation date: as entered, less `elapsedFcf`. Absent before version 3. */
+  /** After-tax interest on positive net debt for the elapsed period. */
+  elapsedInterest?: number;
+  /** Net debt at the valuation date: as entered, less `elapsedFcf`, plus `elapsedInterest`. Absent before version 3. */
   netDebtAtValuationDate?: number;
   eosb: number;
   leases: number;
@@ -1178,8 +1180,8 @@ export type ValuationResult = {
   /* Version 3: the canonical blocks. Absent on stored results before it. */
   tax: TaxProfile & {
     lossesUsed: number;
-    /** Zakat base method only: invested capital, fixed assets and base at the last actual year end, and zakat in each forecast year. */
-    zakatBaseLtm: { investedCapital: number; fixedAssets: number; base: number } | null;
+    /** Zakat base method only: working capital, cash (null when not entered) and base at the last actual year end, and zakat in each forecast year. */
+    zakatBaseLtm: { workingCapital: number; cash: number | null; base: number } | null;
     zakatByYear: number[];
   };
   forecast: ForecastLine[];
@@ -1225,7 +1227,7 @@ export function runValuation(i: ValuationInputs, opts: EngineOptions = CURRENT_M
 function compute(i: ValuationInputs, withScenarios: boolean, opts: EngineOptions, netDebtAtDate?: number): ValuationResult {
   const currency = currencyFor(i.country);
   const x = resolveExtras(i);
-  const tax = taxProfile(i.country, i.wacc.tax, x.gccOwnership, opts, x.investedCapital);
+  const tax = taxProfile(i.country, i.wacc.tax, x.gccOwnership, opts);
   const w = computeWacc(i.wacc, currency, x.waccAdjustment, tax.rate);
   const g = n(i.growth) / 100, xm = n(i.exitMultiple), wD = n(i.dcfWeight);
   const mid = i.midYear, nd = n(i.netDebt);
@@ -1240,7 +1242,7 @@ function compute(i: ValuationInputs, withScenarios: boolean, opts: EngineOptions
 
   const reported = i.financials;
   const fin = normalisedFinancials(reported, x.normalisation);
-  const zakatRule: ZakatRule | null = zakatShareRate ? { shareRate: zakatShareRate, investedCapital: n(x.investedCapital) } : null;
+  const zakatRule: ZakatRule | null = zakatShareRate ? { shareRate: zakatShareRate, cash: x.cash } : null;
   const rows = projections(fin, w.t, { carryForward: tax.lossCarryForward, cap: tax.lossOffsetCap }, zakatRule);
 
   const base = dcf(rows, w.wacc, g, xmApplied, mid, f, basis);
@@ -1281,9 +1283,15 @@ function compute(i: ValuationInputs, withScenarios: boolean, opts: EngineOptions
   // and so reduces net debt. Net debt at the valuation date is therefore net
   // debt at the year end less the elapsed share of year one free cash flow.
   // With no stub it is the entered figure exactly, as the reference used it.
-  const ndAtDate = netDebtAtDate !== undefined ? netDebtAtDate : f ? nd - rows[0].fcf * f : nd;
-  const elapsedFcf = nd - ndAtDate;
-  bridge.elapsedFcf = elapsedFcf;
+  //
+  // The elapsed cash flow is unlevered, so after-tax interest on net debt for
+  // the same period is deducted from it: interest at the pre-tax cost of debt
+  // from the WACC build, after the tax rate used for the cost of debt. Only
+  // positive net debt accrues interest; net cash is not credited with any.
+  const elapsedInterest = f && nd > 0 ? nd * w.kd * (1 - w.t) * f : 0;
+  const ndAtDate = netDebtAtDate !== undefined ? netDebtAtDate : f ? nd - rows[0].fcf * f + elapsedInterest : nd;
+  bridge.elapsedFcf = f ? nd + elapsedInterest - ndAtDate : 0;
+  bridge.elapsedInterest = elapsedInterest;
   bridge.netDebtAtValuationDate = ndAtDate;
   // With no other claims the reference's `ev - netDebt` is kept exactly.
   const toEquity = (v: number) => (claims ? v - ndAtDate - claims : v - ndAtDate);
@@ -1490,7 +1498,7 @@ function compute(i: ValuationInputs, withScenarios: boolean, opts: EngineOptions
       ...tax,
       lossesUsed: sum(rows.map((r) => r.lossUsed ?? 0)),
       zakatBaseLtm: zakatRule
-        ? { investedCapital: zakatRule.investedCapital, ...zakatBase(zakatRule.investedCapital, z(reported.nwc[HISTORY_YEARS - 1])) }
+        ? { workingCapital: z(reported.nwc[HISTORY_YEARS - 1]), cash: zakatRule.cash, base: zakatBase(z(reported.nwc[HISTORY_YEARS - 1]), zakatRule.cash) }
         : null,
       zakatByYear: rows.map((r) => r.zakat ?? 0),
     },

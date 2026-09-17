@@ -1095,12 +1095,14 @@ the valuation date is the server's date and year one is cut by the stub period
 (`stubPeriod`; a last actual year 12 months or more old is refused); tax losses
 carry forward with a per-country cap (`lossOffsetCap`); in Saudi Arabia zakat
 applies to the GCC-owned share (`taxProfile`): 2.5% of an approximate zakat base
-(`zakatBase`: invested capital less fixed assets, fixed assets taken as
-invested capital less working capital, rolled forward each year) when invested
-capital is entered, otherwise 2.5% of profit with a disclosure. Net debt is
-entered at the financial year end (assumed 31 December) and rolled forward to
-the valuation date by the elapsed part of year one free cash flow, the same
-figure in every scenario, so the cash flow cut from the DCF is not lost. `REFERENCE_METHOD` exists only for
+(`zakatBase`: working capital plus the optional cash at the year end, floored at
+zero, cash held flat), disclosed as possibly understated when cash is blank;
+income tax applies to the non-GCC share only. Net debt is entered at the
+financial year end (assumed 31 December) and rolled forward to the valuation
+date: less the elapsed part of year one forecast free cash flow, plus after-tax
+interest on positive net debt at the pre-tax cost of debt for that period, the
+same figure in every scenario. The terminal returns check warns when the return
+on new capital the terminal value implies is below WACC. `REFERENCE_METHOD` exists only for
 `verify-valuation-engine`. Checks are `checks.ts` (every check, Pass or Warning),
 factors are `recommendations.ts`, and `reconcile.ts` asserts the pages cannot
 contradict each other before a PDF renders (throws outside production, logs in
@@ -1108,8 +1110,8 @@ it). Stored leads from before version 3 get their report through
 `leads/reportResult.ts`, which reruns them under `REFERENCE_METHOD` and so
 reproduces the figures they were sent. Market data dates live in
 `MARKET.usTreasury10yAsOf` (5.00% is the 15 September 2026 close) and
-`IMPLIED_ERP_BY_MONTH` (still January 2026, 4.23%; Damodaran published 4.14% for
-1 September 2026, not adopted pending the firm's confirmation).
+`IMPLIED_ERP_BY_MONTH` (4.14%, Damodaran 1 September 2026, adopted 2026-09-17 with
+data version 2026-09-17; the reference HTML carries it too).
 
 **Exploration and versions.** The sliders recompute in the browser and save
 nothing. **Email me this version** posts the explored inputs; the server
@@ -1143,10 +1145,10 @@ cases and rasterises every page to PNG for inspection.
 5. Checks in `verify-valuation-v2` for the item on its own and absent, then `verify-valuation-engine` to prove the neutral path.
 
 **Verifiers.** `verify-valuation-engine` (514, reference parity),
-`verify-valuation-v2` (332), `verify-tool-lead-api` (124),
-`verify-valuation-dashboard` (136, the results page end to end at 1440 and 390
+`verify-valuation-v2` (359), `verify-tool-lead-api` (125),
+`verify-valuation-dashboard` (152, the results page end to end at 1440 and 390
 against a local `next start`, every /api/ request intercepted so nothing is
-written), `verify-tool-email-pdf` (269, pdfjs text and operator list, so a ligature glyph is
+written), `verify-tool-email-pdf` (271, pdfjs text and operator list, so a ligature glyph is
 caught even though extracted text maps it back to letters),
 `verify-tools-visibility` (89), `verify-brevo-webhook` (168) and
 `verify-production-guard` (34). Each was

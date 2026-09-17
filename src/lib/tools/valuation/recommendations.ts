@@ -3,8 +3,9 @@
  *
  * Only the choice and the figures behind it are made here; the wording is in
  * `format.ts` (`recommendationText`). Ordered by materiality: the cost of capital
- * first when it moves value most, then earnings quality, then cash, then the
- * forecast, and diligence readiness last, which is always eligible.
+ * first when it moves value most, then returns below the cost of capital, then
+ * earnings quality, then cash, then the forecast, and diligence readiness last,
+ * which is always eligible.
  *
  * Relative imports only, so the verifiers can load this file outside Next.
  */
@@ -41,13 +42,15 @@ export function buildRecommendations(r: ValuationResult): Recommendation[] {
   if (lever && lever.from > 0 && lever.uplift / lever.from > R.waccSensitivityMaterial) {
     out.push({ id: 'reduce_risk', values: { from: lever.from, to: lever.to, uplift: lever.uplift, share: lever.uplift / lever.from } });
   }
+  // Returns below the cost of capital mean growth destroys value, which outranks everything after it.
+  if (warned.has('roic_below_wacc')) out.push({ id: 'returns', values: { roic: q.roic, wacc: r.wacc.wacc, terminal: 0 } });
+  else if (warned.has('terminal_roic')) out.push({ id: 'returns', values: { roic: r.terminal.impliedRoic, wacc: r.wacc.wacc, terminal: 1 } });
   if (warned.has('no_normalisation')) out.push({ id: 'review_normalisation', values: {} });
   else if (r.normalisation.used) out.push({ id: 'evidence_normalisation', values: { reported: r.ltmEbitdaReported, normalised: r.ltmEbitda } });
   if (Number.isFinite(q.fcfConversion) && q.fcfConversion < R.fcfConversionBelow) {
     out.push({ id: 'cash_conversion', values: { conversion: q.fcfConversion, threshold: R.fcfConversionBelow } });
   }
   if (warned.has('margin_step') || warned.has('growth_ceiling') || warned.has('tv_share')) out.push({ id: 'forecast_credibility', values: {} });
-  if (warned.has('roic_below_wacc')) out.push({ id: 'returns', values: { roic: q.roic, wacc: r.wacc.wacc } });
   if (Number.isFinite(q.ebitdaMarginTerminal) && q.ebitdaMarginTerminal < R.terminalMarginBelow) {
     out.push({ id: 'margin', values: { margin: q.ebitdaMarginTerminal } });
   }

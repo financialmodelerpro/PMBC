@@ -70,7 +70,7 @@ export function footballFieldChart(r: ValuationResult, width = 760): Chart {
   const scale = footballFieldScale(rows, u.scale);
   const labelW = 285, valueW = 112, gap = 12;
   const trackX = labelW + gap, trackW = width - labelW - valueW - gap * 2;
-  const rowH = 39, top = 6;
+  const rowH = 37, top = 6;
   const prims: Prim[] = [];
   rows.forEach((row: FootballFieldRow, i) => {
     const y = top + i * rowH;

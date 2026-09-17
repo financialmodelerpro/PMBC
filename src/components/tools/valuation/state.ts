@@ -85,6 +85,8 @@ export type FormState = {
   /* Version 3 ---------------------------------------------------------- */
   /** Saudi / GCC ownership, percent. Shown, and sent, for Saudi Arabia only. */
   gccOwnership: string;
+  /** Cash at the year end, for the zakat base only. Optional; Saudi Arabia only. */
+  cash: string;
 };
 
 let peerSeq = 0;
@@ -144,6 +146,7 @@ export function initialState(): FormState {
     waccAdjustment: '0',
     // Required for Saudi Arabia and deliberately blank: no default.
     gccOwnership: '',
+    cash: '',
   };
 }
 
@@ -240,6 +243,7 @@ export function toInputs(s: FormState, valuationDate: string | null = todayIso()
     waccAdjustment: num(s.waccAdjustment) ?? 0,
     profile: cleanProfile({ companyName: s.companyName, description: s.description }),
     gccOwnership: s.country === TAX.zakatCountry ? num(s.gccOwnership) : null,
+    cash: s.country === TAX.zakatCountry ? num(s.cash) : null,
     valuationDate,
   };
 }
@@ -425,5 +429,6 @@ export function stateFromInputs(i: ValuationInputs): FormState {
     waccAdjustment: d(i.waccAdjustment ?? 0),
     // Stored inputs from before version 3 were valued on corporate tax alone.
     gccOwnership: i.gccOwnership === null || i.gccOwnership === undefined ? ((i.schemaVersion ?? 1) >= 3 ? '' : '0') : d(i.gccOwnership),
+    cash: d(i.cash),
   };
 }

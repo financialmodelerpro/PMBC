@@ -203,6 +203,48 @@ function KeyValues({ rows, labelWidth = '56%' }: { rows: [string, string][]; lab
   );
 }
 
+/**
+ * Two key-value columns laid out row by row, so the block can break between
+ * rows across a page instead of moving whole.
+ */
+function PairedColumns({ left, right, leftLabelWidth = '50%', rightLabelWidth = '50%' }: {
+  left: { title: string; rows: [string, string][]; note?: string | null };
+  right: { title: string; rows: [string, string][] };
+  leftLabelWidth?: string;
+  rightLabelWidth?: string;
+}) {
+  const count = Math.max(left.rows.length, right.rows.length);
+  const cell = (row: [string, string] | undefined, labelWidth: string, side: 'left' | 'right') => (
+    <View style={{ width: '50%', paddingRight: side === 'left' ? 10 : 0, paddingLeft: side === 'right' ? 10 : 0 }}>
+      {row && (
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 1.5, borderBottomWidth: 0.5, borderBottomColor: C.border }}>
+          <Text style={{ color: C.muted, fontSize: 8, width: labelWidth, paddingRight: 4 }}>{row[0]}</Text>
+          <Text style={{ fontWeight: 500, fontSize: 8, flex: 1, textAlign: 'right' }}>{row[1]}</Text>
+        </View>
+      )}
+    </View>
+  );
+  return (
+    <View>
+      <View style={{ flexDirection: 'row' }} minPresenceAhead={60}>
+        <View style={{ width: '50%', paddingRight: 10 }}>
+          <SubHead>{left.title}</SubHead>
+        </View>
+        <View style={{ width: '50%', paddingLeft: 10 }}>
+          <SubHead>{right.title}</SubHead>
+        </View>
+      </View>
+      {Array.from({ length: count }, (_, k) => (
+        <View key={k} style={{ flexDirection: 'row' }} wrap={false}>
+          {cell(left.rows[k], leftLabelWidth, 'left')}
+          {cell(right.rows[k], rightLabelWidth, 'right')}
+        </View>
+      ))}
+      {left.note && <Note>{left.note}</Note>}
+    </View>
+  );
+}
+
 function Tiles({ items, columns }: { items: [string, string][]; columns?: number }) {
   const per = columns ?? items.length;
   return (
@@ -368,7 +410,7 @@ export function ValuationReport({ result, meta }: { result: ValuationResult; met
           {notes.evRevenue && <Note>{notes.evRevenue}</Note>}
         </Section>
         <Section title="From enterprise value to equity" sub={`Base case, ${unit}. ${h.netDebtNote ?? ''}`} gap={10}>
-          <PdfChart chart={waterfallChart(r, 760, 150)} width={W} />
+          <PdfChart chart={waterfallChart(r, 760, 128)} width={W} />
           <View style={{ marginTop: 6 }}>
             <DataTable table={bridgeTable(r)} firstColWidth={52} />
           </View>
@@ -457,8 +499,8 @@ export function ValuationReport({ result, meta }: { result: ValuationResult; met
             {checks.map((x) => (
               <View key={x.id} style={{ flexDirection: 'row', paddingVertical: 1.8, borderBottomWidth: 0.5, borderBottomColor: C.border }}>
                 <Text style={{ width: '11%', fontSize: 7.5, fontWeight: 600, color: x.status === 'pass' ? C.green : C.red }}>{x.status === 'pass' ? 'PASS' : 'WARNING'}</Text>
-                <Text style={{ width: '22%', fontSize: 8, fontWeight: 600, paddingRight: 4 }}>{x.label}</Text>
-                <Text style={{ width: '67%', fontSize: 8, color: C.muted, lineHeight: 1.35 }}>{x.message}</Text>
+                <Text style={{ width: '24%', fontSize: 8, fontWeight: 600, paddingRight: 4 }}>{x.label}</Text>
+                <Text style={{ width: '65%', fontSize: 8, color: C.muted, lineHeight: 1.3 }}>{x.message}</Text>
               </View>
             ))}
           </View>
@@ -485,18 +527,13 @@ export function ValuationReport({ result, meta }: { result: ValuationResult; met
             {r.comparables.peerNames.join('; ')}.
           </Text>
         )}
-        {/* Allowed to break: with a zakat base and a rolled-forward net debt this block is long, and moving it whole would push the sources onto a third page. */}
-        <View style={{ flexDirection: 'row', marginBottom: 10 }}>
-          <View style={{ width: '50%', paddingRight: 10 }}>
-            <SubHead>{r.tax.zakatApplies ? 'Tax and zakat' : 'Tax'}</SubHead>
-            <KeyValues rows={taxRows(r)} labelWidth="50%" />
-            {notes.premiumAndDiscount && <Note>{notes.premiumAndDiscount}</Note>}
-          </View>
-          <View style={{ width: '50%', paddingLeft: 10 }}>
-            <SubHead>Balance sheet, EBITDA and timing</SubHead>
-            <KeyValues
-              labelWidth="50%"
-              rows={[
+        {/* Row by row, so it can break across the page rather than moving whole. */}
+        <View style={{ marginBottom: 10 }}>
+          <PairedColumns
+            left={{ title: r.tax.zakatApplies ? 'Tax and zakat' : 'Tax', rows: taxRows(r), note: notes.premiumAndDiscount }}
+            right={{
+              title: 'Balance sheet, EBITDA and timing',
+              rows: [
                 ...timingRows(r),
                 ...(bridgeItemsUsed
                   ? ([
@@ -509,9 +546,9 @@ export function ValuationReport({ result, meta }: { result: ValuationResult; met
                 r.normalisation.used
                   ? ['Normalised EBITDA', `${fmtAmount(r.ltmEbitdaReported, u)} to ${amt(r.ltmEbitda)}`]
                   : ['EBITDA', 'Reported, no adjustments'],
-              ]}
-            />
-          </View>
+              ],
+            }}
+          />
         </View>
 
         <View wrap={false} style={{ marginBottom: 8 }}>
@@ -531,14 +568,11 @@ export function ValuationReport({ result, meta }: { result: ValuationResult; met
             forecast year after it. The terminal value is taken two ways, growth in perpetuity on a cash flow whose reinvestment is sized for
             long-term growth, and an exit multiple of final year EBITDA, and the DCF in the blend is their average.
           </Text>
-          <Text style={{ fontSize: 9, lineHeight: 1.45, marginBottom: 4 }}>
-            Comparables apply EV / EBITDA, or EV / Revenue where EBITDA is not positive, to the last actual year, after any private company
-            discount. The two methods are blended at the weight chosen, and net debt and the other balance sheet items are deducted to reach equity.
-          </Text>
           <Text style={{ fontSize: 9, lineHeight: 1.45 }}>
-            The WACC combines a cost of equity (risk-free rate, mature market premium, country premium, relevered industry beta and size premium)
-            with an after-tax cost of debt. Tax is charged on positive EBIT with losses carried forward; in Saudi Arabia zakat applies to the
-            Saudi / GCC owned share.{c.pegged ? '' : ` For ${c.code}, the US dollar WACC is converted using the expected inflation gap.`}
+            Comparables apply EV / EBITDA, or EV / Revenue where EBITDA is not positive, to the last actual year, after any private company
+            discount; the two methods are blended at the weight chosen and net debt and other claims are deducted to reach equity. The WACC
+            combines a cost of equity (risk-free rate, mature market, country and size premiums, relevered industry beta) with an after-tax cost
+            of debt.{c.pegged ? '' : ` For ${c.code}, the US dollar WACC is converted using the expected inflation gap.`}
           </Text>
         </Section>
         <View minPresenceAhead={80}>

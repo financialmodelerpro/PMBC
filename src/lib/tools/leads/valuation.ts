@@ -89,6 +89,7 @@ const inputsSchema = z.object({
   // Version 3. The valuation date is accepted for shape only: the server always
   // replaces it with its own date (`stampServerFields`).
   gccOwnership: cell.optional(),
+  cash: cell.optional(),
   raiseAmount: cell.optional(),
   purpose: z.string().max(40).nullable().optional(),
   valuationDate: z.string().max(20).nullable().optional(),

@@ -9,17 +9,17 @@
 //   npm run render-valuation-qa -- <output directory>
 //
 // CASES (valuation date fixed at 2026-09-16 unless stated)
-//   01 regression, GCC ownership 0% and no stub period (the old report's inputs)
-//   02 regression at its example values (100% GCC ownership, no invested capital,
-//      so zakat falls back to the profit proxy; stub from the valuation date)
+//   01 regression, GCC ownership 0%, no stub period, ERP 4.23% (the old report's inputs)
+//   02 regression at its example values and current market data (100% GCC
+//      ownership, no cash entered, so the zakat base is working capital alone)
 //   03 healthy profitable business, long company name and long peer names, 60% GCC
-//      ownership with invested capital, so zakat is on the approximate base
+//      ownership with cash entered
 //   04 negative and weak EBITDA: EV / Revenue, loss carry-forward, negative_ebitda
-//   05 high debt, net debt above half of enterprise value, 100% GCC, profit proxy
+//   05 high debt, net debt above half of enterprise value, 100% GCC, no cash
 //   06 very small values (thousands)
 //   07 very large values (billions), 0% GCC ownership (corporate tax only)
 //   08 non-Saudi country (UAE): no zakat, corporate tax applied
-//   09 raising equity with an amount to raise: pre-money and post-money, zakat base
+//   09 raising equity with an amount to raise: pre-money and post-money, cash entered
 //   10 Pakistan with every version 2 feature in use and a long description
 //
 // Each page is drawn by pdf.js inside headless Chrome from a local static server,
@@ -76,7 +76,11 @@ const CASES = [
   {
     id: '01-regression-gcc0-nostub',
     meta: { company: 'FMP', industry: 'Healthcare Support Services', country: 'Saudi Arabia', purpose: 'sale' },
-    inputs: () => ({ ...state.toInputs(minimalCase(state), null), gccOwnership: 0 }),
+    // The old report's inputs, including its January 2026 ERP of 4.23%.
+    inputs: () => {
+      const i = state.toInputs(minimalCase(state), null);
+      return { ...i, gccOwnership: 0, wacc: { ...i.wacc, erp: 4.23 } };
+    },
   },
   {
     id: '02-regression-defaults',
@@ -104,6 +108,7 @@ const CASES = [
           state.newPeer('Riyadh Private Schools Operator', '9.8', '1.9'),
         ],
         investedCapital: '520',
+        cash: '45',
         norm: { oneOff: '4', ownerCosts: '3', carryOwnerCosts: true },
       };
       return state.toInputs(state.syncPeerDefaults(s), VALUATION_DATE);
@@ -192,7 +197,7 @@ const CASES = [
         da: [7, 8, 9, 11, 13, 15, 17, 19],
         capex: [15, 18, 22, 26, 30, 32, 34, 36],
         nwc: [15, 17, 20, 24, 28, 32, 36, 40],
-      }, { netDebt: '25', gccOwnership: '100', investedCapital: '180' });
+      }, { netDebt: '25', gccOwnership: '100', investedCapital: '180', cash: '30' });
       return { ...state.toInputs(s, VALUATION_DATE), purpose: 'raise', raiseAmount: 120 };
     },
   },

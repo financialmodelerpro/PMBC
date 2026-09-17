@@ -189,8 +189,8 @@ async function ligatureGlyphs(buf) {
   }
   return [...found];
 }
-const DATA_LABEL = data.dataVersionLabel('2026-09-16');
-check('market data label', DATA_LABEL === 'Damodaran January 2026, risk-free September 2026', DATA_LABEL);
+const DATA_LABEL = data.dataVersionLabel('2026-09-17');
+check('market data label', DATA_LABEL === 'Damodaran January and September 2026, risk-free 15 September 2026', DATA_LABEL);
 const pdfs = {};
 const texts = {};
 for (const [label, result] of [['Saudi', saudi], ['full', full], ['Pakistan', pakistan], ['distressed', distressed]]) {
@@ -259,7 +259,9 @@ for (const [label, result] of [['Saudi', saudi], ['full', full], ['Pakistan', pa
     'EV / Revenue shown for reference; not used in the blend.',
     'A size premium and a private company discount are both applied.',
     'Powered by PaceMakers Business Valuation',
-    'Net debt at 31 December 2025, as entered, less free cash flow earned from then to 16 September 2026, gives net debt at the valuation date.',
+    'Net debt at 31 December 2025, as entered, less free cash flow earned from then to 16 September 2026, plus after-tax interest on it for that period, gives net debt at the valuation date.',
+    'Less after-tax interest on net debt for that period',
+    'uses forecast free cash flow, not actual results',
     'Add free cash flow from 31 December 2025 to the valuation date',
     'Financial years are assumed to end on 31 December.',
     'Implied terminal ROIC',
@@ -270,14 +272,14 @@ for (const [label, result] of [['Saudi', saudi], ['full', full], ['Pakistan', pa
     // Case-insensitive: the cover sets its labels in capitals.
     check(`reports say "${phrase}"`, all.replace(/\s+/g, ' ').toLowerCase().includes(phrase.toLowerCase()));
   }
-  check('Saudi report: tax and zakat row and zakat note', m.includes('Less tax and zakat at 2.5%') && m.replace(/\s+/g, ' ').includes('Invested capital was not entered, so the zakat base cannot be estimated'));
+  check('Saudi report: tax and zakat row and zakat note', m.includes('Less tax and zakat') && m.replace(/\s+/g, ' ').includes('Cash was not entered, so the base is working capital alone and may be understated.'));
   check('Saudi report: equity value as at the valuation date', m.includes('as at 16 September 2026'));
   check('full report: selected comparable companies by name', f.includes('Selected comparable companies (2)') && f.includes('Listed peer one'));
   check('risk-free yield printed to two decimals with its exact date', m.includes('5.00%') && m.replace(/\s+/g, ' ').includes('15 September 2026'));
   {
-    const zb = engine.runValuation({ ...state.toInputs(minimalCase(state), VALUATION_DATE), investedCapital: 60 }).result;
+    const zb = engine.runValuation({ ...state.toInputs(minimalCase(state), VALUATION_DATE), cash: 30 }).result;
     const zt = (await pageTexts(await pdfModule.renderValuationReport(zb, { ...REPORT_META, company: 'Example Co', industry: 'I', country: 'C', bookingHref: BOOK }))).join(' ').replace(/\s+/g, ' ');
-    check('zakat base on the report: base, fixed assets, amounts and the method note', zt.includes('Zakat base (approximate)') && zt.includes('Less fixed assets') && zt.includes('Zakat, FY2026 to FY2030') && zt.includes('of an approximate zakat base') && zt.includes('Less tax and zakat '));
+    check('zakat base on the report: working capital, cash, base, amounts and the method note', zt.includes('Zakat base (approximate)') && zt.includes('Working capital, year end') && zt.includes('Add cash, year end') && zt.includes('Zakat, FY2026 to FY2030') && zt.includes('working capital plus cash') && !zt.includes('Cash was not entered') && zt.includes('Less tax and zakat '));
   }
   for (const retired of ['Your 2 peers', 'What would increase your value', 'Implied exit multiple', 'about 5.0%', 'Midpoint', 'midpoint', 'losses not carried forward', 'is not carried forward']) {
     check(`reports no longer say "${retired}"`, !all.includes(retired));

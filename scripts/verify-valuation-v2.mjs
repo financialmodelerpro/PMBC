@@ -101,7 +101,8 @@ console.log('1. Neutral defaults');
   check('normalisation not used', !B.normalisation.used && B.ltmEbitda === B.ltmEbitdaReported);
   check('no other claims', B.bridge.otherClaims === 0);
   // Version 3: net debt at the year end, then the cash flow since it, between EV and equity.
-  check('bridge table has only net debt and the cash flow since the year end between EV and equity', format.bridgeTable(B).rows.length === 6);
+  // Version 3: net debt at the year end, the cash flow since, and after-tax interest on that net debt.
+  check('bridge table has net debt, the cash flow since the year end and the interest on it between EV and equity', format.bridgeTable(B).rows.length === 7);
   check('headline shows no stake', format.headline(B).stakeRange === null);
   check('default weights 25/50/25', B.scenarios.map((s) => s.weight).join() === '0.25,0.5,0.25');
   check('reference example warns on exactly the expected checks', codes(B).join() === BASE_WARNINGS, codes(B).join());
@@ -385,7 +386,7 @@ console.log('8. Pakistan with every feature');
     near('normalised LTM EBITDA', r.ltmEbitda, 1720 + 85 + 40);
     check('owner costs carried into the forecast', r.rows.every((row, k) => close(row.ebitda, i.financials.ebitda[3 + k] + 40)));
     near('other claims 160 + 220 + 75 - 300', r.bridge.otherClaims, 155);
-    check('equity is EV less net debt at the valuation date less claims', r.equity.every((v, k) => close(v, r.ev[k] - (1200 - r.rows[0].fcf * r.meta.stubFraction) - 155)));
+    check('equity is EV less net debt at the valuation date less claims', r.equity.every((v, k) => close(v, r.ev[k] - (1200 - r.rows[0].fcf * r.meta.stubFraction + 1200 * r.wacc.kd * (1 - r.wacc.t) * r.meta.stubFraction) - 155)));
     check('stake 40% with a 20% minority discount', r.stake.value.every((v, k) => close(v, r.equityDisplay[k] * 0.4 * 0.8)));
     check('the full example raises no stake warning', !codes(r).includes('stake_premium'));
     check('scenario weights 30/50/20', r.scenarios.map((x) => x.weight).join() === '0.3,0.5,0.2');
@@ -501,7 +502,10 @@ console.log('9. Schema version and WACC adjustment');
 console.log('11. Version 3');
 {
   const fin = BASE.financials;
-  const REG = { ...BASE, gccOwnership: 0, valuationDate: null };
+  // The old report's inputs, including its 4.23% January 2026 ERP, so the
+  // before and after comparison is like for like after the September ERP.
+  const REG = { ...BASE, gccOwnership: 0, valuationDate: null, wacc: { ...BASE.wacc, erp: 4.23 } };
+  check('the form now prefills the 1 September 2026 ERP of 4.14%', BASE.wacc.erp === 4.14 && data.MARKET.matureErp === 4.14);
   const reg = run(REG);
   const T = 7, P = 6;
 
@@ -522,6 +526,21 @@ console.log('11. Version 3');
     const nopatTv = Math.max(ebit, 0) * (1 + g) * (1 - t);
     near('terminal reinvestment rate is net capex plus working capital over NOPAT', reg.terminal.reinvestmentRate, (netCapex + dWc) / nopatTv);
     near('implied terminal ROIC is g over the reinvestment rate', reg.terminal.impliedRoic, g / ((netCapex + dWc) / nopatTv));
+    check('terminal returns check: silent when the implied ROIC is above WACC', reg.terminal.impliedRoic > reg.wacc.wacc && checkOf(reg, 'terminal_roic')?.status === 'pass');
+    {
+      // Lift final year reinvestment until the implied return falls below WACC.
+      const heavy = clone(fin);
+      heavy.capex[T] = heavy.da[T] + 150;
+      const lowRoic = run({ ...REG, financials: heavy });
+      check('terminal returns check: warns when the implied ROIC is below WACC', lowRoic.terminal.impliedRoic < lowRoic.wacc.wacc && checkOf(lowRoic, 'terminal_roic')?.status === 'warning', `${lowRoic.terminal.impliedRoic} vs ${lowRoic.wacc.wacc}`);
+      check('terminal returns check: chooses the returns point', lowRoic.recommendations.some((x) => x.id === 'returns'));
+      check('terminal returns check: needs no invested capital', !Number.isFinite(lowRoic.ratios.roic));
+      const noReinvest = clone(fin);
+      noReinvest.capex[T] = noReinvest.da[T] - 20;
+      noReinvest.nwc[T] = noReinvest.nwc[P];
+      const nr = run({ ...REG, financials: noReinvest });
+      check('terminal returns check: not listed when reinvestment is not positive', !Number.isFinite(nr.terminal.impliedRoic) === !checkOf(nr, 'terminal_roic'));
+    }
     check('terminal ROIC and reinvestment rate are on the assumptions', format.terminalRows(reg).some(([k]) => k === 'Implied terminal ROIC') && format.terminalRows(reg).some(([k]) => k === 'Terminal reinvestment rate'));
     check('implied terminal multiple is about 8.1x (was 6.2x)', format.fmtMultiple(reg.terminal.impliedMultiple) === '8.1x', reg.terminal.impliedMultiple);
     const old = engine.runValuation(REG, engine.REFERENCE_METHOD).result;
@@ -558,49 +577,58 @@ console.log('11. Version 3');
     check('refused by runValuation at step 1', engine.runValuation({ ...REG, financialYear: 2024, valuationDate: '2026-09-16' }).ok === false);
     check('exactly 12 months is refused', Boolean(engine.validateCompany({ ...REG, valuationDate: '2026-12-31' }).financialYear));
     check('a day short of 12 months runs', !engine.validateCompany({ ...REG, valuationDate: '2026-12-30' }).financialYear);
-    near('net debt at the valuation date is year end net debt less the elapsed year one cash flow', r.bridge.netDebtAtValuationDate, 45 - r.rows[0].fcf * f);
+    const kd = 0.0477 + 0.0051 + 0.02; // risk-free, country default spread, company credit spread
+    near('the interest rate is the pre-tax cost of debt from the WACC build', r.wacc.kd, kd);
+    const interest = 45 * kd * (1 - 0.2) * f;
+    near('after-tax interest on net debt for the elapsed period', r.bridge.elapsedInterest, interest);
+    near('net debt at the valuation date is year end net debt less the elapsed cash flow plus after-tax interest', r.bridge.netDebtAtValuationDate, 45 - r.rows[0].fcf * f + interest);
+    const cashCo = run({ ...REG, valuationDate: '2026-09-16', netDebt: -30 });
+    check('net cash accrues no interest', cashCo.bridge.elapsedInterest === 0 && close(cashCo.bridge.netDebtAtValuationDate, -30 - cashCo.rows[0].fcf * f));
+    check('the elapsed period is disclosed as forecast cash flow', format.disclosures(r).valuationDate.includes('uses forecast free cash flow, not actual results') && format.disclosures(r).valuationDate.includes('after-tax interest'));
     check('elapsed cash flow is exactly the part of year one not valued in the DCF', close(r.bridge.elapsedFcf + r.forecast[0].fcfValued, r.rows[0].fcf));
-    near('equity is EV less net debt at the valuation date', r.equity[1], r.ev[1] - (45 - r.rows[0].fcf * f));
+    near('equity is EV less net debt at the valuation date', r.equity[1], r.ev[1] - (45 - r.rows[0].fcf * f + interest));
     check('no stub: net debt is the entered figure exactly', reg.bridge.netDebtAtValuationDate === 45 && reg.bridge.elapsedFcf === 0);
     check('the financial year end disclosure is always present', format.disclosures(r).financialYearEnd === 'Financial years are assumed to end on 31 December.' && format.disclosures(reg).financialYearEnd.length > 0);
     check('a year still running takes no stub', run({ ...REG, financialYear: 2026, valuationDate: '2026-09-16' }).meta.stubFraction === 0);
-    check('the headline reads as at the valuation date', format.headline(r).asAt === 'as at 16 September 2026' && format.headline(r).netDebtNote === 'Net debt at 31 December 2025, as entered, less free cash flow earned from then to 16 September 2026, gives net debt at the valuation date.');
+    check('the headline reads as at the valuation date', format.headline(r).asAt === 'as at 16 September 2026' && format.headline(r).netDebtNote === 'Net debt at 31 December 2025, as entered, less free cash flow earned from then to 16 September 2026, plus after-tax interest on it for that period, gives net debt at the valuation date.');
   }
 
   // Tax and zakat.
   {
     const at = (gcc) => run({ ...REG, gccOwnership: gcc });
     near('0% GCC ownership: corporate tax', at(0).wacc.t, 0.2);
-    near('100% GCC ownership without invested capital: zakat on profit, the fallback', at(100).wacc.t, 0.025);
-    check('... and says so', at(100).tax.zakatMethod === 'profit_proxy' && format.disclosures(at(100)).zakat.startsWith('Invested capital was not entered'));
-    near('50% GCC ownership: blended', at(50).wacc.t, 0.5 * 0.2 + 0.5 * 0.025);
+    near('100% GCC ownership: no income tax, zakat on the base', at(100).wacc.t, 0);
+    near('50% GCC ownership: income tax on the non-GCC half only', at(50).wacc.t, 0.5 * 0.2);
     const z = at(100);
-    check('the effective rate reaches FCFF tax, terminal NOPAT and after-tax cost of debt', close(z.rows[2].tax, Math.max(0, z.rows[2].ebit) * 0.025) && close(z.terminal.tax, z.terminal.ebit * 0.025) && close(z.wacc.kdt, z.wacc.kd * 0.975));
-    check('the tax row says tax and zakat', format.taxRowLabel(z) === 'Less tax and zakat at 2.5%' && format.taxRowLabel(at(0)) === 'Less tax at 20.0%');
+    check('the income tax rate reaches FCFF, terminal NOPAT and after-tax cost of debt', close(z.rows[2].incomeTax, 0) && close(z.terminal.tax, z.terminal.zakat) && close(z.wacc.kdt, z.wacc.kd));
+    check('the tax row says tax and zakat', format.taxRowLabel(z) === 'Less tax and zakat' && format.taxRowLabel(at(0)) === 'Less tax at 20.0%');
 
-    // The zakat base method, by hand: invested capital rolled forward, fixed
-    // assets as invested capital less working capital, base floored at zero.
-    for (const [gccPct, ic] of [[100, 60], [100, 20], [40, 90]]) {
-      const zb = run({ ...REG, gccOwnership: gccPct, investedCapital: ic });
+    // The zakat base, by hand: working capital plus cash, floored at zero, cash
+    // held at its year end level.
+    for (const [gccPct, cash] of [[100, 30], [100, null], [40, 12], [100, 0]]) {
+      const zb = run({ ...REG, gccOwnership: gccPct, cash });
       const share = gccPct / 100;
-      check(`zakat base (${gccPct}%, IC ${ic}): method is the base`, zb.tax.zakatMethod === 'base');
-      near(`zakat base (${gccPct}%, IC ${ic}): income tax on the non-GCC share only`, zb.wacc.t, (1 - share) * 0.2);
-      let icT = ic;
-      const want = [3, 4, 5, 6, 7].map((i) => {
-        icT = icT + fin.capex[i] - fin.da[i] + (fin.nwc[i] - fin.nwc[i - 1]);
-        const fa = Math.max(0, icT - fin.nwc[i]);
-        return Math.max(0, icT - fa) * share * 0.025;
-      });
-      check(`zakat base (${gccPct}%, IC ${ic}): zakat each year is 2.5% of the rolled base on the GCC share`, zb.rows.every((row, k) => close(row.zakat, want[k])), JSON.stringify(zb.rows.map((x) => x.zakat)) + ' vs ' + JSON.stringify(want));
-      check(`zakat base (${gccPct}%, IC ${ic}): tax row is income tax plus zakat`, zb.rows.every((row) => close(row.tax, Math.max(0, row.ebit) * (1 - share) * 0.2 + row.zakat)));
+      const tag = `zakat base (${gccPct}%, cash ${cash ?? 'blank'})`;
+      check(`${tag}: method is the base`, zb.tax.zakatMethod === 'base');
+      near(`${tag}: income tax on the non-GCC share only`, zb.wacc.t, (1 - share) * 0.2);
+      const want = [3, 4, 5, 6, 7].map((i) => Math.max(0, fin.nwc[i] + (cash ?? 0)) * share * 0.025);
+      check(`${tag}: zakat each year is 2.5% of working capital plus cash on the GCC share`, zb.rows.every((row, k) => close(row.zakat, want[k])), JSON.stringify(zb.rows.map((x) => x.zakat)) + ' vs ' + JSON.stringify(want));
+      check(`${tag}: tax row is income tax plus zakat`, zb.rows.every((row) => close(row.tax, Math.max(0, row.ebit) * (1 - share) * 0.2 + row.zakat)));
       const ltm = zb.tax.zakatBaseLtm;
-      check(`zakat base (${gccPct}%, IC ${ic}): the last actual base is shown with its parts`, close(ltm.fixedAssets, Math.max(0, ic - fin.nwc[2])) && close(ltm.base, Math.max(0, ic - ltm.fixedAssets)));
-      near(`zakat base (${gccPct}%, IC ${ic}): terminal zakat is the final base grown at g`, zb.terminal.zakat, zb.rows[4].zakatBase * 1.025 * share * 0.025);
-      const rows = format.taxRows(zb).map(([k]) => k).join('|');
-      check(`zakat base (${gccPct}%, IC ${ic}): assumptions show the base and the amounts`, rows.includes('Zakat base (approximate)') && rows.includes('Less fixed assets') && rows.includes('Zakat, FY2026 to FY2030'));
-      check(`zakat base (${gccPct}%, IC ${ic}): reconciles`, reconcileModule.reconcile({ ...zb }).length === 0);
+      check(`${tag}: the last actual base is shown with its parts`, close(ltm.workingCapital, fin.nwc[2]) && ltm.cash === cash && close(ltm.base, Math.max(0, fin.nwc[2] + (cash ?? 0))));
+      near(`${tag}: terminal zakat is the final base grown at g`, zb.terminal.zakat, zb.rows[4].zakatBase * 1.025 * share * 0.025);
+      const rows = format.taxRows(zb);
+      check(`${tag}: assumptions show working capital, cash, the base and the amounts`, rows.some(([k]) => k === 'Zakat base (approximate)') && rows.some(([k, v]) => k === 'Add cash, year end' && (cash === null ? v === 'Not entered' : v !== 'Not entered')) && rows.some(([k]) => k === 'Zakat, FY2026 to FY2030'));
+      check(`${tag}: the missing cash disclosure appears only when cash is blank`, format.disclosures(zb).zakat.includes('Cash was not entered') === (cash === null));
+      check(`${tag}: reconciles`, reconcileModule.reconcile({ ...zb }).length === 0);
     }
-    check('zakat is charged in a loss year on the base method', (() => { const lf = clone(fin); lf.ebitda[3] = -20; const r0 = run({ ...REG, financials: lf, gccOwnership: 100, investedCapital: 80 }); return r0.rows[0].incomeTax === 0 && r0.rows[0].zakat > 0; })());
+    const negBase = clone(fin);
+    negBase.nwc = negBase.nwc.map(() => -40);
+    check('a negative working capital base floors at zero', run({ ...REG, financials: negBase, gccOwnership: 100, cash: 10 }).rows.every((row) => row.zakat === 0));
+    check('zakat is charged in a loss year', (() => { const lf = clone(fin); lf.ebitda[3] = -20; const r0 = run({ ...REG, financials: lf, gccOwnership: 100, cash: 5 }); return r0.rows[0].incomeTax === 0 && r0.rows[0].zakat > 0; })());
+    check('cash changes nothing but zakat', (() => { const a = run({ ...REG, gccOwnership: 0, cash: 500 }); return a.equity.every((v, k) => v === reg.equity[k]); })());
+    check('negative cash is refused', engine.validateCompany({ ...REG, cash: -1 }).cash === 'Enter cash as a positive amount, or leave it blank.');
+    check('form: cash is sent for Saudi Arabia only', state.toInputs({ ...minimalCase(state), cash: '9' }, VALUATION_DATE).cash === 9 && state.toInputs({ ...minimalCase(state), country: 'Qatar', cash: '9' }, VALUATION_DATE).cash === null);
     check('Saudi / GCC ownership is required from version 3, with no default', engine.validateCompany({ ...REG, gccOwnership: undefined }).gccOwnership === engine.GCC_REQUIRED_MESSAGE && engine.validateCompany({ ...REG, gccOwnership: null }).gccOwnership === engine.GCC_REQUIRED_MESSAGE);
     check('form: a new form leaves ownership blank; the example company fills it', state.initialState().gccOwnership === '' && state.exampleState().gccOwnership === '100');
     check('not required outside Saudi Arabia', !engine.validateCompany({ ...REG, country: 'Qatar', gccOwnership: null }).gccOwnership);
@@ -698,10 +726,13 @@ console.log('11. Version 3');
   // Market data.
   {
     const m = data.marketDataInUse();
-    check('the ERP falls back to the latest month and says so', m.aligned === false && m.erp.asOf === '2026-01' && m.treasury.asOf === '2026-09-15');
+    check('the September ERP is used, aligned with the Treasury month', m.aligned === true && m.erp.asOf === '2026-09-01' && m.erp.value === 4.14 && m.treasury.asOf === '2026-09-15');
+    check('the data version and its label moved with the ERP', data.VALUATION_DATA_VERSION === '2026-09-17' && data.dataVersionLabel('2026-09-17').includes('September 2026') && data.dataVersionLabel('2026-09-16') === 'Damodaran January 2026, risk-free September 2026');
     const rf = data.SOURCE_NOTES.find((n) => n.label === 'Risk-free rate');
     check('the risk-free source prints the yield to two decimals and its exact date', rf.source.includes('5.00%') && rf.asOf === '15 September 2026' && !JSON.stringify(data.SOURCE_NOTES).includes('about 5.0%'));
-    check('the market data line prints both dates', format.marketDataLine(reg).includes('15 September 2026') && format.marketDataLine(reg).includes('January 2026, latest available'));
+    check('the market data line prints both exact dates', format.marketDataLine(reg).includes('15 September 2026') && format.marketDataLine(reg).includes('4.14% (1 September 2026)'));
+    const erpNote = data.SOURCE_NOTES.find((x) => x.label === 'Mature market implied equity risk premium');
+    check('the ERP source names the figure, its basis and its date', erpNote.source.includes('4.14%') && erpNote.source.includes('adjusted payout') && erpNote.asOf === '1 September 2026');
   }
 
   // Reconciliation assertions.

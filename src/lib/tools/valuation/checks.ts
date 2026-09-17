@@ -211,7 +211,23 @@ export function buildChecks(r: ValuationResult, extra: { inflationLocal: number 
     });
   }
 
-  // 12 and 13. Only with invested capital.
+  // 12. Returns the terminal value implies, against WACC. Needs no extra input,
+  // so it runs whenever the implied return is measurable (reinvestment positive).
+  if (Number.isFinite(r.terminal.impliedRoic)) {
+    const roic = r.terminal.impliedRoic;
+    const low = roic < r.wacc.wacc;
+    add({
+      id: 'terminal_roic',
+      label: 'Terminal returns against WACC',
+      status: low ? 'warning' : 'pass',
+      message: low
+        ? `The terminal value implies a return on new capital of ${fmtPct(roic, 1)}, below the WACC of ${fmtPct(r.wacc.wacc)}, so growth in perpetuity destroys value.`
+        : `The terminal value implies a return on new capital of ${fmtPct(roic, 1)}, above the WACC of ${fmtPct(r.wacc.wacc)}.`,
+      values: { roic, wacc: r.wacc.wacc, reinvestmentRate: r.terminal.reinvestmentRate },
+    });
+  }
+
+  // 13 and 14. Only with invested capital.
   if (Number.isFinite(r.ratios.roic)) {
     const q = r.ratios;
     const low = q.roic < r.wacc.wacc;

@@ -27,7 +27,7 @@
  */
 
 /** Stamped on every lead. Bump on any change to a value in this file. */
-export const VALUATION_DATA_VERSION = '2026-09-16';
+export const VALUATION_DATA_VERSION = '2026-09-17';
 
 /**
  * How each data version is described to a reader: the PDF report's cover and
@@ -37,6 +37,7 @@ export const VALUATION_DATA_VERSION = '2026-09-16';
  */
 export const DATA_VERSION_LABELS: Record<string, string> = {
   '2026-09-16': 'Damodaran January 2026, risk-free September 2026',
+  '2026-09-17': 'Damodaran January and September 2026, risk-free 15 September 2026',
 };
 
 export function dataVersionLabel(version: string): string {
@@ -65,7 +66,7 @@ export const MARKET = {
    * figure `marketDataInUse` selects from `IMPLIED_ERP_BY_MONTH`; kept here
    * because the form prefills from it.
    */
-  matureErp: 4.23,
+  matureErp: 4.14,
   /**
    * Long-run expected US inflation, percent. The expected local inflation for
    * the currencies pegged to the dollar, used by the terminal growth check.
@@ -75,13 +76,17 @@ export const MARKET = {
 } as const;
 
 /**
- * Damodaran's implied equity risk premium by the month it was published,
- * YYYY-MM to percent. Add a month whenever a newer figure is taken. The value
+ * Damodaran's implied equity risk premium by the date it is as at, YYYY-MM-DD
+ * to percent (trailing 12 month cash yield with adjusted payout, the figure he
+ * leads with). Add a month whenever a newer figure is taken. The value
  * used is the month of the risk-free rate where there is one; otherwise the
  * latest month here, and the report then prints both dates so the gap shows.
  */
 export const IMPLIED_ERP_BY_MONTH: Record<string, number> = {
-  '2026-01': 4.23,
+  '2026-01-01': 4.23,
+  // pages.stern.nyu.edu/~adamodar, "Implied ERP on September 1, 2026 = 4.14%
+  // (Trailing 12 month, with adjusted payout)", checked 2026-09-17.
+  '2026-09-01': 4.14,
 };
 
 export type DatedValue = { value: number; asOf: string };
@@ -90,7 +95,8 @@ export type DatedValue = { value: number; asOf: string };
 export function marketDataInUse(): { treasury: DatedValue; erp: DatedValue; aligned: boolean } {
   const treasury = { value: MARKET.usTreasury10y, asOf: MARKET.usTreasury10yAsOf };
   const month = treasury.asOf.slice(0, 7);
-  if (month in IMPLIED_ERP_BY_MONTH) return { treasury, erp: { value: IMPLIED_ERP_BY_MONTH[month], asOf: month }, aligned: true };
+  const sameMonth = Object.keys(IMPLIED_ERP_BY_MONTH).filter((d) => d.startsWith(month)).sort().at(-1);
+  if (sameMonth) return { treasury, erp: { value: IMPLIED_ERP_BY_MONTH[sameMonth], asOf: sameMonth }, aligned: true };
   const latest = Object.keys(IMPLIED_ERP_BY_MONTH).sort().at(-1) as string;
   return { treasury, erp: { value: IMPLIED_ERP_BY_MONTH[latest], asOf: latest }, aligned: false };
 }
@@ -402,7 +408,7 @@ export const SOURCE_NOTES: SourceNote[] = [
   },
   {
     label: 'Mature market implied equity risk premium',
-    source: `Aswath Damodaran, implied equity risk premium of ${pct2(MARKET_DATA.erp.value)}`,
+    source: `Aswath Damodaran, implied equity risk premium of ${pct2(MARKET_DATA.erp.value)} (trailing 12 month cash yield, with adjusted payout), as at`,
     asOf: ERP_DATE_TEXT,
   },
   {
@@ -412,15 +418,15 @@ export const SOURCE_NOTES: SourceNote[] = [
   },
   {
     label: 'Set by PaceMakers',
-    source: 'Indicative exchange rates to SAR (used only for deal size bands and size premium thresholds), long-term inflation for non-pegged currencies, and preset private company multiples, size premium bands and credit spread, reviewed annually',
+    source: 'Indicative exchange rates to SAR, long-term inflation for non-pegged currencies, preset private company multiples, size premium bands and credit spread, reviewed annually',
     asOf: 'September 2026',
   },
   {
     label: 'Zakat and tax loss carry-forward',
-    source: `Zakat estimated at ${TAX.zakatRate}% of an approximate zakat base (invested capital less fixed assets), or of profit when invested capital is not entered. Loss offset caps simplified from local rules (Saudi Arabia 25% of taxable profit, United Arab Emirates 75%, elsewhere uncapped); loss expiry not modelled. Set by PaceMakers`,
+    source: `Zakat at ${TAX.zakatRate}% of an approximate base; loss offset caps simplified from local rules (Saudi Arabia 25%, United Arab Emirates 75%, elsewhere uncapped), expiry not modelled. Set by PaceMakers`,
     asOf: 'September 2026',
   },
 ];
 
 /** The one-paragraph version shown under the WACC build. */
-export const WACC_SOURCE_SENTENCE = `Sources: country risk premiums, default spreads and tax rates from Aswath Damodaran, January 2026 update. Implied equity risk premium of ${pct2(MARKET_DATA.erp.value)}, Damodaran, ${ERP_DATE_TEXT}. Unlevered betas (corrected for cash) and D/E from Damodaran global industry data, January 2026. Risk-free rate uses the US 10-year Treasury yield of ${pct2(MARKET_DATA.treasury.value)} (${formatDataDate(MARKET_DATA.treasury.asOf)}), less the ${pct2(MARKET.usDefaultSpread)} US default spread per Damodaran’s method.`;
+export const WACC_SOURCE_SENTENCE = `Sources: country risk premiums, default spreads and tax rates from Aswath Damodaran, January 2026 update. Implied equity risk premium of ${pct2(MARKET_DATA.erp.value)}, Damodaran, as at ${ERP_DATE_TEXT}. Unlevered betas (corrected for cash) and D/E from Damodaran global industry data, January 2026. Risk-free rate uses the US 10-year Treasury yield of ${pct2(MARKET_DATA.treasury.value)} (${formatDataDate(MARKET_DATA.treasury.asOf)}), less the ${pct2(MARKET.usDefaultSpread)} US default spread per Damodaran’s method.`;
