@@ -386,6 +386,12 @@ function nums(label, ours, ref) {
   ours.forEach((v, i) => num(`${label}[${i}]`, v, ref[i]));
 }
 
+/**
+ * The reference writes amounts in full ("SAR 385 million"); the tool writes them short ("SAR 385m") since
+ * 17 September 2026. Only the unit word is converted: every figure is still compared exactly.
+ */
+const shortAmounts = (text) => String(text).replace(/\s+thousand\b/g, 'k').replace(/\s+million\b/g, 'm').replace(/\s+billion\b/g, 'bn');
+
 function same(label, ours, ref) {
   const a = JSON.stringify(ours), b = JSON.stringify(ref);
   if (a === b) pass();
@@ -526,8 +532,8 @@ async function runCase(page, c) {
   // 3. Rendered text.
   const h = format.headline(r);
   const t = refOut.text;
-  same('headline equity range', h.equityRange, t.rRange);
-  same('headline EV range', h.evRange, t.rEv);
+  same('headline equity range', h.equityRange, shortAmounts(t.rRange));
+  same('headline EV range', h.evRange, shortAmounts(t.rEv));
   same('valuation date', h.valuationDate, t.rFy);
   same('KPI WACC', h.wacc, t.kW);
   same('KPI terminal value share', h.tvShare, t.kTv);
@@ -558,7 +564,7 @@ async function runCase(page, c) {
   // CHANGED 2: negative equity. The reference floored the low and high only.
   same('equity floor', r.equityFloor, c.expectFloor);
   if (c.expectFloor === 'none') {
-    same('headline midpoint', h.midpoint, t.rMid);
+    same('headline midpoint', h.midpoint, shortAmounts(t.rMid));
     if (h.floorNote === null) pass();
     else fail('floor note shown when equity is positive');
   } else {

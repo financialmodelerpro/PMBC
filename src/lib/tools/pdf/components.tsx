@@ -154,7 +154,7 @@ export function InnerHeader() {
 const clip = (text: string, max: number) => (text.length > max ? `${text.slice(0, max - 3).trimEnd()}...` : text);
 
 /** The firm's legal name, for the footer: the brand name with LLP, never twice. */
-export const legalName = (brandName: string) => (/LLP$/.test(brandName) ? brandName : `${brandName} LLP`);
+export const legalName = (brandName: string) => (/\bLLP$/.test(brandName) ? brandName : `${brandName} LLP`);
 
 /** Tool name, company and date, joined for a footer line. Long company names are shortened. */
 export function detailsLine(d: ReportDetails): string {

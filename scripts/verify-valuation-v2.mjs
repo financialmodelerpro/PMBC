@@ -796,7 +796,8 @@ console.log('11. Version 3');
     const sm = run(state.toInputs(state.onEnterWacc(state.resetWacc(small)), VALUATION_DATE));
     check('a small business prints in thousands', format.amountUnit(sm).label === 'SAR thousands' && format.bridgeTable(sm).head[0] === 'SAR thousands' && format.amountUnit(B).label === 'SAR millions');
     check('thousands reconcile', reconcileModule.reconcile(sm).length === 0, JSON.stringify(reconcileModule.reconcile(sm).slice(0, 2)));
-    check('sub-million headline in thousands, zero stays in millions', format.fmtBig(0.45, sm.currency) === 'SAR 450 thousand' && format.fmtBig(0, sm.currency) === 'SAR 0.0 million');
+    check('sub-million headline in thousands, zero stays in millions, both short', format.fmtBig(0.45, sm.currency) === 'SAR 450k' && format.fmtBig(0, sm.currency) === 'SAR 0.0m');
+    check('amounts are short: m for millions, bn for billions', format.fmtBig(12.5, sm.currency) === 'SAR 12.5m' && format.fmtBig(245, sm.currency) === 'SAR 245m' && format.fmtBig(1250, sm.currency) === 'SAR 1.25bn' && format.fmtBig(-5, sm.currency) === 'negative SAR 5.0m');
   }
 }
 
