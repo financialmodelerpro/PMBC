@@ -368,7 +368,8 @@ export function ValuationReport({ result, meta }: { result: ValuationResult; met
             <SubHead>Terminal value</SubHead>
             <KeyValues rows={terminalRows(r)} labelWidth="72%" />
             <SubHead>Comparables</SubHead>
-            <KeyValues rows={comparablesRows(r).filter(([k]) => !k.startsWith('Companies'))} labelWidth="52%" />
+            {/* Page 6 is the tightest page: EV / EBIT is on page 3's value by method instead. */}
+            <KeyValues rows={comparablesRows(r).filter(([k]) => !k.startsWith('Companies') && k !== 'After discount, EV / EBIT (reference)')} labelWidth="52%" />
           </View>
         </View>
         {r.comparables.peerNames.length > 0 && (

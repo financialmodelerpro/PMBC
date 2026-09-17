@@ -46,7 +46,7 @@ export const WACC_KEYS: WaccKey[] = ['rf', 'erp', 'crp', 'bu', 'de', 'sp', 'ds',
 
 export type FillKey = 'growth' | 'ebitdaMargin' | 'daOfRevenue' | 'capexOfRevenue' | 'nwcOfRevenue';
 
-export type PeerRow = { id: number; name: string; evEbitda: string; evRevenue: string };
+export type PeerRow = { id: number; name: string; evEbitda: string; evRevenue: string; evEbit: string };
 
 export type BridgeKey = 'eosb' | 'leases' | 'minorityInterest' | 'surplusAssets';
 export type ScenarioKey = 'upsideGrowth' | 'upsideMargin' | 'downsideGrowth' | 'downsideMargin' | 'weightDownside' | 'weightBase' | 'weightUpside';
@@ -76,7 +76,13 @@ export type FormState = {
   /* Version 2 ---------------------------------------------------------- */
   norm: { oneOff: string; ownerCosts: string; carryOwnerCosts: boolean };
   bridge: Record<BridgeKey, string>;
+  /** Invested capital as one figure: stored inputs from before it was split, and the verifiers. Not shown on the form. */
   investedCapital: string;
+  /** Invested capital in two parts. Blank working capital means the last actual year's figure from the financials. */
+  icWorkingCapital: string;
+  icFixedAssets: string;
+  /** The zakat rate, percent. Saudi Arabia only; 2.5 by default and editable. */
+  zakatRate: string;
   stake: { percent: string; adjustment: StakeAdjustment; controlPremium: string; minorityDiscount: string };
   /** True once the visitor picks an adjustment. Until then it follows the stake size. */
   stakeAdjustmentTouched: boolean;
@@ -91,9 +97,9 @@ export type FormState = {
 };
 
 let peerSeq = 0;
-export function newPeer(name = '', evEbitda = '', evRevenue = ''): PeerRow {
+export function newPeer(name = '', evEbitda = '', evRevenue = '', evEbit = ''): PeerRow {
   peerSeq += 1;
-  return { id: peerSeq, name, evEbitda, evRevenue };
+  return { id: peerSeq, name, evEbitda, evRevenue, evEbit };
 }
 
 export function initialState(): FormState {
@@ -128,6 +134,9 @@ export function initialState(): FormState {
     norm: { oneOff: '', ownerCosts: '', carryOwnerCosts: false },
     bridge: { eosb: '', leases: '', minorityInterest: '', surplusAssets: '' },
     investedCapital: '',
+    icWorkingCapital: '',
+    icFixedAssets: '',
+    zakatRate: String(TAX.zakatRate),
     stakeAdjustmentTouched: false,
     stake: {
       percent: String(d.stake.percent),
@@ -187,7 +196,7 @@ export function withForecastFrom(fin: FormState['fin'], filled: Financials): For
 }
 
 export function parsePeers(rows: PeerRow[]): Peer[] {
-  return rows.map((r) => ({ name: r.name.trim(), evEbitda: num(r.evEbitda), evRevenue: num(r.evRevenue) }));
+  return rows.map((r) => ({ name: r.name.trim(), evEbitda: num(r.evEbitda), evRevenue: num(r.evRevenue), evEbit: num(r.evEbit ?? '') }));
 }
 
 export function parseWacc(w: FormState['wacc']): WaccInputs {
@@ -217,7 +226,7 @@ export function toInputs(s: FormState, valuationDate: string | null = todayIso()
     exitMultiple: num(s.exitMultiple),
     midYear: s.midYear,
     // Only rows with something in them travel, as the reference recorded.
-    peers: parsePeers(s.peers).filter((p) => p.name || p.evEbitda !== null || p.evRevenue !== null),
+    peers: parsePeers(s.peers).filter((p) => p.name || p.evEbitda !== null || p.evRevenue !== null || p.evEbit !== null),
     privateDiscount: num(s.privateDiscount),
     dcfWeight: num(s.dcfWeight),
     normalisation: { oneOff: num(s.norm.oneOff), ownerCosts: num(s.norm.ownerCosts), carryOwnerCosts: s.norm.carryOwnerCosts },
@@ -227,7 +236,9 @@ export function toInputs(s: FormState, valuationDate: string | null = todayIso()
       minorityInterest: num(s.bridge.minorityInterest),
       surplusAssets: num(s.bridge.surplusAssets),
     },
-    investedCapital: num(s.investedCapital),
+    // Two parts when net fixed assets are entered (the engine sums them); the single legacy figure otherwise.
+    investedCapital: num(s.icFixedAssets) !== null ? investedCapitalOf(s) : num(s.investedCapital),
+    investedCapitalParts: num(s.icFixedAssets) !== null ? { workingCapital: num(s.icWorkingCapital), fixedAssets: num(s.icFixedAssets) } : null,
     stake: {
       percent: num(s.stake.percent),
       adjustment: s.stake.adjustment,
@@ -246,6 +257,7 @@ export function toInputs(s: FormState, valuationDate: string | null = todayIso()
     waccAdjustment: num(s.waccAdjustment) ?? 0,
     profile: cleanProfile({ companyName: s.companyName, description: s.description }),
     gccOwnership: s.country === TAX.zakatCountry ? num(s.gccOwnership) : null,
+    zakatRate: s.country === TAX.zakatCountry ? num(s.zakatRate) : null,
     cash: num(s.cash),
     valuationDate,
   };
@@ -404,7 +416,7 @@ export function stateFromInputs(i: ValuationInputs): FormState {
     exitMultiple: d(i.exitMultiple),
     xmTouched: true,
     midYear: i.midYear,
-    peers: i.peers.length ? i.peers.map((p) => newPeer(p.name, d(p.evEbitda), d(p.evRevenue))) : base.peers,
+    peers: i.peers.length ? i.peers.map((p) => newPeer(p.name, d(p.evEbitda), d(p.evRevenue), d(p.evEbit ?? null))) : base.peers,
     privateDiscount: d(i.privateDiscount),
     discountTouched: true,
     dcfWeight: d(i.dcfWeight),
@@ -414,7 +426,10 @@ export function stateFromInputs(i: ValuationInputs): FormState {
     bridge: i.bridge
       ? { eosb: d(i.bridge.eosb), leases: d(i.bridge.leases), minorityInterest: d(i.bridge.minorityInterest), surplusAssets: d(i.bridge.surplusAssets) }
       : base.bridge,
-    investedCapital: d(i.investedCapital),
+    investedCapital: i.investedCapitalParts?.fixedAssets !== null && i.investedCapitalParts?.fixedAssets !== undefined ? '' : d(i.investedCapital),
+    icWorkingCapital: d(i.investedCapitalParts?.workingCapital ?? null),
+    icFixedAssets: d(i.investedCapitalParts?.fixedAssets ?? null),
+    zakatRate: d(i.zakatRate ?? TAX.zakatRate),
     stakeAdjustmentTouched: true,
     stake: i.stake
       ? { percent: d(i.stake.percent), adjustment: i.stake.adjustment, controlPremium: d(i.stake.controlPremium), minorityDiscount: d(i.stake.minorityDiscount) }
@@ -449,6 +464,18 @@ export function balancesFromInputs(i: ValuationInputs): { debt: string; cash: st
   if (i.netDebt === null || i.netDebt === undefined) return { debt: '', cash: d(i.cash) };
   const zakatCash = i.cash ?? 0;
   return { debt: d(Math.max(i.netDebt, 0) + zakatCash), cash: d(zakatCash + Math.max(-i.netDebt, 0)) };
+}
+
+/**
+ * Invested capital from the form's two boxes: working capital (blank means the
+ * last actual year's net working capital in the financials) plus net fixed
+ * assets. Null until net fixed assets are entered.
+ */
+export function investedCapitalOf(s: Pick<FormState, 'icWorkingCapital' | 'icFixedAssets' | 'fin'>): number | null {
+  const fa = num(s.icFixedAssets);
+  if (fa === null) return null;
+  const wc = num(s.icWorkingCapital) ?? num(s.fin.nwc[HISTORY_YEARS - 1]);
+  return wc === null ? null : wc + fa;
 }
 
 /** Net debt from the form's borrowings and cash, or null until both are numbers. */

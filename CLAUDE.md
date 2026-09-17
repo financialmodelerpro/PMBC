@@ -1093,6 +1093,18 @@ page from before the change still saves, as version 3 with net debt as entered.
 `balancesFromInputs` splits version 3 inputs into borrowings and cash with the
 same net debt and zakat cash.
 
+Added 2026-09-17, all optional and neutral when unused (no schema bump):
+**zakat rate** (`zakatRate`, Saudi Arabia only, 2.5% by default via
+`TAX.zakatRate`, 0 to `TAX.maxZakatRate` 10%; notes and assumptions state the
+rate used); **invested capital in two parts** (`investedCapitalParts`: working
+capital, blank meaning the last actual year's net working capital, plus net
+fixed assets; `withDerivedInputs` sums them, overriding a single
+`investedCapital`, which stored inputs and verifiers may still use); and
+**EV / EBIT from peers** (`Peer.evEbit`, at least two needed, on last actual
+EBIT after the private company discount), a reference row in value by method
+and on the results page that never enters the blend. The PDF keeps it off page
+6, the tightest page.
+
 ### Business Valuation version 3
 
 Shipped 2026-09-17 (`feat/valuation-engine-report-v3`). Input schema version 3.
@@ -1173,8 +1185,8 @@ cases and rasterises every page to PNG for inspection.
 5. Checks in `verify-valuation-v2` for the item on its own and absent, then `verify-valuation-engine` to prove the neutral path.
 
 **Verifiers.** `verify-valuation-engine` (518: 514 reference parity plus 4 on the market data passed into the reference),
-`verify-valuation-v2` (378), `verify-tool-lead-api` (130),
-`verify-valuation-dashboard` (258, the results page end to end at 1440, 1024 and 390, including the partner portrait's 4:5 frame and source ratio,
+`verify-valuation-v2` (404), `verify-tool-lead-api` (132),
+`verify-valuation-dashboard` (267, the results page end to end at 1440, 1024 and 390, including the partner portrait's 4:5 frame and source ratio,
 against a local `next start`, every /api/ request intercepted so nothing is
 written), `verify-tool-email-pdf` (369, pdfjs text and operator list, including the report theme's footer, colour and logo rules, so a ligature glyph is
 caught even though extracted text maps it back to letters),
@@ -1208,7 +1220,7 @@ the results dashboard charts use `SITE_CHART_PALETTE` (the default in
 - White pages, light neutral table shading, warnings in `#B3412F`.
 
 **Pages.**
-- **Cover** (`ReportCover`): the letterhead header, measured from the letterhead PDF's vector paths and a 3x render (`LETTERHEAD` in `theme.ts`): a navy bar at the very top edge, the green swoosh (three copies of one shape, two shaded and one solid) hanging from it on the right, and the logo on the left below the bar. **No tagline in the header** on any page: the tagline appears in the footer only (the letterhead file prints one below the swoosh; reports deliberately do not). Everything is scaled by the same factor in both directions, so the swoosh is never stretched or cut off. Then company, report title, headline range and date, and the report footer.
+- **Cover** (`ReportCover`): the letterhead header, measured from the letterhead PDF's vector paths and a 3x render (`LETTERHEAD` in `theme.ts`): a navy bar at the very top edge, the green swoosh (three copies of one shape, two shaded and one solid) hanging from it on the right, and the logo on the left below the bar, drawn 22% smaller than the letterhead's (31.7pt tall), as the owner chose. **No tagline in the header** on any page: the tagline appears in the footer only (the letterhead file prints one below the swoosh; reports deliberately do not). Everything is scaled by the same factor in both directions, so the swoosh is never stretched or cut off. Then company, report title, headline range and date, and the report footer.
 - **Inner pages** (`ReportPage`): `InnerHeader`, a thin navy bar at the top edge with a small copy of the same swoosh on the right (scale 0.42). No logo or tagline in the header; content starts high; the footer.
 - **Footer**, the same on every page, cover and closing page included (no page carries the letterhead's footer band): small logo, "PaceMakers Business Consultants LLP" and the tagline on the left; tool name, company, date and "Page X of Y" on the right; the same navy rule with a green accent above it. Long company names are shortened.
 - **Closing page** (`ClosingPage`): the letterhead header, the closing content, the **legal line and contact details, stated once in the report** (`LegalAndContact`), and the report footer. The contact details come from Site Settings (advisory email, site, office location); the letterhead's phone number is not in Site Settings and is not printed.

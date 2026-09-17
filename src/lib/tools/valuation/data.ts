@@ -121,7 +121,9 @@ export const TAX = {
    * owned share, or to profit when invested capital was not entered (see
    * `taxProfile` and `zakatBase` in engine.ts).
    */
+  /** The default zakat rate, percent. Editable for Saudi Arabia, from 0 to `maxZakatRate`. */
   zakatRate: 2.5,
+  maxZakatRate: 10,
   /** The one country where the Saudi / GCC ownership input is asked and zakat applies. */
   zakatCountry: 'Saudi Arabia',
 } as const;
@@ -426,7 +428,7 @@ export const SOURCE_NOTES: SourceNote[] = [
   },
   {
     label: 'Zakat and tax loss carry-forward',
-    source: `Zakat at ${TAX.zakatRate}% of an approximate base; loss offset caps simplified from local rules (Saudi Arabia 25%, United Arab Emirates 75%, elsewhere uncapped), expiry not modelled. Set by PaceMakers`,
+    source: `Zakat at ${TAX.zakatRate}% by default (editable) of an approximate base; loss offset caps simplified from local rules (Saudi Arabia 25%, United Arab Emirates 75%, elsewhere uncapped), expiry not modelled. Set by PaceMakers`,
     asOf: 'September 2026',
   },
 ];

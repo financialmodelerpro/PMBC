@@ -313,7 +313,9 @@ console.log('Version 2 inputs');
     ['weights totalling 90', { ...full, scenarios: { ...full.scenarios, weightBase: 40 } }],
     ['stake of 0', { ...full, stake: { ...full.stake, percent: 0 } }],
     ['stake adjustment not in the list', { ...full, stake: { ...full.stake, adjustment: 'bonus' } }],
-    ['invested capital of zero', { ...full, investedCapital: 0 }],
+    ['invested capital of zero', { ...full, investedCapitalParts: null, investedCapital: 0 }],
+    ['negative net fixed assets', { ...full, investedCapitalParts: { workingCapital: null, fixedAssets: -5 } }],
+    ['zakat rate above 10%', { ...full, country: 'Saudi Arabia', gccOwnership: 100, zakatRate: 12 }],
     ['add-back as text', { ...full, normalisation: { ...full.normalisation, oneOff: 'ten' } }],
   ];
   for (const [label, inputs] of refuse) {

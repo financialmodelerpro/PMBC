@@ -56,7 +56,7 @@ const inputsSchema = z.object({
   exitMultiple: cell,
   midYear: z.boolean(),
   peers: z
-    .array(z.object({ name: z.string().max(120), evEbitda: cell, evRevenue: cell }))
+    .array(z.object({ name: z.string().max(120), evEbitda: cell, evRevenue: cell, evEbit: cell.optional() }))
     .max(25),
   privateDiscount: cell,
   dcfWeight: cell,
@@ -92,6 +92,8 @@ const inputsSchema = z.object({
   // replaces it with its own date (`stampServerFields`).
   gccOwnership: cell.optional(),
   cash: cell.optional(),
+  zakatRate: cell.optional(),
+  investedCapitalParts: z.object({ workingCapital: cell, fixedAssets: cell }).nullable().optional(),
   raiseAmount: cell.optional(),
   purpose: z.string().max(40).nullable().optional(),
   valuationDate: z.string().max(20).nullable().optional(),

@@ -350,6 +350,7 @@ export default async function ToolLeadDetailPage(props: { params: Promise<{ id: 
                   ...(inputs.country === 'Saudi Arabia'
                     ? ([
                         ['Saudi / GCC ownership', (inputs.schemaVersion ?? 1) >= 3 ? `${extras.gccOwnership}%` : 'Not asked (saved before version 3); valued on corporate tax'],
+                        ['Zakat rate', `${inputs.zakatRate ?? 2.5}%`],
                         ['Cash at year end (zakat base only)', inputs.cash === null || inputs.cash === undefined ? 'Not entered' : `${inputs.cash} ${result.currency.code} m`],
                       ] as [string, string][])
                     : []),
@@ -373,7 +374,7 @@ export default async function ToolLeadDetailPage(props: { params: Promise<{ id: 
                   [
                     'Peers',
                     inputs.peers.length
-                      ? inputs.peers.map((p) => `${p.name || 'Unnamed'} (${n(p.evEbitda)}x, ${n(p.evRevenue)}x)`).join('; ')
+                      ? inputs.peers.map((p) => `${p.name || 'Unnamed'} (${n(p.evEbitda)}x, ${n(p.evRevenue)}x${p.evEbit !== null && p.evEbit !== undefined ? `, EV / EBIT ${p.evEbit}x` : ''})`).join('; ')
                       : 'None, preset multiples used',
                   ],
                 ]}
@@ -399,7 +400,7 @@ export default async function ToolLeadDetailPage(props: { params: Promise<{ id: 
                   ['One-off costs added back', opt(extras.normalisation.oneOff, ` ${code} m`)],
                   ['Owner costs added back', opt(extras.normalisation.ownerCosts, ` ${code} m`)],
                   ['Carry owner costs into forecast', extras.normalisation.carryOwnerCosts ? 'Yes' : 'No'],
-                  ['Invested capital', opt(inputs.investedCapital, ` ${code} m`)],
+                  ['Invested capital', inputs.investedCapitalParts?.fixedAssets !== null && inputs.investedCapitalParts?.fixedAssets !== undefined ? `working capital ${inputs.investedCapitalParts.workingCapital ?? 'from the financials'} plus fixed assets ${inputs.investedCapitalParts.fixedAssets} ${code} m` : opt(inputs.investedCapital, ` ${code} m`)],
                   ['End of service benefits', opt(extras.bridge.eosb, ` ${code} m`)],
                   ['Lease liabilities', opt(extras.bridge.leases, ` ${code} m`)],
                   ['Minority interest', opt(extras.bridge.minorityInterest, ` ${code} m`)],
