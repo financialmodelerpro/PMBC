@@ -991,6 +991,8 @@ default.
 6. A verifier against whatever the tool was specified from.
 7. `build: 'ready'`, deploy, preview it signed in, then switch it Live at `/admin/tools`.
 
+**Other tools on each tool page.** Below every tool, "Try our other free tools" lists the other Live tools as the same cards the hub uses (`ToolCard`), in registry order, so a new tool is offered on every tool page the moment it is switched Live, with no code change. Staff previews also show ready tools that are still Hidden, marked Hidden; drafts never appear. With nothing to offer the section renders nothing, which is the state while Business Valuation is the only Live tool. Rules in `src/lib/tools/otherTools.ts`, proved by `verify-tools-visibility`.
+
 ### Refreshing the Damodaran data each January
 
 Damodaran publishes his annual update in early January. All values are in
@@ -1190,7 +1192,7 @@ cases and rasterises every page to PNG for inspection.
 against a local `next start`, every /api/ request intercepted so nothing is
 written), `verify-tool-email-pdf` (369, pdfjs text and operator list, including the report theme's footer, colour and logo rules, so a ligature glyph is
 caught even though extracted text maps it back to letters),
-`verify-tools-visibility` (89), `verify-brevo-webhook` (168), `verify-booking-links` (61) and
+`verify-tools-visibility` (97), `verify-brevo-webhook` (168), `verify-booking-links` (61) and
 `verify-production-guard` (34). Each was
 break-tested. `npm run render-valuation-examples -- <dir>` renders the minimal and
 full-feature reports for review, reading the logo and partner read-only.

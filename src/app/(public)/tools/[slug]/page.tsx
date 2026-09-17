@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 
 import { findTool, toolPageSlug, toolPath } from '@/config/tools';
 import { AdminPreviewBanner } from '@/components/tools/AdminPreviewBanner';
+import { OtherTools } from '@/components/tools/OtherTools';
 import { ToolHero } from '@/components/tools/ToolHero';
 import { ToolJsonLd } from '@/components/seo/ToolJsonLd';
 import { TOOL_COMPONENTS } from '@/components/tools/toolComponents';
@@ -12,6 +13,7 @@ import { fetchPage, fetchPageSections } from '@/lib/cms/pages';
 import { fetchSiteSettings } from '@/lib/cms/settings';
 import { PAGE_GUTTER } from '@/lib/public/layout';
 import { buildPageMetadata } from '@/lib/seo/metadata';
+import { otherToolsFor } from '@/lib/tools/otherTools';
 import { fetchToolVisibility, findToolIn } from '@/lib/tools/visibility';
 import { TOOL_DISCLAIMER } from '@/lib/tools/valuation/format';
 
@@ -95,6 +97,8 @@ export default async function ToolPage(props: {
           {TOOL_DISCLAIMER}
         </p>
       </section>
+      {/* Other Live tools, added automatically when one is switched Live; nothing when there are none. */}
+      <OtherTools tools={otherToolsFor(snapshot, slug, { staff: Boolean(staff) })} preview={preview} />
     </main>
   );
 }
