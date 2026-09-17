@@ -1154,6 +1154,10 @@ so reproduces the figures they were sent.
 
 **Pages.** The PDF is eight pages (below). Amounts print in thousands when
 enterprise value and revenue are both under 10 million (`amountUnit`).
+**Amounts in words are short** (`fmtBig`, since 2026-09-17): "SAR 450k", "SAR 12.5m",
+"SAR 245m", "SAR 1.25bn", on the results page, in the emails and in the report,
+which share the formatter. `verify-valuation-engine` converts the reference's
+words ("million") before comparing, so every figure is still matched exactly.
 
 **Exploration and versions.** The sliders recompute in the browser and save
 nothing. **Email me this version** posts the explored inputs; the server

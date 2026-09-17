@@ -76,7 +76,7 @@ function RangeTeaser({ d }: { d: SummaryData }) {
         Indicative equity value
       </p>
       <p aria-hidden className="pmbc-display mt-1.5 select-none text-[20px] leading-tight blur-[6px]">
-        {d.currency.code} 000 million to {d.currency.code} 000 million
+        {d.currency.code} 000m to {d.currency.code} 000m
       </p>
       <p className="mt-2 flex items-center gap-1.5 text-[12.5px] text-[#E8DDC4]">
         <Lock aria-hidden size={13} />

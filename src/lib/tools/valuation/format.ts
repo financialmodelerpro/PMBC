@@ -44,15 +44,18 @@ export function fmtPct(v: number, digits = 2): string {
   return (/^-0\.?0*$/.test(s) ? s.slice(1) : s) + '%';
 }
 
-/** "SAR 450 thousand", "SAR 12.5 million", "SAR 245 million", "SAR 1.25 billion". */
+/**
+ * Amounts in words, short: "SAR 450k", "SAR 12.5m", "SAR 245m", "SAR 1.25bn" (since 17 September 2026;
+ * "million" in full made the report heavy). Shared by the results page, the emails and the report.
+ */
 export function fmtBig(v: number, currency: Currency): string {
   if (!Number.isFinite(v)) return 'n/a';
   const a = Math.abs(v), s = v < 0 && a >= 0.0005 ? 'negative ' : '';
-  // Under one million, thousands; a figure that rounds to zero stays in millions, as "SAR 0.0 million".
-  if (a < 1 && a >= 0.0005) return `${s}${currency.code} ${Math.round(a * 1000).toLocaleString('en-US')} thousand`;
+  // Under one million, thousands; a figure that rounds to zero stays in millions, as "SAR 0.0m".
+  if (a < 1 && a >= 0.0005) return `${s}${currency.code} ${Math.round(a * 1000).toLocaleString('en-US')}k`;
   return a >= 1000
-    ? `${s}${currency.code} ${(a / 1000).toFixed(2)} billion`
-    : `${s}${currency.code} ${a.toFixed(a >= 100 ? 0 : 1)} million`;
+    ? `${s}${currency.code} ${(a / 1000).toFixed(2)}bn`
+    : `${s}${currency.code} ${a.toFixed(a >= 100 ? 0 : 1)}m`;
 }
 
 export function fmtMultiple(v: number): string {
