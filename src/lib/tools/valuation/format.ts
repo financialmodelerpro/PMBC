@@ -14,7 +14,7 @@
  * `warningTexts`) still format them, from the fields they did have.
  */
 
-import { ASSUMPTIONS, COUNTRIES, SOURCE_NOTES, TAX, WARNING_RULES, builtCostOfDebtNote, defaultCostOfDebt, formatDataDate, lendingForCurrency, lendingSourceNote, type LendingRate } from './data';
+import { ASSUMPTIONS, COUNTRIES, SOURCE_NOTES, TAX, WARNING_RULES, builtCostOfDebtNote, countryInflation, defaultCostOfDebt, formatDataDate, lendingForCurrency, lendingSourceNote, type LendingRate } from './data';
 import type {
   Check,
   Currency,
@@ -655,7 +655,8 @@ export function defaultLending(w: ValuationResult['wacc'], currency: Currency): 
   const found = lendingForCurrency(currency.code, currency.country);
   if (!found) return null;
   // The default as the form fills it, rounded to the hundredth of a point (3.625% + 2.0% is 5.63%).
-  const def = defaultCostOfDebt(found.country) as number;
+  const def = defaultCostOfDebt(found.country);
+  if (def === null) return null;
   return Math.abs(w.kdEntered * 100 - def) < 0.005 ? found.lending : null;
 }
 
@@ -1233,6 +1234,23 @@ export function marketDataLine(r: ValuationResult): string {
   const rf = `US 10-year Treasury ${fmtPct(m.treasury.value / 100)} (${formatDataDate(m.treasury.asOf)})`;
   const erp = `implied equity risk premium ${fmtPct(m.erp.value / 100)} (${formatDataDate(m.erp.asOf)}${m.erpAligned ? '' : ', latest available'})`;
   return `${rf}; ${erp}.`;
+}
+
+/**
+ * The warning for a currency with very high expected inflation (since 2026-09-23): at or above
+ * `ASSUMPTIONS.highInflationPercent`, on the inflation entered or the country's default, whichever
+ * is higher. Shown on the results page and the report cover; null otherwise, and for pegged currencies.
+ */
+export function highInflationWarning(r: ValuationResult): string | null {
+  if (r.currency.pegged) return null;
+  const country = r.meta?.country ?? '';
+  const entered = Number.isFinite(r.wacc.inflationLocal) ? (r.wacc.inflationLocal as number) * 100 : NaN;
+  const def = countryInflation(country) ?? NaN;
+  const inflation = Math.max(Number.isFinite(entered) ? entered : -Infinity, Number.isFinite(def) ? def : -Infinity);
+  if (!(inflation >= ASSUMPTIONS.highInflationPercent)) return null;
+  const code = r.currency.code;
+  const used = Number.isFinite(entered) ? `${fmtPct(entered / 100, 1)} a year is used here` : 'a high rate is assumed';
+  return `Results are highly uncertain. Expected inflation in ${code} is very high (${used}), so converting the cost of capital into ${code}, the long-term growth rate and a forecast in nominal ${code} each carry a wide margin of error. Treat this range as a rough indication only; a valuation in US dollars may be more reliable.`;
 }
 
 export function growthCeilingFor(country: string): number | null {

@@ -1,6 +1,6 @@
 'use client';
 
-import { ASSUMPTIONS, LENDING_RATES, WACC_SOURCE_SENTENCE, formatDataDate, type LendingRate } from '@/lib/tools/valuation/data';
+import { ASSUMPTIONS, WACC_SOURCE_SENTENCE, benchmarkStatus, builtCostOfDebtReason, formatDataDate } from '@/lib/tools/valuation/data';
 import type { Currency, WaccBreakdown } from '@/lib/tools/valuation/engine';
 import { fmtPct, waccSteps } from '@/lib/tools/valuation/format';
 
@@ -71,12 +71,13 @@ export function WaccStep({
   const kdEntered = state.wacc.kd.trim() !== '';
   // The default's source: the country's lending base rate, its date and source, plus the typical margin.
   const kdHint = () => {
-    const l = (LENDING_RATES as Record<string, LendingRate | undefined>)[state.country];
+    const b = benchmarkStatus(state.country);
+    const l = b.status === 'used' ? b.lending : null;
     return l
       ? `Set from the ${l.name}, ${l.rate.toFixed(2)}% as at ${formatDataDate(l.asOf)} (${l.source}), plus a ${ASSUMPTIONS.companyCreditSpread.toFixed(1)}% margin set by PaceMakers. In ${currency.code}. Change it to your own borrowing rate, or clear it to build it from the spreads.`
       : kdEntered
         ? `What the company pays on its borrowings, in ${currency.code}. Clear it to build it from the spreads.`
-        : `No benchmark lending rate is on file for ${state.country || 'this country'}, so the cost of debt is built from the risk-free rate, the country default spread and a ${ASSUMPTIONS.companyCreditSpread.toFixed(1)}% margin. Enter the company's own rate in ${currency.code} to use it instead.`;
+        : `${builtCostOfDebtReason(state.country || 'this country')}, so the cost of debt is built from the risk-free rate, the country default spread and a ${ASSUMPTIONS.companyCreditSpread.toFixed(1)}% margin. Enter the company's own rate in ${currency.code} to use it instead.`;
   };
   const hintFor = (s: Spec) =>
     (s.k === 'ds' || s.k === 'cs') && kdEntered

@@ -31,7 +31,7 @@
  */
 
 /** Stamped on every lead. Bump on any change to a value in this file. */
-export const VALUATION_DATA_VERSION = '2026-09-22';
+export const VALUATION_DATA_VERSION = '2026-09-23';
 
 /**
  * How each data version is described to a reader: the PDF report's cover and
@@ -46,6 +46,8 @@ export const DATA_VERSION_LABELS: Record<string, string> = {
   '2026-09-21': 'Market data: Damodaran 2026, risk-free 15 September 2026, local lending rates 2026',
   // Every country Damodaran covers, with central bank policy rates from the BIS where no local benchmark was set.
   '2026-09-22': 'Market data: Damodaran 2026, risk-free 15 September 2026, local lending rates 2026',
+  // PKR to SAR updated; benchmark rates far above the inflation default no longer used.
+  '2026-09-23': 'Market data: Damodaran 2026, risk-free 15 September 2026, local lending rates 2026',
 };
 
 export function dataVersionLabel(version: string): string {
@@ -142,6 +144,17 @@ export const TAX = {
 export const ASSUMPTIONS = {
   /** Default company credit spread over the base rate, percent. */
   companyCreditSpread: 2.0,
+  /**
+   * A benchmark lending rate more than this many points above the country's expected long-term
+   * inflation (`inflationLocal`, or US long-run inflation for the pegged currencies) is not used as
+   * the default cost of debt (since 2026-09-23). A policy rate set against today's inflation, well
+   * above the long-term figure the conversion uses, gives an unrealistic US dollar cost of debt
+   * (Turkey: 37% against 15%). Those countries build it from the spreads instead. Pakistan, at 4.75
+   * points, is inside it.
+   */
+  maxBenchmarkAboveInflationPoints: 5,
+  /** Expected local inflation at or above this, percent, marks the results as highly uncertain. */
+  highInflationPercent: 15,
   /**
    * Size and company-specific premium by last actual revenue, in SAR millions.
    * Below `smallBelow`: `small`. Below `midBelow`: `mid`. Otherwise `large`.
@@ -286,9 +299,11 @@ export type CountryData = {
 };
 
 /**
- * When the indicative exchange rates to SAR for the countries added on 2026-09-22 were taken
- * (open.er-api.com, mid rates). The six GCC currencies are fixed pegs and the Pakistan rupee was
- * set by the firm on 2026-09-16; those seven are unchanged. Refresh with the January update.
+ * When the indicative exchange rates to SAR were taken: ExchangeRate-API's open endpoint
+ * (open.er-api.com/v6/latest/SAR, www.exchangerate-api.com), daily mid rates it compiles from
+ * central bank and commercial data, as published at 00:02 UTC on 21 September 2026. Every country
+ * added on 2026-09-22 and the Pakistan rupee (updated 2026-09-23) use it. The six GCC currencies
+ * are at their official US dollar pegs, which match it. Refresh with the January update.
  */
 export const FX_AS_OF = '2026-09-21';
 
@@ -325,7 +340,8 @@ export const COUNTRIES = {
     tax: 29,
     code: 'PKR',
     pegged: false,
-    sarPerUnit: 0.01333,
+    // 74.05 PKR per SAR, ExchangeRate-API as at FX_AS_OF (was 0.01333, set on 2026-09-16).
+    sarPerUnit: 0.0135,
     growth: 6.0,
     growthCeiling: 9.0,
     lossOffsetCap: 100,
@@ -644,8 +660,13 @@ export const SOURCE_NOTES: SourceNote[] = [
   },
   {
     label: 'Set by PaceMakers',
-    source: `Long-term inflation for currencies not pegged to the US dollar (from central bank targets and IMF projections), preset multiples, size premium bands and credit spread. Indicative exchange rates to SAR, used only for size bands (mid rates as at ${formatDataDate(FX_AS_OF)}; GCC pegs and PKR set 16 September 2026). Reviewed annually`,
+    source: `Long-term inflation for currencies not pegged to the US dollar (from central bank targets and IMF projections), preset multiples, size premium bands and credit spread. Reviewed annually`,
     asOf: 'September 2026',
+  },
+  {
+    label: 'Exchange rates to SAR',
+    source: 'ExchangeRate-API (open.er-api.com) daily mid rates; GCC currencies at their official US dollar pegs. Indicative, used only for deal size bands and the size premium. As at',
+    asOf: formatDataDate(FX_AS_OF),
   },
   {
     label: 'Zakat and tax loss carry-forward',
@@ -747,10 +768,33 @@ export const LENDING_RATES: Partial<Record<CountryName, LendingRate>> = {
   'United States': { name: 'US Federal Reserve policy rate', short: 'Fed funds', rate: 3.625, asOf: '2026-09-15', source: BIS },
 };
 
-/** The default pre-tax cost of debt for a country, percent: the local base rate plus the typical margin. Null for an unknown country. */
+/** The expected long-term inflation a country's figures are converted with, percent. */
+export function countryInflation(country: string): number | null {
+  const c = (COUNTRIES as Record<string, { inflationLocal?: number } | undefined>)[country];
+  return c ? c.inflationLocal ?? MARKET.usInflationLongRun : null;
+}
+
+/**
+ * Whether a country's benchmark rate is used as its default cost of debt: `none` when there is no
+ * rate on file, `inconsistent` when it sits more than `maxBenchmarkAboveInflationPoints` above the
+ * inflation default, else `used`.
+ */
+export function benchmarkStatus(country: string): { status: 'used' | 'none' | 'inconsistent'; lending: LendingRate | null; inflation: number | null } {
+  const lending = (LENDING_RATES as Record<string, LendingRate | undefined>)[country] ?? null;
+  const inflation = countryInflation(country);
+  if (!lending || inflation === null) return { status: 'none', lending, inflation };
+  const gap = lending.rate - inflation;
+  return { status: gap > ASSUMPTIONS.maxBenchmarkAboveInflationPoints ? 'inconsistent' : 'used', lending, inflation };
+}
+
+/**
+ * The default pre-tax cost of debt for a country, percent: the local base rate plus the typical
+ * margin. Null when the rate is missing or inconsistent with the inflation default, and for an
+ * unknown country: the cost of debt is then built from the spreads.
+ */
 export function defaultCostOfDebt(country: string): number | null {
-  const l = (LENDING_RATES as Record<string, LendingRate | undefined>)[country];
-  return l ? +(l.rate + ASSUMPTIONS.companyCreditSpread).toFixed(2) : null;
+  const b = benchmarkStatus(country);
+  return b.status === 'used' && b.lending ? +(b.lending.rate + ASSUMPTIONS.companyCreditSpread).toFixed(2) : null;
 }
 
 /**
@@ -769,13 +813,22 @@ export function lendingForCurrency(code: string, country?: string): { country: s
   return name && lending ? { country: name, lending } : null;
 }
 
+/** Why a cost of debt is built from the spreads, as the opening of a sentence. */
+export function builtCostOfDebtReason(country: string): string {
+  const b = benchmarkStatus(country);
+  if (b.status === 'inconsistent' && b.lending && b.inflation !== null) {
+    return `The ${b.lending.name} of ${b.lending.rate.toFixed(2)}% is more than ${ASSUMPTIONS.maxBenchmarkAboveInflationPoints} points above the ${b.inflation.toFixed(1)}% long-term inflation used for ${country}, which would overstate the US dollar cost of debt`;
+  }
+  if (b.status === 'used') return 'The benchmark lending rate was not used';
+  return `No benchmark lending rate for ${country} is on file`;
+}
+
 /**
  * The source line for a cost of debt built from the spreads: always for a country with no benchmark
  * rate on file, and for one that has a rate when the visitor cleared the field.
  */
 export function builtCostOfDebtNote(country: string): SourceNote {
-  const hasRate = Boolean((LENDING_RATES as Record<string, LendingRate | undefined>)[country]);
-  const why = hasRate ? 'The benchmark lending rate was not used' : `No benchmark lending rate for ${country} is on file`;
+  const why = builtCostOfDebtReason(country);
   return {
     label: 'Cost of debt',
     source: `${why}, so the pre-tax cost of debt is the risk-free rate plus the ${country} default spread (Damodaran) plus a ${ASSUMPTIONS.companyCreditSpread.toFixed(1)}% margin set by PaceMakers. Default spread as at`,

@@ -29,6 +29,7 @@ import { runValuation, type ValuationInputs, type ValuationResult } from '@/lib/
 import {
   INDICATIVE_NOTE,
   LABELS,
+  highInflationWarning,
   ltmMultipleLabel,
   PRE_MONEY_NOTE,
   amountUnit,
@@ -275,6 +276,7 @@ export function ResultsDashboard({
   const u = amountUnit(r);
   const unit = u.label;
   const warnings = warningTexts(r);
+  const inflationWarning = highInflationWarning(r);
   const checks = checkItems(r);
   const notes = disclosures(r);
   const raise = raiseTable(r);
@@ -355,6 +357,17 @@ export function ResultsDashboard({
           {notice ? notice.text : !canSave ? 'Download and email are available once your details have been saved. Your results below are complete.' : ''}
         </p>
       </section>
+
+      {/* Very high inflation: the whole range is uncertain, so it is said above everything else. */}
+      {inflationWarning && (
+        <div role="note" className="flex gap-3 rounded-[2px] border border-[#B3412F]/40 border-l-[3px] border-l-[#B3412F] bg-[#FCF3F1] p-4 text-[14px] leading-[1.55] text-[color:var(--pmbc-text)]">
+          <AlertTriangle aria-hidden size={18} className="mt-0.5 shrink-0 text-[#B3412F]" />
+          <p>
+            <strong className="font-semibold text-[#B3412F]">Highly uncertain result. </strong>
+            {inflationWarning.replace(/^Results are highly uncertain. /, '')}
+          </p>
+        </div>
+      )}
 
       {/* Tiles ----------------------------------------------------------- */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">

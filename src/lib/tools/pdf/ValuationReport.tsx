@@ -48,6 +48,7 @@ import { equityRangeBar, footballFieldChart, revenueMarginChart, sensitivityHeat
 import {
   INDICATIVE_NOTE,
   LABELS,
+  highInflationWarning,
   ltmMultipleLabel,
   dcfCombinedLabel,
   PRE_MONEY_NOTE,
@@ -233,6 +234,7 @@ export function ValuationReport({ result, meta }: { result: ValuationResult; met
   const brand = withBrandDefaults(meta.branding);
   const partner = brand.partner;
   const about = descriptionParagraphs(meta.description);
+  const inflationWarning = highInflationWarning(r);
   const checks = checkItems(r);
   const checksTogether = checksFitOnPage6(r, checks);
   const warningCount = checks.filter((x) => x.status === 'warning').length;
@@ -282,6 +284,15 @@ export function ValuationReport({ result, meta }: { result: ValuationResult; met
             <View style={{ marginTop: 8 }}>
               <KpiRow items={kpis} />
             </View>
+            {/* Very high inflation: stated on the cover, under the figures it qualifies. */}
+            {inflationWarning && (
+              <View style={{ marginTop: 10, borderLeftWidth: 3, borderLeftColor: RC.warning, backgroundColor: RC.shade, paddingVertical: 7, paddingHorizontal: 10 }}>
+                <Text style={{ fontSize: 8.5, lineHeight: 1.45, color: RC.text }}>
+                  <Text style={{ fontWeight: 600, color: RC.warning }}>Highly uncertain result. </Text>
+                  {inflationWarning.replace(/^Results are highly uncertain. /, '')}
+                </Text>
+              </View>
+            )}
           </View>
 
           {/* The visitor's own words about the business, set apart as theirs, centred in the cover's

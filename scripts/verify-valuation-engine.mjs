@@ -451,6 +451,9 @@ async function runCase(page, c) {
   // Current market data into the reference, before anything reads CONFIG.
   const given = await page.evaluate(`(() => { Object.assign(CONFIG, ${JSON.stringify(REFERENCE_MARKET)}); return { t: CONFIG.US_TBOND, s: CONFIG.US_DEFAULT_SPREAD, e: CONFIG.MATURE_ERP }; })()`);
   same('reference given the current market data', given, { t: REFERENCE_MARKET.US_TBOND, s: REFERENCE_MARKET.US_DEFAULT_SPREAD, e: REFERENCE_MARKET.MATURE_ERP });
+  // The indicative rates to SAR as well (deal size bands only): PKR moved on 2026-09-23. The reference file is not edited.
+  const fx = Object.fromEntries(Object.keys(data.COUNTRIES).map((k) => [k, data.COUNTRIES[k].sarPerUnit]));
+  await page.evaluate(`(() => { const fx = ${JSON.stringify(fx)}; for (const k of Object.keys(COUNTRIES)) if (fx[k] !== undefined) COUNTRIES[k].sarPerUnit = fx[k]; })()`);
   await page.evaluate(`(() => { ${c.ref} })()`);
 
   const refIn = await page.evaluate(READ_INPUTS);
