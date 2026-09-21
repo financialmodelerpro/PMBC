@@ -1007,7 +1007,18 @@ Damodaran publishes his annual update in early January. All values are in
 7. `npm run verify-valuation-engine`. **Do not edit `reference/tools/business-valuation.html`**: it stays exactly as ported, and the verifier writes the current Treasury yield, default spread and implied ERP from `marketDataInUse` into its CONFIG before each case. Add a `DATA_VERSION_LABELS` line for the new version (it is printed in the report footer, so keep it short).
 
 Old leads keep the results they were given: `results` is stored as computed and
-never recomputed, and each lead records its `data_version`.
+never recomputed, and each lead records its `data_version`. **A result field that
+can be null must be listed in `NULL_MEANS_ABSENT`** (`serialize.ts`), or a stored
+null revives as NaN, passes a `!== null` test and prints "n/a". Borrowings, cash,
+invested capital and EV / EBIT did that from 2026-09-17 to 2026-09-21.
+
+**The form cannot accept what the server refuses.** Text and list limits (peer
+names, peer count, the gate's name, email and company) live in
+`src/lib/tools/valuation/limits.ts`, read by both the zod schema and the form. A
+refused save shows the visitor local results with no lead, no email and no PDF,
+and no message, so a mismatch here loses the lead silently. The same goes for the
+date: the form's `todayIso` is UTC, as the server's is. A financial year that has
+not started is refused; the year still running is allowed and takes no stub.
 
 ### Leads, email and tracking
 
@@ -1156,8 +1167,14 @@ so reproduces the figures they were sent.
 enterprise value and revenue are both under 10 million (`amountUnit`).
 **Amounts in words are short** (`fmtBig`, since 2026-09-17): "SAR 450k", "SAR 12.5m",
 "SAR 245m", "SAR 1.25bn", on the results page, in the emails and in the report,
-which share the formatter. `verify-valuation-engine` converts the reference's
-words ("million") before comparing, so every figure is still matched exactly.
+which share the formatter, **in headlines, KPI tiles and sentences only**.
+**A table cell prints the full figure** (`fmtTableAmount`, `headline().table`, since
+2026-09-21): "SAR 385.2 million", or thousands for a small business as the other
+tables. That covers the email summary tables, the stake tables on the results page
+and in the report, and the admin lead list and version history.
+`verify-tool-email-pdf` fails on a short amount in an email table cell.
+`verify-valuation-engine` converts the reference's words ("million") before
+comparing, so every figure is still matched exactly.
 
 **Exploration and versions.** The sliders recompute in the browser and save
 nothing. **Email me this version** posts the explored inputs; the server
@@ -1191,10 +1208,10 @@ cases and rasterises every page to PNG for inspection.
 5. Checks in `verify-valuation-v2` for the item on its own and absent, then `verify-valuation-engine` to prove the neutral path.
 
 **Verifiers.** `verify-valuation-engine` (518: 514 reference parity plus 4 on the market data passed into the reference),
-`verify-valuation-v2` (404), `verify-tool-lead-api` (132),
+`verify-valuation-v2` (408), `verify-tool-lead-api` (137),
 `verify-valuation-dashboard` (267, the results page end to end at 1440, 1024 and 390, including the partner portrait's 4:5 frame and source ratio,
 against a local `next start`, every /api/ request intercepted so nothing is
-written), `verify-tool-email-pdf` (369, pdfjs text and operator list, including the report theme's footer, colour and logo rules, so a ligature glyph is
+written), `verify-tool-email-pdf` (374, pdfjs text and operator list, including the report theme's footer, colour and logo rules, so a ligature glyph is
 caught even though extracted text maps it back to letters),
 `verify-tools-visibility` (97), `verify-brevo-webhook` (168), `verify-booking-links` (61) and
 `verify-production-guard` (34). Each was
@@ -1231,7 +1248,7 @@ the results dashboard charts use `SITE_CHART_PALETTE` (the default in
 - **Footer**, the same on every page, cover and closing page included (no page carries the letterhead's footer band): small logo, "PaceMakers Business Consultants LLP" and the tagline on the left; tool name, company, date and "Page X of Y" on the right; the same navy rule with a green accent above it. Long company names are shortened.
 - **Closing page** (`ClosingPage`): the letterhead header, the closing content, the **legal line and contact details, stated once in the report** (`LegalAndContact`), and the report footer. The contact details come from Site Settings (advisory email, site, office location); the letterhead's phone number is not in Site Settings and is not printed.
 - **Logos**: `BrandLogo` uses the colour file on white and the white file on a dark background, **the original Header Settings files exactly as stored** (not resized, trimmed, traced, flattened or recoloured; since 2026-09-17, after reduced copies looked blurry), drawn at each file's own proportions (`imageRatio`). react-pdf embeds the file once however many pages draw it, so the report stays under 400 KB. Bundled byte-for-byte copies in `src/lib/tools/pdf/brand/` are the fallback, and the tool emails use byte-for-byte copies in `public/email/` (`pacemakers-logo.png` colour, `pacemakers-logo-on-navy.png` white), drawn at 22px high with explicit width and height attributes. **Replace all four copies when Header Settings changes the logo.** The PDF copies are traced into the PDF routes next to the fonts (`next.config.ts`).
-- **Branding is never silently missing**: `renderValuationReport` fetches branding itself when `meta.branding` is left out, so a render without it still has the logo, the founder block and the contact details; pass `null` only to render deliberately without them. The website address is always `SITE_ADDRESS` (`www.pacemakersglobal.com`), never the environment, so a local render cannot print localhost. The cover's market data label is the one for the data behind the figures (`result.meta.dataVersion`).
+- **Branding is never silently missing**: `renderValuationReport` fetches branding itself when `meta.branding` is left out, so a render without it still has the logo, the founder block and the contact details; pass `null` only to render deliberately without them. The website address is always `SITE_ADDRESS`, printed in full as `https://www.pacemakersglobal.com` (since 2026-09-21), never the environment, so a local render cannot print localhost. Every absolute link a PDF or tool email carries (booking links and their QR code, the alert's dashboard link, the email footers) is built on `SITE_HREF` for the same reason. The cover's market data label is the one for the data behind the figures (`result.meta.dataVersion`).
 - An absolutely positioned block that reaches into the page's bottom padding must be `fixed`, or react-pdf keeps moving it to a new page and never finishes the render.
 
 **Adding a tool report.**

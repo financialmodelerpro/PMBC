@@ -20,6 +20,8 @@ import {
   fcfTable,
   headline,
   keyRatiosTable,
+  amountUnit,
+  fmtMultiple,
   normalisationRows,
   scenariosTable,
   sensitivityTable,
@@ -145,8 +147,8 @@ function versionHistory(events: ToolLeadEventRow[]): VersionEntry[] {
       const adj = prev.inputs.waccAdjustment;
       out.push({
         at: e.occurred_at,
-        midpoint: h.midpoint,
-        range: h.equityRange,
+        midpoint: h.table.midpoint,
+        range: h.table.equityRange,
         growth: `${prev.inputs.growth}%`,
         exitMultiple: `${prev.inputs.exitMultiple}x`,
         waccAdjustment: adj ? `${adj > 0 ? '+' : ''}${adj} points` : 'None',
@@ -289,8 +291,8 @@ export default async function ToolLeadDetailPage(props: { params: Promise<{ id: 
                   <p style={{ ...muted, margin: '0 0 6px' }}>Scenarios</p>
                   {result.scenarios.length ? <MiniTable table={scenariosTable(result)} /> : <p style={{ ...small, margin: 0 }}>Not run.</p>}
                   <p style={{ ...muted, margin: '14px 0 6px' }}>Stake</p>
-                  <p style={{ ...small, margin: 0 }}>{h.stakeRange ? `${h.stakeLabel}: ${h.stakeRange}` : 'Whole business, no premium or discount.'}</p>
-                  <p style={{ ...muted, margin: '14px 0 6px' }}>Normalised EBITDA ({code} millions)</p>
+                  <p style={{ ...small, margin: 0 }}>{h.table.stakeRange ? `${h.stakeLabel}: ${h.table.stakeRange}` : 'Whole business, no premium or discount.'}</p>
+                  <p style={{ ...muted, margin: '14px 0 6px' }}>Normalised EBITDA ({amountUnit(result).label})</p>
                   {result.normalisation.used ? (
                     <Pairs rows={normalisationRows(result)} />
                   ) : (
@@ -327,7 +329,7 @@ export default async function ToolLeadDetailPage(props: { params: Promise<{ id: 
                   ? ([
                       ['Borrowings', `${n(inputs.debt)} ${result.currency.code} m`],
                       ['Cash', `${n(inputs.cash ?? null)} ${result.currency.code} m`],
-                      ['Net debt (borrowings less cash)', `${n(inputs.debt - (inputs.cash ?? 0))} ${result.currency.code} m`],
+                      ['Net debt (borrowings less cash)', `${n(Math.round((inputs.debt - (inputs.cash ?? 0)) * 1e6) / 1e6)} ${result.currency.code} m`],
                     ] as [string, string][])
                   : ([['Net debt', `${n(inputs.netDebt)} ${result.currency.code} m`]] as [string, string][])),
               ]}
@@ -351,7 +353,10 @@ export default async function ToolLeadDetailPage(props: { params: Promise<{ id: 
                     ? ([
                         ['Saudi / GCC ownership', (inputs.schemaVersion ?? 1) >= 3 ? `${extras.gccOwnership}%` : 'Not asked (saved before version 3); valued on corporate tax'],
                         ['Zakat rate', `${inputs.zakatRate ?? 2.5}%`],
-                        ['Cash at year end (zakat base only)', inputs.cash === null || inputs.cash === undefined ? 'Not entered' : `${inputs.cash} ${result.currency.code} m`],
+                        // From version 4 cash is entered with borrowings and listed above; before it, cash fed the zakat base only.
+                        ...(inputs.debt === null || inputs.debt === undefined
+                          ? ([['Cash at year end (zakat base only)', inputs.cash === null || inputs.cash === undefined ? 'Not entered' : `${inputs.cash} ${result.currency.code} m`]] as [string, string][])
+                          : []),
                       ] as [string, string][])
                     : []),
                   ...(result.currency.pegged
@@ -369,7 +374,7 @@ export default async function ToolLeadDetailPage(props: { params: Promise<{ id: 
                   ['Discounting', inputs.midYear ? 'Mid-year' : 'End of year'],
                   ['Private company discount', `${n(inputs.privateDiscount)}%`],
                   ['DCF weight', `${n(inputs.dcfWeight)}%`],
-                  ['Exit multiple used', v2 ? `${result.exitMultipleApplied.toFixed(2)}x after the discount` : 'As entered (saved before version 2)'],
+                  ['Exit multiple used', v2 ? `${fmtMultiple(result.exitMultipleApplied)} after the discount` : 'As entered (saved before version 2)'],
                   ['WACC adjustment', signed(inputs.waccAdjustment)],
                   [
                     'Peers',
@@ -437,7 +442,7 @@ export default async function ToolLeadDetailPage(props: { params: Promise<{ id: 
               </p>
               <MiniTable
                 table={{
-                  head: ['Replaced', 'Equity range', 'Midpoint', 'Growth', 'Exit multiple', 'WACC adjustment'],
+                  head: ['Replaced', 'Equity range', 'Base case', 'Growth', 'Exit multiple', 'WACC adjustment'],
                   rows: versions.map((vv) => ({ label: when(vv.at), values: [vv.range, vv.midpoint, vv.growth, vv.exitMultiple, vv.waccAdjustment] })),
                 }}
               />

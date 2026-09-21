@@ -495,7 +495,7 @@ export function ResultsDashboard({
                 </div>
               </Card>
               <div className="grid gap-5 md:grid-cols-2">
-                <Card title="EBITDA used">
+                <Card title="EBITDA used" sub={r.normalisation?.used ? u.label : undefined}>
                   {r.normalisation?.used ? (
                     <KeyValueList rows={normalisationRows(r)} />
                   ) : (
@@ -532,8 +532,8 @@ export function ResultsDashboard({
                   <KeyValueList
                     rows={[
                       ['Stake', stakeLabel(r)],
-                      ['Equity value, 100%', h.equityRange],
-                      ['Indicative value of the stake', h.stakeRange ?? ''],
+                      ['Equity value, 100%', h.table.equityRange],
+                      ['Indicative value of the stake', h.table.stakeRange ?? ''],
                     ]}
                   />
                 ) : (

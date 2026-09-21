@@ -9,7 +9,7 @@
 
 import { randomBytes } from 'node:crypto';
 
-import { siteUrl } from '@/lib/seo/metadata';
+import { SITE_HREF } from '@/lib/brand/letterhead';
 
 import { BOOKING_LINK_EVENT, bookingLinkDedupeKey, bookingLinkPath, newBookingLinkId, type BookingChannel } from '../bookingLinks';
 import type { BookingRedirectDeps } from '../bookingRedirect';
@@ -55,14 +55,15 @@ export async function linkIdForLead(leadId: string): Promise<string | null> {
 }
 
 /**
- * The absolute booking link for a lead and channel: the short link when the
- * lead has one, otherwise the long tracked link a lead saved before short links
- * existed has always used. Reads only.
+ * The absolute booking link for a lead and channel, always on the live https
+ * host (it is printed in PDFs and emails, so never taken from the environment):
+ * the short link when the lead has one, otherwise the long tracked link a lead
+ * saved before short links existed has always used. Reads only.
  */
 export async function bookingLinkFor(lead: Pick<ToolLeadRow, 'id' | 'access_token'>, channel: BookingChannel): Promise<string> {
   const id = await linkIdForLead(lead.id);
-  if (id) return `${siteUrl()}${bookingLinkPath(id, channel)}`;
-  return `${siteUrl()}/api/tools/book?t=${encodeURIComponent(lead.access_token)}&src=${channel}`;
+  if (id) return `${SITE_HREF}${bookingLinkPath(id, channel)}`;
+  return `${SITE_HREF}/api/tools/book?t=${encodeURIComponent(lead.access_token)}&src=${channel}`;
 }
 
 /**

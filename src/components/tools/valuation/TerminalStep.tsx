@@ -4,6 +4,7 @@ import { X } from 'lucide-react';
 
 import { ASSUMPTIONS, WARNING_RULES } from '@/lib/tools/valuation/data';
 import { industryFor, type StakeAdjustment } from '@/lib/tools/valuation/engine';
+import { LIMITS } from '@/lib/tools/valuation/limits';
 
 import { num, type FormState, type PeerRow, type ScenarioKey } from './state';
 import {
@@ -162,6 +163,7 @@ export function TerminalStep({
                     <input
                       type="text"
                       placeholder="Company name"
+                      maxLength={LIMITS.peerName}
                       value={p.name}
                       onChange={(e) => onPeer(p.id, { name: e.target.value })}
                       aria-label={`Peer ${idx + 1} name`}
@@ -193,9 +195,10 @@ export function TerminalStep({
           </table>
         </div>
         <div className="mt-2.5">
-          <button type="button" onClick={onAddPeer} className={buttonSmall} style={TRACKING}>
+          <button type="button" onClick={onAddPeer} disabled={state.peers.length >= LIMITS.peers} className={buttonSmall} style={TRACKING}>
             Add peer
           </button>
+          {state.peers.length >= LIMITS.peers && <span className="ml-3 text-[13px] text-[#52606B]">Up to {LIMITS.peers} peers.</span>}
         </div>
 
         <div className="mt-5 grid gap-x-5 sm:grid-cols-2">

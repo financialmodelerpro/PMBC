@@ -96,8 +96,9 @@ export function BusinessValuationTool({ preview, partner }: ToolComponentProps) 
 
   const currency = useMemo(() => currencyFor(s.country), [s.country]);
   const years = financialYears(parseInt(s.financialYear, 10) || null);
-  // With the effective tax rate, so the WACC shown on step 3 is the one the valuation uses.
-  const wacc = useMemo(() => waccFor(toInputs(s, null)), [s]);
+  // With the effective tax rate and any adjustment carried back from an emailed version, so the WACC
+  // shown on step 3 is the one the valuation uses.
+  const wacc = useMemo(() => waccFor(toInputs(s, null), num(s.waccAdjustment) ?? 0), [s]);
   const dealBands = useMemo(() => dealBandOptions(currency), [currency]);
 
   const update = (fn: (prev: FormState) => FormState) => setS(fn);
@@ -173,7 +174,9 @@ export function BusinessValuationTool({ preview, partner }: ToolComponentProps) 
     const raise = gate.purpose === 'raise' ? num(gate.raiseAmount) : null;
     const inputs = { ...toInputs(s), purpose: gate.purpose, raiseAmount: raise };
     const local = runValuation(inputs);
-    setLead({ name: gate.name.trim(), email: gate.email.trim(), token: null, booking: null });
+    // A re-run keeps the earlier lead's token and booking link until the new save returns its own, so a
+    // refused save (the hourly limit, a network error) leaves Download PDF and Email me this version working.
+    setLead((l) => ({ name: gate.name.trim(), email: gate.email.trim(), token: l?.token ?? null, booking: l?.booking ?? null }));
     try {
       const response = await submitLead({
         inputs,
@@ -290,6 +293,8 @@ export function BusinessValuationTool({ preview, partner }: ToolComponentProps) 
                 state={s}
                 currency={currency}
                 wacc={wacc}
+                adjustment={num(s.waccAdjustment) ?? 0}
+                onClearAdjustment={() => patch({ waccAdjustment: '0' })}
                 onWacc={(k, v) => update((prev) => ({ ...prev, wacc: { ...prev.wacc, [k]: v }, spTouched: prev.spTouched || k === 'sp' }))}
                 onReset={() => update(resetWacc)}
                 onBack={() => next(1)}

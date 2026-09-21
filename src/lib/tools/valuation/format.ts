@@ -116,6 +116,17 @@ export function fmtAmount(v: number, u: AmountUnit): string {
   return x < 0 ? `(${s})` : s;
 }
 
+/**
+ * An amount in a table cell: the full figure in the result's unit, "SAR 385.2 million" (or
+ * "SAR 4,250 thousand" for a small business, as the report's other tables). Short amounts
+ * ("SAR 385m") are for headlines and sentences only.
+ */
+export function fmtTableAmount(r: ValuationResult, v: number): string {
+  if (!Number.isFinite(v)) return 'n/a';
+  const u = amountUnit(r);
+  return `${r.currency.code} ${fmtAmount(v, u)} ${u.scale === 1 ? 'million' : 'thousand'}`;
+}
+
 /** Shorthand for the functions below, which all hold a result. */
 function amt(r: ValuationResult, v: number): string {
   return fmtAmount(v, amountUnit(r));
@@ -197,6 +208,14 @@ export function headline(r: ValuationResult) {
     weighted: Number.isFinite(r.weightedEquity) && r.scenarios?.length ? fmtBig(r.weightedEquity, c) : null,
     stakeRange: stake?.used ? `${fmtBig(stake.value[0], c)} to ${fmtBig(stake.value[2], c)}` : null,
     stakeLabel: stake?.used ? stakeLabel(r) : null,
+    /** The same figures for table cells, in full: "SAR 385.2 million to SAR 412.0 million". */
+    table: {
+      equityRange: `${fmtTableAmount(r, r.equityDisplay[0])} to ${fmtTableAmount(r, r.equityDisplay[2])}`,
+      midpoint: fmtTableAmount(r, r.equityDisplay[1]),
+      evRange: `${fmtTableAmount(r, r.ev[0])} to ${fmtTableAmount(r, r.ev[2])}`,
+      weighted: Number.isFinite(r.weightedEquity) && r.scenarios?.length ? fmtTableAmount(r, r.weightedEquity) : null,
+      stakeRange: stake?.used ? `${fmtTableAmount(r, stake.value[0])} to ${fmtTableAmount(r, stake.value[2])}` : null,
+    },
   };
 }
 
@@ -573,7 +592,7 @@ export function scenariosTable(r: ValuationResult): Table {
     rows.push({ label: 'Probability-weighted', values: ['', '', fmtPct(total, 0), '', amt(r, weightedEv), amt(r, raw)], tone: 'strong' });
   }
   return {
-    head: ['Scenario', 'Growth', 'Margin', 'Probability', `Final year revenue`, `EV, ${unitShort(r)}`, `Equity, ${unitShort(r)}`],
+    head: ['Scenario', 'Growth', 'Margin', 'Probability', `Final year revenue, ${unitShort(r)}`, `EV, ${unitShort(r)}`, `Equity, ${unitShort(r)}`],
     rows,
   };
 }

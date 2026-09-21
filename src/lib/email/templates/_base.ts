@@ -1,7 +1,7 @@
 import { fetchEmailBranding } from '@/lib/cms/emailBranding';
 import { fetchBranding } from '@/lib/cms/branding';
 import { fetchSiteSettings } from '@/lib/cms/settings';
-import { BRAND, LEGAL_LINE, NEUTRALS } from '@/lib/brand/letterhead';
+import { BRAND, LEGAL_LINE, NEUTRALS, SITE_ADDRESS, SITE_HREF } from '@/lib/brand/letterhead';
 
 /**
  * The branded email shell.
@@ -32,7 +32,8 @@ const BORDER = '#E4E7EC';
 const SERIF = "Georgia,'Times New Roman',serif";
 const SANS = "-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif";
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://pacemakersglobal.com';
+/** Every link and address an email prints: the live https host, never the environment, so a mail sent from any deployment points at the live site. */
+const SITE_URL = SITE_HREF;
 
 /**
  * The email header logo in `public/` (the Header Settings white logo file, byte
@@ -96,7 +97,7 @@ const DEFAULT_FOOTER = `
 <p style="margin:0 0 4px;font-family:${SANS};font-size:12px;color:${MUTED};">
   <a href="mailto:advisory@pacemakersglobal.com" style="color:${MUTED};text-decoration:none;">advisory@pacemakersglobal.com</a>
   &nbsp;&middot;&nbsp;
-  <a href="${SITE_URL}" style="color:${MUTED};text-decoration:none;">pacemakersglobal.com</a>
+  <a href="${SITE_URL}" style="color:${MUTED};text-decoration:none;">${SITE_ADDRESS}</a>
 </p>
 <p style="margin:0 0 10px;font-family:${SANS};font-size:12px;color:${MUTED};">Lahore, Pakistan</p>
 <p style="margin:0;font-family:${SANS};font-size:11px;color:#8A94A0;line-height:1.6;">
@@ -208,7 +209,7 @@ async function reportLayout(content: string): Promise<string> {
   const brandName = siteBranding?.brand_name || 'PaceMakers Business Consultants';
   const tagline = siteBranding?.tagline || 'Advisory from Structure to Exit';
   const email = settings.contact_email_advisory || settings.contact_email || 'advisory@pacemakersglobal.com';
-  const site = 'www.pacemakersglobal.com';
+  const site = SITE_ADDRESS;
   const location = settings.office_location_text || '';
   const year = new Date().getFullYear();
   const logo = `<img src="${EMAIL_LOGO_COLOUR.src}" alt="${escapeHtml(brandName)}" width="${EMAIL_LOGO_COLOUR.width}" height="${EMAIL_LOGO_COLOUR.height}" style="display:block;border:0;outline:none;width:${EMAIL_LOGO_COLOUR.width}px;height:${EMAIL_LOGO_COLOUR.height}px;color:${R.navy};font-family:${SERIF};font-size:14px;" />`;

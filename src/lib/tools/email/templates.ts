@@ -29,7 +29,7 @@ import { renderSubject, renderTemplate } from '@/lib/email/render';
 
 import { PURPOSES } from '../valuation/data';
 import type { ValuationResult } from '../valuation/engine';
-import { equityFloorNote, fmtPct, headline, methodsUsed } from '../valuation/format';
+import { LABELS, equityFloorNote, headline, methodsUsed } from '../valuation/format';
 
 export type EmailTemplate = { subject: string; body_html: string; enabled: boolean };
 
@@ -127,11 +127,11 @@ export function buildResultsEmail(i: ResultsEmailInput): { subject: string; body
   const h = headline(i.result);
   const methods = methodsUsed(i.result).join(', ');
   const rows: [string, string][] = [
-    ['Indicative equity value', h.equityRange],
-    ['Base case', h.midpoint],
-    ...(h.weighted ? ([['Probability-weighted value', h.weighted]] as [string, string][]) : []),
-    ...(h.stakeRange && h.stakeLabel ? ([[`Value of ${h.stakeLabel}`, h.stakeRange]] as [string, string][]) : []),
-    ['Enterprise value', h.evRange],
+    ['Indicative equity value', h.table.equityRange],
+    ['Base case', h.table.midpoint],
+    ...(h.weighted ? ([[LABELS.weighted, h.table.weighted ?? '']] as [string, string][]) : []),
+    ...(h.stakeRange && h.stakeLabel ? ([[`Value of ${h.stakeLabel}`, h.table.stakeRange ?? '']] as [string, string][]) : []),
+    ['Enterprise value', h.table.evRange],
     ['WACC', h.wacc],
     ['Methods', methods],
     ['Valuation date', h.asAt.replace(/^as at /, '').replace(/^end of/, 'End of')],
@@ -198,8 +198,8 @@ export function buildAlertEmail(i: AlertEmailInput): { subject: string; body: st
     ['Below minimum mandate size', l.belowMinimum ? 'Yes' : 'No'],
     ['Country', l.country ?? ''],
     ['Industry', l.industry ?? ''],
-    ['Indicative equity value', h.equityRange],
-    ['Base case', h.midpoint],
+    ['Indicative equity value', h.table.equityRange],
+    ['Base case', h.table.midpoint],
     ['WACC', h.wacc],
     ['Follow-up email consent', l.followUp ? 'Yes' : 'No'],
   ];
@@ -218,7 +218,7 @@ export function buildAlertEmail(i: AlertEmailInput): { subject: string; body: st
     industry: l.industry ?? '',
     equity_range: h.equityRange,
     midpoint: h.midpoint,
-    wacc: fmtPct(i.result.wacc.wacc),
+    wacc: h.wacc,
     follow_up: l.followUp ? 'Yes' : 'No',
     is_test: l.isTest ? 'Yes' : 'No',
     dashboard_url: i.dashboardUrl,
