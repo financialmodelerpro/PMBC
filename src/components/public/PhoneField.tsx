@@ -19,16 +19,19 @@ export function PhoneField({
   country,
   onCountryChange,
   numberProps,
+  inputClassName = PHONE_INPUT_CLASS,
 }: {
   /** ISO code of the dialling country. */
   country: string;
   onCountryChange: (code: string) => void;
   /** The number box's props: `register('phone')` on the contact form, value and onChange elsewhere. */
   numberProps: InputHTMLAttributes<HTMLInputElement> & { ref?: React.Ref<HTMLInputElement> };
+  /** Both boxes' look. Defaults to the contact form's; another form passes its own field style. */
+  inputClassName?: string;
 }) {
   return (
     <div className="grid gap-2">
-      <CountryCombobox value={country} onChange={onCountryChange} ariaLabel="Phone country code" />
+      <CountryCombobox value={country} onChange={onCountryChange} ariaLabel="Phone country code" inputClassName={inputClassName} />
       <input
         type="tel"
         // A visible label wrapping both controls attaches to the first one, the combobox, which then
@@ -36,7 +39,7 @@ export function PhoneField({
         aria-label="Phone number"
         autoComplete="tel-national"
         placeholder="5X XXX XXXX"
-        className={PHONE_INPUT_CLASS}
+        className={inputClassName}
         {...numberProps}
       />
     </div>

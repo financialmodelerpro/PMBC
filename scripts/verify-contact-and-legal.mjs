@@ -229,14 +229,16 @@ async function main() {
       (brandingRow?.footer_html ?? '').includes('pacemakersglobal.com'),
     'absent');
 
-  // Every variable both templates reference must be one the contact route
-  // supplies. An unknown one renders as a literal {{placeholder}} in live mail.
+  // Every variable the two contact templates reference must be one the contact
+  // route supplies. An unknown one renders as a literal {{placeholder}} in live
+  // mail. The free tools' templates share the table and are filled by their own
+  // code (checked by verify-tool-email-pdf), so they are left out here.
   const routeSrc = fs.readFileSync(path.join(projectRoot, 'src/app/api/contact/route.ts'), 'utf8');
   const supplied = new Set(
     [...routeSrc.matchAll(/^\s{4}([a-z_]+):/gm)].map((m) => m[1]),
   );
   const used = new Set(
-    [...(tpls ?? [])].flatMap((t) =>
+    [notif, ack].filter(Boolean).flatMap((t) =>
       [...`${t.subject} ${t.body_html}`.matchAll(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g)].map((m) => m[1]),
     ),
   );
@@ -249,8 +251,12 @@ async function main() {
   // depends on are still in it.
   console.log('\n=== email shell (source)');
   const shell = fs.readFileSync(path.join(projectRoot, 'src/lib/email/templates/_base.ts'), 'utf8');
-  ok('the header logo falls back to the site dark logo',
-    /logo_url\s*\|\|\s*siteBranding\?\.logo_dark_url/.test(shell), 'fallback chain changed');
+  // Since 2026-09-17 the header logo is email_branding.logo_url when set, else
+  // the white logo file shipped in public/email, drawn at a fixed size.
+  ok('the header logo is the email branding logo, else the shipped white logo',
+    /customLogo\s*=\s*emailBranding\?\.logo_url/.test(shell) && shell.includes('/email/pacemakers-logo-on-navy.png') &&
+      fs.existsSync(path.join(projectRoot, 'public/email/pacemakers-logo-on-navy.png')),
+    'fallback chain changed');
   ok('the shell carries a shipped signature and footer',
     shell.includes('DEFAULT_SIGNATURE') && shell.includes('DEFAULT_FOOTER'), 'defaults missing');
   ok('the shipped footer states the registration', shell.includes('LLP Act, 2017'), 'absent');
@@ -260,13 +266,8 @@ async function main() {
       !/#2E75B6|#1F3864|#F4F6F9/.test(shell),
     'palette is wrong');
 
-  // A dark logo has to be reachable, or every email header falls back to text.
-  const { data: siteBranding } = await db
-    .from('branding_config')
-    .select('logo_dark_url, logo_url')
-    .eq('id', 1)
-    .maybeSingle();
-  const resolved = brandingRow?.logo_url || siteBranding?.logo_dark_url || siteBranding?.logo_url;
+  // The logo the header will draw has to be reachable, or it renders as its alt text.
+  const resolved = brandingRow?.logo_url || 'https://www.pacemakersglobal.com/email/pacemakers-logo-on-navy.png';
   ok('a header logo resolves', !!resolved, 'no logo anywhere, the header would render as text');
   if (resolved) {
     const head = await fetch(resolved, { method: 'HEAD' });

@@ -172,6 +172,8 @@ export function LeadGate({
               <PhoneField
                 country={values.phoneCountry || DEFAULT_DIAL_COUNTRY}
                 onCountryChange={(code) => onChange({ phoneCountry: code })}
+                // The contact form's component, in this form's field style.
+                inputClassName={inputClass}
                 numberProps={{ id, maxLength: 40, value: values.phone, onChange: (e) => onChange({ phone: e.target.value }) }}
               />
             )}
