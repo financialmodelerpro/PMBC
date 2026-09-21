@@ -68,3 +68,67 @@ export async function submitLead(body: unknown): Promise<{ result: ValuationResu
     return null;
   }
 }
+
+/* ------------------------------------------------------------------------ */
+/* Running again in the same session                                         */
+/* ------------------------------------------------------------------------ */
+
+/**
+ * The lead this browser session created, so running the valuation again, even
+ * after a reload in the same tab, updates it as a new version instead of
+ * creating a second lead with a second admin alert. Session storage only: it
+ * ends with the tab, and holds nothing the page did not already hold.
+ */
+const SESSION_LEAD_KEY = 'pmbcValuationLead';
+
+export type SessionLead = {
+  lead: { name: string; email: string; token: string; booking: string | null };
+  /** The gate as submitted, less the honeypot. Its purpose and raise amount travel with each re-run. */
+  gate: { name: string; email: string; company: string; purpose: string; dealSize: string; consent: boolean; followUp: boolean; raiseAmount: string };
+};
+
+export function readSessionLead(): SessionLead | null {
+  try {
+    const raw = window.sessionStorage.getItem(SESSION_LEAD_KEY);
+    if (!raw) return null;
+    const v = JSON.parse(raw) as SessionLead;
+    return typeof v?.lead?.token === 'string' && v.lead.token.length >= 20 ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+export function storeSessionLead(v: SessionLead | null): void {
+  try {
+    if (v) window.sessionStorage.setItem(SESSION_LEAD_KEY, JSON.stringify(v));
+    else window.sessionStorage.removeItem(SESSION_LEAD_KEY);
+  } catch {
+    // Storage can be unavailable (private windows). The session still works until a reload.
+  }
+}
+
+/**
+ * A re-run: saves the inputs to the existing lead as a new version and sends
+ * nothing (`sendEmail: false`). `unknown` means the lead no longer answers to
+ * the token, so the caller starts a new lead through the gate. Any other
+ * failure resolves to null and the page shows its own result.
+ */
+export async function saveRerun(token: string, inputs: unknown): Promise<{ result: ValuationResult } | 'unknown' | null> {
+  try {
+    const res = await fetch('/api/tools/business-valuation/lead/version', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ token, inputs, sendEmail: false }),
+      signal: AbortSignal.timeout(20_000),
+    });
+    if (res.status === 404) return 'unknown';
+    const data = (await res.json().catch(() => ({}))) as { ok?: boolean; result?: unknown };
+    // A 429 still carries the recomputed result; it simply was not saved.
+    if (data.result) return { result: reviveResult(data.result) };
+    console.error('[valuation] re-run responded', res.status);
+    return null;
+  } catch (err) {
+    console.error('[valuation] re-run request failed', err);
+    return null;
+  }
+}

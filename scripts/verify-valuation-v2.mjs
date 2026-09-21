@@ -887,6 +887,33 @@ console.log('13. Zakat rate, invested capital in parts, EV / EBIT');
   check('form: EV / EBIT travels with the peer rows', state.toInputs({ ...minimalCase(state), peers: [state.newPeer('X', '9', '1', '12')] }, VALUATION_DATE).peers[0].evEbit === 12);
 }
 
+console.log('14. Cost of debt: the company borrowing rate');
+{
+  const blank = run(BASE);
+  const nullKd = run({ ...BASE, wacc: { ...BASE.wacc, kd: null } });
+  check('blank borrowing rate: WACC and equity bit for bit as before', nullKd.wacc.wacc === blank.wacc.wacc && nullKd.equity.every((v, k) => v === blank.equity[k]) && blank.wacc.kdSource === 'built');
+  const w = blank.wacc;
+  check('built cost of debt is risk-free plus default spread plus credit spread', close(w.kd, w.rf + w.ds + w.cs));
+  check('cost of equity is risk-free plus beta times ERP plus country and size premiums', close(w.ke, w.rf + w.bl * w.erp + w.crp + w.sp));
+  check('levered beta relevers at the tax rate used', close(w.bl, w.bu * (1 + (1 - w.t) * w.de)));
+  check('WACC weights the two costs by the target structure', close(w.waccUsd, w.we * w.ke + w.wd * w.kd * (1 - w.t)) && close(w.wd, w.de / (1 + w.de)));
+  // A pegged currency: the entered rate is used as it is.
+  const sar = run({ ...BASE, wacc: { ...BASE.wacc, kd: 7 } });
+  check('pegged currency: entered rate used as it is', sar.wacc.kdSource === 'entered' && close(sar.wacc.kd, 0.07) && close(sar.wacc.kdt, 0.07 * (1 - sar.wacc.t)));
+  check('entered rate changes only the cost of debt side', close(sar.wacc.ke, w.ke) && !close(sar.wacc.wacc, w.wacc));
+  // A currency not pegged: taken to US dollar terms by the inflation gap, then the WACC converted back.
+  const pk = engine.computeWacc({ rf: 4.77, erp: 4.14, crp: 9.71, bu: 0.56, de: 37.1, sp: 2, ds: 6.37, cs: 2, tax: 29, inflationLocal: 7, inflationUs: 2.5, kd: 16 }, engine.currencyFor('Pakistan'));
+  check('not pegged: entered local rate converted to US dollars', close(pk.kd, 1.16 * 1.025 / 1.07 - 1) && close(pk.kdEntered, 0.16));
+  check('not pegged: local WACC is the converted dollar WACC', close(pk.wacc, (1 + pk.waccUsd) * 1.07 / 1.025 - 1));
+  // Validation, in the engine and the form.
+  for (const bad of [0, -2, 50, 80]) check(`borrowing rate ${bad}% refused`, engine.validateWacc({ ...BASE.wacc, kd: bad }, engine.currencyFor(BASE.country)) === engine.KD_RATE_MESSAGE);
+  check('a refused rate stops the run at step 3', engine.runValuation({ ...BASE, wacc: { ...BASE.wacc, kd: 60 } }).ok === false);
+  check('form: the rate travels as a number and blank as null', state.toInputs({ ...minimalCase(state), wacc: { ...minimalCase(state).wacc, kd: '8.5' } }, VALUATION_DATE).wacc.kd === 8.5 && state.toInputs(minimalCase(state), VALUATION_DATE).wacc.kd === null);
+  check('form: Reset to Damodaran defaults clears it', state.resetWacc({ ...minimalCase(state), wacc: { ...minimalCase(state).wacc, kd: '8.5' } }).wacc.kd === '');
+  check('the working names an entered rate', format.waccSteps(sar.wacc, sar.currency).some((x) => x.key === 'kd' && x.formula === 'Your own borrowing rate'));
+  check('the inputs list shows the entered rate instead of the spreads', format.waccBuildRows(sar).some(([k]) => k.startsWith('Your borrowing rate')) && !format.waccBuildRows(sar).some(([k]) => k === 'Country default spread'));
+}
+
 console.log(`\n${checks - failures} of ${checks} checks passed.`);
 if (failures) {
   console.log(`${failures} FAILED`);

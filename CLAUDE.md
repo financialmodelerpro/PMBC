@@ -1176,6 +1176,28 @@ and in the report, and the admin lead list and version history.
 `verify-valuation-engine` converts the reference's words ("million") before
 comparing, so every figure is still matched exactly.
 
+**Running again: one lead per session** (since 2026-09-21). Once a lead exists,
+Run valuation skips the gate and posts to the version route with
+`sendEmail: false`: the lead gets a new version, **no results email and no admin
+alert** (the alert is sent once, when the lead is created). The lead and gate are
+kept in `sessionStorage` (`pmbcValuationLead`), so a reload in the same tab is the
+same session; a new tab is a new session. A re-run's event is source `results`
+with `payload.kind = 'rerun'`, because the `source` column's CHECK allows only its
+original values; emailed versions are counted as all versions less re-runs, so
+older events count as emailed. Re-runs have their own limit (30 an hour, 100 a
+day), so they never use up the emails. The admin version history says which
+kind replaced each version.
+
+**Cost of capital working** (since 2026-09-21). `waccSteps` in `format.ts` works
+the WACC through: levered beta, cost of equity, pre-tax and after-tax cost of
+debt, weights, WACC, and for a currency not pegged to the dollar the conversion.
+For those currencies the build runs in US dollars and every dollar line says so,
+which is why a PKR WACC can sit above both component rates. Shown on step 3, on
+the results page and on report page 5. **The company's own borrowing rate**
+(`wacc.kd`, optional, in the valuation currency, above 0% and below 50%) replaces
+the spread build; for an unpegged currency it is taken to dollar terms by the same
+inflation gap. Blank keeps every earlier figure bit for bit.
+
 **Exploration and versions.** The sliders recompute in the browser and save
 nothing. **Email me this version** posts the explored inputs; the server
 recomputes, keeps the replaced inputs and results as a `version_saved` event,
@@ -1208,10 +1230,10 @@ cases and rasterises every page to PNG for inspection.
 5. Checks in `verify-valuation-v2` for the item on its own and absent, then `verify-valuation-engine` to prove the neutral path.
 
 **Verifiers.** `verify-valuation-engine` (518: 514 reference parity plus 4 on the market data passed into the reference),
-`verify-valuation-v2` (408), `verify-tool-lead-api` (137),
-`verify-valuation-dashboard` (267, the results page end to end at 1440, 1024 and 390, including the partner portrait's 4:5 frame and source ratio,
+`verify-valuation-v2` (426), `verify-tool-lead-api` (146),
+`verify-valuation-dashboard` (291, the results page end to end at 1440, 1024 and 390, including the partner portrait's 4:5 frame and source ratio,
 against a local `next start`, every /api/ request intercepted so nothing is
-written), `verify-tool-email-pdf` (374, pdfjs text and operator list, including the report theme's footer, colour and logo rules, so a ligature glyph is
+written), `verify-tool-email-pdf` (389, pdfjs text and operator list, including the report theme's footer, colour and logo rules, so a ligature glyph is
 caught even though extracted text maps it back to letters),
 `verify-tools-visibility` (97), `verify-brevo-webhook` (168), `verify-booking-links` (61) and
 `verify-production-guard` (34). Each was
@@ -1243,7 +1265,7 @@ the results dashboard charts use `SITE_CHART_PALETTE` (the default in
 - White pages, light neutral table shading, warnings in `#B3412F`.
 
 **Pages.**
-- **Cover** (`ReportCover`): the letterhead header, measured from the letterhead PDF's vector paths and a 3x render (`LETTERHEAD` in `theme.ts`): a navy bar at the very top edge, the green swoosh (three copies of one shape, two shaded and one solid) hanging from it on the right, and the logo on the left below the bar, drawn 22% smaller than the letterhead's (31.7pt tall), as the owner chose. **No tagline in the header** on any page: the tagline appears in the footer only (the letterhead file prints one below the swoosh; reports deliberately do not). Everything is scaled by the same factor in both directions, so the swoosh is never stretched or cut off. Then company, report title, headline range and date, and the report footer.
+- **Cover** (`ReportCover`): the letterhead header, measured from the letterhead PDF's vector paths and a 3x render (`LETTERHEAD` in `theme.ts`): a navy bar at the very top edge, the green swoosh (three copies of one shape, two shaded and one solid) hanging from it on the right, and the logo on the left below the bar, drawn 22% smaller than the letterhead's (31.7pt tall), as the owner chose. **No tagline in the header** on any page: the tagline appears in the footer only (the letterhead file prints one below the swoosh; reports deliberately do not). Everything is scaled by the same factor in both directions, so the swoosh is never stretched or cut off. **The bar and the swoosh are drawn 1.5pt past the top and right edges** (`HEADER_BLEED`, since 2026-09-21): the layout grid is 595pt but A4 is 595.28pt, and a header ending at the grid left a white hairline down the right at zoom. `verify-tool-email-pdf` reads the drawing operators on the cover, an inner page and the closing page and fails on any gap. Then company, report title, headline range and date, and the report footer.
 - **Inner pages** (`ReportPage`): `InnerHeader`, a thin navy bar at the top edge with a small copy of the same swoosh on the right (scale 0.42). No logo or tagline in the header; content starts high; the footer.
 - **Footer**, the same on every page, cover and closing page included (no page carries the letterhead's footer band): small logo, "PaceMakers Business Consultants LLP" and the tagline on the left; tool name, company, date and "Page X of Y" on the right; the same navy rule with a green accent above it. Long company names are shortened.
 - **Closing page** (`ClosingPage`): the letterhead header, the closing content, the **legal line and contact details, stated once in the report** (`LegalAndContact`), and the report footer. The contact details come from Site Settings (advisory email, site, office location); the letterhead's phone number is not in Site Settings and is not printed.

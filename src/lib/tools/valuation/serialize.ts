@@ -23,6 +23,7 @@ const NULL_MEANS_ABSENT = new Set([
   'compsEbitda', 'exit', 'ebitdaValue', 'raise', 'valuationDate', 'company', 'purpose',
   'debt', 'cash', 'investedCapital', 'workingCapital', 'fixedAssets', 'zakatBaseLtm',
   'ebitMultiplesPre', 'ebitMultiplesPost', 'ebitValue',
+  'kdEntered',
 ]);
 
 export function serializeResult(result: ValuationResult): unknown {

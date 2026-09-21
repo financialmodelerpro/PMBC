@@ -52,6 +52,8 @@ const inputsSchema = z.object({
   wacc: z.object({
     rf: cell, erp: cell, crp: cell, bu: cell, de: cell, sp: cell, ds: cell, cs: cell, tax: cell,
     inflationLocal: cell, inflationUs: cell,
+    // The company's own borrowing rate, optional (2026-09-21). Absent or null builds it from the spreads.
+    kd: cell.optional(),
   }),
   growth: cell,
   exitMultiple: cell,

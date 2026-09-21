@@ -2,10 +2,10 @@
 
 import { WACC_SOURCE_SENTENCE } from '@/lib/tools/valuation/data';
 import type { Currency, WaccBreakdown } from '@/lib/tools/valuation/engine';
-import { fmtPct } from '@/lib/tools/valuation/format';
+import { fmtPct, waccSteps } from '@/lib/tools/valuation/format';
 
 import type { FormState, WaccKey } from './state';
-import { Field, Group, Hint, NumberInput, Panel, PanelTitle, StepNav, TRACKING, buttonGhost } from './ui';
+import { ErrorText, Field, Group, Hint, NumberInput, Panel, PanelTitle, StepNav, TRACKING, buttonGhost } from './ui';
 
 type Spec = { k: WaccKey; label: string; hint: string; step: number; suffix?: string };
 
@@ -25,6 +25,13 @@ const EQUITY: Spec[] = [
 ];
 
 const DEBT: Spec[] = [
+  {
+    k: 'kd',
+    label: 'Your pre-tax borrowing rate (optional)',
+    hint: 'What the company pays on its borrowings. Leave blank to build it from the spreads.',
+    step: 0.1,
+    suffix: '%',
+  },
   { k: 'ds', label: 'Country default spread', hint: 'From sovereign rating', step: 0.01, suffix: '%' },
   { k: 'cs', label: 'Company credit spread', hint: 'Your borrowing margin over the base rate', step: 0.1, suffix: '%' },
   {
@@ -40,6 +47,7 @@ export function WaccStep({
   state,
   currency,
   wacc,
+  error = '',
   adjustment = 0,
   onClearAdjustment,
   onWacc,
@@ -50,6 +58,8 @@ export function WaccStep({
   state: FormState;
   currency: Currency;
   wacc: WaccBreakdown;
+  /** The step's validation message, for example a borrowing rate out of range. */
+  error?: string;
   /** Points added by the results page slider in an emailed version. Included in `wacc`. */
   adjustment?: number;
   onClearAdjustment?: () => void;
@@ -58,8 +68,13 @@ export function WaccStep({
   onBack: () => void;
   onNext: () => void;
 }) {
+  const kdEntered = state.wacc.kd.trim() !== '';
   const hintFor = (s: Spec) =>
-    s.k === 'crp' && state.country
+    (s.k === 'ds' || s.k === 'cs') && kdEntered
+      ? 'Not used while your borrowing rate is entered.'
+      : s.k === 'kd'
+        ? `${s.hint} In ${currency.code}.`
+        : s.k === 'crp' && state.country
       ? `Damodaran, ${state.country}`
       : s.k === 'bu' && state.industry
         ? `Damodaran global, ${state.industry}`
@@ -71,16 +86,15 @@ export function WaccStep({
     </Field>
   );
 
-  const bl = Number.isFinite(wacc.bl) ? wacc.bl.toFixed(2) : 'n/a';
-  const outRows: [string, string][] = [
-    ['Levered beta', bl],
-    ['Cost of equity', fmtPct(wacc.ke)],
-    ['Pre-tax cost of debt', fmtPct(wacc.kd)],
-    ...(wacc.cit !== undefined && Number.isFinite(wacc.t) && wacc.t !== wacc.cit ? ([['Tax rate used, after Saudi / GCC ownership', fmtPct(wacc.t)]] as [string, string][]) : []),
-    ['After-tax cost of debt', fmtPct(wacc.kdt)],
-    ['Equity weight', fmtPct(wacc.we, 1)],
-    ['Debt weight', fmtPct(wacc.wd, 1)],
-  ];
+  // The working, line by line. The final WACC is the large figure below it, so it is left out here.
+  const all = Number.isFinite(wacc.wacc) ? waccSteps(wacc, currency) : [];
+  const finalKey = currency.pegged ? 'wacc_base' : 'wacc_local';
+  const final = all.find((x) => x.key === finalKey);
+  const steps = all.filter((x) => x.key !== finalKey && x.key !== 'wacc_adjusted');
+  const taxNote =
+    wacc.cit !== undefined && Number.isFinite(wacc.t) && wacc.t !== wacc.cit
+      ? `Tax rate used: ${fmtPct(wacc.t, 1)}, income tax on the non-GCC share only. Zakat is not a tax on profit, so it gives no interest shield.`
+      : null;
 
   return (
     <Panel eyebrow="Step 3 of 4">
@@ -121,25 +135,40 @@ export function WaccStep({
         </Group>
       )}
 
+      <ErrorText>{error}</ErrorText>
       <div className="mt-2 rounded-[2px] bg-[#1B3A5F] p-5 text-white sm:p-6" aria-live="polite">
-        <dl className="grid gap-x-7 sm:grid-cols-2">
-          {outRows.map(([k, v]) => (
-            <div key={k} className="flex justify-between border-b border-[#E8DDC4]/20 py-1.5 text-[14.5px]">
-              <dt className="text-[#E8DDC4]">{k}</dt>
-              <dd className="tabular-nums">{v}</dd>
+        <p className="text-[11px] font-semibold uppercase text-[#C69C3E]" style={{ letterSpacing: '0.14em' }}>
+          How your WACC is calculated
+        </p>
+        {!currency.pegged && (
+          <p className="mt-1.5 text-[13px] leading-[1.5] text-[#E8DDC4]">
+            The Damodaran inputs are US dollar rates, so the build runs in US dollars and the last line converts it to {currency.code}.
+          </p>
+        )}
+        <dl className="mt-2">
+          {steps.map((x) => (
+            <div key={x.key} className="flex items-start justify-between gap-4 border-b border-[#E8DDC4]/20 py-2 text-[14.5px]">
+              <dt className="min-w-0">
+                <span className={x.strong ? 'font-semibold text-white' : 'text-[#E8DDC4]'}>{x.label}</span>
+                <span className="block text-[12.5px] leading-[1.45] text-[#E8DDC4]/80">{x.formula}</span>
+                <span className="block text-[12.5px] leading-[1.45] tabular-nums text-[#E8DDC4]/80">= {x.working}</span>
+              </dt>
+              <dd className={`shrink-0 tabular-nums ${x.strong ? 'font-semibold' : ''}`}>{x.value}</dd>
             </div>
           ))}
-          {!currency.pegged && (
-            <div className="flex justify-between border-b border-[#E8DDC4]/20 py-1.5 text-[14.5px]">
-              <dt className="text-[#E8DDC4]">WACC in US dollars</dt>
-              <dd className="tabular-nums">{fmtPct(wacc.waccUsd)}</dd>
-            </div>
-          )}
         </dl>
+        {taxNote && <p className="mt-2 text-[12.5px] leading-[1.45] text-[#E8DDC4]/80">{taxNote}</p>}
         <div className="mt-4 flex flex-wrap items-baseline justify-between gap-2">
           <span className="text-[15px] text-[#E8DDC4]">Weighted average cost of capital, {currency.code}</span>
           <b className="pmbc-display text-[36px] text-[#C69C3E]">{fmtPct(wacc.wacc)}</b>
         </div>
+        {final && (
+          <p className="mt-1 text-[12.5px] leading-[1.45] tabular-nums text-[#E8DDC4]/80">
+            {final.formula}
+            <br />= {final.working}
+            {adjustment !== 0 ? ` = ${final.value}, before the adjustment below` : ''}
+          </p>
+        )}
         {adjustment !== 0 && (
           <p className="mt-2 text-[13.5px] text-[#E8DDC4]">
             Includes a {adjustment > 0 ? '+' : ''}

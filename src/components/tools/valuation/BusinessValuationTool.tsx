@@ -25,6 +25,7 @@ import {
   validateCompany,
   validateFinancials,
   validateTerminal,
+  validateWacc,
   waccFor,
   type FieldErrors,
   type ValuationInputs,
@@ -58,7 +59,7 @@ import {
   type FormState,
 } from './state';
 import { StepBar, type StepState } from './StepBar';
-import { captureAttribution, readAttribution, submitLead } from './submit';
+import { captureAttribution, readAttribution, readSessionLead, saveRerun, storeSessionLead, submitLead } from './submit';
 import { SummaryPanel } from './SummaryPanel';
 import { TerminalStep } from './TerminalStep';
 import { WaccStep } from './WaccStep';
@@ -77,6 +78,7 @@ export function BusinessValuationTool({ preview, partner }: ToolComponentProps) 
 
   const [companyErrors, setCompanyErrors] = useState<FieldErrors>({});
   const [finError, setFinError] = useState('');
+  const [waccError, setWaccError] = useState('');
   const [termError, setTermError] = useState('');
 
   const [gate, setGate] = useState<GateValues>(EMPTY_GATE);
@@ -90,8 +92,17 @@ export function BusinessValuationTool({ preview, partner }: ToolComponentProps) 
   const topRef = useRef<HTMLDivElement>(null);
   const mountedAt = useRef(Date.now());
 
+  const [resultNotice, setResultNotice] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
+  const rerunning = useRef(false);
+
   useEffect(() => {
     captureAttribution();
+    // A lead created earlier in this tab: running again updates it rather than starting another.
+    const kept = readSessionLead();
+    if (kept) {
+      setLead(kept.lead);
+      setGate((g) => ({ ...g, ...kept.gate }));
+    }
   }, []);
 
   const currency = useMemo(() => currencyFor(s.country), [s.country]);
@@ -131,7 +142,11 @@ export function BusinessValuationTool({ preview, partner }: ToolComponentProps) 
       setFinError(e ?? '');
       return !e;
     }
-    if (step === 2) return Number.isFinite(wacc.wacc);
+    if (step === 2) {
+      const e = validateWacc(toInputs(s).wacc, currency) ?? '';
+      setWaccError(e);
+      return !e && Number.isFinite(wacc.wacc);
+    }
     return true;
   }
 
@@ -141,7 +156,7 @@ export function BusinessValuationTool({ preview, partner }: ToolComponentProps) 
     go(to as View);
   }
 
-  function onRun() {
+  async function onRun() {
     const inputs = toInputs(s);
     const e = validateTerminal(inputs, waccFor(inputs, inputs.waccAdjustment ?? 0).wacc);
     if (e) {
@@ -161,6 +176,40 @@ export function BusinessValuationTool({ preview, partner }: ToolComponentProps) 
     // visitor has already typed one there.
     const named = s.companyName.trim();
     if (named) setGate((g) => (g.company.trim() ? g : { ...g, company: named }));
+
+    // Run again in the same session: the lead already exists, so the gate is not asked twice. The
+    // inputs are saved to it as a new version; no email goes to the visitor and no alert to the firm.
+    // The results email is sent again only from Email me this version.
+    if (lead?.token) {
+      if (rerunning.current) return;
+      rerunning.current = true;
+      setSubmitting(true);
+      const raise = gate.purpose === 'raise' ? num(gate.raiseAmount) : null;
+      const rerunInputs = { ...inputs, purpose: gate.purpose, raiseAmount: raise };
+      const local = runValuation(rerunInputs);
+      try {
+        const saved = await saveRerun(lead.token, rerunInputs);
+        if (saved === 'unknown') {
+          // The lead no longer answers to this token: start a new one through the gate.
+          storeSessionLead(null);
+          setLead(null);
+          go('gate');
+          return;
+        }
+        setSaved({ inputs: rerunInputs, result: saved?.result ?? (local.ok ? local.result : outcome.result) });
+        setResultNotice({
+          tone: 'ok',
+          text: saved
+            ? 'Updated with your changes and saved to your valuation. Nothing was emailed; use Email me this version to receive these figures and a new report.'
+            : 'Updated with your changes. They could not be saved just now, so use Email me this version to keep them.',
+        });
+        go('result');
+      } finally {
+        rerunning.current = false;
+        setSubmitting(false);
+      }
+      return;
+    }
     go('gate');
   }
 
@@ -196,7 +245,13 @@ export function BusinessValuationTool({ preview, partner }: ToolComponentProps) 
       // The server's recomputation is what was saved and emailed, so it is what
       // the visitor sees. The browser's own run is the fallback, never the source.
       setSaved({ inputs, result: response?.result ?? (local.ok ? local.result : pending) });
-      if (response?.token) setLead((l) => (l ? { ...l, token: response.token, booking: response.booking } : l));
+      if (response?.token) {
+        setLead((l) => (l ? { ...l, token: response.token, booking: response.booking } : l));
+        const { website: _honeypot, ...kept } = gate;
+        void _honeypot;
+        storeSessionLead({ lead: { name: gate.name.trim(), email: gate.email.trim(), token: response.token, booking: response.booking }, gate: kept });
+      }
+      setResultNotice(null);
     } finally {
       setSubmitting(false);
       setMaxReached(3);
@@ -293,9 +348,13 @@ export function BusinessValuationTool({ preview, partner }: ToolComponentProps) 
                 state={s}
                 currency={currency}
                 wacc={wacc}
+                error={waccError}
                 adjustment={num(s.waccAdjustment) ?? 0}
                 onClearAdjustment={() => patch({ waccAdjustment: '0' })}
-                onWacc={(k, v) => update((prev) => ({ ...prev, wacc: { ...prev.wacc, [k]: v }, spTouched: prev.spTouched || k === 'sp' }))}
+                onWacc={(k, v) => {
+                  if (waccError) setWaccError('');
+                  update((prev) => ({ ...prev, wacc: { ...prev.wacc, [k]: v }, spTouched: prev.spTouched || k === 'sp' }));
+                }}
                 onReset={() => update(resetWacc)}
                 onBack={() => next(1)}
                 onNext={() => next(3)}
@@ -355,6 +414,7 @@ export function BusinessValuationTool({ preview, partner }: ToolComponentProps) 
             baseResult={saved.result}
             lead={lead}
             preview={preview}
+            initialNotice={resultNotice}
             partner={partner}
             onEdit={() => go(3)}
             onVersionSaved={(inputs, result) => {

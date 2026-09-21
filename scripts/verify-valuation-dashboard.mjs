@@ -274,6 +274,12 @@ async function walk(width) {
   }
   check(`${label}: on financials`, await page.evaluate(clickButton('Continue to cost of capital')));
   await wait(400);
+  {
+    const t3 = await page.evaluate(text());
+    const t3l = t3.toLowerCase();
+    check(`${label}: step 3 shows the WACC worked through`, t3l.includes('how your wacc is calculated') && t3l.includes('risk-free rate + levered beta x equity risk premium') && t3l.includes('pre-tax cost of debt x (1 - tax rate)'), t3.slice(t3l.indexOf('how your wacc'), t3l.indexOf('how your wacc') + 300));
+    check(`${label}: step 3 offers the company borrowing rate`, t3.includes('Your pre-tax borrowing rate (optional)'));
+  }
   check(`${label}: on cost of capital`, await page.evaluate(clickButton('Continue to terminal')));
   await wait(400);
   check(`${label}: peers table offers EV / EBIT as an optional column`, (await page.evaluate(text())).includes('EV / EBIT (x, optional)'));
@@ -336,6 +342,16 @@ async function walk(width) {
   check(`${label}: version request intercepted and confirmed`, Boolean(await waitFor(() => page.evaluate(`document.body.innerText.includes('This version is on its way')`))) && log.version.length === 1 && log.version[0].ok);
   check(`${label}: Download PDF`, await page.evaluate(clickButton('Download PDF')));
   check(`${label}: PDF request intercepted, rendered and confirmed`, Boolean(await waitFor(() => page.evaluate(`document.body.innerText.includes('Your report has downloaded.')`), 120)) && log.pdf.length === 1 && log.pdf[0].header === '%PDF-');
+
+  // Running again in the same session: no gate, no new lead, the version saved without email.
+  check(`${label}: back to inputs`, await page.evaluate(clickButton('Back to inputs')));
+  await wait(400);
+  check(`${label}: run again`, await page.evaluate(clickButton('Run valuation')));
+  const rerunShown = await waitFor(() => page.evaluate(`document.body.innerText.includes('Nothing was emailed')`), 60);
+  check(`${label}: re-run opens the results, not the gate`, Boolean(rerunShown) && !(await page.evaluate(text())).includes('Work email'));
+  check(`${label}: re-run creates no new lead`, log.lead.length === 1, `${log.lead.length} lead requests`);
+  check(`${label}: re-run saves a version with sendEmail false`, log.version.length === 2 && log.version[1].body.sendEmail === false && log.version[1].ok && log.version[0].body.sendEmail === undefined);
+  check(`${label}: re-run carries the lead token`, log.version[1]?.body.token === log.version[0]?.body.token && typeof log.version[1]?.body.token === 'string');
 
   // The partner portrait keeps its proportions: a 4:5 frame, the image cropped
   // to cover it, and the file itself not distorted on the way.

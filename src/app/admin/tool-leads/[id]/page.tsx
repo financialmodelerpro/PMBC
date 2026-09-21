@@ -134,19 +134,22 @@ function eventContext(e: ToolLeadEventRow): string {
 }
 
 /** One replaced version: when it was replaced and what it said. */
-type VersionEntry = { at: string; midpoint: string; range: string; growth: string; exitMultiple: string; waccAdjustment: string };
+type VersionEntry = { at: string; how: string; midpoint: string; range: string; growth: string; exitMultiple: string; waccAdjustment: string };
 
 function versionHistory(events: ToolLeadEventRow[]): VersionEntry[] {
   const out: VersionEntry[] = [];
   for (const e of events) {
     if (e.event_type !== 'version_saved') continue;
-    const prev = (e.payload as { previous?: { inputs?: ValuationInputs; results?: unknown } } | null)?.previous;
+    const payload = e.payload as { kind?: string; previous?: { inputs?: ValuationInputs; results?: unknown } } | null;
+    const prev = payload?.previous;
     if (!prev?.results || !prev.inputs) continue;
     try {
       const h = headline(reviveResult(prev.results));
       const adj = prev.inputs.waccAdjustment;
       out.push({
         at: e.occurred_at,
+        // Before 2026-09-21 every version was emailed; re-runs carry kind 'rerun'.
+        how: payload?.kind === 'rerun' ? 'A re-run, not emailed' : 'An emailed version',
         midpoint: h.table.midpoint,
         range: h.table.equityRange,
         growth: `${prev.inputs.growth}%`,
@@ -348,6 +351,7 @@ export default async function ToolLeadDetailPage(props: { params: Promise<{ id: 
                   ['Size premium', `${n(w.sp)}%`],
                   ['Default spread', `${n(w.ds)}%`],
                   ['Credit spread', `${n(w.cs)}%`],
+                  ['Own borrowing rate', w.kd !== null && w.kd !== undefined ? `${n(w.kd)}% ${result.currency.code}, replaces the spreads` : 'Not entered, built from the spreads'],
                   ['Corporate income tax rate', `${n(w.tax)}%`],
                   ...(inputs.country === 'Saudi Arabia'
                     ? ([
@@ -437,13 +441,13 @@ export default async function ToolLeadDetailPage(props: { params: Promise<{ id: 
           {versions.length > 0 && (
             <Card title={`Version history (${versions.length})`} span>
               <p style={{ ...muted, margin: '0 0 10px', lineHeight: 1.5 }}>
-                Each time the visitor used Email me this version, the stored inputs and results above were replaced, and the version replaced is kept
-                here. Most recent first.
+                Each time the visitor ran the valuation again or used Email me this version, the stored inputs and results above were replaced, and
+                the version replaced is kept here. Only an emailed version sends the results email again. Most recent first.
               </p>
               <MiniTable
                 table={{
-                  head: ['Replaced', 'Equity range', 'Base case', 'Growth', 'Exit multiple', 'WACC adjustment'],
-                  rows: versions.map((vv) => ({ label: when(vv.at), values: [vv.range, vv.midpoint, vv.growth, vv.exitMultiple, vv.waccAdjustment] })),
+                  head: ['Replaced', 'Replaced by', 'Equity range', 'Base case', 'Growth', 'Exit multiple', 'WACC adjustment'],
+                  rows: versions.map((vv) => ({ label: when(vv.at), values: [vv.how, vv.range, vv.midpoint, vv.growth, vv.exitMultiple, vv.waccAdjustment] })),
                 }}
               />
             </Card>

@@ -7,6 +7,12 @@
  * the previous inputs and results, which is the version history the admin
  * detail view shows. The results email is then sent again with the new report.
  *
+ * RE-RUNS (since 2026-09-21). Running the valuation again in the same session
+ * posts here too, with `sendEmail: false`: the lead gets a new version, no email
+ * goes to the visitor and no alert to the firm (the alert is sent once, when the
+ * lead is created). Its event has source `rerun`; an emailed version's has
+ * `results`. Each has its own limit, so re-runs never use up the emails.
+ *
  * RULES
  *   1. The lead is found by its access token only. An unknown token is a 404.
  *   2. The tool must be Live, unless the caller is signed-in staff.
@@ -28,11 +34,18 @@ import { serializeResult } from '../valuation/serialize';
 import { recomputeInputs } from './valuation';
 
 export const VERSION_RATE_LIMIT = { perHour: 5, perDay: 20 } as const;
+/** Re-runs send nothing, so they are limited only to bound the writes. */
+export const RERUN_RATE_LIMIT = { perHour: 30, perDay: 100 } as const;
+
+/** An emailed version (`Email me this version`) or a silent re-run. Stored as the event's source. */
+export type VersionKind = 'results' | 'rerun';
 
 const bodySchema = z.object({
   token: z.string().min(20).max(200),
   inputs: z.unknown(),
   website: z.string().max(500).optional(),
+  /** False for a re-run: save the version, send nothing. Absent means true, as every earlier caller sent. */
+  sendEmail: z.boolean().optional(),
 });
 
 export type VersionLead = {
@@ -48,17 +61,18 @@ export type VersionLead = {
 
 export type VersionStore = {
   findByToken(token: string): Promise<VersionLead | null>;
-  countVersionsSince(leadId: string, sinceIso: string): Promise<number | null>;
+  countVersionsSince(leadId: string, sinceIso: string, kind: VersionKind): Promise<number | null>;
   /** Records the previous version as an event, then writes the new one onto the lead. */
   saveVersion(
     lead: VersionLead,
     next: { inputs: unknown; results: unknown; equity_low: number; equity_mid: number; equity_high: number; wacc: number | null; data_version: string },
+    kind: VersionKind,
   ): Promise<boolean>;
 };
 
 export type VersionOutcome =
   | { kind: 'invalid' | 'not_found' | 'rate_limited' | 'save_failed'; status: 400 | 404 | 429 | 500; body: Record<string, unknown>; lead: null; result: null }
-  | { kind: 'saved' | 'honeypot'; status: 200; body: { ok: true; result: unknown }; lead: VersionLead | null; result: ValuationResult };
+  | { kind: 'saved' | 'honeypot'; status: 200; body: { ok: true; result: unknown }; lead: VersionLead | null; result: ValuationResult; emailed?: boolean };
 
 export async function processVersionUpdate(
   raw: unknown,
@@ -95,11 +109,14 @@ export async function processVersionUpdate(
   const result = recomputed.result;
   const serialized = serializeResult(result);
 
+  const sendEmail = parsed.data.sendEmail !== false;
+  const versionKind: VersionKind = sendEmail ? 'results' : 'rerun';
   if (!ctx.isStaff) {
+    const limit = sendEmail ? VERSION_RATE_LIMIT : RERUN_RATE_LIMIT;
     const hourAgo = new Date(ctx.now.getTime() - 3600_000).toISOString();
     const dayAgo = new Date(ctx.now.getTime() - 86_400_000).toISOString();
-    const [hour, day] = await Promise.all([store.countVersionsSince(lead.id, hourAgo), store.countVersionsSince(lead.id, dayAgo)]);
-    if ((hour ?? 0) >= VERSION_RATE_LIMIT.perHour || (day ?? 0) >= VERSION_RATE_LIMIT.perDay) {
+    const [hour, day] = await Promise.all([store.countVersionsSince(lead.id, hourAgo, versionKind), store.countVersionsSince(lead.id, dayAgo, versionKind)]);
+    if ((hour ?? 0) >= limit.perHour || (day ?? 0) >= limit.perDay) {
       return fail('rate_limited', 429, {
         error: 'You have updated this valuation several times recently. Please try again later.',
         result: serialized,
@@ -115,7 +132,7 @@ export async function processVersionUpdate(
     equity_high: result.equityDisplay[2],
     wacc: Number.isFinite(result.wacc.wacc) ? result.wacc.wacc : null,
     data_version: VALUATION_DATA_VERSION,
-  });
+  }, versionKind);
   if (!ok) return fail('save_failed', 500, { error: 'Could not save this version', result: serialized });
-  return { kind: 'saved', status: 200, body: { ok: true, result: serialized }, lead, result };
+  return { kind: 'saved', status: 200, body: { ok: true, result: serialized }, lead, result, emailed: sendEmail };
 }

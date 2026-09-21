@@ -328,7 +328,7 @@ for (const [label, result] of [['Saudi', saudi], ['full', full], ['Pakistan', pa
   check('full: stake value and label on the report', f.includes(hf.stakeLabel) && f.includes(hf.table.stakeRange) && f.includes(hf.table.equityRange), hf.table.stakeRange);
   check('full: weighted value on the report', f.includes('Probability-weighted') && f.includes(hf.weighted));
   check('full: bridge items on the report', ['end of service benefits', 'lease liabilities', 'minority interest', 'surplus assets'].every((x) => f.toLowerCase().includes(x)));
-  check('full: normalised EBITDA on the report', f.includes('Normalised EBITDA'));
+  check('full: reported and normalised EBITDA on the report, each with its unit', f.includes('EBITDA, reported') && f.includes('EBITDA, normalised'));
   check('full: raised at least one warning', format.warningTexts(full).length > 0);
   for (const w of format.warningTexts(full)) check(`full: warning "${w.title}" on the report`, f.includes(w.title));
   for (const [label, r, text] of [['full', full, f], ['minimal', saudi, m]]) {
@@ -413,6 +413,75 @@ for (const [label, result] of [['Saudi', saudi], ['full', full], ['Pakistan', pa
   check('a result that does not reconcile is refused before rendering', refused);
 }
 check('file name is tidy', pdfModule.reportFileName('Acme & Sons / KSA', 'x', new Date('2026-09-16')) === 'PaceMakers valuation Acme  Sons  KSA 2026-09-16.pdf');
+
+console.log('Cost of capital working');
+{
+  // The densest page 5: five value factors and a stake table above the WACC working. It must stay on
+  // eight pages, with the working on page 5, whether the cost of debt is built or entered.
+  const base = fullFeatureCase(state);
+  for (const kd of ['', '30']) {
+    const s = { ...base, growth: '3', wacc: { ...base.wacc, kd } };
+    s.fin = { ...s.fin, ebitda: s.fin.ebitda.map((v, i) => (i >= 3 ? String(+v * 0.5) : v)) };
+    const r = fromState(s);
+    const t = await pageTexts(await pdfModule.renderValuationReport(r, { ...REPORT_META, branding: null, company: 'A very long company name that goes on for a while, Holdings', bookingHref: BOOK }));
+    const tag = kd ? 'entered borrowing rate' : 'built cost of debt';
+    check(`WACC working, ${tag}: the densest page 5 (five factors, stake) keeps eight pages`, format.valueLevers(r).length === 5 && r.stake.used && t.length === 8, `${format.valueLevers(r).length} factors, ${t.length} pages`);
+    check(`WACC working, ${tag}: on page 5, ending in the ${r.currency.code} WACC`, t[4].includes('Cost of capital') && t[4].includes(`WACC (${r.currency.code})`) && t[4].includes(format.fmtPct(r.wacc.wacc, 2)));
+    if (kd) check('WACC working: an entered rate is converted to US dollar terms and named', t[4].includes('your rate 30.00%') && r.wacc.kdSource === 'entered');
+  }
+  // The steps reconcile: each result is the engine's figure, and the local WACC is the converted dollar WACC.
+  for (const [label, r] of [['Saudi', saudi], ['Pakistan', pakistan]]) {
+    const st = format.waccSteps(r.wacc, r.currency);
+    const val = (k) => st.find((x) => x.key === k)?.value;
+    check(`${label}: working shows the engine's cost of equity, after-tax cost of debt and WACC`, val('ke') === format.fmtPct(r.wacc.ke, 2) && val('kdt') === format.fmtPct(r.wacc.kdt, 2) && val(r.currency.pegged ? 'wacc_base' : 'wacc_local') === format.fmtPct(r.wacc.wacc, 2));
+    check(`${label}: US dollar lines are labelled only when the currency is not pegged`, st.some((x) => x.label.includes('(US dollars)')) === !r.currency.pegged);
+  }
+}
+
+console.log('Header reaches the page edges');
+{
+  // Read from the drawing operators, not a raster: the cover once stopped 0.28pt short of the right
+  // edge (A4 is 595.28pt, the grid 595pt), a hairline no raster at report size shows but a viewer at
+  // zoom does. A navy shape must cover the top edge across the full width, and the green swoosh must
+  // run past the right edge, on the cover, an inner page and the closing page alike.
+  const buf = await pdfModule.renderValuationReport(saudi, { ...REPORT_META, company: 'Example Co', industry: 'I', country: 'C', bookingHref: BOOK });
+  const doc = await pdfjs.getDocument({ data: new Uint8Array(buf), verbosity: 0 }).promise;
+  const O = pdfjs.OPS;
+  const mul = (m, n) => [m[0] * n[0] + m[2] * n[1], m[1] * n[0] + m[3] * n[1], m[0] * n[2] + m[2] * n[3], m[1] * n[2] + m[3] * n[3], m[0] * n[4] + m[2] * n[5] + m[4], m[1] * n[4] + m[3] * n[5] + m[5]];
+  const rgb = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)).join(',');
+  const NAVY = rgb(letterhead.BRAND.navy), GREEN = rgb(letterhead.BRAND.green);
+  async function topShapes(n) {
+    const page = await doc.getPage(n);
+    const [, , W, H] = page.view;
+    const ops = await page.getOperatorList();
+    let ctm = [1, 0, 0, 1, 0, 0], fill = null;
+    const stack = [], out = [];
+    ops.fnArray.forEach((fn, i) => {
+      const a = ops.argsArray[i];
+      if (fn === O.save) stack.push([...ctm]);
+      else if (fn === O.restore) ctm = stack.pop() ?? ctm;
+      else if (fn === O.transform) ctm = mul(ctm, a);
+      else if (fn === O.setFillRGBColor) fill = typeof a[0] === 'string' ? [1, 3, 5].map((k) => parseInt(a[0].slice(k, k + 2), 16)).join(',') : a.join(',');
+      else if (fn === O.constructPath) {
+        const mm = a[2] ?? a[a.length - 1];
+        if (!mm || mm.length < 4) return;
+        const p = [[mm[0], mm[1]], [mm[2], mm[3]]].map(([x, y]) => [ctm[0] * x + ctm[2] * y + ctm[4], ctm[1] * x + ctm[3] * y + ctm[5]]);
+        const box = { fill, left: Math.min(p[0][0], p[1][0]), right: W - Math.max(p[0][0], p[1][0]), top: H - Math.max(p[0][1], p[1][1]), bottom: H - Math.min(p[0][1], p[1][1]) };
+        if (box.top < 40) out.push(box);
+      }
+    });
+    return out;
+  }
+  for (const [n, name] of [[1, 'cover'], [4, 'inner page'], [8, 'closing page']]) {
+    const shapes = await topShapes(n);
+    const bar = shapes.find((b) => b.fill === NAVY && b.left <= 0 && b.right <= 0 && b.top <= 0 && b.bottom < 20);
+    const swoosh = shapes.filter((b) => b.fill === GREEN && b.top <= 0);
+    check(`${name}: navy bar covers the top edge from left to right, no gap`, Boolean(bar), JSON.stringify(shapes.filter((b) => b.fill === NAVY).slice(0, 3)));
+    // The swoosh is clipped to its drawing box, whose navy strip starts part way across: that box, not just the paths, must reach the edge.
+    const swooshBox = shapes.filter((b) => b.fill === NAVY && b.left > 100);
+    check(`${name}: green swoosh and its drawing box reach past the right edge`, swoosh.length > 0 && swoosh.every((b) => b.right <= 0) && swooshBox.length > 0 && swooshBox.every((b) => b.right <= 0), JSON.stringify({ swoosh, swooshBox }));
+  }
+}
 
 console.log('Brevo payload');
 {

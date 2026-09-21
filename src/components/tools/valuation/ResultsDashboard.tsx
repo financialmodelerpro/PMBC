@@ -59,6 +59,7 @@ import {
   terminalRows,
   timingRows,
   waccBuildRows,
+  waccSteps,
   warningTexts,
   type Table,
 } from '@/lib/tools/valuation/format';
@@ -158,6 +159,7 @@ export function ResultsDashboard({
   partner = null,
   onEdit,
   onVersionSaved,
+  initialNotice = null,
 }: {
   baseInputs: ValuationInputs;
   baseResult: ValuationResult;
@@ -166,6 +168,8 @@ export function ResultsDashboard({
   partner?: PartnerCardData | null;
   onEdit: () => void;
   onVersionSaved: (inputs: ValuationInputs, result: ValuationResult) => void;
+  /** Shown when the results open, for example after a re-run that was saved but not emailed. */
+  initialNotice?: { tone: 'ok' | 'error'; text: string } | null;
 }) {
   const [tab, setTab] = useState<TabId>('summary');
   const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
@@ -201,7 +205,7 @@ export function ResultsDashboard({
 
   /* Actions --------------------------------------------------------------- */
   const [busy, setBusy] = useState<'pdf' | 'email' | null>(null);
-  const [notice, setNotice] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
+  const [notice, setNotice] = useState<{ tone: 'ok' | 'error'; text: string } | null>(initialNotice);
   const canSave = Boolean(lead.token);
 
   async function onDownload() {
@@ -559,8 +563,40 @@ export function ResultsDashboard({
 
           {tab === 'assumptions' && (
             <>
+              <Card
+                title="How the WACC is calculated"
+                sub={
+                  r.currency.pegged
+                    ? 'Cost of equity and cost of debt, weighted by the target capital structure.'
+                    : `The Damodaran inputs are US dollar rates, so the build runs in US dollars and the last line converts it to ${r.currency.code}.`
+                }
+              >
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[560px] border-collapse text-[14px]">
+                    <thead>
+                      <tr className="bg-[#F6F1E6] text-left text-[12.5px] text-[color:var(--pmbc-muted)]">
+                        <th scope="col" className="p-2 font-semibold">Step</th>
+                        <th scope="col" className="p-2 font-semibold">Working</th>
+                        <th scope="col" className="p-2 text-right font-semibold">Result</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {waccSteps(r.wacc, r.currency).map((x) => (
+                        <tr key={x.key} className="border-t border-[color:var(--pmbc-border-warm)] align-top">
+                          <th scope="row" className={`p-2 text-left ${x.strong ? 'font-semibold' : 'font-normal'}`}>
+                            {x.label}
+                            <span className="block text-[12.5px] font-normal text-[color:var(--pmbc-muted)]">{x.formula}</span>
+                          </th>
+                          <td className="p-2 tabular-nums text-[color:var(--pmbc-muted)]">{x.working}</td>
+                          <td className={`p-2 text-right tabular-nums ${x.strong ? 'font-semibold' : ''}`}>{x.value}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </Card>
               <div className="grid gap-5 lg:grid-cols-2">
-                <Card title="Cost of capital">
+                <Card title="Cost of capital" sub="The inputs. The calculation from them is below.">
                   <KeyValueList rows={waccBuildRows(r)} />
                 </Card>
                 <Card title="Terminal value">
