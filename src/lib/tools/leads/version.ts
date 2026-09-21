@@ -42,6 +42,8 @@ export type VersionLead = {
   inputs: unknown;
   results: unknown;
   data_version: string;
+  /** The gate's purpose. The version is valued for it, whatever the browser sends, as the lead and PDF routes do. */
+  purpose?: string | null;
 };
 
 export type VersionStore = {
@@ -71,17 +73,27 @@ export async function processVersionUpdate(
   const parsed = bodySchema.safeParse(raw);
   if (!parsed.success) return fail('invalid', 400, { error: 'Validation failed' });
 
-  const recomputed = recomputeInputs(parsed.data.inputs, ctx.now);
-  if (!recomputed.ok) return fail('invalid', 400, { error: 'Validation failed', issues: recomputed.issues });
-  const result = recomputed.result;
-  const serialized = serializeResult(result);
+  const first = recomputeInputs(parsed.data.inputs, ctx.now);
+  if (!first.ok) return fail('invalid', 400, { error: 'Validation failed', issues: first.issues });
 
   if ((parsed.data.website ?? '').trim() !== '') {
-    return { kind: 'honeypot', status: 200, body: { ok: true, result: serialized }, lead: null, result };
+    return { kind: 'honeypot', status: 200, body: { ok: true, result: serializeResult(first.result) }, lead: null, result: first.result };
   }
 
   const lead = await store.findByToken(parsed.data.token);
   if (!lead) return fail('not_found', 404, { error: 'Not found' });
+
+  // The purpose is the lead's, and a raise amount only counts when raising equity, so a browser cannot
+  // add a pre-money section to a sale valuation. Leads read without a purpose keep what was sent.
+  let recomputed = first;
+  if (lead.purpose !== undefined) {
+    const raw = parsed.data.inputs && typeof parsed.data.inputs === 'object' ? (parsed.data.inputs as Record<string, unknown>) : {};
+    const pinned = recomputeInputs({ ...raw, purpose: lead.purpose, raiseAmount: lead.purpose === 'raise' ? (raw.raiseAmount ?? null) : null }, ctx.now);
+    if (!pinned.ok) return fail('invalid', 400, { error: 'Validation failed', issues: pinned.issues });
+    recomputed = pinned;
+  }
+  const result = recomputed.result;
+  const serialized = serializeResult(result);
 
   if (!ctx.isStaff) {
     const hourAgo = new Date(ctx.now.getTime() - 3600_000).toISOString();

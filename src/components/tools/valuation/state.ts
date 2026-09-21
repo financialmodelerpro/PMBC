@@ -160,10 +160,13 @@ export function initialState(): FormState {
   };
 }
 
-/** Today as YYYY-MM-DD in the visitor's own calendar. The server replaces it with its own date. */
+/**
+ * Today as YYYY-MM-DD in UTC, the calendar the server values on. It once used the visitor's local
+ * date, so late on 30 December in the Americas a year the page accepted was refused by the server
+ * as twelve months old, and the lead was lost without a message.
+ */
 export function todayIso(now: Date = new Date()): string {
-  const p = (v: number) => String(v).padStart(2, '0');
-  return `${now.getFullYear()}-${p(now.getMonth() + 1)}-${p(now.getDate())}`;
+  return now.toISOString().slice(0, 10);
 }
 
 export function num(s: string): number | null {

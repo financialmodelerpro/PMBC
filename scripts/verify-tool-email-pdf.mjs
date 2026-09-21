@@ -127,7 +127,8 @@ for (const [label, result] of [['Saudi', saudi], ['Pakistan', pakistan], ['distr
   });
   const h = format.headline(result);
   check(`${label}: subject carries the equity range`, subject === `Your indicative valuation: ${h.equityRange}`, subject);
-  check(`${label}: body has range, midpoint, EV and WACC`, [h.equityRange, h.midpoint, h.evRange, h.wacc].every((x) => body.includes(x)));
+  check(`${label}: body has range, base case, EV and WACC in full`, [h.table.equityRange, h.table.midpoint, h.table.evRange, h.wacc].every((x) => body.includes(x)));
+  check(`${label}: no short amount in the summary table`, !/<td[^>]*>[^<]*\b[A-Z]{3} [\d.,]+(k|m|bn)\b/.test(body), body.match(/<td[^>]*>[^<]*\b[A-Z]{3} [\d.,]+(k|m|bn)\b/)?.[0]);
   check(`${label}: body lists the methods used`, body.includes(templates.escapeHtml(format.methodsUsed(result).join(', '))));
   check(`${label}: booking button links to the tracked URL`, body.includes(`href="${templates.escapeHtml(BOOK)}"`));
   check(`${label}: visitor name escaped`, body.includes('Test &lt;b&gt;Person&lt;/b&gt;') && !body.includes('<b>Person</b>'));
@@ -148,7 +149,7 @@ console.log('Alert email');
     dashboardUrl: 'https://www.pacemakersglobal.com/admin/tool-leads/00000000-0000-4000-8000-000000000001',
   });
   check('subject names tool, person, company, below minimum and test', subject === 'New Business Valuation lead: Test Person, Acme (below minimum) [TEST]', subject);
-  for (const v of ['test@example.com', 'Raising equity', 'Under SAR 50 million', 'Saudi Arabia', 'Education', 'Test lead', format.headline(saudi).equityRange]) {
+  for (const v of ['test@example.com', 'Raising equity', 'Under SAR 50 million', 'Saudi Arabia', 'Education', 'Test lead', format.headline(saudi).table.equityRange]) {
     check(`alert body includes "${v}"`, body.includes(templates.escapeHtml(v)));
   }
   check('alert links to the dashboard', body.includes('href="https://www.pacemakersglobal.com/admin/tool-leads/00000000-0000-4000-8000-000000000001"'));
@@ -324,7 +325,7 @@ for (const [label, result] of [['Saudi', saudi], ['full', full], ['Pakistan', pa
   const f = texts.full.join(' ');
   const m = texts.Saudi.join(' ');
   const hf = format.headline(full);
-  check('full: stake value and label on the report', f.includes(hf.stakeLabel) && f.includes(hf.stakeRange));
+  check('full: stake value and label on the report', f.includes(hf.stakeLabel) && f.includes(hf.table.stakeRange) && f.includes(hf.table.equityRange), hf.table.stakeRange);
   check('full: weighted value on the report', f.includes('Probability-weighted') && f.includes(hf.weighted));
   check('full: bridge items on the report', ['end of service benefits', 'lease liabilities', 'minority interest', 'surplus assets'].every((x) => f.toLowerCase().includes(x)));
   check('full: normalised EBITDA on the report', f.includes('Normalised EBITDA'));
@@ -479,6 +480,8 @@ console.log('Email shell and parts');
   }
   check('report email: navy and green accent strip, gold tagline', rep.includes(`bgcolor="${letterhead.BRAND.green}"`) && rep.includes(`bgcolor="${letterhead.BRAND.navy}"`) && new RegExp(`color:${letterhead.BRAND.gold};">Advisory from Structure to Exit`).test(rep));
   check('report email: legal line and contact details in the footer', rep.includes(templates.escapeHtml(letterhead.LEGAL_LINE)) && rep.includes('www.pacemakersglobal.com'));
+  check('report email: the website is printed and linked as https://www.pacemakersglobal.com, and nothing is http', rep.includes('>https://www.pacemakersglobal.com</a>') && rep.includes('href="https://www.pacemakersglobal.com"') && !/http:\/\//.test(rep));
+  check('site email shell: the website is printed and linked as https://www.pacemakersglobal.com', html.includes('>https://www.pacemakersglobal.com</a>') && !/href="http:\/\//.test(html));
   check('report email: no website colours', !/#1B3A5F|#C69C3E|#FAF7F2|#14304F|#A88530/i.test(rep));
   check('report email: gold only in the tagline', (rep.match(new RegExp(letterhead.BRAND.gold, 'g')) ?? []).length === 1);
   check('site email shell unchanged: navy header, white logo, gold hairline', html.includes('background:#1B3A5F') && html.includes(base.EMAIL_LOGO.src) && html.includes('background:#C69C3E'));
@@ -498,9 +501,9 @@ console.log('Email shell and parts');
   const fb = build(full), mb = build(saudi);
   check('results email body: no website colours', !/#1B3A5F|#C69C3E|#FAF7F2/i.test(fb + mb));
   const hf = format.headline(full);
-  check('results email, full: weighted value row', fb.includes('Probability-weighted value') && fb.includes(templates.escapeHtml(hf.weighted)));
-  check('results email, full: stake value row', fb.includes(templates.escapeHtml(`Value of ${hf.stakeLabel}`)) && fb.includes(templates.escapeHtml(hf.stakeRange)));
-  check('results email, minimal: weighted row shown (scenarios always run)', mb.includes('Probability-weighted value'));
+  check('results email, full: weighted value row', fb.includes(format.LABELS.weighted) && fb.includes(templates.escapeHtml(hf.table.weighted)));
+  check('results email, full: stake value row', fb.includes(templates.escapeHtml(`Value of ${hf.stakeLabel}`)) && fb.includes(templates.escapeHtml(hf.table.stakeRange)));
+  check('results email, minimal: weighted row shown (scenarios always run)', mb.includes(format.LABELS.weighted));
   check('results email, minimal: no stake row', !mb.includes('Value of '));
 
   const alertFor = (followUp) =>
@@ -670,7 +673,7 @@ console.log('Report branding and partner');
     }
     const coverText = tb[0].replace(/\s+/g, ' ');
     check('the cover names the same market data label as the data behind the figures', coverText.includes(data.dataVersionLabel(full.meta.dataVersion)));
-    check('the closing page shows the live website address, never a local host', tb[7].includes('www.pacemakersglobal.com') && !/localhost|vercel\.app|127\.0\.0\.1/.test(tb.join(' ')));
+    check('the closing page shows the live website address in full, https://www.pacemakersglobal.com, never a local host or http', tb[7].includes('https://www.pacemakersglobal.com') && !/localhost|vercel\.app|127\.0\.0\.1|http:\/\//.test(tb.join(' ')));
     const nextConfig = fs.readFileSync(path.join(root, 'next.config.ts'), 'utf8');
     check('bundled logos are traced into every PDF route', (nextConfig.match(/'\.\/src\/lib\/tools\/pdf\/brand\/\*\*'/g) ?? []).length === (nextConfig.match(/'\.\/src\/lib\/tools\/pdf\/fonts\/\*\*'/g) ?? []).length);
   }

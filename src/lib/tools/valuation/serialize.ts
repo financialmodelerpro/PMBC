@@ -12,7 +12,18 @@
 
 import type { ValuationResult } from './engine';
 
-const NULL_MEANS_ABSENT = new Set(['compsEbitda', 'exit', 'ebitdaValue', 'raise', 'valuationDate', 'company', 'purpose']);
+/**
+ * Keys whose null means "not entered" or "not used". A result field that can be
+ * null must be listed here, or a stored null comes back as NaN, which passes a
+ * `!== null` test and prints "n/a" (it did for borrowings, cash and invested
+ * capital, added 2026-09-17, until 2026-09-21). `workingCapital` is also a
+ * number inside `zakatBaseLtm`, which is never NaN, so listing it is safe.
+ */
+const NULL_MEANS_ABSENT = new Set([
+  'compsEbitda', 'exit', 'ebitdaValue', 'raise', 'valuationDate', 'company', 'purpose',
+  'debt', 'cash', 'investedCapital', 'workingCapital', 'fixedAssets', 'zakatBaseLtm',
+  'ebitMultiplesPre', 'ebitMultiplesPost', 'ebitValue',
+]);
 
 export function serializeResult(result: ValuationResult): unknown {
   return JSON.parse(

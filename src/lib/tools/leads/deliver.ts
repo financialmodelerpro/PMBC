@@ -13,7 +13,7 @@ import { findTool } from '@/config/tools';
 import { fetchSiteSettings } from '@/lib/cms/settings';
 import { sendEmail, type SendEmailResult } from '@/lib/email/send';
 import { baseLayoutBranded } from '@/lib/email/templates/_base';
-import { siteUrl } from '@/lib/seo/metadata';
+import { SITE_HREF } from '@/lib/brand/letterhead';
 import { bookingLinkFor } from './bookingLinkStore';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 
@@ -191,7 +191,7 @@ export async function sendLeadAlert(lead: LeadForDelivery, result: ValuationResu
       isTest: lead.is_test,
     },
     result,
-    dashboardUrl: `${siteUrl()}/admin/tool-leads/${lead.id}`,
+    dashboardUrl: `${SITE_HREF}/admin/tool-leads/${lead.id}`,
   });
   const sent = await sendEmail({
     to,

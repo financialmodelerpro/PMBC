@@ -15,7 +15,7 @@ const store: VersionStore = {
   async findByToken(token) {
     const lead = await getLeadByToken(token);
     return lead
-      ? { id: lead.id, tool_slug: lead.tool_slug, is_test: lead.is_test, inputs: lead.inputs, results: lead.results, data_version: lead.data_version }
+      ? { id: lead.id, tool_slug: lead.tool_slug, is_test: lead.is_test, inputs: lead.inputs, results: lead.results, data_version: lead.data_version, purpose: lead.purpose }
       : null;
   },
   async countVersionsSince(leadId, sinceIso) {

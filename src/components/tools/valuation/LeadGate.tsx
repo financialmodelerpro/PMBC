@@ -4,6 +4,7 @@ import Link from 'next/link';
 
 import { CONSENT_TEXT, FOLLOW_UP_TEXT } from '@/lib/tools/consent';
 import { DEAL_BAND_UNSURE, PURPOSES } from '@/lib/tools/valuation/data';
+import { LIMITS } from '@/lib/tools/valuation/limits';
 
 import { Field, NumberInput, Panel, PanelTitle, Select, StepNav, inputClass } from './ui';
 
@@ -106,6 +107,7 @@ export function LeadGate({
                 id={id}
                 type="text"
                 autoComplete="name"
+                maxLength={LIMITS.gateName}
                 value={values.name}
                 onChange={(e) => onChange({ name: e.target.value })}
                 aria-describedby={describedBy}
@@ -120,6 +122,7 @@ export function LeadGate({
                 id={id}
                 type="email"
                 autoComplete="email"
+                maxLength={LIMITS.gateEmail}
                 value={values.email}
                 onChange={(e) => onChange({ email: e.target.value })}
                 aria-describedby={describedBy}
@@ -136,6 +139,7 @@ export function LeadGate({
                 id={id}
                 type="text"
                 autoComplete="organization"
+                maxLength={LIMITS.gateCompany}
                 value={values.company}
                 onChange={(e) => onChange({ company: e.target.value })}
                 className={inputClass}

@@ -25,10 +25,19 @@ import { DEAL_BANDS_SAR, DEAL_BAND_UNSURE } from '@/lib/tools/valuation/data';
 export const metadata: Metadata = { title: 'Tool Leads | PMBC Admin', robots: { index: false, follow: false } };
 export const dynamic = 'force-dynamic';
 
+/**
+ * The base case in full, as the report's tables print amounts: "SAR 385.2 million", or thousands
+ * under 10 million ("SAR 4,250 thousand"). The row carries only the equity figure, so its size
+ * picks the unit, where the report also looks at revenue.
+ */
 function money(v: number | null, currency: string | null): string {
   if (v === null || v === undefined) return '';
   const n = Number(v);
-  return `${currency ?? ''} ${n >= 1000 ? (n / 1000).toFixed(2) + 'bn' : n.toFixed(n >= 100 ? 0 : 1) + 'm'}`.trim();
+  if (!Number.isFinite(n)) return '';
+  const small = Math.abs(n) < 10;
+  const x = small ? n * 1000 : n;
+  const s = Math.abs(x).toLocaleString('en-US', { minimumFractionDigits: small ? 0 : 1, maximumFractionDigits: small ? 0 : 1 });
+  return `${currency ?? ''} ${x < 0 ? `(${s})` : s} ${small ? 'thousand' : 'million'}`.trim();
 }
 
 export default async function ToolLeadsPage(props: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
@@ -127,7 +136,7 @@ export default async function ToolLeadsPage(props: { searchParams: Promise<Recor
                 <th style={adminTh}>Name</th>
                 <th style={adminTh}>Tool</th>
                 <th style={adminTh}>Deal size</th>
-                <th style={{ ...adminTh, textAlign: 'right' }}>Equity midpoint</th>
+                <th style={{ ...adminTh, textAlign: 'right' }}>Base case</th>
                 <th style={adminTh}>Email</th>
                 <th style={adminTh}>Status</th>
               </tr>

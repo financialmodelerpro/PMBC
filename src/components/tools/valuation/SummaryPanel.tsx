@@ -65,7 +65,7 @@ function RangeTeaser({ d }: { d: SummaryData }) {
           Indicative equity value
         </p>
         <p className="pmbc-display mt-1.5 text-[20px] leading-tight">{d.range}</p>
-        {d.midpoint && <p className="mt-1 text-[13px] text-[#E8DDC4]">Midpoint {d.midpoint}</p>}
+        {d.midpoint && <p className="mt-1 text-[13px] text-[#E8DDC4]">Base case {d.midpoint}</p>}
         <p className="mt-2 text-[12.5px] text-[#E8DDC4]">From your last run. Run the valuation again to update it.</p>
       </div>
     );

@@ -48,6 +48,7 @@ import { equityRangeBar, footballFieldChart, revenueMarginChart, sensitivityHeat
 import {
   INDICATIVE_NOTE,
   LABELS,
+  dcfCombinedLabel,
   PRE_MONEY_NOTE,
   RELIANCE_STATEMENT,
   TOOL_DISCLAIMER,
@@ -60,6 +61,7 @@ import {
   disclosures,
   executiveSummary,
   fcfTable,
+  fmtWacc,
   headline,
   methodsUsed,
   normalisationRows,
@@ -163,6 +165,7 @@ export function ValuationReport({ result, meta }: { result: ValuationResult; met
   const about = descriptionParagraphs(meta.description);
   const checks = checkItems(r);
   const warningCount = checks.filter((x) => x.status === 'warning').length;
+  const perpetuityOnly = r.dcfBlock?.combination === 'perpetuity_only';
   const notes = disclosures(r);
   const raise = raiseTable(r);
   const details: ReportDetails = { toolName: TOOL_NAME, subject: who, dateLabel: r.meta.valuationDate ? h.valuationDate : dateText };
@@ -293,7 +296,7 @@ export function ValuationReport({ result, meta }: { result: ValuationResult; met
             </View>
             <View style={{ width: '42%' }}>
               <Text style={{ fontSize: 8.5, color: RC.muted, lineHeight: 1.45 }}>
-                {notes.exitMultiple} The {LABELS.dcfCombined} is used in the blend; the low and high flex WACC by one point and growth by half a point, or the exit multiple by one turn.
+                {notes.exitMultiple} The {dcfCombinedLabel(r)} is used in the blend; the low and high flex WACC by one point and growth by half a point, or the exit multiple by one turn.
               </Text>
             </View>
           </View>
@@ -317,8 +320,8 @@ export function ValuationReport({ result, meta }: { result: ValuationResult; met
               <KeyValues
                 rows={[
                   ['Stake', stakeLabel(r)],
-                  ['Equity value, 100%', h.equityRange],
-                  ['Indicative value of the stake', h.stakeRange ?? ''],
+                  ['Equity value, 100%', h.table.equityRange],
+                  ['Indicative value of the stake', h.table.stakeRange ?? ''],
                 ]}
               />
             </View>
@@ -361,7 +364,7 @@ export function ValuationReport({ result, meta }: { result: ValuationResult; met
             <KeyValues rows={waccBuildRows(r)} />
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', backgroundColor: RC.navy, paddingVertical: 4, paddingHorizontal: 6, marginTop: 4 }}>
               <Text style={{ color: RC.white, fontSize: 8.5 }}>WACC, {c.code}</Text>
-              <Text style={{ color: RC.white, fontWeight: 600, fontSize: 8.5 }}>{h.wacc}</Text>
+              <Text style={{ color: RC.white, fontWeight: 600, fontSize: 8.5 }}>{fmtWacc(r.wacc.wacc)}</Text>
             </View>
           </View>
           <View style={{ width: '50%', paddingLeft: 10 }}>
@@ -389,6 +392,8 @@ export function ValuationReport({ result, meta }: { result: ValuationResult; met
               title: 'Balance sheet, EBITDA and timing',
               rows: [
                 ...timingRows(r),
+                // Only when entered: it drives the returns checks, so the report states the figure they used.
+                ...(r.investedCapital ? ([['Invested capital', amt(r.investedCapital.total)]] as [string, string][]) : []),
                 ...(bridgeItemsUsed
                   ? ([
                       ['End of service benefits', amt(b.eosb)],
@@ -420,7 +425,7 @@ export function ValuationReport({ result, meta }: { result: ValuationResult; met
           <Text style={{ fontSize: 9, lineHeight: 1.45, marginBottom: 4 }}>
             The DCF discounts five years of free cash flow to the firm at the WACC from the valuation date, counting only the part of the first
             forecast year after it. The terminal value is taken two ways, growth in perpetuity on a cash flow whose reinvestment is sized for
-            long-term growth, and an exit multiple of final year EBITDA, and the DCF in the blend is their average.
+            long-term growth, and an exit multiple of final year EBITDA, and the DCF in the blend is {perpetuityOnly ? 'the perpetuity figure alone, since final year EBITDA does not support an exit multiple' : 'their average'}.
           </Text>
           <Text style={{ fontSize: 9, lineHeight: 1.45 }}>
             Comparables apply EV / EBITDA, or EV / Revenue where EBITDA is not positive, to the last actual year, after any private company

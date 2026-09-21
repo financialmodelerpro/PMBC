@@ -349,6 +349,7 @@ console.log('7. Warnings');
     check('ROIC: below WACC triggers', has(poor, 'roic_below_wacc'));
     check('ROIC: without invested capital, no ROIC and no ROIC checks listed', !Number.isFinite(B.ratios.roic) && !checkOf(B, 'roic_below_wacc') && !checkOf(B, 'reinvestment'));
     check('invested capital of zero refused', engine.validateFinancials(BASE.financials, { investedCapital: 0 }) === 'Enter invested capital above zero, or leave it blank.');
+    check('invested capital parts summing to zero or less name the two boxes', /Working capital plus net fixed assets must be above zero/.test(engine.validateFinancials(BASE.financials, engine.withInvestedCapitalFromParts({ ...BASE, investedCapitalParts: { workingCapital: -50, fixedAssets: 30 } })) ?? ''));
   }
   // Reinvestment against growth.
   {
@@ -574,9 +575,11 @@ console.log('11. Version 3');
     const eoy = run({ ...REG, valuationDate: '2026-09-16', midYear: false });
     check('end of year convention: 1 - f, then i - f', close(eoy.forecast[0].period, 1 - f) && close(eoy.forecast[3].period, 4 - f));
     const old = engine.validateCompany({ ...REG, financialYear: 2024, valuationDate: '2026-09-16' });
-    check('a last actual year over 12 months old is refused with the set message', old.financialYear === 'Your latest actual year is more than 12 months old. Please enter the latest full year as actuals.', old.financialYear);
+    check('a last actual year over 12 months old is refused with the set message', old.financialYear === 'Your latest actual year ended 12 months or more ago. Please enter the latest full year as actuals.', old.financialYear);
     check('refused by runValuation at step 1', engine.runValuation({ ...REG, financialYear: 2024, valuationDate: '2026-09-16' }).ok === false);
     check('exactly 12 months is refused', Boolean(engine.validateCompany({ ...REG, valuationDate: '2026-12-31' }).financialYear));
+    check('a year that has not started is refused', engine.validateCompany({ ...REG, financialYear: 2027, valuationDate: '2026-09-16' }).financialYear === engine.FUTURE_YEAR_MESSAGE, engine.validateCompany({ ...REG, financialYear: 2027, valuationDate: '2026-09-16' }).financialYear);
+    check('the year still running is accepted', !engine.validateCompany({ ...REG, financialYear: 2026, valuationDate: '2026-09-16' }).financialYear);
     check('a day short of 12 months runs', !engine.validateCompany({ ...REG, valuationDate: '2026-12-30' }).financialYear);
     const kd = 0.0477 + 0.0051 + 0.02; // risk-free, country default spread, company credit spread
     near('the interest rate is the pre-tax cost of debt from the WACC build', r.wacc.kd, kd);

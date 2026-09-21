@@ -40,6 +40,8 @@ export function WaccStep({
   state,
   currency,
   wacc,
+  adjustment = 0,
+  onClearAdjustment,
   onWacc,
   onReset,
   onBack,
@@ -48,6 +50,9 @@ export function WaccStep({
   state: FormState;
   currency: Currency;
   wacc: WaccBreakdown;
+  /** Points added by the results page slider in an emailed version. Included in `wacc`. */
+  adjustment?: number;
+  onClearAdjustment?: () => void;
   onWacc: (k: WaccKey, v: string) => void;
   onReset: () => void;
   onBack: () => void;
@@ -135,6 +140,17 @@ export function WaccStep({
           <span className="text-[15px] text-[#E8DDC4]">Weighted average cost of capital, {currency.code}</span>
           <b className="pmbc-display text-[36px] text-[#C69C3E]">{fmtPct(wacc.wacc)}</b>
         </div>
+        {adjustment !== 0 && (
+          <p className="mt-2 text-[13.5px] text-[#E8DDC4]">
+            Includes a {adjustment > 0 ? '+' : ''}
+            {adjustment} point adjustment from the version you emailed.{' '}
+            {onClearAdjustment && (
+              <button type="button" onClick={onClearAdjustment} className="underline underline-offset-2 hover:text-white">
+                Remove it
+              </button>
+            )}
+          </p>
+        )}
       </div>
       <p className="mt-3.5 text-[12.5px] leading-[1.5] text-[color:var(--pmbc-muted)]">{WACC_SOURCE_SENTENCE}</p>
 

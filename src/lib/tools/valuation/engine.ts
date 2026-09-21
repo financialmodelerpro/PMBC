@@ -422,8 +422,9 @@ export const DEBT_REQUIRED_MESSAGE = 'Enter borrowings. Use 0 if none.';
 export const CASH_REQUIRED_MESSAGE = 'Enter cash. Use 0 if none.';
 export const GCC_REQUIRED_MESSAGE = 'Enter the Saudi / GCC ownership share, from 0% to 100%.';
 
+export const FUTURE_YEAR_MESSAGE = 'That year is still to come. Enter the latest financial year you have full-year actuals for.';
 export const STUB_TOO_OLD_MESSAGE =
-  'Your latest actual year is more than 12 months old. Please enter the latest full year as actuals.';
+  'Your latest actual year ended 12 months or more ago. Please enter the latest full year as actuals.';
 
 /* ------------------------------------------------------------------------ */
 /* Cost of capital                                                           */
@@ -653,6 +654,9 @@ export function validateCompany(
     e.financialYear = `Enter a year between ${ASSUMPTIONS.minFinancialYear} and ${ASSUMPTIONS.maxFinancialYear}.`;
   } else if (stubPeriod(fy, isIsoDate(i.valuationDate) ? (i.valuationDate as string) : null).tooOld) {
     e.financialYear = STUB_TOO_OLD_MESSAGE;
+  } else if (isIsoDate(i.valuationDate) && fy > Number((i.valuationDate as string).slice(0, 4))) {
+    // A year still running is allowed and takes no stub (see `stubPeriod`); one that has not started is not.
+    e.financialYear = FUTURE_YEAR_MESSAGE;
   }
   if (entersDebtAndCash(i)) {
     if (!(typeof i.debt === 'number' && i.debt >= 0)) e.debt = DEBT_REQUIRED_MESSAGE;
@@ -696,7 +700,12 @@ export function validateFinancials(fin: Financials, extras?: Pick<ValuationInput
   if (parts && parts.fixedAssets !== null && parts.fixedAssets !== undefined && !(parts.fixedAssets >= 0)) return FIXED_ASSETS_MESSAGE;
   if (parts && parts.workingCapital !== null && parts.workingCapital !== undefined && !Number.isFinite(parts.workingCapital)) return FIXED_ASSETS_MESSAGE;
   const ic = extras?.investedCapital;
-  if (ic !== null && ic !== undefined && !(ic > 0)) return 'Enter invested capital above zero, or leave it blank.';
+  if (ic !== null && ic !== undefined && !(ic > 0)) {
+    // The form enters invested capital as its two parts, so name those rather than a field it does not show.
+    return parts && parts.fixedAssets !== null && parts.fixedAssets !== undefined
+      ? 'Working capital plus net fixed assets must be above zero. Change either figure, or leave both invested capital boxes blank.'
+      : 'Enter invested capital above zero, or leave it blank.';
+  }
   return null;
 }
 

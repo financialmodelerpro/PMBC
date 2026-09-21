@@ -233,6 +233,20 @@ console.log('Serialisation');
   check('compsEbitda null stays null', r.compsEbitda === null && back.compsEbitda === null);
   check('finite numbers unchanged', back.ev.every((v, i) => v === r.ev[i]) && back.wacc.wacc === r.wacc.wacc);
   check('sensitivity grid shape kept', back.sensitivity.grid.length === 5 && back.sensitivity.grid.every((row) => row.length === 5));
+
+  // A version 3 lead (net debt as one figure, no cash, no invested capital, no
+  // EV / EBIT peers): each of those nulls means "not entered" and must come
+  // back as null, not NaN, or the report prints "n/a" and the wrong wording.
+  const format = await jiti.import(path.join(root, 'src/lib/tools/valuation/format.ts'));
+  const v3 = { ...state.toInputs(s, VALUATION_DATE), schemaVersion: 3, netDebt: 400 };
+  delete v3.debt;
+  delete v3.cash;
+  const r3 = engine.runValuation(v3).result;
+  const b3 = serialize.reviveResult(JSON.parse(JSON.stringify(serialize.serializeResult(r3))));
+  const absent = ['debt', 'cash', 'investedCapital'].filter((k) => r3[k] === null);
+  check('version 3 nulls stay null: borrowings, cash, invested capital', absent.length === 3 && absent.every((k) => b3[k] === null), JSON.stringify({ debt: b3.debt, cash: b3.cash, ic: b3.investedCapital }));
+  check('no EV / EBIT peers stays null', r3.comparables.ebitValue === null && b3.comparables.ebitValue === null && b3.comparables.ebitMultiplesPre === null && b3.comparables.ebitMultiplesPost === null);
+  check('revived version 3 result reads "as entered", with no n/a', format.enteredAs(b3) === 'as entered' && !format.timingRows(b3).flat().some((x) => /n\/a/.test(x)), JSON.stringify(format.timingRows(b3)));
 }
 
 console.log('Version 2 inputs');
@@ -286,7 +300,7 @@ console.log('Version 2 inputs');
   check('a browser valuation date is replaced by the server date', dated.inserted[0]?.inputs.valuationDate === '2026-09-16' && dated.inserted[0]?.results.meta.valuationDate === '2026-09-16');
   const stale = memoryStore();
   const staleOut = await leads.processValuationSubmission(body({ inputs: { ...exampleInputs(), financialYear: 2024 } }), ctx(), stale);
-  check('a last actual year more than 12 months before the server date is refused', staleOut.status === 400 && stale.inserted.length === 0 && JSON.stringify(staleOut.body).includes('more than 12 months old'), JSON.stringify(staleOut.body).slice(0, 200));
+  check('a last actual year more than 12 months before the server date is refused', staleOut.status === 400 && stale.inserted.length === 0 && JSON.stringify(staleOut.body).includes('ended 12 months or more ago'), JSON.stringify(staleOut.body).slice(0, 200));
   const raiseSale = memoryStore();
   await leads.processValuationSubmission(body({ inputs: { ...exampleInputs(), raiseAmount: 80 } }), ctx(), raiseSale);
   check('a raise amount is dropped unless the purpose is raising equity', raiseSale.inserted[0]?.inputs.raiseAmount === null && raiseSale.inserted[0]?.results.raise === null && raiseSale.inserted[0]?.inputs.purpose === 'sale');
@@ -403,6 +417,16 @@ console.log('Email me this version');
   check('version: previous inputs and results kept in the event', st.events.length === 1 && st.events[0].payload.previous.inputs.growth === original.inputs.growth && JSON.stringify(st.events[0].payload.previous.results) === expectedJson);
   check('version: previous data version kept', st.events[0].payload.previous.data_version === '2026-01-01');
   check('version: returns the lead for the resend', out.lead?.id === st.lead.id && out.result?.equityDisplay[1] === changedResult.equityDisplay[1]);
+
+  // The purpose is the lead's: a sale lead cannot be given a pre-money section by the browser.
+  const saleStore = versionStore();
+  saleStore.lead.purpose = 'sale';
+  const asRaise = await version.processVersionUpdate({ token: TOKEN, inputs: { ...changed, purpose: 'raise', raiseAmount: 50 } }, vctx(), saleStore);
+  check('version: a sale lead stays a sale, no raise section', asRaise.kind === 'saved' && asRaise.result.raise === null && saleStore.saves[0]?.inputs.purpose === 'sale', JSON.stringify(asRaise.result?.raise));
+  const raiseStore = versionStore();
+  raiseStore.lead.purpose = 'raise';
+  const realRaise = await version.processVersionUpdate({ token: TOKEN, inputs: { ...changed, purpose: 'sale', raiseAmount: 50 } }, vctx(), raiseStore);
+  check('version: a raise lead keeps its raise amount', realRaise.kind === 'saved' && realRaise.result.raise !== null && raiseStore.saves[0]?.inputs.purpose === 'raise');
 
   const claimedStore = versionStore();
   await version.processVersionUpdate({ token: TOKEN, inputs: { ...changed, schemaVersion: 1 } }, vctx(), claimedStore);

@@ -25,6 +25,7 @@ import { z } from 'zod';
 
 import { BELOW_MINIMUM_BAND, DEAL_BANDS_SAR, DEAL_BAND_UNSURE, PURPOSES, VALUATION_DATA_VERSION } from '../valuation/data';
 import { INPUT_SCHEMA_VERSION, isoDate, runValuation, TOTAL_YEARS, type ValuationInputs, type ValuationResult } from '../valuation/engine';
+import { LIMITS } from '../valuation/limits';
 import { cleanProfile } from '../valuation/profile';
 import { serializeResult } from '../valuation/serialize';
 import { CONSENT_TEXT, FOLLOW_UP_TEXT } from '../consent';
@@ -56,8 +57,8 @@ const inputsSchema = z.object({
   exitMultiple: cell,
   midYear: z.boolean(),
   peers: z
-    .array(z.object({ name: z.string().max(120), evEbitda: cell, evRevenue: cell, evEbit: cell.optional() }))
-    .max(25),
+    .array(z.object({ name: z.string().max(LIMITS.peerName), evEbitda: cell, evRevenue: cell, evEbit: cell.optional() }))
+    .max(LIMITS.peers),
   privateDiscount: cell,
   dcfWeight: cell,
   // Version 2. Every block is optional: a version 1 body is still valid, and
@@ -145,9 +146,9 @@ const optional = (max: number) => z.string().trim().max(max).optional().nullable
 export const submissionSchema = z.object({
   inputs: inputsSchema,
   gate: z.object({
-    name: text(120).refine((v) => v.length >= 2, 'Enter your full name.'),
-    email: text(200).refine((v) => EMAIL_RE.test(v), 'Enter a valid email address, for example name@company.com.'),
-    company: optional(160),
+    name: text(LIMITS.gateName).refine((v) => v.length >= 2, 'Enter your full name.'),
+    email: text(LIMITS.gateEmail).refine((v) => EMAIL_RE.test(v), 'Enter a valid email address, for example name@company.com.'),
+    company: optional(LIMITS.gateCompany),
     purpose: z.enum(purposeValues, { message: 'Select what the valuation is for.' }),
     dealSize: z.enum(dealValues, { message: 'Select a transaction size range.' }),
     consent: z.literal(true, { message: 'Tick the box to agree before we show your results.' }),
