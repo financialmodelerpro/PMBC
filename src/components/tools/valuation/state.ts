@@ -18,6 +18,7 @@ import {
   TAX,
   V2_DEFAULTS,
   WARNING_RULES,
+  defaultCostOfDebt,
   defaultFinancialYearFor,
   marketDataInUse,
 } from '@/lib/tools/valuation/data';
@@ -275,7 +276,9 @@ type CountryRecord = (typeof COUNTRIES)[keyof typeof COUNTRIES];
 export function applyCountryDefaults(s: FormState): FormState {
   const c = (COUNTRIES as Record<string, CountryRecord>)[s.country];
   if (!c) return s;
-  const wacc = { ...s.wacc, crp: str(c.crp), ds: str(c.ds), tax: str(c.tax) };
+  // The cost of debt follows the country too: its local lending rate plus the typical margin
+  // (`defaultCostOfDebt`). A rate typed for another country is in that country's currency, so it goes.
+  const wacc = { ...s.wacc, crp: str(c.crp), ds: str(c.ds), tax: str(c.tax), kd: str(defaultCostOfDebt(s.country)) };
   if (!c.pegged && 'inflationLocal' in c) {
     wacc.inflationLocal = str(c.inflationLocal);
     wacc.inflationUs = str(c.inflationUs);

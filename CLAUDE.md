@@ -1004,7 +1004,8 @@ Damodaran publishes his annual update in early January. All values are in
 4. `MARKET.usTreasury10y` on the day of the refresh.
 5. FX to SAR (`sarPerUnit`) and the inflation expectations for non-pegged currencies. Review the preset multiples and size premium bands while there.
 6. Update every `asOf` in `SOURCE_NOTES` and the `WACC_SOURCE_SENTENCE`, and bump `VALUATION_DATA_VERSION`.
-7. `npm run verify-valuation-engine`. **Do not edit `reference/tools/business-valuation.html`**: it stays exactly as ported, and the verifier writes the current Treasury yield, default spread and implied ERP from `marketDataInUse` into its CONFIG before each case. Add a `DATA_VERSION_LABELS` line for the new version (it is printed in the report footer, so keep it short).
+7. **Local lending rates** (`LENDING_RATES`, since 2026-09-21): the base rate for each country with its source and date, refreshed at the same time and whenever a central bank moves. The default pre-tax cost of debt is that rate plus `ASSUMPTIONS.companyCreditSpread`; no published typical bank margin exists for these markets, so the margin is the firm's. `lendingSourceNote` prints the line in the sources.
+8. `npm run verify-valuation-engine`. **Do not edit `reference/tools/business-valuation.html`**: it stays exactly as ported, and the verifier writes the current Treasury yield, default spread and implied ERP from `marketDataInUse` into its CONFIG before each case. Add a `DATA_VERSION_LABELS` line for the new version (it is printed in the report footer, so keep it short).
 
 Old leads keep the results they were given: `results` is stored as computed and
 never recomputed, and each lead records its `data_version`. **A result field that
@@ -1132,7 +1133,7 @@ downstream computes a value; rounding happens only in `format.ts`.
 
 | Area | Rule |
 |---|---|
-| Terminal value | Perpetuity on a normalised terminal cash flow (`terminalCashFlow`): NOPAT at g, net capex scaled to g over final year growth, working capital at g. Implied terminal multiple, reinvestment rate and implied terminal ROIC (g over reinvestment rate) are reported. |
+| Terminal value | Perpetuity on a normalised terminal cash flow (`terminalCashFlow`): NOPAT at g, net capex scaled to g over final year growth, working capital at g. **Reinvestment is at least NOPAT x g / RONIC** (since 2026-09-21), RONIC the WACC of each run plus `TERMINAL.ronicPremiumPoints` (0), so growth beyond the forecast adds no value it has not paid for; the scaled capex alone implied returns of 40% to 50% on new capital. A business whose own figures imply more reinvestment keeps them; the top-up is added to net capex. Implied terminal multiple, reinvestment rate and implied terminal ROIC (g over reinvestment rate) are reported. |
 | Valuation date | The server's date. Year one keeps (1 - f) of its cash flow, periods (1 - f) / 2 then (i - 0.5) - f, terminal at N - f (`stubPeriod`). A last actual year 12 months or more old is refused. Financial years are assumed to end 31 December. |
 | Net debt | Borrowings less cash at the year end (both entered, from input version 4), rolled forward to the valuation date: less the elapsed year one forecast cash flow, plus after-tax interest on positive net debt at the pre-tax cost of debt. One figure for every scenario. |
 | Tax and zakat | Saudi / GCC ownership is required for Saudi Arabia, no default (the example company fills 100%). Income tax on the non-GCC share only; zakat 2.5% of an approximate base, working capital plus optional year end cash (`zakatBase`, cash held flat, floored at zero), disclosed as possibly understated when cash is blank. The same income tax rate is used for FCFF, terminal NOPAT, cost of debt and beta relevering. |
@@ -1188,6 +1189,21 @@ older events count as emailed. Re-runs have their own limit (30 an hour, 100 a
 day), so they never use up the emails. The admin version history says which
 kind replaced each version.
 
+**Cost of debt by country** (since 2026-09-21). Choosing a country fills the cost of
+debt on step 3 with its local lending base rate plus the 2.0% margin
+(`defaultCostOfDebt`), with the base rate, date and source in the field's hint and
+in the report's sources. It stays editable; a typed rate is replaced when the
+country changes, since it is in that country's currency; clearing it builds the
+cost of debt from the spreads as before. `verify-valuation-engine` clears it, as
+the reference tool only knows the spread build, and so does the v2 regression case.
+
+**Implied multiple against comparables** (`multiple_vs_peers`, since 2026-09-21):
+warns when the implied EV / LTM EBITDA is above the highest comparable EV / EBITDA
+before the private company discount (the top of the preset range without peers).
+
+**The company description** is on the cover's lower half and the results page's
+Summary tab, as well as the admin lead view.
+
 **Cost of capital working** (since 2026-09-21). `waccSteps` in `format.ts` works
 the WACC through: levered beta, cost of equity, pre-tax and after-tax cost of
 debt, weights, WACC, and for a currency not pegged to the dollar the conversion.
@@ -1230,10 +1246,10 @@ cases and rasterises every page to PNG for inspection.
 5. Checks in `verify-valuation-v2` for the item on its own and absent, then `verify-valuation-engine` to prove the neutral path.
 
 **Verifiers.** `verify-valuation-engine` (518: 514 reference parity plus 4 on the market data passed into the reference),
-`verify-valuation-v2` (426), `verify-tool-lead-api` (146),
-`verify-valuation-dashboard` (291, the results page end to end at 1440, 1024 and 390, including the partner portrait's 4:5 frame and source ratio,
+`verify-valuation-v2` (465), `verify-tool-lead-api` (146),
+`verify-valuation-dashboard` (300, the results page end to end at 1440, 1024 and 390, including the partner portrait's 4:5 frame and source ratio,
 against a local `next start`, every /api/ request intercepted so nothing is
-written), `verify-tool-email-pdf` (389, pdfjs text and operator list, including the report theme's footer, colour and logo rules, so a ligature glyph is
+written), `verify-tool-email-pdf` (390, pdfjs text and operator list, including the report theme's footer, colour and logo rules, so a ligature glyph is
 caught even though extracted text maps it back to letters),
 `verify-tools-visibility` (97), `verify-brevo-webhook` (168), `verify-booking-links` (61) and
 `verify-production-guard` (34). Each was

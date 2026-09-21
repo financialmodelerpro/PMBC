@@ -14,7 +14,7 @@
  * `warningTexts`) still format them, from the fields they did have.
  */
 
-import { COUNTRIES, SOURCE_NOTES, TAX, WARNING_RULES, formatDataDate } from './data';
+import { ASSUMPTIONS, COUNTRIES, SOURCE_NOTES, TAX, WARNING_RULES, formatDataDate, lendingForCurrency, lendingSourceNote, type LendingRate } from './data';
 import type {
   Check,
   Currency,
@@ -597,6 +597,18 @@ export function scenariosTable(r: ValuationResult): Table {
   };
 }
 
+/**
+ * The lending rate behind the cost of debt when it is the country default (base rate plus the
+ * typical margin, to the hundredth of a point), else null: an entered rate the visitor changed.
+ */
+export function defaultLending(w: ValuationResult['wacc'], currency: Currency): LendingRate | null {
+  if (w.kdSource !== 'entered' || typeof w.kdEntered !== 'number') return null;
+  const found = lendingForCurrency(currency.code);
+  if (!found) return null;
+  const def = found.lending.rate + ASSUMPTIONS.companyCreditSpread;
+  return Math.abs(w.kdEntered * 100 - def) < 0.005 ? found.lending : null;
+}
+
 /** One line of the WACC working: what is computed, the formula in words, the formula with the figures, and the result. */
 export type WaccStepRow = {
   key: string;
@@ -654,6 +666,26 @@ export function waccSteps(w: ValuationResult['wacc'], currency: Currency): WaccS
       named: `risk-free ${p(w.rf)} + default spread ${p(w.ds)} + credit spread ${p(w.cs)}`,
       value: p(w.kd),
     });
+  } else if (defaultLending(w, currency)) {
+    // The country default: the local lending base rate plus the typical margin.
+    const l = defaultLending(w, currency) as LendingRate;
+    const m = ASSUMPTIONS.companyCreditSpread / 100, b = l.rate / 100;
+    if (!usd) {
+      steps.push({ key: 'kd', label: 'Pre-tax cost of debt', formula: `${l.name} + typical margin`, working: `${p(b)} + ${p(m)}`, named: `${l.short} ${p(b)} + margin ${p(m)}`, value: p(w.kd) });
+    } else {
+      steps.push({
+        key: 'kd',
+        label: 'Pre-tax cost of debt (US dollars)',
+        formula: `(1 + ${l.name} + typical margin) x (1 + US inflation) / (1 + local inflation) - 1`,
+        working: hasInflation
+          ? `(1 + ${p(b)} + ${p(m)}) x (1 + ${p1(w.inflationUs as number)}) / (1 + ${p1(w.inflationLocal as number)}) - 1`
+          : `${p(b + m)} ${currency.code}, converted`,
+        named: hasInflation
+          ? `(1 + ${l.short} ${p(b)} + margin ${p(m)}) x (1 + US ${p1(w.inflationUs as number)}) / (1 + ${currency.code} ${p1(w.inflationLocal as number)}) - 1`
+          : `${l.short} ${p(b)} + margin ${p(m)}, converted`,
+        value: p(w.kd),
+      });
+    }
   } else if (!usd) {
     steps.push({ key: 'kd', label: 'Pre-tax cost of debt', formula: 'Your own borrowing rate', working: 'As entered', named: 'your own borrowing rate, as entered', value: p(w.kd) });
   } else {
@@ -694,7 +726,7 @@ export function waccSteps(w: ValuationResult['wacc'], currency: Currency): WaccS
       label: usd ? 'WACC (US dollars)' : `WACC (${currency.code})`,
       formula: 'Equity weight x cost of equity + debt weight x after-tax cost of debt',
       working: `${p1(w.we)} x ${p(w.ke)} + ${p1(w.wd)} x ${p(w.kdt)}`,
-      named: `equity ${p1(w.we)} x cost of equity ${p(w.ke)} + debt ${p1(w.wd)} x after-tax cost of debt ${p(w.kdt)}`,
+      named: `equity ${p1(w.we)} x ${p(w.ke)} + debt ${p1(w.wd)} x after tax ${p(w.kdt)}`,
       value: p(w.waccUsd),
       strong: !usd && !w.adjustment,
     },
@@ -746,7 +778,12 @@ export function waccBuildRows(r: ValuationResult): [string, string][] {
     ['Target debt to equity', fmtPct(w.de, 1)],
     ['Size and company premium', fmtPct(w.sp, 1)],
     ...(entered
-      ? ([[`Your borrowing rate (${r.currency.code})`, fmtPct(w.kdEntered as number)]] as [string, string][])
+      ? defaultLending(w, r.currency)
+        ? ([
+            [`${(defaultLending(w, r.currency) as LendingRate).name}`, fmtPct((defaultLending(w, r.currency) as LendingRate).rate / 100)],
+            ['Typical margin, set by PaceMakers', fmtPct(ASSUMPTIONS.companyCreditSpread / 100)],
+          ] as [string, string][])
+        : ([[`Your borrowing rate (${r.currency.code})`, fmtPct(w.kdEntered as number)]] as [string, string][])
       : ([
           ['Country default spread', fmtPct(w.ds)],
           ['Company credit spread', fmtPct(w.cs, 1)],
@@ -867,11 +904,13 @@ export function timingRows(r: ValuationResult): [string, string][] {
 /* ------------------------------------------------------------------------ */
 
 export const TERMINAL_NOTE = 'Terminal cash flow reflects reinvestment at long-term growth.';
+/** Only when the reinvestment floor set the terminal reinvestment (since 2026-09-21). */
+export const TERMINAL_FLOOR_NOTE = 'Reinvestment is set so new capital earns the WACC, so growth beyond the forecast is not credited with value it has not paid for.';
 
 /** The terminal value note for a result, including one valued under the method used before 17 September 2026. */
 export function terminalNote(r: ValuationResult): string {
   return canonical(r) && r.terminal.method === 'normalised'
-    ? `${TERMINAL_NOTE} ${TERMINAL_COLUMN_NOTE}`
+    ? `${TERMINAL_NOTE}${r.terminal.reinvestmentFloored ? ` ${TERMINAL_FLOOR_NOTE}` : ''} ${TERMINAL_COLUMN_NOTE}`
     : 'Terminal value grows the final forecast year’s free cash flow at long-term growth, the method used for valuations before 17 September 2026.';
 }
 export const TERMINAL_COLUMN_NOTE = 'In the terminal column, capital expenditure is shown net of depreciation and amortisation.';
@@ -1110,9 +1149,17 @@ export function valueLevers(r: ValuationResult): { title: string; detail: string
   return (r.recommendations ?? []).map((rec) => recommendationText(rec, r));
 }
 
-/** The sources, from the data module, for the methodology page. */
-export function sourceNotes(): { label: string; source: string; asOf: string }[] {
-  return SOURCE_NOTES;
+/**
+ * The sources, from the data module, for the methodology page. With a result and its country, the
+ * local lending rate behind the cost of debt follows the risk-free rate, when the cost of debt was
+ * entered (the country default the form fills, or the visitor's own); a cost of debt built from the
+ * spreads needs no such line.
+ */
+export function sourceNotes(r?: ValuationResult, country?: string): { label: string; source: string; asOf: string }[] {
+  const lending = r && country && r.wacc.kdSource === 'entered' ? lendingSourceNote(country) : null;
+  if (!lending) return SOURCE_NOTES;
+  const at = SOURCE_NOTES.findIndex((n) => n.label === 'Risk-free rate') + 1;
+  return [...SOURCE_NOTES.slice(0, at), lending, ...SOURCE_NOTES.slice(at)];
 }
 
 /** Market data dates as the report states them. */

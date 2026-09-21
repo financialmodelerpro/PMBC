@@ -264,6 +264,7 @@ async function walk(width) {
   check(`${label}: blank cash is refused`, (await page.evaluate(text())).includes(engine.CASH_REQUIRED_MESSAGE));
   check(`${label}: borrowings entered`, (await page.evaluate(setField('Borrowings at 31 December 2025', '75'))) === true);
   check(`${label}: cash entered`, (await page.evaluate(setField('Cash at 31 December 2025', '30'))) === true);
+  check(`${label}: description entered`, (await page.evaluate(setField('About the business', 'We run three clinics in Riyadh for families and employers.'))) === true);
   await wait(200);
   check(`${label}: net debt updates as the fields are typed`, (await page.evaluate(text())).includes('Net debt: 45 SAR m (borrowings less cash)'));
   check(`${label}: continues once ownership is entered`, await page.evaluate(clickButton('Continue to financials')));
@@ -278,7 +279,7 @@ async function walk(width) {
     const t3 = await page.evaluate(text());
     const t3l = t3.toLowerCase();
     check(`${label}: step 3 shows the WACC worked through`, t3l.includes('how your wacc is calculated') && t3l.includes('risk-free rate + levered beta x equity risk premium') && t3l.includes('pre-tax cost of debt x (1 - tax rate)'), t3.slice(t3l.indexOf('how your wacc'), t3l.indexOf('how your wacc') + 300));
-    check(`${label}: step 3 offers the company borrowing rate`, t3.includes('Your pre-tax borrowing rate (optional)'));
+    check(`${label}: step 3 fills the cost of debt from the country, with its source`, t3.includes('Pre-tax cost of debt') && t3.includes('Set from the 3-month SAIBOR'));
   }
   check(`${label}: on cost of capital`, await page.evaluate(clickButton('Continue to terminal')));
   await wait(400);
@@ -313,6 +314,8 @@ async function walk(width) {
   check(`${label}: headline equals the engine for the submitted inputs`, Boolean(h && tr.includes(h.equityRange) && tr.includes(`Base case ${h.midpoint}`)), h?.equityRange);
   check(`${label}: equity value as at the valuation date`, Boolean(h && tr.includes(h.asAt)));
   check(`${label}: v3 tile labels`, tr.includes('Implied EV / LTM EBITDA') && tr.includes('Implied terminal multiple (perpetuity method)'));
+  check(`${label}: the description is on the results summary`, tr.includes('About the business') && tr.includes('We run three clinics in Riyadh for families and employers.'));
+  check(`${label}: and travels with the lead`, lead?.body?.inputs?.profile?.description === 'We run three clinics in Riyadh for families and employers.');
   await shot('results-summary');
 
   // Every tab.

@@ -18,7 +18,6 @@
 import { useMemo, useRef, useState } from 'react';
 import { AlertTriangle, ArrowUpRight, Download, Mail, RotateCcw } from 'lucide-react';
 
-import { SOURCE_NOTES } from '@/lib/tools/valuation/data';
 import {
   cashConversionChart,
   footballFieldChart,
@@ -50,6 +49,7 @@ import {
   normalisationRows,
   raiseTable,
   scenariosTable,
+  sourceNotes,
   sensitivityTable,
   sensitivityTitle,
   stakeLabel,
@@ -63,6 +63,7 @@ import {
   warningTexts,
   type Table,
 } from '@/lib/tools/valuation/format';
+import { descriptionParagraphs } from '@/lib/tools/valuation/profile';
 import { reviveResult } from '@/lib/tools/valuation/serialize';
 import type { PartnerCard as PartnerCardData } from '@/lib/tools/brand/partner';
 import { bookingPageLink } from '@/lib/tools/booking';
@@ -183,6 +184,8 @@ export function ResultsDashboard({
   const [xm, setXm] = useState(baseXm);
   const explored = adj !== baseAdj || growth !== baseGrowth || xm !== baseXm;
 
+  // The visitor's own description from step 1, shown on the Summary tab as it is on the report cover.
+  const about = useMemo(() => descriptionParagraphs(baseInputs.profile?.description), [baseInputs]);
   const exploredInputs = useMemo<ValuationInputs>(
     () => ({ ...baseInputs, waccAdjustment: adj, growth: +growth.toFixed(2), exitMultiple: +xm.toFixed(2) }),
     [baseInputs, adj, growth, xm],
@@ -422,6 +425,17 @@ export function ResultsDashboard({
         <div id={`panel-${tab}`} role="tabpanel" aria-labelledby={`tab-${tab}`} tabIndex={0} key={tab} className="pmbc-enter mt-5 space-y-5 focus-visible:outline-none">
           {tab === 'summary' && (
             <>
+              {about.length > 0 && (
+                <Card title="About the business" sub={`As you described it${baseInputs.profile?.companyName ? `, for ${baseInputs.profile.companyName}` : ''}. It is printed on the cover of your report and does not change any figure.`}>
+                  <div className="border-l-[3px] border-[#2E8B3A] pl-4">
+                    {about.map((para, i) => (
+                      <p key={i} className={`text-[15px] leading-[1.65] text-[color:var(--pmbc-text)] ${i ? 'mt-3' : ''}`}>
+                        {para}
+                      </p>
+                    ))}
+                  </div>
+                </Card>
+              )}
               <Card
                 title="Checks"
                 sub={warnings.length ? `${warnings.length} of ${checks.length} checks raise a warning. Every check runs on every valuation.` : `All ${checks.length} checks passed.`}
@@ -617,7 +631,7 @@ export function ResultsDashboard({
               </div>
               <Card title="Sources">
                 <ul className="space-y-2">
-                  {SOURCE_NOTES.map((n) => (
+                  {sourceNotes(r, baseInputs.country).map((n) => (
                     <li key={n.label} className="text-[13.5px]">
                       <strong className="text-[color:var(--pmbc-text)]">{n.label}.</strong>{' '}
                       <span className="text-[#52606B]">

@@ -505,7 +505,10 @@ async function runCase(page, c) {
   const ref = revive(refOut.calc);
 
   // The reference's method, with every version 3 input neutral.
-  const outcome = engine.runValuation({ ...state.toInputs(s, null), gccOwnership: 0 }, engine.REFERENCE_METHOD);
+  // The reference builds the cost of debt from the spreads; the form's country default (since
+  // 2026-09-21) is cleared so both run the same WACC.
+  const refInputs = state.toInputs(s, null);
+  const outcome = engine.runValuation({ ...refInputs, wacc: { ...refInputs.wacc, kd: null }, gccOwnership: 0 }, engine.REFERENCE_METHOD);
   if (!outcome.ok) return fail(`engine refused the case at step ${outcome.step}: ${JSON.stringify(outcome.errors)}`);
   const r = outcome.result;
 

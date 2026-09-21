@@ -80,13 +80,21 @@ function tryRun(label, inputs) {
   return o.ok ? o.result : null;
 }
 
-const BASE = state.toInputs(minimalCase(state), VALUATION_DATE);
+// The regression case keeps the spread-built cost of debt of the old report: the form's country
+// default (since 2026-09-21) is cleared here and tested on its own in section 16.
+const BASE = (() => {
+  const i = state.toInputs(minimalCase(state), VALUATION_DATE);
+  return { ...i, wacc: { ...i.wacc, kd: null } };
+})();
 const B = run(BASE);
 const H = 3; // history years
 const codes = (r) => r.checks.filter((c) => c.status === 'warning').map((c) => c.id);
 const checkOf = (r, id) => r.checks.find((c) => c.id === id);
-/** What the regression case warns on, on purpose: see section 11. */
-const BASE_WARNINGS = 'method_divergence,tv_share,peer_count,capital_structure,no_normalisation';
+/**
+ * What the regression case warns on, on purpose: see section 11. Terminal value share left the list on
+ * 2026-09-21, when the reinvestment floor brought it from 77% to 73%.
+ */
+const BASE_WARNINGS = 'method_divergence,peer_count,capital_structure,no_normalisation';
 
 console.log('1. Neutral defaults');
 {
@@ -276,7 +284,8 @@ console.log('7. Warnings');
 
   // Terminal value share. Growth moves the share; search both sides of 75%.
   {
-    const hi = run({ ...BASE, growth: 7 });
+    // A lower WACC: with the reinvestment floor, growth alone no longer lifts the share above 75%.
+    const hi = run({ ...BASE, growth: 7, waccAdjustment: -2 });
     const lo = run({ ...BASE, growth: 0, waccAdjustment: 3 });
     check('TV share: case above 75% is above', hi.tvShare > R.terminalValueShare, hi.tvShare);
     check('TV share: triggers above 75%', has(hi, 'tv_share'));
@@ -517,18 +526,33 @@ console.log('11. Version 3');
     const ebit = fin.ebitda[T] - fin.da[T];
     const growthT = fin.rev[T] / fin.rev[P] - 1;
     const netCapexT = fin.capex[T] - fin.da[T];
-    const netCapex = growthT > g ? netCapexT * (g / growthT) : netCapexT * (1 + g);
+    const netCapexScaled = growthT > g ? netCapexT * (g / growthT) : netCapexT * (1 + g);
     const dWc = (fin.nwc[T] / fin.rev[T]) * fin.rev[T] * g;
-    const fcf = Math.max(ebit, 0) * (1 + g) * (1 - t) - netCapex - dWc;
+    // The reinvestment floor: at least NOPAT x g / RONIC, RONIC the WACC (plus the set premium, zero).
+    const nopatT = Math.max(ebit, 0) * (1 + g) * (1 - t);
+    const ronic = reg.wacc.wacc + data.TERMINAL.ronicPremiumPoints / 100;
+    const floor = (nopatT * g) / ronic;
+    const netCapex = Math.max(netCapexScaled + dWc, floor) - dWc;
+    const fcf = nopatT - netCapex - dWc;
+    check('reinvestment floor: RONIC is the WACC by default', data.TERMINAL.ronicPremiumPoints === 0 && close(reg.terminal.ronic, reg.wacc.wacc));
+    check('reinvestment floor binds on the regression case (41.8% implied before)', reg.terminal.reinvestmentFloored === true && netCapexScaled + dWc < floor);
     near('terminal FCF matches the formula', reg.terminal.fcf, fcf);
-    check('terminal FCF is about 45.7 (was about 35.2)', Math.abs(reg.terminal.fcf - 45.7) < 0.05, reg.terminal.fcf);
+    check('terminal FCF is about 36.7 (45.7 before the floor, 35.2 in the reference)', Math.abs(reg.terminal.fcf - 36.7) < 0.05, reg.terminal.fcf);
     const tv = fcf / (reg.wacc.wacc - g);
     near('perpetuity TV is FCF over WACC less g', reg.terminal.tvPerpetuity, tv);
     near('implied terminal multiple is TV over final year EBITDA', reg.terminal.impliedMultiple, tv / fin.ebitda[T]);
     const nopatTv = Math.max(ebit, 0) * (1 + g) * (1 - t);
     near('terminal reinvestment rate is net capex plus working capital over NOPAT', reg.terminal.reinvestmentRate, (netCapex + dWc) / nopatTv);
     near('implied terminal ROIC is g over the reinvestment rate', reg.terminal.impliedRoic, g / ((netCapex + dWc) / nopatTv));
-    check('terminal returns check: silent when the implied ROIC is above WACC', reg.terminal.impliedRoic > reg.wacc.wacc && checkOf(reg, 'terminal_roic')?.status === 'pass');
+    near('with the floor, the implied return on new capital is the WACC', reg.terminal.impliedRoic, reg.wacc.wacc);
+    check('terminal returns check: passes at the floor, and says why', checkOf(reg, 'terminal_roic')?.status === 'pass' && checkOf(reg, 'terminal_roic').message.includes('new capital earns the WACC'));
+    {
+      // A business whose own figures imply more reinvestment than the floor keeps them.
+      const heavier = clone(fin);
+      heavier.capex[T] = heavier.da[T] + 60;
+      const own = run({ ...REG, financials: heavier });
+      check('own reinvestment above the floor is kept', own.terminal.reinvestmentFloored === false && own.terminal.impliedRoic < own.wacc.wacc + 1e-9);
+    }
     {
       // Lift final year reinvestment until the implied return falls below WACC.
       const heavy = clone(fin);
@@ -544,7 +568,7 @@ console.log('11. Version 3');
       check('terminal returns check: not listed when reinvestment is not positive', !Number.isFinite(nr.terminal.impliedRoic) === !checkOf(nr, 'terminal_roic'));
     }
     check('terminal ROIC and reinvestment rate are on the assumptions', format.terminalRows(reg).some(([k]) => k === 'Implied terminal ROIC') && format.terminalRows(reg).some(([k]) => k === 'Terminal reinvestment rate'));
-    check('implied terminal multiple is about 8.1x (was 6.2x)', format.fmtMultiple(reg.terminal.impliedMultiple) === '8.1x', reg.terminal.impliedMultiple);
+    check('implied terminal multiple is about 6.5x (8.1x before the floor, 6.2x in the reference)', format.fmtMultiple(reg.terminal.impliedMultiple) === '6.5x', reg.terminal.impliedMultiple);
     const old = engine.runValuation(REG, engine.REFERENCE_METHOD).result;
     check('the reference method keeps 35.2 and 6.2x', Math.abs(old.terminal.fcf - 35.2) < 0.05 && format.fmtMultiple(old.impliedExitMultiple) === '6.2x', `${old.terminal.fcf} ${old.impliedExitMultiple}`);
     check('the reference method keeps the old DCF mid 441.0 and sensitivity 343.9', format.fmtMillions(old.dcfRange[1]) === '441.0' && format.fmtMillions(old.sensitivity.grid[2][2]) === '343.9' && format.fmtMultiple(old.ltmMultiple) === '10.0x');
@@ -552,7 +576,8 @@ console.log('11. Version 3');
     flat.rev[T] = flat.rev[P] * 1.01;
     const f2 = run({ ...REG, financials: flat });
     const nc2 = (flat.capex[T] - flat.da[T]) * 1.025;
-    near('final year growth below g: net capex grows at g instead', f2.terminal.netCapex, nc2);
+    const f2Floor = (f2.terminal.nopat * 0.025) / f2.wacc.wacc - f2.terminal.dWc;
+    near('final year growth below g: net capex grows at g, or the floor if higher', f2.terminal.netCapex, Math.max(nc2, f2Floor));
     const sens = reg.sensitivity;
     near('sensitivity rows sit on the unrounded WACC, one point apart', sens.waccs[1], reg.wacc.wacc - 0.01);
     check('sensitivity centre is the perpetuity DCF base equity', sens.grid[2][2] === reg.dcfBlock.perpetuityEquityBase && sens.waccs[2] === reg.wacc.wacc);
@@ -691,7 +716,7 @@ console.log('11. Version 3');
     const ids = reg.checks.map((c) => c.id);
     check('the eight specified checks always run', ['method_divergence', 'terminal_gap', 'tv_share', 'peer_count', 'capital_structure', 'margin_step', 'no_normalisation', 'negative_ebitda'].every((id) => ids.includes(id)));
     check('regression case: divergence, peer count, capital structure and normalisation warn', ['method_divergence', 'peer_count', 'capital_structure', 'no_normalisation'].every((id) => codes(reg).includes(id)));
-    check('regression case: terminal value share warns too, at 77% after the terminal fix', codes(reg).includes('tv_share') && Math.abs(reg.tvShare - 0.7735) < 0.001, reg.tvShare);
+    check('regression case: terminal value share passes at 73% with the reinvestment floor (77% before)', !codes(reg).includes('tv_share') && Math.abs(reg.tvShare - 0.7327) < 0.001, reg.tvShare);
     const gap = Math.abs(reg.dcfRange[1] / reg.compRange[1] - 1);
     check('divergence measured as DCF base over comparables base', close(checkOf(reg, 'method_divergence').values.gap, gap) && checkOf(reg, 'method_divergence').message.includes(format.fmtPct(gap, 0)));
     const agree = run({ ...REG, peers: [], privateDiscount: 0, exitMultiple: 10 });
@@ -730,7 +755,7 @@ console.log('11. Version 3');
   {
     const m = data.marketDataInUse();
     check('the September ERP is used, aligned with the Treasury month', m.aligned === true && m.erp.asOf === '2026-09-01' && m.erp.value === 4.14 && m.treasury.asOf === '2026-09-15');
-    check('the data version and its label moved with the ERP', data.VALUATION_DATA_VERSION === '2026-09-17' && data.dataVersionLabel('2026-09-17').includes('September 2026') && data.dataVersionLabel('2026-09-16') === 'Damodaran January 2026, risk-free September 2026');
+    check('the data version and its label moved with the ERP and the lending rates', data.VALUATION_DATA_VERSION === '2026-09-21' && data.dataVersionLabel('2026-09-21').includes('local lending rates 2026') && data.dataVersionLabel('2026-09-17').includes('September 2026') && data.dataVersionLabel('2026-09-16') === 'Damodaran January 2026, risk-free September 2026');
     const rf = data.SOURCE_NOTES.find((n) => n.label === 'Risk-free rate');
     check('the risk-free source prints the yield to two decimals and its exact date', rf.source.includes('5.00%') && rf.asOf === '15 September 2026' && !JSON.stringify(data.SOURCE_NOTES).includes('about 5.0%'));
     check('the market data line prints both exact dates', format.marketDataLine(reg).includes('15 September 2026') && format.marketDataLine(reg).includes('4.14% (1 September 2026)'));
@@ -908,10 +933,60 @@ console.log('14. Cost of debt: the company borrowing rate');
   // Validation, in the engine and the form.
   for (const bad of [0, -2, 50, 80]) check(`borrowing rate ${bad}% refused`, engine.validateWacc({ ...BASE.wacc, kd: bad }, engine.currencyFor(BASE.country)) === engine.KD_RATE_MESSAGE);
   check('a refused rate stops the run at step 3', engine.runValuation({ ...BASE, wacc: { ...BASE.wacc, kd: 60 } }).ok === false);
-  check('form: the rate travels as a number and blank as null', state.toInputs({ ...minimalCase(state), wacc: { ...minimalCase(state).wacc, kd: '8.5' } }, VALUATION_DATE).wacc.kd === 8.5 && state.toInputs(minimalCase(state), VALUATION_DATE).wacc.kd === null);
-  check('form: Reset to Damodaran defaults clears it', state.resetWacc({ ...minimalCase(state), wacc: { ...minimalCase(state).wacc, kd: '8.5' } }).wacc.kd === '');
+  check('form: the rate travels as a number and blank as null', state.toInputs({ ...minimalCase(state), wacc: { ...minimalCase(state).wacc, kd: '8.5' } }, VALUATION_DATE).wacc.kd === 8.5 && state.toInputs({ ...minimalCase(state), wacc: { ...minimalCase(state).wacc, kd: '' } }, VALUATION_DATE).wacc.kd === null);
+  check('form: Reset to Damodaran defaults restores the country default', state.resetWacc({ ...minimalCase(state), wacc: { ...minimalCase(state).wacc, kd: '8.5' } }).wacc.kd === String(data.defaultCostOfDebt('Saudi Arabia')));
   check('the working names an entered rate', format.waccSteps(sar.wacc, sar.currency).some((x) => x.key === 'kd' && x.formula === 'Your own borrowing rate'));
   check('the inputs list shows the entered rate instead of the spreads', format.waccBuildRows(sar).some(([k]) => k.startsWith('Your borrowing rate')) && !format.waccBuildRows(sar).some(([k]) => k === 'Country default spread'));
+}
+
+console.log('15. Implied multiple against comparables');
+{
+  const low = [{ name: 'A', evEbitda: 4, evRevenue: 0.5 }, { name: 'B', evEbitda: 5, evRevenue: 0.6 }, { name: 'C', evEbitda: 6, evRevenue: 0.7 }];
+  const high = [{ name: 'A', evEbitda: 18, evRevenue: 3 }, { name: 'B', evEbitda: 20, evRevenue: 3.5 }, { name: 'C', evEbitda: 22, evRevenue: 4 }];
+  const lo = run({ ...BASE, peers: low });
+  const hi = run({ ...BASE, peers: high });
+  const cLo = checkOf(lo, 'multiple_vs_peers'), cHi = checkOf(hi, 'multiple_vs_peers');
+  check('implied multiple above the highest peer warns, naming both', lo.ltmMultiple > 6 && cLo?.status === 'warning' && cLo.message.includes('highest comparable') && cLo.message.includes('6.0x'), cLo?.message);
+  check('implied multiple within the peers passes', hi.ltmMultiple <= 22 && cHi?.status === 'pass', cHi?.message);
+  check('compared before the private company discount', close(cLo.values.top, 6));
+  const noPeers = run({ ...BASE, peers: [] });
+  const preset = checkOf(noPeers, 'multiple_vs_peers');
+  check('without peers it compares with the top of the preset range', preset && preset.message.includes('preset range') && close(preset.values.top, noPeers.comparables.ebitdaMultiplesPre[2]), preset?.message);
+  const lossFin = clone(BASE.financials); lossFin.ebitda[2] = -5;
+  const loss = engine.runValuation({ ...BASE, financials: lossFin });
+  check('not run when last actual EBITDA is not positive', !loss.ok || !checkOf(loss.result, 'multiple_vs_peers'));
+}
+
+console.log('16. Cost of debt by country');
+{
+  const M = data.ASSUMPTIONS.companyCreditSpread;
+  for (const country of Object.keys(data.COUNTRIES)) {
+    const l = data.LENDING_RATES[country];
+    check(`${country}: a sourced, dated lending rate`, Boolean(l && l.rate > 0 && l.rate < 30 && /^\d{4}-\d{2}-\d{2}$/.test(l.asOf) && l.source && l.name && l.short));
+    check(`${country}: default cost of debt is the lending rate plus the ${M}% margin`, close(data.defaultCostOfDebt(country), l.rate + M));
+    const s = state.applyCountryDefaults({ ...state.initialState(), country });
+    check(`${country}: choosing the country fills the cost of debt`, s.wacc.kd === String(data.defaultCostOfDebt(country)), s.wacc.kd);
+  }
+  check('country default dates are no later than today', Object.values(data.LENDING_RATES).every((l) => l.asOf <= '2026-09-21'));
+  // A typed rate belongs to its currency: a new country replaces it.
+  const typed = { ...minimalCase(state), wacc: { ...minimalCase(state).wacc, kd: '9' } };
+  check('a new country replaces a typed rate with its own default', state.applyCountryDefaults({ ...typed, country: 'Pakistan' }).wacc.kd === String(data.defaultCostOfDebt('Pakistan')));
+  // The form's own run uses the default, and the working names it.
+  const sa = run(state.toInputs(minimalCase(state), VALUATION_DATE));
+  const kdStep = format.waccSteps(sa.wacc, sa.currency).find((x) => x.key === 'kd');
+  check('Saudi default: cost of debt is SAIBOR plus the margin', sa.wacc.kdSource === 'entered' && close(sa.wacc.kd, (data.LENDING_RATES['Saudi Arabia'].rate + M) / 100));
+  check('Saudi default: the working names the base rate and the margin', kdStep.formula === '3-month SAIBOR + typical margin' && kdStep.named.startsWith('SAIBOR 4.76% + margin 2.00%'), kdStep.named);
+  check('Saudi default: the inputs list shows the base rate and the margin', format.waccBuildRows(sa).some(([k, v]) => k === '3-month SAIBOR' && v === '4.76%') && format.waccBuildRows(sa).some(([k]) => k === 'Typical margin, set by PaceMakers'));
+  const src = format.sourceNotes(sa, 'Saudi Arabia');
+  check('Saudi default: the sources name the rate, where it is from and its date', src.some((n) => n.label === 'Cost of debt' && n.source.includes('Argaam') && n.asOf === '27 August 2026'));
+  check('no cost of debt source line when it is built from the spreads', !format.sourceNotes(B, 'Saudi Arabia').some((n) => n.label === 'Cost of debt'));
+  const changed = run({ ...BASE, wacc: { ...BASE.wacc, kd: 9 } });
+  check('a changed rate is described as the visitor own rate', format.waccSteps(changed.wacc, changed.currency).find((x) => x.key === 'kd').formula === 'Your own borrowing rate');
+  // Pakistan: KIBOR plus the margin, taken to dollars by the inflation gap.
+  const pkS = state.resetWacc(state.applyIndustryDefaults(state.applyCountryDefaults({ ...minimalCase(state), country: 'Pakistan' })));
+  const pkW = engine.computeWacc(state.toInputs(pkS, VALUATION_DATE).wacc, engine.currencyFor('Pakistan'));
+  const infl = (1 + pkW.inflationLocal) / (1 + pkW.inflationUs);
+  check('Pakistan default: KIBOR plus margin, converted to dollars', close(pkW.kd, (1 + (data.LENDING_RATES.Pakistan.rate + M) / 100) / infl - 1));
 }
 
 console.log(`\n${checks - failures} of ${checks} checks passed.`);
