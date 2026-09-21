@@ -65,6 +65,7 @@ import {
   type Table,
 } from '@/lib/tools/valuation/format';
 import { descriptionParagraphs } from '@/lib/tools/valuation/profile';
+import { fileNameFromHeader, reportFileName } from '@/lib/tools/pdf/fileName';
 import { reviveResult } from '@/lib/tools/valuation/serialize';
 import type { PartnerCard as PartnerCardData } from '@/lib/tools/brand/partner';
 import { bookingPageLink } from '@/lib/tools/booking';
@@ -160,6 +161,7 @@ export function ResultsDashboard({
   preview,
   partner = null,
   onEdit,
+  onNew,
   onVersionSaved,
   initialNotice = null,
 }: {
@@ -169,6 +171,8 @@ export function ResultsDashboard({
   preview: boolean;
   partner?: PartnerCardData | null;
   onEdit: () => void;
+  /** Start a new valuation: a clean form, and the next run is a new lead. */
+  onNew?: () => void;
   onVersionSaved: (inputs: ValuationInputs, result: ValuationResult) => void;
   /** Shown when the results open, for example after a re-run that was saved but not emailed. */
   initialNotice?: { tone: 'ok' | 'error'; text: string } | null;
@@ -223,7 +227,8 @@ export function ResultsDashboard({
         body: JSON.stringify({ token: lead.token, inputs: exploredInputs }),
       });
       if (!res.ok) throw new Error(`The report could not be prepared (${res.status}).`);
-      download(await res.blob(), 'PaceMakers valuation report.pdf');
+      // The server's name for the file (`fileName.ts`), the same the email and admin use.
+      download(await res.blob(), fileNameFromHeader(res.headers.get('content-disposition')) ?? reportFileName(baseInputs.profile?.companyName, lead.name, new Date()));
       setNotice({ tone: 'ok', text: 'Your report has downloaded.' });
     } catch (err) {
       setNotice({ tone: 'error', text: err instanceof Error ? err.message : 'The report could not be prepared.' });
@@ -666,9 +671,16 @@ export function ResultsDashboard({
       </section>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <button type="button" onClick={onEdit} className={buttonGhost} style={TRACKING}>
-          Back to inputs
-        </button>
+        <div className="flex flex-wrap gap-3">
+          <button type="button" onClick={onEdit} className={buttonGhost} style={TRACKING}>
+            Back to inputs
+          </button>
+          {onNew && (
+            <button type="button" onClick={onNew} className={buttonGhost} style={TRACKING}>
+              Start a new valuation
+            </button>
+          )}
+        </div>
         {preview && <p className="text-[13px] text-[#92400E]">Admin preview: anything saved here is a test lead.</p>}
         <button type="button" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} className={buttonPrimary} style={TRACKING}>
           Back to top

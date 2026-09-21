@@ -159,7 +159,8 @@ export function ValuationReport({ result, meta }: { result: ValuationResult; met
   const purposeValue = r.meta.purpose ?? meta.purpose;
   const purpose = PURPOSES.find((p) => p.value === purposeValue)?.label;
   const dateText = meta.generatedAt.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
-  const who = meta.company || meta.preparedFor;
+  // The report is about the business, not the person: without a company name it reads "Your business".
+  const who = meta.company?.trim() || 'Your business';
   const b = r.bridge;
   const bridgeItemsUsed = Boolean(b.eosb || b.leases || b.minorityInterest || b.surplusAssets);
   const W = PAGE.contentWidth;
@@ -404,23 +405,12 @@ export function ValuationReport({ result, meta }: { result: ValuationResult; met
         </View>
       </ReportPage>
 
-      {/* 6 and 7. Checks and key assumptions, then methodology, sources and
-          disclaimer. One flowing section over two pages: each block is kept
-          whole, and a long check list or a long list of comparable companies
-          moves the methodology down rather than adding a page. */}
+      {/* 6 and 7. Key assumptions and checks, then methodology, sources and
+          disclaimer. One flowing section over two pages. The assumption tables
+          come first and are each kept whole; everything after them breaks
+          between rows or paragraphs, so the section fills page 6 and never
+          leaves a gap when a long check list moves text down. */}
       <ReportPage title={REPORT_PAGE_TITLES[5]} brand={brand} details={details}>
-        <View wrap={false} style={{ marginBottom: 6 }}>
-          <SectionHeading title="Checks, all run on every valuation" />
-          <View style={{ borderTopWidth: 0.5, borderTopColor: RC.border }}>
-            {checks.map((x) => (
-              <View key={x.id} style={{ flexDirection: 'row', paddingVertical: 1.8, borderBottomWidth: 0.5, borderBottomColor: RC.border }}>
-                <Text style={{ width: '11%', fontSize: 7.5, fontWeight: 600, color: x.status === 'pass' ? RC.green : RC.warning }}>{x.status === 'pass' ? 'PASS' : 'WARNING'}</Text>
-                <Text style={{ width: '24%', fontSize: 8, fontWeight: 600, paddingRight: 4 }}>{x.label}</Text>
-                <Text style={{ width: '65%', fontSize: 8, color: RC.muted, lineHeight: 1.3 }}>{x.message}</Text>
-              </View>
-            ))}
-          </View>
-        </View>
         <View style={{ flexDirection: 'row', marginTop: 4 }} wrap={false}>
           <View style={{ width: '50%', paddingRight: 10 }}>
             <SubHead>Terminal value</SubHead>
@@ -448,11 +438,27 @@ export function ValuationReport({ result, meta }: { result: ValuationResult; met
             leftLabelWidth="55%"
             rightLabelWidth="64%"
             // The note is printed below the block, so it can flow to the next page instead of moving the table.
-            left={{ title: timingOnLeft ? `${taxTitle} and timing` : taxTitle, rows: timingOnLeft ? [...taxR, ...timingR] : taxR }}
+            left={{ title: timingOnLeft ? (r.tax.zakatApplies ? 'Tax, zakat and timing' : 'Tax and timing') : taxTitle, rows: timingOnLeft ? [...taxR, ...timingR] : taxR }}
             right={{ title: timingOnLeft ? 'Balance sheet and EBITDA' : 'Balance sheet, EBITDA and timing', rows: timingOnLeft ? balanceR : [...timingR, ...balanceR] }}
           />
           {notes.premiumAndDiscount && <Note>{notes.premiumAndDiscount}</Note>}
         </View>
+
+        {/* The check list flows row by row (since 2026-09-21): it fills what page 6 has left under the
+            assumption tables and continues on page 7, so page 6 is never left half empty by a block that
+            could not fit. Each row is kept whole; the heading stays with at least its first rows. */}
+        {/* Heading and rows are direct children of the page, not wrapped in a container: react-pdf then
+            moves rows one at a time, whereas a container of unsplittable rows was moved whole and left a gap. */}
+        <View minPresenceAhead={50} style={{ marginTop: 4 }}>
+          <SectionHeading title="Checks, all run on every valuation" />
+        </View>
+        {checks.map((x, i) => (
+          <View key={x.id} wrap={false} style={{ flexDirection: 'row', paddingVertical: 1.8, borderBottomWidth: 0.5, borderBottomColor: RC.border, ...(i === 0 ? { borderTopWidth: 0.5, borderTopColor: RC.border } : {}), ...(i === checks.length - 1 ? { marginBottom: 6 } : {}) }}>
+            <Text style={{ width: '11%', fontSize: 7.5, fontWeight: 600, color: x.status === 'pass' ? RC.green : RC.warning }}>{x.status === 'pass' ? 'PASS' : 'WARNING'}</Text>
+            <Text style={{ width: '24%', fontSize: 8, fontWeight: 600, paddingRight: 4 }}>{x.label}</Text>
+            <Text style={{ width: '65%', fontSize: 8, color: RC.muted, lineHeight: 1.3 }}>{x.message}</Text>
+          </View>
+        ))}
 
         <View wrap={false} style={{ marginBottom: 4 }}>
           {[notes.zakat, notes.valuationDate, notes.financialYearEnd].filter(Boolean).map((line) => (
@@ -462,22 +468,27 @@ export function ValuationReport({ result, meta }: { result: ValuationResult; met
           ))}
         </View>
 
-        <View minPresenceAhead={160} style={{ marginTop: 2 }}>
+        {/* The title and heading stay with the first paragraph; the paragraphs may break between them, so a
+            long check list above never pushes a whole block over and leaves a gap. */}
+        <View minPresenceAhead={90} style={{ marginTop: 2 }}>
           <PageTitle>{REPORT_PAGE_TITLES[6]}</PageTitle>
         </View>
-        <Section title="How the value was built" gap={8}>
-          <Text style={{ fontSize: 9, lineHeight: 1.45, marginBottom: 4 }}>
+        <View minPresenceAhead={60}>
+          <SectionHeading title="How the value was built" />
+        </View>
+        <View style={{ marginBottom: 8 }}>
+          <Text wrap={false} style={{ fontSize: 9, lineHeight: 1.45, marginBottom: 4 }}>
             The DCF discounts five years of free cash flow to the firm at the WACC from the valuation date, counting only the part of the first
             forecast year after it. The terminal value is taken two ways, growth in perpetuity on a cash flow whose reinvestment is sized for
             long-term growth, and an exit multiple of final year EBITDA, and the DCF in the blend is {perpetuityOnly ? 'the perpetuity figure alone, since final year EBITDA does not support an exit multiple' : 'their average'}.
           </Text>
-          <Text style={{ fontSize: 9, lineHeight: 1.45 }}>
+          <Text wrap={false} style={{ fontSize: 9, lineHeight: 1.45 }}>
             Comparables apply EV / EBITDA, or EV / Revenue where EBITDA is not positive, to the last actual year, after any private company
             discount; the two methods are blended at the weight chosen and net debt and other claims are deducted to reach equity. The WACC
             combines a cost of equity (risk-free rate, mature market, country and size premiums, relevered industry beta) with an after-tax cost
             of debt.{c.pegged ? '' : ` For ${c.code}, the US dollar WACC is converted using the expected inflation gap.`}
           </Text>
-        </Section>
+        </View>
         <View minPresenceAhead={80}>
           <SectionHeading title="Sources" />
         </View>
@@ -489,8 +500,11 @@ export function ValuationReport({ result, meta }: { result: ValuationResult; met
             {note.asOf}.
           </Text>
         ))}
-        <View style={{ marginTop: 10 }} wrap={false}>
-          <SectionHeading title="Important" />
+        {/* May break between its paragraphs, so it never jumps a page whole and strands a gap. */}
+        <View style={{ marginTop: 10 }}>
+          <View minPresenceAhead={40}>
+            <SectionHeading title="Important" />
+          </View>
           <Text style={[s.note, { fontSize: 8.5, marginTop: 2 }]}>{INDICATIVE_NOTE}</Text>
           <Text style={[s.note, { fontSize: 8.5, marginTop: 3 }]}>{RELIANCE_STATEMENT}</Text>
           <Text style={[s.note, { fontSize: 8.5, marginTop: 3 }]}>{TOOL_DISCLAIMER}</Text>
@@ -529,7 +543,5 @@ export async function renderValuationReport(result: ValuationResult, meta: Repor
 }
 
 /** A tidy attachment name: "PaceMakers valuation Acme 2026-09-16.pdf" without awkward characters. */
-export function reportFileName(company: string | null, preparedFor: string, date: Date): string {
-  const who = (company || preparedFor).replace(/[^A-Za-z0-9 ]+/g, '').trim().slice(0, 60) || 'report';
-  return `PaceMakers valuation ${who} ${date.toISOString().slice(0, 10)}.pdf`;
-}
+/** The report's file name: one rule for the results download, the email and admin (`./fileName`). */
+export { reportFileName } from './fileName';

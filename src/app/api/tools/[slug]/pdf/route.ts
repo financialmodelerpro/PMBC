@@ -6,7 +6,8 @@ import { bookingLinkFor } from '@/lib/tools/leads/bookingLinkStore';
 import { getLeadByToken } from '@/lib/tools/leads/store';
 import { recomputeInputs } from '@/lib/tools/leads/valuation';
 import { fetchReportBranding } from '@/lib/tools/brand/fetch';
-import { renderValuationReport, reportFileName } from '@/lib/tools/pdf/ValuationReport';
+import { attachmentHeader, reportFileName } from '@/lib/tools/pdf/fileName';
+import { renderValuationReport } from '@/lib/tools/pdf/ValuationReport';
 import { VALUATION_DATA_VERSION } from '@/lib/tools/valuation/data';
 import { fetchToolVisibility, findToolIn } from '@/lib/tools/visibility';
 
@@ -44,9 +45,11 @@ export async function POST(req: Request, props: { params: Promise<{ slug: string
   const recomputed = recomputeInputs({ ...raw, purpose: lead.purpose, raiseAmount: lead.purpose === 'raise' ? (raw.raiseAmount ?? null) : null }, now);
   if (!recomputed.ok) return NextResponse.json({ error: 'Validation failed', issues: recomputed.issues }, { status: 400 });
 
+  // One company name for the title and the file name: the gate's, else the one typed on step 1.
+  const company = lead.company || recomputed.inputs.profile?.companyName || null;
   const pdf = await renderValuationReport(recomputed.result, {
     preparedFor: lead.name,
-    company: lead.company || recomputed.inputs.profile?.companyName || null,
+    company,
     industry: recomputed.inputs.industry,
     country: recomputed.inputs.country,
     purpose: lead.purpose,
@@ -59,7 +62,7 @@ export async function POST(req: Request, props: { params: Promise<{ slug: string
   return new NextResponse(new Uint8Array(pdf), {
     headers: {
       'content-type': 'application/pdf',
-      'content-disposition': `attachment; filename="${reportFileName(lead.company, lead.name, now)}"`,
+      'content-disposition': attachmentHeader(reportFileName(company, lead.name, now)),
       'cache-control': 'no-store',
     },
   });

@@ -163,7 +163,7 @@ function fakeServer(page, log) {
         // What the route does: validate, stamp the server fields, recompute.
         const out = await leads.processValuationSubmission(
           body,
-          { now, toolSlug: 'business-valuation', toolLive: true, isStaff: false, ipHash: null, userAgent: 'dashboard-verifier', newToken: () => 'verifier-token-' + 'x'.repeat(40) },
+          { now, toolSlug: 'business-valuation', toolLive: true, isStaff: false, ipHash: null, userAgent: 'dashboard-verifier', newToken: () => `verifier-token-${log.lead.length + 1}-` + 'x'.repeat(40) },
           { countSince: async () => 0, insert: async () => ({ ok: true, id: '00000000-0000-4000-8000-000000000099' }) },
         );
         log.lead.push({ body, outcome: out });
@@ -346,15 +346,71 @@ async function walk(width) {
   check(`${label}: Download PDF`, await page.evaluate(clickButton('Download PDF')));
   check(`${label}: PDF request intercepted, rendered and confirmed`, Boolean(await waitFor(() => page.evaluate(`document.body.innerText.includes('Your report has downloaded.')`), 120)) && log.pdf.length === 1 && log.pdf[0].header === '%PDF-');
 
-  // Running again in the same session: no gate, no new lead, the version saved without email.
+  // Every run from the form is a new lead (since 2026-09-21). The gate is shown each time, prefilled
+  // with the person's details, with consent to give again; only the results page (sliders, Email me
+  // this version) updates the valuation on screen.
+  const gateValue = (labelStart) => page.evaluate(`(() => { const l = [...document.querySelectorAll('label')].find((x) => x.offsetParent !== null && x.textContent.trim().startsWith(${JSON.stringify(labelStart)})); const i = l && (l.htmlFor ? document.getElementById(l.htmlFor) : l.querySelector('input,select,textarea')); return i ? (i.type === 'checkbox' ? i.checked : i.value) : null; })()`);
+  const consentBox = () => page.evaluate(`[...document.querySelectorAll('input[type=checkbox]')][0]?.checked ?? null`);
+  const submitGate = async () => {
+    await page.evaluate(`(() => { const c = [...document.querySelectorAll('input[type=checkbox]')][0]; if (!c.checked) c.click(); return true; })()`);
+    await wait(3200);
+    const ok = await page.evaluate(clickButton('Show my valuation'));
+    return ok && Boolean(await waitFor(() => page.evaluate(`document.body.innerText.toLowerCase().includes('email me this version')`)));
+  };
+  const throughSteps = async () => {
+    for (const b of ['Continue to financials', 'Continue to cost of capital', 'Continue to terminal']) {
+      if (!(await page.evaluate(clickButton(b)))) return false;
+      await wait(400);
+    }
+    return page.evaluate(clickButton('Run valuation'));
+  };
+  const emailVersion = async (n) => {
+    if (!(await page.evaluate(clickButton('Email me this version')))) return false;
+    return Boolean(await waitFor(() => log.version.length === n));
+  };
+  const leadToken = (k) => log.lead[k]?.outcome?.body?.lead?.token;
+
+  // 1. Back to inputs and run again: the gate, prefilled, and a second lead.
   check(`${label}: back to inputs`, await page.evaluate(clickButton('Back to inputs')));
   await wait(400);
   check(`${label}: run again`, await page.evaluate(clickButton('Run valuation')));
-  const rerunShown = await waitFor(() => page.evaluate(`document.body.innerText.includes('Nothing was emailed')`), 60);
-  check(`${label}: re-run opens the results, not the gate`, Boolean(rerunShown) && !(await page.evaluate(text())).includes('Work email'));
-  check(`${label}: re-run creates no new lead`, log.lead.length === 1, `${log.lead.length} lead requests`);
-  check(`${label}: re-run saves a version with sendEmail false`, log.version.length === 2 && log.version[1].body.sendEmail === false && log.version[1].ok && log.version[0].body.sendEmail === undefined);
-  check(`${label}: re-run carries the lead token`, log.version[1]?.body.token === log.version[0]?.body.token && typeof log.version[1]?.body.token === 'string');
+  check(`${label}: run again shows the gate`, Boolean(await waitFor(() => page.evaluate(`document.body.innerText.includes('Your valuation is ready')`))));
+  check(`${label}: gate prefilled with the person's name and email`, (await gateValue('Full name')) === 'Dashboard Verifier' && (await gateValue('Work email')) === 'verifier@example.com');
+  check(`${label}: consent given again for a new lead`, (await consentBox()) === false);
+  check(`${label}: second run submitted`, await submitGate());
+  check(`${label}: second run is a new lead with its own token`, log.lead.length === 2 && leadToken(1) && leadToken(1) !== leadToken(0), `${log.lead.length} leads`);
+  check(`${label}: Email me this version uses the new lead`, (await emailVersion(2)) && log.version[1].body.token === leadToken(1) && log.version[1].body.sendEmail === undefined);
+
+  // 2. Start a new valuation, then Load an example company after a real one, as a second company.
+  check(`${label}: start a new valuation`, await page.evaluate(clickButton('Start a new valuation')));
+  await wait(400);
+  check(`${label}: back on step 1 with a clean company name`, (await gateValue('Company name')) === '');
+  check(`${label}: load an example company after a real valuation`, await page.evaluate(clickButton('Load an example company')));
+  await wait(300);
+  check(`${label}: name the second company`, (await page.evaluate(setField('Company name', 'Second Company Ltd'))) === true);
+  check(`${label}: second company run`, await throughSteps());
+  check(`${label}: second company shows the gate`, Boolean(await waitFor(() => page.evaluate(`document.body.innerText.includes('Your valuation is ready')`))));
+  check(`${label}: gate company is the second company, not the first`, (await gateValue('Company (optional)')) === 'Second Company Ltd', String(await gateValue('Company (optional)')));
+  check(`${label}: person's details still prefilled`, (await gateValue('Full name')) === 'Dashboard Verifier');
+  check(`${label}: second company submitted`, await submitGate());
+  const third = log.lead[2]?.body;
+  check(`${label}: second company is its own lead`, log.lead.length === 3 && third?.gate?.company === 'Second Company Ltd' && third?.inputs?.profile?.companyName === 'Second Company Ltd');
+  check(`${label}: Email me this version uses the second company and its lead`, (await emailVersion(3)) && log.version[2].body.token === leadToken(2) && log.version[2].body.inputs?.profile?.companyName === 'Second Company Ltd');
+
+  // 3. A blank company name, twice: neither inherits the second company.
+  for (const n of [1, 2]) {
+    check(`${label}: blank company ${n}: start a new valuation`, await page.evaluate(clickButton('Start a new valuation')));
+    await wait(400);
+    await page.evaluate(clickButton('Load an example company'));
+    await wait(300);
+    await page.evaluate(setField('Company name', ''));
+    check(`${label}: blank company ${n}: run`, await throughSteps());
+    check(`${label}: blank company ${n}: gate shown`, Boolean(await waitFor(() => page.evaluate(`document.body.innerText.includes('Your valuation is ready')`))));
+    check(`${label}: blank company ${n}: gate company is empty`, (await gateValue('Company (optional)')) === '', String(await gateValue('Company (optional)')));
+    check(`${label}: blank company ${n}: submitted`, await submitGate());
+    const body = log.lead[2 + n]?.body;
+    check(`${label}: blank company ${n}: its own lead, with no company`, log.lead.length === 3 + n && !body?.gate?.company && !body?.inputs?.profile?.companyName && leadToken(2 + n) !== leadToken(1 + n));
+  }
 
   // The partner portrait keeps its proportions: a 4:5 frame, the image cropped
   // to cover it, and the file itself not distorted on the way.
