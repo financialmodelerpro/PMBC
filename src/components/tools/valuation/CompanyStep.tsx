@@ -2,11 +2,13 @@
 
 import { COUNTRIES, INDUSTRIES, TAX } from '@/lib/tools/valuation/data';
 import { PROFILE_LIMITS } from '@/lib/tools/valuation/profile';
-import type { FieldErrors } from '@/lib/tools/valuation/engine';
+import { financialYearEnd, type FieldErrors } from '@/lib/tools/valuation/engine';
 
 import { SearchSelect } from './SearchSelect';
 import { netDebtOf, type BridgeKey, type FormState } from './state';
-import { Collapsible, Field, NumberInput, Panel, PanelTitle, StepNav, inputClass } from './ui';
+import { Collapsible, Field, NumberInput, Panel, PanelTitle, Select, StepNav, inputClass } from './ui';
+
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 const INDUSTRY_OPTIONS = Object.keys(INDUSTRIES).map((name) => ({ value: name, label: name }));
 /** A million figure for the net debt line: up to one decimal, grouped. */
@@ -59,7 +61,15 @@ export function CompanyStep({
   onNext: () => void;
 }) {
   const bridgeCount = BRIDGE_FIELDS.filter((f) => state.bridge[f.k].trim() !== '').length;
-  const yearEnd = /^\d{4}$/.test(state.financialYear.trim()) ? state.financialYear.trim() : 'of that year';
+  // The year end date the balance sheet figures are at, from the year and the year end month.
+  const fy = /^\d{4}$/.test(state.financialYear.trim()) ? parseInt(state.financialYear.trim(), 10) : null;
+  const month = parseInt(state.fyEndMonth, 10) || 12;
+  const yearEndText = fy
+    ? (() => {
+        const [y, m, d] = financialYearEnd(fy, month).split('-').map(Number);
+        return `${d} ${MONTH_NAMES[m - 1]} ${y}`;
+      })()
+    : `the end of ${MONTH_NAMES[month - 1]}`;
   const netDebt = netDebtOf(state);
   return (
     <Panel eyebrow="Step 1 of 4">
@@ -115,7 +125,7 @@ export function CompanyStep({
         </Field>
       </div>
       <div className="grid gap-x-5 sm:grid-cols-2">
-        <Field label="Last completed financial year" hint="The latest full year of actuals, assumed to end on 31 December. The valuation is dated today." error={errors.financialYear ?? ''}>
+        <Field label="Last completed financial year" hint="The latest full year of actuals, named for the year it ends in. The valuation is dated today." error={errors.financialYear ?? ''}>
           {({ id, describedBy, invalid }) => (
             <NumberInput
               id={id}
@@ -129,12 +139,23 @@ export function CompanyStep({
             />
           )}
         </Field>
+        <Field label="Financial year ends in" hint="The month your financial year ends. December for most companies." error={errors.fyEndMonth ?? ''}>
+          {({ id, describedBy }) => (
+            <Select id={id} aria-describedby={describedBy} value={state.fyEndMonth} onChange={(e) => onChange({ fyEndMonth: e.target.value })}>
+              {MONTH_NAMES.map((m, k) => (
+                <option key={m} value={String(k + 1)}>
+                  {m}
+                </option>
+              ))}
+            </Select>
+          )}
+        </Field>
       </div>
 
       {/* Borrowings and cash, entered separately; net debt is worked out from them. */}
       <div className="grid gap-x-5 sm:grid-cols-2">
         <Field
-          label={`Borrowings at 31 December ${yearEnd}`}
+          label={`Borrowings at ${yearEndText}`}
           hint="Bank loans, overdrafts and other interest-bearing debt at the year end. Use 0 if none. Enter lease liabilities under Other balance sheet items."
           error={errors.debt ?? ''}
         >
@@ -153,7 +174,7 @@ export function CompanyStep({
           )}
         </Field>
         <Field
-          label={`Cash at 31 December ${yearEnd}`}
+          label={`Cash at ${yearEndText}`}
           hint={
             state.country === TAX.zakatCountry
               ? 'Cash and bank balances at the year end. Use 0 if none. Also adds to the zakat base.'

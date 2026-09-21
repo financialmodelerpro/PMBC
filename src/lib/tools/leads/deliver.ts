@@ -15,6 +15,7 @@ import { sendEmail, type SendEmailResult } from '@/lib/email/send';
 import { baseLayoutBranded } from '@/lib/email/templates/_base';
 import { SITE_HREF } from '@/lib/brand/letterhead';
 import { bookingLinkFor } from './bookingLinkStore';
+import { resumeLinkForLead } from './resumeLinks';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 
 import type { EmailStatus, ToolLeadRow } from '../db';
@@ -38,6 +39,8 @@ type LeadForDelivery = Pick<
   ToolLeadRow,
   | 'id'
   | 'tool_slug'
+  | 'phone'
+  | 'contact_country'
   | 'is_test'
   | 'data_version'
   | 'name'
@@ -100,6 +103,7 @@ export async function sendResultsEmail(
     company: lead.company,
     result,
     bookingHref: await bookingLinkFor(lead, 'email'),
+    resumeHref: await resumeLinkForLead(lead),
   });
 
   // A resend is a new message, so its status starts again. Set before the send,
@@ -192,6 +196,8 @@ export async function sendLeadAlert(lead: LeadForDelivery, result: ValuationResu
       industry: lead.industry,
       followUp: lead.follow_up_consent,
       isTest: lead.is_test,
+      phone: lead.phone ?? null,
+      contactCountry: lead.contact_country ?? null,
     },
     result,
     dashboardUrl: `${SITE_HREF}/admin/tool-leads/${lead.id}`,

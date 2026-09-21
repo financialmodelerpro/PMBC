@@ -44,6 +44,7 @@ import {
   applyIndustryDefaults,
   exampleState,
   initialState,
+  stateFromInputs,
   newPeer,
   num,
   onEnterWacc,
@@ -59,7 +60,8 @@ import {
   type FormState,
 } from './state';
 import { StepBar, type StepState } from './StepBar';
-import { captureAttribution, readAttribution, readGatePrefill, storeGatePrefill, submitLead } from './submit';
+import { cleanPhone } from '@/lib/tools/contactCountries';
+import { captureAttribution, fetchResume, readAttribution, readGatePrefill, saveResumedRun, storeGatePrefill, submitLead } from './submit';
 import { SummaryPanel } from './SummaryPanel';
 import { TerminalStep } from './TerminalStep';
 import { WaccStep } from './WaccStep';
@@ -95,6 +97,10 @@ export function BusinessValuationTool({ preview, partner }: ToolComponentProps) 
   // True once this run's lead is saved: the next run from the form is a new valuation, so the gate's
   // company (unless step 1 names one) and consent start again, while the person's details stay.
   const leadSaved = useRef(false);
+  // Save and return (since 2026-09-21): a valuation opened from its emailed link. Running it again saves
+  // a new version of that project rather than a new lead, so the name and email step is not asked.
+  const [resumed, setResumed] = useState<{ project: string | null } | null>(null);
+  const [resumeNotice, setResumeNotice] = useState<string | null>(null);
 
   useEffect(() => {
     captureAttribution();
@@ -102,6 +108,26 @@ export function BusinessValuationTool({ preview, partner }: ToolComponentProps) 
     // every run from the form is a new lead (since 2026-09-21).
     const prefill = readGatePrefill();
     if (prefill) setGate((g) => ({ ...g, ...prefill }));
+    // A resume link: load the saved valuation, then drop the id from the address bar so it is not kept
+    // in history or sent on as a referrer.
+    const id = new URLSearchParams(window.location.search).get('resume');
+    if (id) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('resume');
+      window.history.replaceState(null, '', url.pathname + url.search + url.hash);
+      void fetchResume(id).then((v) => {
+        if (!v) {
+          setResumeNotice('That link to a saved valuation is not recognised. You can start a new one below.');
+          return;
+        }
+        setS(stateFromInputs(v.inputs as ValuationInputs));
+        setLead(v.lead);
+        const [code, ...rest] = (v.gate.phone || '').split(' ');
+        setGate((g) => ({ ...g, ...v.gate, phoneCode: code?.startsWith('+') ? code : g.phoneCode, phone: code?.startsWith('+') ? rest.join(' ') : v.gate.phone, consent: true }));
+        setResumed({ project: v.project });
+        setMaxReached(3);
+      });
+    }
   }, []);
 
   const currency = useMemo(() => currencyFor(s.country), [s.country]);
@@ -179,6 +205,27 @@ export function BusinessValuationTool({ preview, partner }: ToolComponentProps) 
     const fresh = leadSaved.current;
     setGate((g) => ({ ...g, company: named || (fresh ? '' : g.company), consent: fresh ? false : g.consent }));
     leadSaved.current = false;
+
+    // A resumed valuation: a new version of the same project, not a new lead.
+    if (resumed && lead?.token) {
+      setSubmitting(true);
+      const raise = gate.purpose === 'raise' ? num(gate.raiseAmount) : null;
+      const runInputs = { ...inputs, purpose: gate.purpose, raiseAmount: raise };
+      const local = runValuation(runInputs);
+      try {
+        const out = await saveResumedRun(lead.token, runInputs);
+        setSaved({ inputs: runInputs, result: out?.result ?? (local.ok ? local.result : outcome.result) });
+        setResumeNotice(
+          out?.saved
+            ? `Saved as a new version of ${resumed.project ?? 'your valuation'}. Use Email me this version to receive the figures and a new report.`
+            : 'Updated with your changes, but they could not be saved just now. Use Email me this version to keep them.',
+        );
+        go('result');
+      } finally {
+        setSubmitting(false);
+      }
+      return;
+    }
     go('gate');
   }
 
@@ -206,6 +253,8 @@ export function BusinessValuationTool({ preview, partner }: ToolComponentProps) 
           dealSize: gate.dealSize,
           consent: gate.consent,
           followUp: gate.followUp,
+          contactCountry: gate.contactCountry,
+          phone: cleanPhone(gate.phoneCode, gate.phone),
         },
         attribution: readAttribution(),
         website: gate.website,
@@ -216,7 +265,7 @@ export function BusinessValuationTool({ preview, partner }: ToolComponentProps) 
       setSaved({ inputs, result: response?.result ?? (local.ok ? local.result : pending) });
       if (response?.token) setLead((l) => (l ? { ...l, token: response.token, booking: response.booking } : l));
       leadSaved.current = true;
-      storeGatePrefill({ name: gate.name.trim(), email: gate.email.trim(), purpose: gate.purpose, dealSize: gate.dealSize, followUp: gate.followUp, raiseAmount: gate.raiseAmount });
+      storeGatePrefill({ name: gate.name.trim(), email: gate.email.trim(), purpose: gate.purpose, dealSize: gate.dealSize, followUp: gate.followUp, raiseAmount: gate.raiseAmount, contactCountry: gate.contactCountry, phoneCode: gate.phoneCode, phone: gate.phone });
     } finally {
       setSubmitting(false);
       setMaxReached(3);
@@ -258,6 +307,13 @@ export function BusinessValuationTool({ preview, partner }: ToolComponentProps) 
     <div ref={topRef} className="mx-auto w-full max-w-[1200px] scroll-mt-28">
       <div className="mx-auto mb-8 max-w-[760px]">
         <StepBar labels={STEP_LABELS} states={stepStates} onGo={(i) => go(i as View)} />
+        {view !== 'result' && (resumed || resumeNotice) && (
+          <p role="status" className="mb-4 border-l-2 border-[#C69C3E] bg-[#FDF8EC] px-3 py-2 text-[13.5px] text-[#6B4E12]">
+            {resumed
+              ? `You are editing your saved valuation${resumed.project ? ` of ${resumed.project}` : ''}. Running it again saves a new version of it.`
+              : resumeNotice}
+          </p>
+        )}
       </div>
 
       {showForm ? (
@@ -378,6 +434,7 @@ export function BusinessValuationTool({ preview, partner }: ToolComponentProps) 
             baseInputs={saved.inputs}
             baseResult={saved.result}
             lead={lead}
+            initialNotice={resumed && resumeNotice ? { tone: 'ok', text: resumeNotice } : null}
             preview={preview}
             onNew={() => {
               // A new valuation: a clean form. The person's details stay for the gate; the next run is a new lead.
@@ -390,6 +447,8 @@ export function BusinessValuationTool({ preview, partner }: ToolComponentProps) 
               setTermError('');
               setMaxReached(0);
               leadSaved.current = true;
+              setResumed(null);
+              setResumeNotice(null);
               go(0);
             }}
             partner={partner}

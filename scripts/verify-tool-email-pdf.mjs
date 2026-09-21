@@ -525,6 +525,27 @@ console.log('Revenue and EBITDA chart labels');
   }
 }
 
+console.log('Financial year end and P/E');
+{
+  const june = fromState({ ...minimalCase(state), fyEndMonth: '6', financialYear: '2026' });
+  const juneT = await pageTexts(await pdfModule.renderValuationReport(june, { ...REPORT_META, company: 'Example Co', industry: 'I', country: 'C', bookingHref: BOOK }));
+  const dec = await pageTexts(await pdfModule.renderValuationReport(saudi, { ...REPORT_META, company: 'Example Co', industry: 'I', country: 'C', bookingHref: BOOK }));
+  const squash = (x) => x.replace(/\s+/g, '').toLowerCase();
+  check('June year end: 8 pages', juneT.length === 8, String(juneT.length));
+  check('June year end: the report says years end on 30 June, not 31 December', squash(juneT.join(' ')).includes(squash('Financial years end on 30 June, as entered.')) && !squash(juneT.join(' ')).includes(squash('assumed to end on 31 December')));
+  check('December year end: the wording is unchanged', squash(dec.join(' ')).includes(squash('Financial years are assumed to end on 31 December.')));
+  const peS = { ...fullFeatureCase(state), netIncome: '1100', peers: [state.newPeer('Listed peer one', '8.5', '1.1', '11.2', '14'), state.newPeer('Listed peer two', '10.5', '1.5', '13.8', '17')] };
+  const pe = fromState(peS);
+  const noPe = fromState(fullFeatureCase(state));
+  check('P/E: a reference value is computed and kept out of the blend', pe.comparables.peValue && pe.comparables.pePeerCount === 2 && pe.blend.ev.every((v, i) => Math.abs(v - noPe.blend.ev[i]) < 1e-6));
+  const ff = format.footballFieldRows(pe).find((r) => r.key === 'comps_pe');
+  check('P/E: a reference row in value by method, not blended', ff && ff.blend === false && ff.sub.includes('not used in the blend'));
+  check('P/E: no row without net income', !format.footballFieldRows(noPe).some((r) => r.key === 'comps_pe'));
+  const peT = await pageTexts(await pdfModule.renderValuationReport(pe, { ...REPORT_META, company: 'Example Co', industry: 'I', country: 'C', bookingHref: BOOK }));
+  check('P/E: 8 pages', peT.length === 8, String(peT.length));
+  check('P/E: the report shows the reference row', squash(peT.join(' ')).includes(squash('Comparables, P/E')));
+}
+
 console.log('Brevo payload');
 {
   const captured = [];

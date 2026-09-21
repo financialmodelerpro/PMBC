@@ -96,7 +96,8 @@ export type WaccInputs = {
 };
 
 /** A listed comparable company. EV / EBIT is optional: a reference cross-check, never used in the blend. */
-export type Peer = { name: string; evEbitda: number | null; evRevenue: number | null; evEbit?: number | null };
+/** A listed comparable. EV / EBIT and P/E are optional reference cross-checks, never used in the blend. */
+export type Peer = { name: string; evEbitda: number | null; evRevenue: number | null; evEbit?: number | null; pe?: number | null };
 
 export type StakeAdjustment = 'none' | 'control_premium' | 'minority_discount';
 
@@ -178,8 +179,16 @@ export type ValuationInputs = {
   investedCapitalParts?: { workingCapital: number | null; fixedAssets: number | null } | null;
   /** The zakat rate, percent. Saudi Arabia only; blank means `TAX.zakatRate` (2.5%). */
   zakatRate?: number | null;
+  /**
+   * The month the financial year ends, 1 to 12 (since 2026-09-21). Blank means December, as every
+   * earlier input was valued, so no schema bump. A financial year is named for the calendar year it
+   * ends in: FY2025 with a June year end runs July 2024 to June 2025.
+   */
+  fyEndMonth?: number | null;
   /** Percentage points added to the computed WACC. Set by the exploration slider. */
   waccAdjustment?: number | null;
+  /** Net income for the last actual year, millions (2026-09-21). Optional: only the P/E reference method reads it. */
+  netIncome?: number | null;
   /** Company name and a description for the report. Never read by the engine's arithmetic. See `profile.ts`. */
   profile?: CompanyProfile;
   /* Version 3 ------------------------------------------------------------- */
@@ -301,7 +310,13 @@ export function resolveExtras(i: ValuationInputs) {
     purpose: i.purpose ?? null,
     cash: i.cash === null || i.cash === undefined ? null : i.cash,
     zakatRate: typeof i.zakatRate === 'number' && Number.isFinite(i.zakatRate) ? i.zakatRate : TAX.zakatRate,
+    fyEndMonth: fyEndMonthOf(i.fyEndMonth),
   };
+}
+
+/** A financial year end month, 1 to 12, or December when blank or out of range. */
+export function fyEndMonthOf(m: number | null | undefined): number {
+  return typeof m === 'number' && Number.isInteger(m) && m >= 1 && m <= 12 ? m : 12;
 }
 
 /* ------------------------------------------------------------------------ */
@@ -387,10 +402,15 @@ export function isoDate(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
-/** Financial years are taken to end on 31 December: the form asks for a year, not a month. */
-export function financialYearEnd(fy: number | null): string {
+/**
+ * The last day of a financial year: the end of `month` (1 to 12, December when blank) in the year the
+ * financial year is named for. Before 2026-09-21 every year ended on 31 December.
+ */
+export function financialYearEnd(fy: number | null, month: number | null = 12): string {
   const y = fy && Number.isFinite(fy) ? Math.trunc(fy) : ASSUMPTIONS.defaultFinancialYear;
-  return `${y}-12-31`;
+  const m = fyEndMonthOf(month);
+  const last = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  return `${y}-${String(m).padStart(2, '0')}-${String(last).padStart(2, '0')}`;
 }
 
 /** Months from one date to another, with the part month as days over that month's length. */
@@ -414,8 +434,8 @@ export type StubPeriod = {
   tooOld: boolean;
 };
 
-export function stubPeriod(financialYear: number | null, valuationDate: string | null): StubPeriod {
-  const lastFyEnd = financialYearEnd(financialYear);
+export function stubPeriod(financialYear: number | null, valuationDate: string | null, fyEndMonth: number | null = 12): StubPeriod {
+  const lastFyEnd = financialYearEnd(financialYear, fyEndMonth);
   if (!valuationDate) return { lastFyEnd, valuationDate: null, months: 0, fraction: 0, tooOld: false };
   const months = monthsBetween(lastFyEnd, valuationDate);
   // A year still in progress (the date before its end) takes no stub.
@@ -544,6 +564,9 @@ export type CompsMultiples = {
   /** EV / EBIT from the visitor's peers when at least two are entered; there is no preset. */
   ebit: [number, number, number] | null;
   peersB: number;
+  /** P/E from the visitor's peers when at least two are entered (2026-09-21); there is no preset. */
+  pe: [number, number, number] | null;
+  peersP: number;
   /** Number of peers behind each set, or 0 when the preset was used. */
   peersE: number;
   peersR: number;
@@ -554,6 +577,7 @@ export function compsMultiples(industry: string, peers: Peer[]): CompsMultiples 
   const se = peerStats(peers.map((p) => p.evEbitda));
   const sr = peerStats(peers.map((p) => p.evRevenue));
   const sb = peerStats(peers.map((p) => p.evEbit ?? null));
+  const sp = peerStats(peers.map((p) => p.pe ?? null));
   const presetE = s ? ([...s.ebitdaMultiples] as [number, number, number]) : ([NaN, NaN, NaN] as [number, number, number]);
   const presetR = s ? ([...s.revenueMultiples] as [number, number, number]) : ([NaN, NaN, NaN] as [number, number, number]);
   return {
@@ -563,6 +587,8 @@ export function compsMultiples(industry: string, peers: Peer[]): CompsMultiples 
     peersR: sr ? peers.filter((p) => Number.isFinite(n(p.evRevenue))).length : 0,
     ebit: sb,
     peersB: sb ? peers.filter((p) => Number.isFinite(n(p.evEbit ?? null))).length : 0,
+    pe: sp,
+    peersP: sp ? peers.filter((p) => Number.isFinite(n(p.pe ?? null))).length : 0,
   };
 }
 
@@ -680,7 +706,7 @@ export function withDerivedInputs<T extends ValuationInputs>(i: T): T {
 }
 
 export function validateCompany(
-  i: Pick<ValuationInputs, 'industry' | 'country' | 'financialYear' | 'netDebt' | 'bridge' | 'gccOwnership' | 'valuationDate' | 'raiseAmount' | 'schemaVersion' | 'cash' | 'debt' | 'zakatRate'>,
+  i: Pick<ValuationInputs, 'industry' | 'country' | 'financialYear' | 'netDebt' | 'bridge' | 'gccOwnership' | 'valuationDate' | 'raiseAmount' | 'schemaVersion' | 'cash' | 'debt' | 'zakatRate' | 'fyEndMonth'>,
 ): FieldErrors {
   const e: FieldErrors = {};
   if (!industryFor(i.industry)) e.industry = 'Select an industry.';
@@ -688,12 +714,14 @@ export function validateCompany(
   const fy = n(i.financialYear);
   if (!(fy >= ASSUMPTIONS.minFinancialYear && fy <= ASSUMPTIONS.maxFinancialYear)) {
     e.financialYear = `Enter a year between ${ASSUMPTIONS.minFinancialYear} and ${ASSUMPTIONS.maxFinancialYear}.`;
-  } else if (stubPeriod(fy, isIsoDate(i.valuationDate) ? (i.valuationDate as string) : null).tooOld) {
+  } else if (stubPeriod(fy, isIsoDate(i.valuationDate) ? (i.valuationDate as string) : null, i.fyEndMonth ?? 12).tooOld) {
     e.financialYear = STUB_TOO_OLD_MESSAGE;
-  } else if (isIsoDate(i.valuationDate) && fy > Number((i.valuationDate as string).slice(0, 4))) {
-    // A year still running is allowed and takes no stub (see `stubPeriod`); one that has not started is not.
+  } else if (isIsoDate(i.valuationDate) && monthsBetween(i.valuationDate as string, financialYearEnd(fy, i.fyEndMonth ?? 12)) >= 12) {
+    // A year still running is allowed and takes no stub (see `stubPeriod`); one that has not started (it
+    // ends twelve months or more after the valuation date) is not. For December this is "after this year".
     e.financialYear = FUTURE_YEAR_MESSAGE;
   }
+  if (i.fyEndMonth !== null && i.fyEndMonth !== undefined && fyEndMonthOf(i.fyEndMonth) !== i.fyEndMonth) e.fyEndMonth = 'Choose the month the financial year ends.';
   if (entersDebtAndCash(i)) {
     if (!(typeof i.debt === 'number' && i.debt >= 0)) e.debt = DEBT_REQUIRED_MESSAGE;
     if (!(typeof i.cash === 'number' && i.cash >= 0)) e.cash = CASH_REQUIRED_MESSAGE;
@@ -1238,6 +1266,18 @@ export type ComparablesBlock = {
   /** Null without EV / EBIT peers, or when last actual EBIT is not positive. */
   ebitValue: Range3 | null;
   ebitPeerCount: number;
+  /**
+   * P/E from at least two peers, on last actual net income after the private company discount
+   * (2026-09-21). A reference, never in the blend. `peEquity` is the equity value it gives; `peValue`
+   * is that equity plus net debt at the valuation date and other claims, so it sits on the enterprise
+   * value chart beside the other methods. Null without P/E peers or positive net income; absent on
+   * results stored before.
+   */
+  peMultiplesPre?: Range3 | null;
+  peMultiplesPost?: Range3 | null;
+  peEquity?: Range3 | null;
+  peValue?: Range3 | null;
+  pePeerCount?: number;
   /** Null when last actual EBITDA is not positive. */
   ebitdaValue: Range3 | null;
   revenueValue: Range3;
@@ -1262,6 +1302,8 @@ export type RaiseResult = {
 export type ResultMeta = {
   valuationDate: string | null;
   lastFyEnd: string;
+  /** The financial year end month, 1 to 12. Absent on results stored before 2026-09-21: December. */
+  fyEndMonth?: number;
   stubMonths: number;
   stubFraction: number;
   treasury: DatedValue;
@@ -1410,7 +1452,7 @@ function compute(i: ValuationInputs, withScenarios: boolean, opts: EngineOptions
   // CHANGED: the discount applies to the exit multiple too. With no discount
   // this is the entered multiple exactly.
   const xmApplied = disc ? xm * (1 - disc) : xm;
-  const stub = stubPeriod(i.financialYear, x.valuationDate);
+  const stub = stubPeriod(i.financialYear, x.valuationDate, x.fyEndMonth);
   const f = stub.fraction;
   const zakatShareRate = tax.zakatMethod === 'base' ? tax.gccOwnership * tax.zakatRate : 0;
   // The reinvestment floor's return on new capital at the base WACC (with any exploration adjustment), for the terminal block.
@@ -1606,7 +1648,12 @@ function compute(i: ValuationInputs, withScenarios: boolean, opts: EngineOptions
     equity: dcfRange.map(toEquity) as Range3,
     perpetuityEquityBase: toEquity(base.evG),
   };
-  const entered = i.peers.filter((p) => Number.isFinite(n(p.evEbitda)) || Number.isFinite(n(p.evRevenue)) || Number.isFinite(n(p.evEbit ?? null)));
+  const entered = i.peers.filter((p) => Number.isFinite(n(p.evEbitda)) || Number.isFinite(n(p.evRevenue)) || Number.isFinite(n(p.evEbit ?? null)) || Number.isFinite(n(p.pe ?? null)));
+  // P/E: equity from last actual net income, then on the enterprise value basis by adding back net debt at the
+  // valuation date and other claims, as `toEquity` takes them off. Reference only.
+  const netIncome = n(i.netIncome ?? null);
+  const peEquity = cm.pe && netIncome > 0 ? (cm.pe.map((m) => netIncome * m * (1 - disc)) as Range3) : null;
+  const peValue = peEquity ? (peEquity.map((v) => v + ndAtDate + (claims || 0)) as Range3) : null;
   const comparables: ComparablesBlock = {
     ebitdaMultiplesPre: cm.ebitda,
     ebitdaMultiplesPost: cm.ebitda.map((m) => m * (1 - disc)) as Range3,
@@ -1616,6 +1663,11 @@ function compute(i: ValuationInputs, withScenarios: boolean, opts: EngineOptions
     ebitMultiplesPost: cm.ebit ? (cm.ebit.map((m) => m * (1 - disc)) as Range3) : null,
     ebitValue: cB,
     ebitPeerCount: cm.peersB,
+    peMultiplesPre: cm.pe,
+    peMultiplesPost: cm.pe ? (cm.pe.map((m) => m * (1 - disc)) as Range3) : null,
+    peEquity,
+    peValue,
+    pePeerCount: cm.peersP,
     ebitdaValue: cE,
     revenueValue: cR,
     basis: cE ? 'ebitda' : 'revenue',
@@ -1639,6 +1691,7 @@ function compute(i: ValuationInputs, withScenarios: boolean, opts: EngineOptions
   const meta: ResultMeta = {
     valuationDate: stub.valuationDate,
     lastFyEnd: stub.lastFyEnd,
+    fyEndMonth: x.fyEndMonth,
     stubMonths: stub.months,
     stubFraction: f,
     treasury: market.treasury,

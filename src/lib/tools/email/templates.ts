@@ -121,7 +121,14 @@ export type ResultsEmailInput = {
   result: ValuationResult;
   /** The tracked booking link, `/api/tools/book?t=...&src=email`, absolute. */
   bookingHref: string;
+  /** Save and return (2026-09-21): the private link to edit and rerun this valuation. Optional. */
+  resumeHref?: string | null;
 };
+
+/** The save and return paragraph, added under the template's own text so a stored template needs no edit. */
+export function resumeBlock(href: string): string {
+  return `<p style="margin:20px 0 0;font-family:${SANS};font-size:13px;line-height:1.6;color:${TEXT};">Want to change an assumption? <a href="${escapeHtml(href)}" style="color:${NAVY};font-weight:600;">Edit and rerun your valuation</a>. Each run is saved as a new version. The link is personal to you, so please do not forward it.</p>`;
+}
 
 export function buildResultsEmail(i: ResultsEmailInput): { subject: string; body: string } {
   const h = headline(i.result);
@@ -156,13 +163,15 @@ export function buildResultsEmail(i: ResultsEmailInput): { subject: string; body
     valuation_date: h.valuationDate,
     currency: i.result.currency.code,
     booking_url: i.bookingHref,
+    resume_url: i.resumeHref ?? '',
   };
+  const body = renderWithBlocks(i.template.body_html, vars, {
+    summary_block: summary,
+    booking_button_block: button(i.bookingHref, 'Book a free call'),
+  });
   return {
     subject: renderSubject(i.template.subject, vars),
-    body: renderWithBlocks(i.template.body_html, vars, {
-      summary_block: summary,
-      booking_button_block: button(i.bookingHref, 'Book a free call'),
-    }),
+    body: i.resumeHref ? body + resumeBlock(i.resumeHref) : body,
   };
 }
 
@@ -180,6 +189,9 @@ export type AlertEmailInput = {
     industry: string | null;
     followUp: boolean;
     isTest: boolean;
+    /** Migration 082. Optional: absent on leads saved before it. */
+    phone?: string | null;
+    contactCountry?: string | null;
   };
   result: ValuationResult;
   dashboardUrl: string;
@@ -192,11 +204,13 @@ export function buildAlertEmail(i: AlertEmailInput): { subject: string; body: st
   const rows: [string, string][] = [
     ['Name', l.name],
     ['Email', l.email],
+    ['Phone', l.phone || 'Not given'],
+    ['Their country', l.contactCountry || 'Not given'],
     ['Company', l.company || 'Not given'],
     ['Purpose', purpose],
     ['Planned transaction size', l.dealSizeLabel],
     ['Below minimum mandate size', l.belowMinimum ? 'Yes' : 'No'],
-    ['Country', l.country ?? ''],
+    ['Country of operations', l.country ?? ''],
     ['Industry', l.industry ?? ''],
     ['Indicative equity value', h.table.equityRange],
     ['Base case', h.table.midpoint],
@@ -220,6 +234,7 @@ export function buildAlertEmail(i: AlertEmailInput): { subject: string; body: st
     midpoint: h.midpoint,
     wacc: h.wacc,
     follow_up: l.followUp ? 'Yes' : 'No',
+    phone: l.phone || 'Not given',
     is_test: l.isTest ? 'Yes' : 'No',
     dashboard_url: i.dashboardUrl,
   };
@@ -229,5 +244,46 @@ export function buildAlertEmail(i: AlertEmailInput): { subject: string; body: st
       details_block: table(rows),
       dashboard_button_block: button(i.dashboardUrl, 'Open the lead', 'navy'),
     }),
+  };
+}
+
+/* ------------------------------------------------------------------------ */
+/* Follow-up reminders (since 2026-09-21)                                    */
+/* ------------------------------------------------------------------------ */
+
+export type ReminderEmailInput = {
+  n: 1 | 2;
+  name: string;
+  company: string | null;
+  /** "SAR 382m to SAR 504m", from the stored result. Optional. */
+  equityRange: string | null;
+  bookingHref: string;
+  resumeHref: string | null;
+  unsubscribeHref: string;
+};
+
+/**
+ * The day 7 and day 14 reminders: the report email shell, the booking button, the save and return
+ * link and an unsubscribe line. Worded in code: two short notes the admin does not need to edit.
+ */
+export function buildReminderEmail(i: ReminderEmailInput): { subject: string; body: string } {
+  const first = i.name.trim().split(/\s+/)[0] || 'there';
+  const subjectOf = i.company ? `your valuation of ${i.company}` : 'your valuation';
+  const valued = i.company ? `${i.company}` : 'your business';
+  const range = i.equityRange ? ` at ${i.equityRange}` : '';
+  const p = (html: string, top = 0) => `<p style="margin:${top}px 0 14px;font-family:${SANS};font-size:15px;line-height:1.65;color:${TEXT};">${html}</p>`;
+  const lead =
+    i.n === 1
+      ? p(`Hello ${escapeHtml(first)}, a week ago you valued ${escapeHtml(valued)}${escapeHtml(range)} with our free tool.`) +
+        p('An indicative range is a starting point. If you would like to test the forecast, the discount rate or the comparables with us, book a free 30 minute call and we will go through it with you.')
+      : p(`Hello ${escapeHtml(first)}, two weeks ago you valued ${escapeHtml(valued)}${escapeHtml(range)} with our free tool.`) +
+        p('If a sale, a raise or a partner discussion is coming up, a short call now can save time later. This is the last reminder we will send.');
+  const resume = i.resumeHref
+    ? p(`You can also <a href="${escapeHtml(i.resumeHref)}" style="color:${NAVY};font-weight:600;">edit and rerun your valuation</a>; each run is saved as a new version.`, 18)
+    : '';
+  const footer = `<p style="margin:22px 0 0;font-family:${SANS};font-size:12px;line-height:1.6;color:#6B7680;">You are receiving this because you asked for follow-up emails when you ran your valuation. <a href="${escapeHtml(i.unsubscribeHref)}" style="color:#6B7680;">Unsubscribe from reminders</a>.</p>`;
+  return {
+    subject: i.n === 1 ? `A second look at ${subjectOf}` : `Still thinking about ${subjectOf}?`,
+    body: lead + button(i.bookingHref, 'Book a free call') + resume + footer,
   };
 }

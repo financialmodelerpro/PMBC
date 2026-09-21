@@ -192,6 +192,21 @@ function fakeServer(page, log) {
           body: buf.toString('base64'),
         });
       }
+      if (request.method === 'GET' && url.pathname === '/api/tools/business-valuation/resume') {
+        // Save and return: the first lead of this walk stands in for the saved project.
+        const saved = log.lead[0];
+        log.resume.push(url.searchParams.get('r'));
+        if (url.searchParams.get('r') !== RESUME_ID || !saved) return json(404, { error: 'Not found' });
+        const g = saved.body.gate;
+        const project = g.company || saved.body.inputs.profile?.companyName || null;
+        return json(200, {
+          ok: true,
+          inputs: saved.outcome.body.inputs ?? saved.body.inputs,
+          lead: { name: g.name, email: g.email, token: RESUME_TOKEN, booking: null },
+          gate: { name: g.name, email: g.email, company: g.company ?? '', purpose: g.purpose ?? '', dealSize: g.dealSize ?? '', raiseAmount: '', contactCountry: g.contactCountry ?? '', phone: g.phone ?? '' },
+          project,
+        });
+      }
       log.refused.push(`${request.method} ${url.pathname}`);
       return json(403, { error: 'Refused by verify-valuation-dashboard' });
     } catch (err) {
@@ -221,11 +236,14 @@ const setField = (labelStart, value) =>
   })()`;
 const text = () => `document.body.innerText.replace(/\\s+/g, ' ')`;
 
+const RESUME_ID = 'abcdefghijkmnpqr';
+const RESUME_TOKEN = 'resume-token-' + 'r'.repeat(40);
+
 async function walk(width) {
   const label = `${width}px`;
   console.log(`\n${label}`);
   const page = await openPage();
-  const log = { lead: [], version: [], pdf: [], refused: [], errors: [], requests: [] };
+  const log = { lead: [], version: [], pdf: [], refused: [], errors: [], requests: [], resume: [] };
   fakeServer(page, log);
   page.on((m) => {
     if (m.method === 'Network.requestWillBeSent' && m.params.request.url.includes('/api/')) log.requests.push(m.params.request.url);
@@ -251,7 +269,8 @@ async function walk(width) {
   check(`${label}: zakat rate field shown for Saudi Arabia, 2.5 by default`, t1.includes('Zakat rate %') && (await page.evaluate(`(() => { const l = [...document.querySelectorAll('label')].find((x) => x.textContent.trim().startsWith('Zakat rate')); const i = l && document.getElementById(l.htmlFor); return i ? i.value : null; })()`)) === '2.5');
   check(`${label}: borrowings and cash fields carry the year end date`, t1.includes('Borrowings at 31 December 2025') && t1.includes('Cash at 31 December 2025') && !t1.includes('(optional)Cash'), t1.match(/Borrowings at[^.]{0,40}/)?.[0]);
   check(`${label}: the example shows net debt as borrowings less cash`, t1.includes('Net debt: 45 SAR m (borrowings less cash)'), t1.match(/Net (debt|cash):[^.]{0,60}/)?.[0]);
-  check(`${label}: financial year end disclosed on the form`, t1.includes('assumed to end on 31 December'));
+  check(`${label}: financial year end asked on the form`, t1.includes('The month your financial year ends.'));
+  check(`${label}: financial year end month offered, December by default`, t1.includes('Financial year ends in') && (await page.evaluate(`(() => { const l = [...document.querySelectorAll('label')].find((x) => x.textContent.trim().startsWith('Financial year ends in')); const i = l && document.getElementById(l.htmlFor); return i ? i.value + '|' + i.options.length : null; })()`)) === '12|12');
   await page.evaluate(setField('Saudi / GCC ownership', ''));
   await page.evaluate(clickButton('Continue to financials'));
   await wait(400);
@@ -284,6 +303,7 @@ async function walk(width) {
   check(`${label}: on cost of capital`, await page.evaluate(clickButton('Continue to terminal')));
   await wait(400);
   check(`${label}: peers table offers EV / EBIT as an optional column`, (await page.evaluate(text())).includes('EV / EBIT (x, optional)'));
+  check(`${label}: peers table offers P/E as an optional column`, (await page.evaluate(text())).includes('P/E (x, optional)'));
   check(`${label}: run valuation`, await page.evaluate(clickButton('Run valuation')));
   check(`${label}: gate shown`, Boolean(await waitFor(() => page.evaluate(`document.body.innerText.includes('Your valuation is ready')`))));
 
@@ -294,6 +314,11 @@ async function walk(width) {
     check(`${label}: gate field ${f}`, (await page.evaluate(setField(f, v))) === true);
   }
   await wait(300);
+  check(`${label}: country and phone offered on the gate`, (await page.evaluate(text())).includes('Your country (optional)') && (await page.evaluate(text())).includes('Phone number (optional)'));
+  check(`${label}: gate country chosen`, (await page.evaluate(setField('Your country', 'Saudi Arabia'))) === true);
+  await wait(200);
+  check(`${label}: the country fills the phone code`, (await page.evaluate(`document.querySelector('input[aria-label="Country code"]')?.value`)) === '+966');
+  check(`${label}: gate phone entered`, (await page.evaluate(setField('Phone number', '50 123 4567'))) === true);
   check(`${label}: raise amount field appears for raising equity`, (await page.evaluate(setField('Amount you plan to raise', '120'))) === true);
   const deal = await page.evaluate(`(() => { const s = [...document.querySelectorAll('select')].find((x) => [...x.options].some((o) => o.value === '50-200')); if (!s) return false; Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(s, '50-200'); s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
   check(`${label}: deal size chosen`, deal);
@@ -307,6 +332,8 @@ async function walk(width) {
   // The lead request and the figures on screen.
   const lead = log.lead[0];
   check(`${label}: one lead request, intercepted`, log.lead.length === 1 && lead?.outcome.kind === 'saved', JSON.stringify(lead?.outcome?.body).slice(0, 200));
+  check(`${label}: the request carries the phone with its code and the country`, lead?.body.gate.phone === '+966 50 123 4567' && lead?.body.gate.contactCountry === 'Saudi Arabia', JSON.stringify({ p: lead?.body.gate.phone, c: lead?.body.gate.contactCountry }));
+  check(`${label}: the lead row stores them`, lead?.outcome.kind === 'saved');
   check(`${label}: the request carries the purpose, the raise amount, borrowings, cash and net debt`, lead?.body.inputs.purpose === 'raise' && lead?.body.inputs.raiseAmount === 120 && lead?.body.inputs.gccOwnership === 100 && lead?.body.inputs.debt === 75 && lead?.body.inputs.cash === 30 && lead?.body.inputs.netDebt === 45);
   const result = lead?.outcome.result;
   const h = result ? format.headline(result) : null;
@@ -412,6 +439,20 @@ async function walk(width) {
     check(`${label}: blank company ${n}: its own lead, with no company`, log.lead.length === 3 + n && !body?.gate?.company && !body?.inputs?.profile?.companyName && leadToken(2 + n) !== leadToken(1 + n));
   }
 
+  // Save and return: an unknown link says so; the emailed link loads the saved project, and running it
+  // again saves a version of that project with no gate and no email.
+  const leadsBefore = log.lead.length, versionsBefore = log.version.length;
+  await page.send('Page.navigate', { url: `${BASE}/tools/business-valuation?resume=zzzzzzzzzzzzzzzz` });
+  check(`${label}: an unknown resume link is reported`, Boolean(await waitFor(() => page.evaluate(`document.body.innerText.includes('not recognised')`))));
+  await page.send('Page.navigate', { url: `${BASE}/tools/business-valuation?resume=${RESUME_ID}` });
+  check(`${label}: resume link loads the saved valuation`, Boolean(await waitFor(() => page.evaluate(`document.body.innerText.includes('You are editing your saved valuation')`))));
+  check(`${label}: resume id dropped from the address bar`, !(await page.evaluate('location.search')).includes('resume'));
+  check(`${label}: saved inputs are in the form`, (await gateValue('About the business')) === 'We run three clinics in Riyadh for families and employers.' && (await gateValue('Borrowings at 31 December 2025')) === '75');
+  check(`${label}: edit and run the saved valuation`, (await page.evaluate(setField('Borrowings at 31 December 2025', '80'))) === true && (await throughSteps()));
+  check(`${label}: resumed run shows results with no gate`, Boolean(await waitFor(() => page.evaluate(`document.body.innerText.toLowerCase().includes('email me this version') && !document.body.innerText.includes('Your valuation is ready')`))));
+  check(`${label}: resumed run saved as a version of the project`, Boolean(await waitFor(() => log.version.length === versionsBefore + 1)) && log.version.at(-1).body.token === RESUME_TOKEN && log.version.at(-1).body.sendEmail === false && log.version.at(-1).body.inputs.debt === 80 && log.lead.length === leadsBefore);
+  check(`${label}: resumed run says it was saved as a new version`, Boolean(await waitFor(() => page.evaluate(`document.body.innerText.includes('Saved as a new version of')`))));
+
   // The partner portrait keeps its proportions: a 4:5 frame, the image cropped
   // to cover it, and the file itself not distorted on the way.
   const portrait = await page.evaluate(`(async () => {
@@ -436,7 +477,7 @@ async function walk(width) {
   check(`${label}: no horizontal scroll`, overflow <= 1, `${overflow}px wider than the viewport`);
   check(`${label}: no uncaught page errors`, log.errors.length === 0, log.errors.join(' | '));
   check(`${label}: nothing else under /api/ was requested`, log.refused.length === 0, log.refused.join(', '));
-  check(`${label}: every /api/ request was one of the three intercepted`, log.requests.every((u) => /\/api\/tools\/business-valuation\/(lead|lead\/version|pdf)$/.test(new URL(u).pathname)), log.requests.join(', '));
+  check(`${label}: every /api/ request was one of the three intercepted`, log.requests.every((u) => /\/api\/tools\/business-valuation\/(lead|lead\/version|pdf|resume)$/.test(new URL(u).pathname)), log.requests.join(', '));
   await shot('results-final');
   page.close();
 }

@@ -1077,6 +1077,43 @@ console.log('19. Implied multiple basis, reinvestment wording');
   check('reinvestment: pass reads plainly', !pass || pass.message.startsWith('Your forecast reinvests about what'), pass?.message);
 }
 
+console.log('20. Financial year end month');
+{
+  check('December is the default year end', engine.financialYearEnd(2025) === '2025-12-31' && engine.financialYearEnd(2025, null) === '2025-12-31');
+  check('June year end: 30 June', engine.financialYearEnd(2025, 6) === '2025-06-30');
+  check('February year end in a leap year: 29 February', engine.financialYearEnd(2024, 2) === '2024-02-29' && engine.financialYearEnd(2025, 2) === '2025-02-28');
+  const june = run({ ...BASE, financialYear: 2026, fyEndMonth: 6, valuationDate: '2026-09-16' });
+  check('June: FY2026 ended 30 June 2026, stub from there', june.meta.lastFyEnd === '2026-06-30' && close(june.meta.stubFraction, engine.monthsBetween('2026-06-30', '2026-09-16') / 12) && june.meta.fyEndMonth === 6);
+  check('June: the running year FY2027 is allowed', !engine.validateCompany({ ...BASE, financialYear: 2027, fyEndMonth: 6, valuationDate: '2026-09-16' }).financialYear);
+  check('June: FY2028 has not started and is refused', engine.validateCompany({ ...BASE, financialYear: 2028, fyEndMonth: 6, valuationDate: '2026-09-16' }).financialYear === engine.FUTURE_YEAR_MESSAGE);
+  check('June: FY2025 ended over 12 months ago and is refused', engine.validateCompany({ ...BASE, financialYear: 2025, fyEndMonth: 6, valuationDate: '2026-09-16' }).financialYear === engine.STUB_TOO_OLD_MESSAGE);
+  check('a month out of range is refused', Boolean(engine.validateCompany({ ...BASE, fyEndMonth: 13, valuationDate: '2026-09-16' }).fyEndMonth));
+  const dec = run({ ...BASE, fyEndMonth: 12 });
+  const none = run(BASE);
+  check('December entered values exactly as no month', dec.equity.every((v, k) => v === none.equity[k]));
+  check('the year end note names the month', format.disclosures(june).financialYearEnd === 'Financial years end on 30 June, as entered.' && format.disclosures(none).financialYearEnd === 'Financial years are assumed to end on 31 December.');
+  check('the default year is the latest that has ended', data.defaultFinancialYearFor(new Date('2026-09-21T00:00:00Z'), 6) === 2026 && data.defaultFinancialYearFor(new Date('2026-09-21T00:00:00Z'), 12) === 2025 && data.defaultFinancialYearFor(new Date('2026-05-01T00:00:00Z'), 6) === 2025);
+  check('form: the month travels and restores', state.toInputs({ ...minimalCase(state), fyEndMonth: '3' }, VALUATION_DATE).fyEndMonth === 3 && state.stateFromInputs({ ...BASE, fyEndMonth: 3 }).fyEndMonth === '3');
+}
+
+console.log('21. P/E, a reference method');
+{
+  const peers = [{ name: 'A', evEbitda: 9, evRevenue: 1.2, pe: 14 }, { name: 'B', evEbitda: 11, evRevenue: 1.6, pe: 18 }, { name: 'C', evEbitda: 10, evRevenue: 1.4, pe: 16 }];
+  const ni = 20;
+  const withPe = run({ ...BASE, peers, netIncome: ni });
+  const without = run({ ...BASE, peers: peers.map(({ pe, ...p }) => p) });
+  const disc = withPe.comparables.discount;
+  check('P/E equity is net income times the multiples after the discount', withPe.comparables.peEquity.every((v, k) => close(v, ni * [14, 16, 18][k] * (1 - disc))));
+  check('on the enterprise value basis it adds back net debt and other claims', withPe.comparables.peValue.every((v, k) => close(v, withPe.comparables.peEquity[k] + withPe.bridge.netDebtAtValuationDate + (withPe.bridge.otherClaims ?? 0))));
+  check('P/E never changes the blend or equity', withPe.ev.every((v, k) => v === without.ev[k]) && withPe.equity.every((v, k) => v === without.equity[k]));
+  check('value by method shows P/E as a reference row', format.footballFieldRows(withPe).some((row) => row.key === 'comps_pe' && row.sub.includes('not used in the blend')) && !format.footballFieldRows(without).some((row) => row.key === 'comps_pe'));
+  check('comparables list P/E after discount as a reference', format.comparablesRows(withPe).some(([k]) => k === 'After discount, P/E (reference)'));
+  check('without net income there is no P/E value', run({ ...BASE, peers }).comparables.peValue === null);
+  check('a loss gives no P/E value', run({ ...BASE, peers, netIncome: -5 }).comparables.peValue === null);
+  check('one peer with P/E is not enough', run({ ...BASE, peers: [peers[0], { ...peers[1], pe: null }], netIncome: ni }).comparables.peValue === null);
+  check('form: P/E and net income travel with the inputs', (() => { const i = state.toInputs({ ...minimalCase(state), netIncome: '12.5', peers: [state.newPeer('X', '9', '1', '12', '15')] }, VALUATION_DATE); return i.netIncome === 12.5 && i.peers[0].pe === 15; })());
+}
+
 console.log(`\n${checks - failures} of ${checks} checks passed.`);
 if (failures) {
   console.log(`${failures} FAILED`);

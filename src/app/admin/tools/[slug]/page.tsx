@@ -24,7 +24,7 @@ export default async function AdminToolDetailPage(props: { params: Promise<{ slu
   if (!tool) notFound();
 
   const [history, { counts, missingTable }] = await Promise.all([visibilityHistory(slug), leadCountsBySlug([slug])]);
-  const c = counts[slug] ?? { total: 0, last30: 0 };
+  const c = counts[slug] ?? { total: 0, last30: 0, projects: 0 };
 
   return (
     <div style={adminPageMain}>
@@ -80,7 +80,7 @@ export default async function AdminToolDetailPage(props: { params: Promise<{ slu
           <section style={adminCard}>
             <h2 style={{ margin: '0 0 12px', fontSize: 15, color: ADMIN_COLORS.textHeading }}>Leads</h2>
             <p style={{ margin: 0, fontSize: 28, fontWeight: 700, color: ADMIN_COLORS.textHeading }}>{c.total}</p>
-            <p style={{ margin: '2px 0 12px', fontSize: 13, color: ADMIN_COLORS.textMuted }}>{c.last30} in the last 30 days, excluding test leads</p>
+            <p style={{ margin: '2px 0 12px', fontSize: 13, color: ADMIN_COLORS.textMuted }}>{c.last30} in the last 30 days, excluding test leads. One lead per email: {c.projects} valuations in all.</p>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
               <Link href={`/admin/tool-leads?tool=${tool.slug}`} style={adminButtonGhost}>
                 View leads

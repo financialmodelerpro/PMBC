@@ -245,6 +245,20 @@ export function FinancialsStep({
         </p>
       </Collapsible>
 
+      <Collapsible
+        title="Net income"
+        badge={state.netIncome.trim() ? 'In use' : 'Optional'}
+        summary="Profit after tax for the last actual year. Only used for the P/E cross-check with your peers on step 4."
+      >
+        <div className="grid gap-x-5 sm:grid-cols-2">
+          <Field label={`Net income for FY${years.history[HISTORY_YEARS - 1]}`} hint="Profit after interest and tax. Leave blank to skip P/E.">
+            {({ id, describedBy }) => (
+              <NumberInput id={id} step={0.1} suffix={`${currencyCode} m`} value={state.netIncome} onValue={(v) => onChange({ netIncome: v })} aria-describedby={describedBy} />
+            )}
+          </Field>
+        </div>
+      </Collapsible>
+
       <StepNav onBack={onBack} onNext={onNext} nextLabel="Continue to cost of capital" />
     </Panel>
   );

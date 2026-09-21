@@ -204,7 +204,7 @@ export function page6Tables(r: ValuationResult) {
 export function checksFitOnPage6(r: ValuationResult, checks: { label: string; message: string }[]): boolean {
   const t = page6Tables(r);
   const terminal = terminalRows(r).length;
-  const comps = comparablesRows(r).filter(([k]) => !k.startsWith('Companies') && k !== 'After discount, EV / EBIT (reference)').length + (r.comparables.source === 'peers' ? 1 : 0);
+  const comps = comparablesRows(r).filter(([k]) => !k.startsWith('Companies') && !k.endsWith('(reference)')).length + (r.comparables.source === 'peers' ? 1 : 0);
   const left = t.timingOnLeft ? t.taxR.length + t.timingR.length : t.taxR.length;
   const right = t.timingOnLeft ? t.balanceR.length : t.timingR.length + t.balanceR.length;
   const peers = r.comparables.peerNames.length ? r.comparables.peerNames.join('; ').length + 35 : 0;
@@ -458,7 +458,7 @@ export function ValuationReport({ result, meta }: { result: ValuationResult; met
           <View style={{ width: '50%', paddingLeft: 10 }}>
             <SubHead>Comparables</SubHead>
             {/* Page 6 is the tightest page: EV / EBIT is on page 3's value by method instead. */}
-            <KeyValues rows={comparablesRows(r).filter(([k]) => !k.startsWith('Companies') && k !== 'After discount, EV / EBIT (reference)')} labelWidth="52%" />
+            <KeyValues rows={comparablesRows(r).filter(([k]) => !k.startsWith('Companies') && !k.endsWith('(reference)'))} labelWidth="52%" />
           </View>
         </View>
         {r.comparables.peerNames.length > 0 && (

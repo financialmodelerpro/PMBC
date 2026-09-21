@@ -92,6 +92,9 @@ export type ToolLeadRow = {
   consent_at: string | null;
   consent_text: string | null;
   follow_up_consent: boolean;
+  /** Migration 082 (2026-09-21). Absent before it is applied. */
+  phone?: string | null;
+  contact_country?: string | null;
   follow_up_consent_at: string | null;
   utm_source: string | null;
   utm_medium: string | null;
