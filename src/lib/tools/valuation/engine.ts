@@ -86,6 +86,12 @@ export type WaccInputs = {
   tax: number | null;
   inflationLocal: number | null;
   inflationUs: number | null;
+  /**
+   * The company's own pre-tax borrowing rate, percent, in the valuation currency. Optional: blank
+   * builds the cost of debt as risk-free rate plus default spread plus credit spread, as before.
+   * Added 2026-09-21; absent on older inputs, which therefore value exactly as they did.
+   */
+  kd?: number | null;
 };
 
 /** A listed comparable company. EV / EBIT is optional: a reference cross-check, never used in the blend. */
@@ -441,7 +447,26 @@ export type WaccBreakdown = {
   waccUsd: number; wacc: number;
   /** Percentage points added by the exploration slider, as a ratio. 0 unless adjusted. */
   adjustment: number;
+  /**
+   * Where the pre-tax cost of debt came from: `built` from the spreads, or `entered` as the
+   * company's own rate. `kd` is always on the US dollar basis the rest of the build uses; for a
+   * currency not pegged to the dollar an entered local rate is converted by the inflation gap,
+   * and `kdEntered` keeps the rate as typed, as a ratio. Absent on results stored before
+   * 2026-09-21, which were all built.
+   */
+  kdSource?: 'built' | 'entered';
+  kdEntered?: number | null;
+  /** Expected inflation, as ratios, behind the currency conversion. Absent on older results. */
+  inflationLocal?: number;
+  inflationUs?: number;
 };
+
+export const KD_RATE_MESSAGE = 'Enter a borrowing rate above 0% and below 50%, or leave it blank to build it from the spreads.';
+
+/** True when the company's own borrowing rate is entered and usable. */
+function kdIsEntered(w: WaccInputs): boolean {
+  return typeof w.kd === 'number' && Number.isFinite(w.kd);
+}
 
 /**
  * `taxRate` overrides the entered tax rate with an effective one (zakat blended
@@ -453,15 +478,25 @@ export function computeWacc(w: WaccInputs, currency: Currency, adjustmentPoints 
     de = n(w.de) / 100, sp = n(w.sp) / 100, ds = n(w.ds) / 100, cs = n(w.cs) / 100,
     cit = n(w.tax) / 100;
   const t = taxRate === undefined ? cit : taxRate;
+  const conv = currency.pegged ? 1 : (1 + n(w.inflationLocal) / 100) / (1 + n(w.inflationUs) / 100);
   const bl = bu * (1 + (1 - t) * de);
   const ke = rf + bl * erp + crp + sp;
-  const kd = rf + ds + cs, kdt = kd * (1 - t);
+  // The company's own rate, when entered, replaces the spread build. It is typed in the valuation
+  // currency, so for a currency not pegged to the dollar it is taken to US dollar terms by the same
+  // inflation gap that later converts the WACC back: the whole build stays on one basis.
+  const entered = kdIsEntered(w);
+  const kdEntered = entered ? (w.kd as number) / 100 : null;
+  const kd = kdEntered !== null ? (1 + kdEntered) / conv - 1 : rf + ds + cs;
+  const kdt = kd * (1 - t);
   const wd = de / (1 + de), we = 1 - wd;
   const waccUsd = we * ke + wd * kdt;
-  const conv = currency.pegged ? 1 : (1 + n(w.inflationLocal) / 100) / (1 + n(w.inflationUs) / 100);
   const base = (1 + waccUsd) * conv - 1;
   const adjustment = adjustmentPoints / 100;
   return {
+    kdSource: entered ? 'entered' : 'built',
+    kdEntered,
+    inflationLocal: n(w.inflationLocal) / 100,
+    inflationUs: n(w.inflationUs) / 100,
     rf, erp, crp, bu, de, sp, ds, cs, t, cit, bl, ke, kd, kdt, we, wd, waccUsd,
     // Adding a literal 0 would still be exact, but the branch keeps the
     // unadjusted value bit-for-bit identical to the reference's.
@@ -710,6 +745,7 @@ export function validateFinancials(fin: Financials, extras?: Pick<ValuationInput
 }
 
 export function validateWacc(w: WaccInputs, currency: Currency): string | null {
+  if (kdIsEntered(w) && !((w.kd as number) > 0 && (w.kd as number) < 50)) return KD_RATE_MESSAGE;
   return Number.isFinite(computeWacc(w, currency).wacc) ? null : 'Complete every cost of capital input.';
 }
 
@@ -1301,6 +1337,8 @@ export function runValuation(entered: ValuationInputs, opts: EngineOptions = CUR
   const finError = validateFinancials(i.financials, i);
   if (finError) return { ok: false, step: 1, errors: finError };
 
+  const waccError = validateWacc(i.wacc, currencyFor(i.country));
+  if (waccError) return { ok: false, step: 2, errors: waccError };
   const w = waccFor(i, resolveExtras(i).waccAdjustment);
   if (!Number.isFinite(w.wacc)) return { ok: false, step: 2, errors: 'Complete every cost of capital input.' };
   const termError = validateTerminal(i, w.wacc);

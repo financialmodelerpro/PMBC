@@ -42,7 +42,7 @@ import {
 } from '@/lib/tools/valuation/engine';
 
 export type WaccKey = keyof WaccInputs;
-export const WACC_KEYS: WaccKey[] = ['rf', 'erp', 'crp', 'bu', 'de', 'sp', 'ds', 'cs', 'tax', 'inflationLocal', 'inflationUs'];
+export const WACC_KEYS: WaccKey[] = ['rf', 'erp', 'crp', 'bu', 'de', 'sp', 'ds', 'cs', 'tax', 'inflationLocal', 'inflationUs', 'kd'];
 
 export type FillKey = 'growth' | 'ebitdaMargin' | 'daOfRevenue' | 'capexOfRevenue' | 'nwcOfRevenue';
 
@@ -121,7 +121,7 @@ export function initialState(): FormState {
       capexOfRevenue: String(fill.capexOfRevenue),
       nwcOfRevenue: String(fill.nwcOfRevenue),
     },
-    wacc: { rf: '', erp: '', crp: '', bu: '', de: '', sp: '', ds: '', cs: '', tax: '', inflationLocal: '', inflationUs: '' },
+    wacc: { rf: '', erp: '', crp: '', bu: '', de: '', sp: '', ds: '', cs: '', tax: '', inflationLocal: '', inflationUs: '', kd: '' },
     spTouched: false,
     growth: '2.5',
     exitMultiple: '',
@@ -389,6 +389,8 @@ export function resetWacc(s: FormState): FormState {
       rf: str(+(marketDataInUse().treasury.value - MARKET.usDefaultSpread).toFixed(2)),
       erp: str(marketDataInUse().erp.value),
       cs: str(ASSUMPTIONS.companyCreditSpread),
+      // The company's own borrowing rate is cleared too: the reset returns to the spread build.
+      kd: '',
     },
   };
   next = applyCountryDefaults(next);

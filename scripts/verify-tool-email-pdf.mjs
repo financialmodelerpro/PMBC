@@ -414,6 +414,30 @@ for (const [label, result] of [['Saudi', saudi], ['full', full], ['Pakistan', pa
 }
 check('file name is tidy', pdfModule.reportFileName('Acme & Sons / KSA', 'x', new Date('2026-09-16')) === 'PaceMakers valuation Acme  Sons  KSA 2026-09-16.pdf');
 
+console.log('Cost of capital working');
+{
+  // The densest page 5: five value factors and a stake table above the WACC working. It must stay on
+  // eight pages, with the working on page 5, whether the cost of debt is built or entered.
+  const base = fullFeatureCase(state);
+  for (const kd of ['', '30']) {
+    const s = { ...base, growth: '3', wacc: { ...base.wacc, kd } };
+    s.fin = { ...s.fin, ebitda: s.fin.ebitda.map((v, i) => (i >= 3 ? String(+v * 0.5) : v)) };
+    const r = fromState(s);
+    const t = await pageTexts(await pdfModule.renderValuationReport(r, { ...REPORT_META, branding: null, company: 'A very long company name that goes on for a while, Holdings', bookingHref: BOOK }));
+    const tag = kd ? 'entered borrowing rate' : 'built cost of debt';
+    check(`WACC working, ${tag}: the densest page 5 (five factors, stake) keeps eight pages`, format.valueLevers(r).length === 5 && r.stake.used && t.length === 8, `${format.valueLevers(r).length} factors, ${t.length} pages`);
+    check(`WACC working, ${tag}: on page 5, ending in the ${r.currency.code} WACC`, t[4].includes('Cost of capital') && t[4].includes(`WACC (${r.currency.code})`) && t[4].includes(format.fmtPct(r.wacc.wacc, 2)));
+    if (kd) check('WACC working: an entered rate is converted to US dollar terms and named', t[4].includes('your rate 30.00%') && r.wacc.kdSource === 'entered');
+  }
+  // The steps reconcile: each result is the engine's figure, and the local WACC is the converted dollar WACC.
+  for (const [label, r] of [['Saudi', saudi], ['Pakistan', pakistan]]) {
+    const st = format.waccSteps(r.wacc, r.currency);
+    const val = (k) => st.find((x) => x.key === k)?.value;
+    check(`${label}: working shows the engine's cost of equity, after-tax cost of debt and WACC`, val('ke') === format.fmtPct(r.wacc.ke, 2) && val('kdt') === format.fmtPct(r.wacc.kdt, 2) && val(r.currency.pegged ? 'wacc_base' : 'wacc_local') === format.fmtPct(r.wacc.wacc, 2));
+    check(`${label}: US dollar lines are labelled only when the currency is not pegged`, st.some((x) => x.label.includes('(US dollars)')) === !r.currency.pegged);
+  }
+}
+
 console.log('Brevo payload');
 {
   const captured = [];

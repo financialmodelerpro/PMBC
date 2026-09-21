@@ -597,29 +597,165 @@ export function scenariosTable(r: ValuationResult): Table {
   };
 }
 
-/** The cost of capital build, as label and value pairs. */
+/** One line of the WACC working: what is computed, the formula in words, the formula with the figures, and the result. */
+export type WaccStepRow = {
+  key: string;
+  label: string;
+  formula: string;
+  working: string;
+  /** The working with each figure named, on one line, for the report, which has no room for the formula above it. */
+  named: string;
+  value: string;
+  strong?: boolean;
+};
+
+/**
+ * The WACC worked through, step by step, from the breakdown the engine used. Shared by step 3 of
+ * the form, the results page and the report, so all three show the same working.
+ *
+ * For a currency not pegged to the US dollar the build runs in US dollars, as the Damodaran inputs
+ * are dollar rates, and only the final line converts it. Every dollar line says so: a cost of
+ * equity of 19.4% beside a PKR WACC of 21.8% reads as an error unless the reader can see the
+ * conversion. Figures are rounded for display; each result is the engine's unrounded value.
+ */
+export function waccSteps(w: ValuationResult['wacc'], currency: Currency): WaccStepRow[] {
+  const p = (v: number) => fmtPct(v, 2);
+  const p1 = (v: number) => fmtPct(v, 1);
+  const beta = (v: number) => (Number.isFinite(v) ? v.toFixed(2) : 'n/a');
+  const usd = !currency.pegged;
+  const tag = usd ? ' (US dollars)' : '';
+  const hasInflation = Number.isFinite(w.inflationLocal) && Number.isFinite(w.inflationUs);
+  const steps: WaccStepRow[] = [
+    {
+      key: 'bl',
+      label: 'Levered beta',
+      formula: 'Unlevered beta x (1 + (1 - tax rate) x debt to equity)',
+      working: `${beta(w.bu)} x (1 + (1 - ${p1(w.t)}) x ${p1(w.de)})`,
+      named: `unlevered beta ${beta(w.bu)} x (1 + (1 - tax ${p1(w.t)}) x D/E ${p1(w.de)})`,
+      value: beta(w.bl),
+    },
+    {
+      key: 'ke',
+      label: `Cost of equity${tag}`,
+      formula: 'Risk-free rate + levered beta x equity risk premium + country risk premium + size premium',
+      working: `${p(w.rf)} + ${beta(w.bl)} x ${p(w.erp)} + ${p(w.crp)} + ${p(w.sp)}`,
+      named: `risk-free ${p(w.rf)} + beta ${beta(w.bl)} x ERP ${p(w.erp)} + country ${p(w.crp)} + size ${p(w.sp)}`,
+      value: p(w.ke),
+      strong: true,
+    },
+  ];
+  const entered = w.kdSource === 'entered' && typeof w.kdEntered === 'number';
+  if (!entered) {
+    steps.push({
+      key: 'kd',
+      label: `Pre-tax cost of debt${tag}`,
+      formula: 'Risk-free rate + country default spread + company credit spread',
+      working: `${p(w.rf)} + ${p(w.ds)} + ${p(w.cs)}`,
+      named: `risk-free ${p(w.rf)} + default spread ${p(w.ds)} + credit spread ${p(w.cs)}`,
+      value: p(w.kd),
+    });
+  } else if (!usd) {
+    steps.push({ key: 'kd', label: 'Pre-tax cost of debt', formula: 'Your own borrowing rate', working: 'As entered', named: 'your own borrowing rate, as entered', value: p(w.kd) });
+  } else {
+    steps.push({
+      key: 'kd',
+      label: 'Pre-tax cost of debt (US dollars)',
+      formula: `(1 + your ${currency.code} borrowing rate) x (1 + US inflation) / (1 + local inflation) - 1`,
+      working: hasInflation
+        ? `(1 + ${p(w.kdEntered as number)}) x (1 + ${p1(w.inflationUs as number)}) / (1 + ${p1(w.inflationLocal as number)}) - 1`
+        : `${p(w.kdEntered as number)} ${currency.code}, converted`,
+      named: hasInflation
+        ? `(1 + your rate ${p(w.kdEntered as number)}) x (1 + US inflation ${p1(w.inflationUs as number)}) / (1 + ${currency.code} inflation ${p1(w.inflationLocal as number)}) - 1`
+        : `your rate ${p(w.kdEntered as number)} ${currency.code}, converted`,
+      value: p(w.kd),
+    });
+  }
+  steps.push(
+    {
+      key: 'kdt',
+      label: `After-tax cost of debt${tag}`,
+      formula: 'Pre-tax cost of debt x (1 - tax rate)',
+      working: `${p(w.kd)} x (1 - ${p1(w.t)})`,
+      named: `pre-tax ${p(w.kd)} x (1 - tax ${p1(w.t)})`,
+      value: p(w.kdt),
+      strong: true,
+    },
+    {
+      key: 'wd',
+      label: 'Debt weight',
+      formula: 'Debt to equity / (1 + debt to equity)',
+      working: `${p1(w.de)} / (1 + ${p1(w.de)})`,
+      named: `D/E ${p1(w.de)} / (1 + D/E ${p1(w.de)})`,
+      value: p1(w.wd),
+    },
+    { key: 'we', label: 'Equity weight', formula: '1 - debt weight', working: `1 - ${p1(w.wd)}`, named: `1 - debt weight ${p1(w.wd)}`, value: p1(w.we) },
+    {
+      key: 'wacc_base',
+      label: usd ? 'WACC (US dollars)' : `WACC (${currency.code})`,
+      formula: 'Equity weight x cost of equity + debt weight x after-tax cost of debt',
+      working: `${p1(w.we)} x ${p(w.ke)} + ${p1(w.wd)} x ${p(w.kdt)}`,
+      named: `equity ${p1(w.we)} x cost of equity ${p(w.ke)} + debt ${p1(w.wd)} x after-tax cost of debt ${p(w.kdt)}`,
+      value: p(w.waccUsd),
+      strong: !usd && !w.adjustment,
+    },
+  );
+  const converted = w.wacc - (w.adjustment || 0);
+  if (usd) {
+    steps.push({
+      key: 'wacc_local',
+      label: `WACC (${currency.code})`,
+      formula: '(1 + WACC in US dollars) x (1 + local inflation) / (1 + US inflation) - 1',
+      working: hasInflation
+        ? `(1 + ${p(w.waccUsd)}) x (1 + ${p1(w.inflationLocal as number)}) / (1 + ${p1(w.inflationUs as number)}) - 1`
+        : `(1 + ${p(w.waccUsd)}) x the inflation gap - 1`,
+      named: hasInflation
+        ? `(1 + ${p(w.waccUsd)}) x (1 + ${currency.code} inflation ${p1(w.inflationLocal as number)}) / (1 + US inflation ${p1(w.inflationUs as number)}) - 1`
+        : `(1 + US dollar WACC ${p(w.waccUsd)}) x the inflation gap - 1`,
+      value: p(converted),
+      strong: !w.adjustment,
+    });
+  }
+  if (w.adjustment) {
+    steps.push({
+      key: 'wacc_adjusted',
+      label: `WACC used (${currency.code})`,
+      formula: 'WACC + the adjustment chosen on the results page',
+      working: `${p(converted)} ${w.adjustment > 0 ? '+' : '-'} ${fmtPoints(Math.abs(w.adjustment) * 100).replace(/^[+-]/, '')}`,
+      named: `WACC ${p(converted)} ${w.adjustment > 0 ? '+' : '-'} adjustment ${fmtPoints(Math.abs(w.adjustment) * 100).replace(/^[+-]/, '')}`,
+      value: p(w.wacc),
+      strong: true,
+    });
+  }
+  return steps;
+}
+
+/**
+ * The cost of capital inputs, as label and value pairs. The calculation from them is `waccSteps`,
+ * shown beside or below these rows, so an input is listed once and every derived figure is shown
+ * with its working (since 2026-09-21; before it this list mixed the two with no working).
+ */
 export function waccBuildRows(r: ValuationResult): [string, string][] {
   const w = r.wacc;
   const zakat = canonical(r) && r.tax.zakatApplies && r.tax.gccOwnership > 0;
+  const entered = w.kdSource === 'entered' && typeof w.kdEntered === 'number';
   const rows: [string, string][] = [
     ['Risk-free rate', fmtPct(w.rf)],
     ['Mature market equity risk premium', fmtPct(w.erp)],
     ['Country risk premium', fmtPct(w.crp)],
     ['Unlevered beta', Number.isFinite(w.bu) ? w.bu.toFixed(2) : 'n/a'],
     ['Target debt to equity', fmtPct(w.de, 1)],
-    ['Levered beta', Number.isFinite(w.bl) ? w.bl.toFixed(2) : 'n/a'],
     ['Size and company premium', fmtPct(w.sp, 1)],
-    ['Cost of equity', fmtPct(w.ke)],
-    ['Country default spread', fmtPct(w.ds)],
-    ['Company credit spread', fmtPct(w.cs, 1)],
-    ['Pre-tax cost of debt', fmtPct(w.kd)],
+    ...(entered
+      ? ([[`Your borrowing rate (${r.currency.code})`, fmtPct(w.kdEntered as number)]] as [string, string][])
+      : ([
+          ['Country default spread', fmtPct(w.ds)],
+          ['Company credit spread', fmtPct(w.cs, 1)],
+        ] as [string, string][])),
     [zakat ? 'Income tax rate, non-GCC share' : 'Tax rate', fmtPct(w.t, 1)],
-    ['After-tax cost of debt', fmtPct(w.kdt)],
-    ['Equity weight', fmtPct(w.we, 1)],
-    ['Debt weight', fmtPct(w.wd, 1)],
   ];
-  if (!r.currency.pegged) rows.push(['WACC in US dollars', fmtWacc(w.waccUsd)]);
-  if (w.adjustment) rows.push(['Adjustment (exploration)', fmtPoints(w.adjustment * 100)]);
+  if (!r.currency.pegged && Number.isFinite(w.inflationLocal) && Number.isFinite(w.inflationUs)) {
+    rows.push(['Expected local inflation', fmtPct(w.inflationLocal as number, 1)], ['Expected US inflation', fmtPct(w.inflationUs as number, 1)]);
+  }
   return rows;
 }
 

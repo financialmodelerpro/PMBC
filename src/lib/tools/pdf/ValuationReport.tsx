@@ -61,6 +61,7 @@ import {
   disclosures,
   executiveSummary,
   fcfTable,
+  fmtPct,
   fmtWacc,
   headline,
   methodsUsed,
@@ -77,6 +78,7 @@ import {
   timingRows,
   valueLevers,
   waccBuildRows,
+  waccSteps,
   type Table,
 } from '../valuation/format';
 import { assertReconciled } from '../valuation/reconcile';
@@ -166,6 +168,15 @@ export function ValuationReport({ result, meta }: { result: ValuationResult; met
   const checks = checkItems(r);
   const warningCount = checks.filter((x) => x.status === 'warning').length;
   const perpetuityOnly = r.dcfBlock?.combination === 'perpetuity_only';
+  // The WACC working for page 5, with the two weights on one line: the page holds five value factors
+  // and a stake table above it, and one line fewer is what keeps that case on eight pages.
+  const pdfWaccSteps = waccSteps(r.wacc, c).flatMap((x) =>
+    x.key === 'we'
+      ? []
+      : x.key === 'wd'
+        ? [{ ...x, label: 'Debt and equity weights', named: `debt D/E ${fmtPct(r.wacc.de, 1)} / (1 + D/E); equity 1 - debt`, value: `${fmtPct(r.wacc.wd, 1)} / ${fmtPct(r.wacc.we, 1)}` }]
+        : [x],
+  );
   const notes = disclosures(r);
   const raise = raiseTable(r);
   const details: ReportDetails = { toolName: TOOL_NAME, subject: who, dateLabel: r.meta.valuationDate ? h.valuationDate : dateText };
@@ -339,6 +350,25 @@ export function ValuationReport({ result, meta }: { result: ValuationResult; met
             </View>
           </View>
         ))}
+        {/* The WACC worked through, from the same steps as the form and the results page. One line
+            each, with every figure named, so it fits below the factors (at most five) on this page. */}
+        <SectionHeading
+          title="Cost of capital"
+          sub={
+            c.pegged
+              ? 'How the WACC used to discount the forecast is calculated.'
+              : `The Damodaran inputs are US dollar rates, so the WACC is built in US dollars and the last line converts it to ${c.code}.`
+          }
+        />
+        <View wrap={false}>
+          {pdfWaccSteps.map((x) => (
+            <View key={x.key} style={{ flexDirection: 'row', paddingVertical: 1.8, borderBottomWidth: 0.5, borderBottomColor: RC.border }}>
+              <Text style={{ width: '30%', fontSize: 8.5, fontWeight: x.strong ? 600 : 400, color: x.strong ? RC.navy : RC.text, paddingRight: 4 }}>{x.label}</Text>
+              <Text style={{ width: '55%', fontSize: 8, color: RC.muted, paddingRight: 4 }}>{x.named}</Text>
+              <Text style={{ width: '15%', fontSize: 8.5, textAlign: 'right', fontWeight: x.strong ? 600 : 400, color: x.strong ? RC.navy : RC.text }}>{x.value}</Text>
+            </View>
+          ))}
+        </View>
       </ReportPage>
 
       {/* 6 and 7. Checks and key assumptions, then methodology, sources and
@@ -358,18 +388,12 @@ export function ValuationReport({ result, meta }: { result: ValuationResult; met
             ))}
           </View>
         </View>
-        <View style={{ flexDirection: 'row' }} wrap={false}>
+        <View style={{ flexDirection: 'row', marginTop: 4 }} wrap={false}>
           <View style={{ width: '50%', paddingRight: 10 }}>
-            <SubHead>Cost of capital</SubHead>
-            <KeyValues rows={waccBuildRows(r)} />
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', backgroundColor: RC.navy, paddingVertical: 4, paddingHorizontal: 6, marginTop: 4 }}>
-              <Text style={{ color: RC.white, fontSize: 8.5 }}>WACC, {c.code}</Text>
-              <Text style={{ color: RC.white, fontWeight: 600, fontSize: 8.5 }}>{fmtWacc(r.wacc.wacc)}</Text>
-            </View>
-          </View>
-          <View style={{ width: '50%', paddingLeft: 10 }}>
             <SubHead>Terminal value</SubHead>
             <KeyValues rows={terminalRows(r)} labelWidth="72%" />
+          </View>
+          <View style={{ width: '50%', paddingLeft: 10 }}>
             <SubHead>Comparables</SubHead>
             {/* Page 6 is the tightest page: EV / EBIT is on page 3's value by method instead. */}
             <KeyValues rows={comparablesRows(r).filter(([k]) => !k.startsWith('Companies') && k !== 'After discount, EV / EBIT (reference)')} labelWidth="52%" />

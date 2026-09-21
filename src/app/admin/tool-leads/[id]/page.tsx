@@ -348,6 +348,7 @@ export default async function ToolLeadDetailPage(props: { params: Promise<{ id: 
                   ['Size premium', `${n(w.sp)}%`],
                   ['Default spread', `${n(w.ds)}%`],
                   ['Credit spread', `${n(w.cs)}%`],
+                  ['Own borrowing rate', w.kd !== null && w.kd !== undefined ? `${n(w.kd)}% ${result.currency.code}, replaces the spreads` : 'Not entered, built from the spreads'],
                   ['Corporate income tax rate', `${n(w.tax)}%`],
                   ...(inputs.country === 'Saudi Arabia'
                     ? ([

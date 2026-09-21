@@ -25,6 +25,7 @@ import {
   validateCompany,
   validateFinancials,
   validateTerminal,
+  validateWacc,
   waccFor,
   type FieldErrors,
   type ValuationInputs,
@@ -77,6 +78,7 @@ export function BusinessValuationTool({ preview, partner }: ToolComponentProps) 
 
   const [companyErrors, setCompanyErrors] = useState<FieldErrors>({});
   const [finError, setFinError] = useState('');
+  const [waccError, setWaccError] = useState('');
   const [termError, setTermError] = useState('');
 
   const [gate, setGate] = useState<GateValues>(EMPTY_GATE);
@@ -131,7 +133,11 @@ export function BusinessValuationTool({ preview, partner }: ToolComponentProps) 
       setFinError(e ?? '');
       return !e;
     }
-    if (step === 2) return Number.isFinite(wacc.wacc);
+    if (step === 2) {
+      const e = validateWacc(toInputs(s).wacc, currency) ?? '';
+      setWaccError(e);
+      return !e && Number.isFinite(wacc.wacc);
+    }
     return true;
   }
 
@@ -293,9 +299,13 @@ export function BusinessValuationTool({ preview, partner }: ToolComponentProps) 
                 state={s}
                 currency={currency}
                 wacc={wacc}
+                error={waccError}
                 adjustment={num(s.waccAdjustment) ?? 0}
                 onClearAdjustment={() => patch({ waccAdjustment: '0' })}
-                onWacc={(k, v) => update((prev) => ({ ...prev, wacc: { ...prev.wacc, [k]: v }, spTouched: prev.spTouched || k === 'sp' }))}
+                onWacc={(k, v) => {
+                  if (waccError) setWaccError('');
+                  update((prev) => ({ ...prev, wacc: { ...prev.wacc, [k]: v }, spTouched: prev.spTouched || k === 'sp' }));
+                }}
                 onReset={() => update(resetWacc)}
                 onBack={() => next(1)}
                 onNext={() => next(3)}
