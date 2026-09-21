@@ -6,11 +6,12 @@ Chronological build history for the PMBC website. Split out of `CLAUDE.md` to ke
 
 ## Handoff, 2026-09-21 (read this first)
 
-**State at close.** `main` is `1bff88a`. Production was still serving `028d3c5` at close: the
-Vercel build of `1bff88a` failed on the Google font step (Source Serif 4, Turbopack, "next/font/google
-queries have exactly one entry") after restoring the build cache. The same commit builds locally.
-Redeploy it in Vercel with **Use existing Build Cache** unticked, then check `/api/health` shows the
-new sha. Until then the phone field style fix (below) is not live; the shared phone field itself is.
+**State at close.** Production matches `main` (the documentation merge of 2026-09-21; `/api/health`
+confirmed). One Vercel build failed earlier that evening, on `1bff88a`, at the Google font step
+(Source Serif 4, Turbopack, "next/font/google queries have exactly one entry") after restoring the
+build cache; the same commit built locally and the next push deployed cleanly. If it recurs, redeploy
+with **Use existing Build Cache** unticked. Working tree clean; the only unmerged branch is
+`fmp-cms-archive`, an old archive.
 
 **Pending.**
 1. **`CRON_SECRET` on Vercel (Production).** Until it is set, `/api/cron/tool-reminders` answers 503
