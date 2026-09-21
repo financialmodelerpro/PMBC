@@ -332,7 +332,7 @@ async function walk(width) {
   check(`${label}: gate phone entered`, (await page.evaluate(setField('Phone number', '0300 1234567'))) === true);
   // Alignment: the phone column matches the email field above it, and nothing reaches past it.
   const geo = await page.evaluate(`(() => {
-    const r = (el) => { const b = el.getBoundingClientRect(); return { l: Math.round(b.left), r: Math.round(b.right), w: Math.round(b.width) }; };
+    const r = (el) => { const b = el.getBoundingClientRect(), cs = getComputedStyle(el); return { l: Math.round(b.left), r: Math.round(b.right), w: Math.round(b.width), h: Math.round(b.height), radius: cs.borderTopLeftRadius, font: cs.fontSize }; };
     const lbl = (t) => [...document.querySelectorAll('label')].find((x) => x.offsetParent !== null && x.textContent.trim().startsWith(t));
     const email = document.getElementById(lbl('Work email').htmlFor);
     const country = document.getElementById(lbl('Your country').htmlFor);
@@ -347,6 +347,8 @@ async function walk(width) {
   check(`${label}: phone number box lines up with the email field`, Math.abs(geo.num.l - geo.email.l) <= 1 && Math.abs(geo.num.w - geo.email.w) <= 1, d);
   check(`${label}: phone picker lines up with the number box`, Math.abs(geo.combo.l - geo.num.l) <= 1 && Math.abs(geo.combo.w - geo.num.w) <= 1, d);
   check(`${label}: phone field has two boxes, the picker and the number`, geo.boxes === 2, d);
+  check(`${label}: phone boxes have the other fields' corner radius and text size`, [geo.num, geo.combo].every((x) => x.radius === geo.email.radius && x.font === geo.email.font), d);
+  check(`${label}: phone boxes are the other fields' height`, [geo.num, geo.combo].every((x) => Math.abs(x.h - geo.email.h) <= 1), d);
   check(`${label}: country field the same width as the phone field`, Math.abs(geo.country.w - geo.num.w) <= 1, d);
   check(`${label}: phone field stays clear of the summary panel and the screen edge`, geo.num.r <= geo.vw && geo.combo.r <= geo.vw && (!geo.aside || geo.aside.l >= geo.num.r || geo.aside.r <= geo.num.l), d);
   check(`${label}: raise amount field appears for raising equity`, (await page.evaluate(setField('Amount you plan to raise', '120'))) === true);

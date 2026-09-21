@@ -53,12 +53,15 @@ export function CountryCombobox({
   onChange,
   id,
   ariaLabel,
+  inputClassName,
 }: {
   /** ISO code of the selected country. */
   value: string;
   onChange: (code: string) => void;
   id?: string;
   ariaLabel: string;
+  /** The input's look, when a form's fields differ from the contact form's. The list is unchanged. */
+  inputClassName?: string;
 }) {
   const reactId = useId();
   const baseId = id ?? `country-${reactId}`;
@@ -211,7 +214,7 @@ export function CountryCombobox({
           onMouseDown={() => {
             if (!open) openList(Math.max(0, flat.findIndex((c) => c.code === value)));
           }}
-          className={`${inputCls} pr-9`}
+          className={`${inputClassName ?? inputCls} pr-9`}
         />
         <ChevronDown
           size={15}
