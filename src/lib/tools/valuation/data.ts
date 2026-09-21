@@ -212,8 +212,10 @@ export const WARNING_RULES = {
   minPeers: 3,
   /** Target debt to equity and actual net debt to equity differ by more than this, percentage points. */
   capitalStructurePoints: 20,
-  /** First forecast year EBITDA margin above the last actual year by more than this, percentage points. */
+  /** First forecast year EBITDA margin above or below the last actual (normalised) margin by more than this, percentage points. */
   marginStepPoints: 1.5,
+  /** EBITDA add-backs above this share of reported EBITDA are a warning: they carry much of the value and must survive diligence. */
+  addBackShare: 0.2,
   /** Growth implied by reinvestment and ROIC differs from long-term growth by more than this, percentage points. */
   reinvestmentGapPoints: 2,
   /** Terminal growth more than this below expected local inflation, percentage points. */

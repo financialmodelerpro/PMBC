@@ -352,7 +352,7 @@ for (const [label, result] of [['Saudi', saudi], ['full', full], ['Pakistan', pa
     'Powered by PaceMakers Business Valuation',
     'Net debt at 31 December 2025, borrowings less cash, less free cash flow earned from then to 16 September 2026, plus after-tax interest on it for that period, gives net debt at the valuation date.',
     'Borrowings, year end',
-    'Net debt at year end (borrowings less cash)',
+    'Net debt at year end',
     'Less after-tax interest on net debt for that period',
     'uses forecast free cash flow, not actual results',
     'Add free cash flow from 31 December 2025 to the valuation date',
@@ -428,6 +428,8 @@ console.log('Cost of capital working');
     check(`WACC working, ${tag}: the densest page 5 (five factors, stake) keeps eight pages`, format.valueLevers(r).length === 5 && r.stake.used && t.length === 8, `${format.valueLevers(r).length} factors, ${t.length} pages`);
     check(`WACC working, ${tag}: on page 5, ending in the ${r.currency.code} WACC`, t[4].includes('Cost of capital') && t[4].includes(`WACC (${r.currency.code})`) && t[4].includes(format.fmtPct(r.wacc.wacc, 2)));
     if (kd) check('WACC working: an entered rate is converted to US dollar terms and named', t[4].includes('your rate 30.00%') && r.wacc.kdSource === 'entered');
+    // The tax and balance sheet block is kept whole on page 6 (since 2026-09-21): both EBITDA rows with it.
+    check(`densest report, ${tag}: the normalised EBITDA rows stay on page 6 with their table`, r.normalisation.used && t[5].includes('EBITDA, reported') && t[5].includes('EBITDA, normalised') && t[5].includes('Balance sheet') && !t[6].includes('EBITDA, normalised'));
   }
   // The steps reconcile: each result is the engine's figure, and the local WACC is the converted dollar WACC.
   for (const [label, r] of [['Saudi', saudi], ['Pakistan', pakistan]]) {

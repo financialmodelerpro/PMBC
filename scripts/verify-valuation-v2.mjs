@@ -229,13 +229,20 @@ console.log('5. Stake');
   const plain = run({ ...BASE, stake: stake(40, 'none') });
   check('40%: value is 40% of equity', plain.stake.used && plain.stake.value.every((v, i) => close(v, B.equityDisplay[i] * 0.4)));
   const prem = run({ ...BASE, stake: stake(40, 'control_premium') });
-  check('40% with a 25% control premium', prem.stake.value.every((v, i) => close(v, B.equityDisplay[i] * 0.4 * 1.25)) && prem.stake.adjustmentRate === 0.25);
+  // Since 2026-09-21 a control premium lifts the comparables part of the blend only: the DCF already
+  // reflects control. Comparables equity is comparables EV less net debt at the date and other claims.
+  const compsEq = (r, k) => Math.max(0, r.compRange[k] - r.bridge.netDebtAtValuationDate - (r.bridge.otherClaims ?? 0));
+  const premiumValue = (r, pct, p, k) => pct * (r.equityDisplay[k] + (1 - r.dcfWeight / 100) * p * compsEq(r, k));
+  check('40% with a 25% control premium, on the comparables part only', prem.stake.value.every((v, i) => close(v, premiumValue(B, 0.4, 0.25, i))) && prem.stake.adjustmentRate === 0.25 && prem.stake.premiumBasis === 'comparables');
+  check('the premium adds less than a premium on the whole blend would', prem.stake.value[1] < B.equityDisplay[1] * 0.4 * 1.25 && prem.stake.value[1] > B.equityDisplay[1] * 0.4);
+  const allDcf = run({ ...BASE, dcfWeight: 100, stake: stake(40, 'control_premium') });
+  check('with a 100% DCF weight the premium adds nothing', close(allDcf.stake.value[1], allDcf.equityDisplay[1] * 0.4));
   const minor = run({ ...BASE, stake: stake(15, 'minority_discount') });
   check('15% with a 20% minority discount', minor.stake.value.every((v, i) => close(v, B.equityDisplay[i] * 0.15 * 0.8)) && minor.stake.adjustmentRate === -0.2);
   const whole = run({ ...BASE, stake: stake(100, 'control_premium', 10) });
-  check('100% with a premium is still shown', whole.stake.used && close(whole.stake.value[1], B.equityDisplay[1] * 1.1));
+  check('100% with a premium is still shown', whole.stake.used && close(whole.stake.value[1], premiumValue(B, 1, 0.1, 1)));
   check('stake does not change equity itself', prem.equity.every((v, i) => v === B.equity[i]));
-  check('headline stake label', format.headline(prem).stakeLabel === '40% stake with a 25% control premium', format.headline(prem).stakeLabel);
+  check('headline stake label says where the premium applies', format.headline(prem).stakeLabel === '40% stake with a 25% control premium on the comparables part', format.headline(prem).stakeLabel);
   check('minority label', format.stakeLabel(minor) === '15% stake with a 20% minority discount', format.stakeLabel(minor));
 
   const wacc = B.wacc.wacc;
@@ -339,7 +346,9 @@ console.log('7. Warnings');
     };
     check('year one margin: +1.6 points triggers', has(withMargin(1.6), 'margin_step'));
     check('year one margin: +1.4 points silent', !has(withMargin(1.4), 'margin_step'));
-    check('year one margin: a step down is not a step up, silent', !has(withMargin(-11), 'margin_step'));
+    check('year one margin: a sharp fall warns, worded as a fall', has(withMargin(-1.6), 'margin_step') && checkOf(withMargin(-1.6), 'margin_step').message.startsWith('Forecast margin falls in year one'));
+    check('year one margin: a small fall is silent', !has(withMargin(-1.4), 'margin_step'));
+    check('year one margin: a rise is worded as a rise', checkOf(withMargin(1.6), 'margin_step').message.startsWith('Forecast margin rises in year one'));
     const norm = run({ ...BASE, normalisation: { oneOff: -B.ltmRevenue * 0.03, ownerCosts: null, carryOwnerCosts: false } });
     check('year one margin: measured from normalised EBITDA', has(norm, 'margin_step') && !has(B, 'margin_step'));
   }
@@ -455,7 +464,11 @@ console.log('10. Lever, stake rule and inflation band');
   check('exactly 50% with a control premium warns', codes(run(stake(50, 'control_premium'))).includes('stake_premium'));
   check('51% with a control premium is silent', !codes(run(stake(51, 'control_premium'))).includes('stake_premium'));
   check('40% with a minority discount is not tested, so not listed', !checkOf(run(stake(40, 'minority_discount')), 'stake_premium'));
-  check('the premium is still applied as chosen', close(run(stake(40, 'control_premium')).stake.value[1], B.equityDisplay[1] * 0.4 * 1.25));
+  {
+    const r40 = run(stake(40, 'control_premium'));
+    const cq = Math.max(0, r40.compRange[1] - r40.bridge.netDebtAtValuationDate - (r40.bridge.otherClaims ?? 0));
+    check('the premium is still applied as chosen, to the comparables part', close(r40.stake.value[1], 0.4 * (r40.equityDisplay[1] + (1 - r40.dcfWeight / 100) * 0.25 * cq)));
+  }
 
   // The form: the adjustment follows the stake until chosen.
   let st = minimalCase(state);
@@ -718,7 +731,7 @@ console.log('11. Version 3');
     check('regression case: divergence, peer count, capital structure and normalisation warn', ['method_divergence', 'peer_count', 'capital_structure', 'no_normalisation'].every((id) => codes(reg).includes(id)));
     check('regression case: terminal value share passes at 73% with the reinvestment floor (77% before)', !codes(reg).includes('tv_share') && Math.abs(reg.tvShare - 0.7327) < 0.001, reg.tvShare);
     const gap = Math.abs(reg.dcfRange[1] / reg.compRange[1] - 1);
-    check('divergence measured as DCF base over comparables base', close(checkOf(reg, 'method_divergence').values.gap, gap) && checkOf(reg, 'method_divergence').message.includes(format.fmtPct(gap, 0)));
+    check('divergence measured as DCF base over comparables base', close(checkOf(reg, 'method_divergence').values.gap, gap) && checkOf(reg, 'method_divergence').message.includes(format.fmtDifferPct(gap)));
     const agree = run({ ...REG, peers: [], privateDiscount: 0, exitMultiple: 10 });
     check('divergence silent when within 20%', (Math.abs(agree.dcfRange[1] / agree.compRange[1] - 1) <= 0.2) === !codes(agree).includes('method_divergence'));
     const actualDe = reg.netDebt / reg.equity[1];
@@ -1009,6 +1022,29 @@ console.log('17. Pakistan: the entered cost of debt is converted once');
   check('KIBOR default: dollar cost of debt is (1 + rate) / inflation gap - 1', close(kibor.kd, (1 + data.defaultCostOfDebt('Pakistan') / 100) / conv - 1));
   check('KIBOR default: PKR WACC is the dollar WACC converted once', close(kibor.wacc, (1 + kibor.waccUsd) * conv - 1));
   check('the cost of equity is a dollar rate and is not converted on its own', close(kibor.ke, kibor.rf + kibor.bl * kibor.erp + kibor.crp + kibor.sp));
+}
+
+console.log('18. Normalisation against the forecast, add-backs, gap wording');
+{
+  const ebitdaR = B.ltmEbitdaReported;
+  const nrm = (oneOff, ownerCosts, carry) => run({ ...BASE, normalisation: { oneOff, ownerCosts, carryOwnerCosts: carry } });
+  const notCarried = nrm(null, ebitdaR * 0.1, false);
+  const carried = nrm(null, ebitdaR * 0.1, true);
+  const oneOffOnly = nrm(ebitdaR * 0.1, null, false);
+  check('owner costs not carried: warning that the forecast lacks them', checkOf(notCarried, 'normalisation_forecast')?.status === 'warning' && checkOf(notCarried, 'normalisation_forecast').message.includes('not in the forecast'));
+  check('owner costs carried: pass, and every forecast year includes them', checkOf(carried, 'normalisation_forecast')?.status === 'pass' && carried.rows.every((row, k) => close(row.ebitda, notCarried.rows[k].ebitda + ebitdaR * 0.1)));
+  check('one-off costs only: pass, they do not recur', checkOf(oneOffOnly, 'normalisation_forecast')?.status === 'pass' && checkOf(oneOffOnly, 'normalisation_forecast').message.includes('do not recur'));
+  check('no normalisation: the forecast check is not listed', !checkOf(B, 'normalisation_forecast') && !checkOf(B, 'addbacks_large'));
+  const R = data.WARNING_RULES;
+  check('add-backs threshold is 20% of reported EBITDA', R.addBackShare === 0.2);
+  check('add-backs of 21% warn', checkOf(nrm(ebitdaR * 0.21, null, false), 'addbacks_large')?.status === 'warning');
+  check('add-backs of 19% pass', checkOf(nrm(ebitdaR * 0.19, null, false), 'addbacks_large')?.status === 'pass');
+  check('one-off and owner costs count together', checkOf(nrm(ebitdaR * 0.12, ebitdaR * 0.12, true), 'addbacks_large')?.status === 'warning');
+  // Gap wording: never "within 0%".
+  check('within: 0.3% reads 1%, 12.2% reads 13%', format.fmtWithinPct(0.003) === '1%' && format.fmtWithinPct(0.122) === '13%' && format.fmtWithinPct(0.12) === '12%');
+  check('differ by: 0.3% reads 1%, 24.6% reads 25%', format.fmtDifferPct(0.003) === '1%' && format.fmtDifferPct(0.246) === '25%');
+  const texts = [B, notCarried, carried, oneOffOnly].flatMap((r) => [...r.checks.map((c) => c.message), ...format.executiveSummary(r)]);
+  check('no result says within 0% or differ by 0%', !texts.some((t) => /within 0%|by 0%/.test(t)));
 }
 
 console.log(`\n${checks - failures} of ${checks} checks passed.`);

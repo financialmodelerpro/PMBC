@@ -18,7 +18,7 @@
 
 import { COUNTRIES, MARKET, WARNING_RULES } from './data';
 import type { Check, ValuationResult } from './engine';
-import { amountUnit, fmtAmount, fmtMultiple, fmtPct } from './format';
+import { amountUnit, fmtAmount, fmtDifferPct, fmtMultiple, fmtPct, fmtWithinPct } from './format';
 
 const R = WARNING_RULES;
 
@@ -41,8 +41,8 @@ export function buildChecks(r: ValuationResult, extra: { inflationLocal: number 
       message: !Number.isFinite(gap)
         ? 'The comparables value is not positive, so the two methods cannot be compared; the blend depends on the weight chosen.'
         : warn
-          ? `DCF and comparables differ by ${fmtPct(gap, 0)}; the blend depends on the weight chosen.`
-          : `DCF and comparables base values are within ${fmtPct(gap, 0)} of each other.`,
+          ? `DCF and comparables differ by ${fmtDifferPct(gap)}; the blend depends on the weight chosen.`
+          : `DCF and comparables base values are within ${fmtWithinPct(gap)} of each other.`,
       values: { dcf: dcfBase, comps: compsBase, gap, threshold: R.methodDivergence },
     });
   }
@@ -144,18 +144,24 @@ export function buildChecks(r: ValuationResult, extra: { inflationLocal: number 
     });
   }
 
-  // 6. Year one margin step.
+  // 6. Year one margin step, either way, against the last actual margin (normalised when add-backs
+  // were entered). A sharp fall matters as much as a jump: it often means the forecast was built on
+  // reported EBITDA while the comparables use normalised EBITDA (since 2026-09-21 in both directions).
   {
     const from = r.ltmEbitda / r.ltmRevenue, to = r.rows[0].ebitda / r.rows[0].rev;
     const stepPoints = (to - from) * 100;
-    const warn = Number.isFinite(stepPoints) && stepPoints > R.marginStepPoints;
+    const up = Number.isFinite(stepPoints) && stepPoints > R.marginStepPoints;
+    const down = Number.isFinite(stepPoints) && stepPoints < -R.marginStepPoints;
+    const last = r.normalisation?.used ? 'last actual (normalised)' : 'last actual';
     add({
       id: 'margin_step',
       label: 'Year one margin',
-      status: warn ? 'warning' : 'pass',
-      message: warn
-        ? `Forecast margin steps up in year one, from ${fmtPct(from, 1)} to ${fmtPct(to, 1)}.`
-        : `The first forecast year margin of ${fmtPct(to, 1)} is no more than ${R.marginStepPoints} points above the last actual ${fmtPct(from, 1)}.`,
+      status: up || down ? 'warning' : 'pass',
+      message: up
+        ? `Forecast margin rises in year one, from the ${last} ${fmtPct(from, 1)} to ${fmtPct(to, 1)}.`
+        : down
+          ? `Forecast margin falls in year one, from the ${last} ${fmtPct(from, 1)} to ${fmtPct(to, 1)}.`
+          : `Year one margin of ${fmtPct(to, 1)} is within ${R.marginStepPoints} points of the ${last} ${fmtPct(from, 1)}.`,
       values: { from, to, stepPoints, threshold: R.marginStepPoints },
     });
   }
@@ -170,6 +176,40 @@ export function buildChecks(r: ValuationResult, extra: { inflationLocal: number 
       : 'Reported EBITDA used; review one-off and owner costs.',
     values: { reported: r.ltmEbitdaReported, normalised: r.ltmEbitda },
   });
+
+  // 7b and 7c. Since 2026-09-21. Comparables value normalised EBITDA; the DCF values the forecast.
+  // Owner cost add-backs marked to continue are added to every forecast year, so both methods value
+  // the same business. Owner costs not carried leave the forecast on reported earnings: a warning.
+  // One-off costs are never carried, since they do not recur.
+  if (r.normalisation?.used) {
+    const n = r.normalisation;
+    const notCarried = n.ownerCosts !== 0 && !n.carryOwnerCosts;
+    add({
+      id: 'normalisation_forecast',
+      label: 'Normalisation in the forecast',
+      status: notCarried ? 'warning' : 'pass',
+      message: notCarried
+        ? `Owner cost add-backs of ${amt(n.ownerCosts)} ${u.short} lift comparables but are not in the forecast, so the DCF values reported earnings.`
+        : n.ownerCosts !== 0
+          ? `Owner cost add-backs of ${amt(n.ownerCosts)} ${u.short} are in every forecast year, as in the comparables.`
+          : 'One-off costs are added back to the last actual year only; they do not recur in the forecast.',
+      values: { ownerCosts: n.ownerCosts, oneOff: n.oneOff, carried: n.carryOwnerCosts ? 1 : 0 },
+    });
+    const addBacks = n.oneOff + n.ownerCosts;
+    const share = r.ltmEbitdaReported > 0 ? addBacks / r.ltmEbitdaReported : NaN;
+    const large = !Number.isFinite(share) || share > R.addBackShare;
+    add({
+      id: 'addbacks_large',
+      label: 'Size of add-backs',
+      status: large ? 'warning' : 'pass',
+      message: !Number.isFinite(share)
+        ? 'Add-backs are applied to reported EBITDA that is not positive; each needs evidence.'
+        : large
+          ? `Add-backs are ${fmtPct(share, 0)} of reported EBITDA, above ${fmtPct(R.addBackShare, 0)}: each needs evidence that survives diligence.`
+          : `Add-backs are ${fmtPct(share, 0)} of reported EBITDA, within ${fmtPct(R.addBackShare, 0)}.`,
+      values: { addBacks, reported: r.ltmEbitdaReported, share, threshold: R.addBackShare },
+    });
+  }
 
   // 8. Negative EBITDA.
   add({
@@ -291,7 +331,7 @@ export function buildChecks(r: ValuationResult, extra: { inflationLocal: number 
       status: warn ? 'warning' : 'pass',
       message: warn
         ? `A ${+r.stake.percent.toFixed(2)}% stake does not carry control, so a minority discount usually applies rather than a control premium.`
-        : `A ${+r.stake.percent.toFixed(2)}% stake carries control, so a control premium can apply.`,
+        : `A ${+r.stake.percent.toFixed(2)}% stake carries control; the premium applies to the comparables part only, as the DCF already reflects control.`,
       values: { percent: r.stake.percent, threshold: R.controlStakeAbovePercent },
     });
   }

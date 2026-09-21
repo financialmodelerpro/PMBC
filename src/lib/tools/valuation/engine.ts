@@ -1077,6 +1077,8 @@ export type CheckId =
   | 'capital_structure'
   | 'margin_step'
   | 'no_normalisation'
+  | 'normalisation_forecast'
+  | 'addbacks_large'
   | 'negative_ebitda'
   | 'growth_ceiling'
   | 'growth_vs_inflation'
@@ -1169,6 +1171,14 @@ export type StakeResult = {
   value: Range3;
   /** False at 100% with no adjustment, when there is nothing extra to show. */
   used: boolean;
+  /**
+   * Where a control premium is applied: to the comparables part of the blend only (since
+   * 2026-09-21), because the DCF values the company's own cash flows and so already reflects
+   * control. Absent on results stored before, whose premium was applied to the whole blend.
+   */
+  premiumBasis?: 'comparables';
+  /** The comparables weight the premium was applied through, as a ratio. */
+  compsWeight?: number;
 };
 
 /** One forecast year of the DCF, everything the FCFF table prints. */
@@ -1486,13 +1496,20 @@ function compute(i: ValuationInputs, withScenarios: boolean, opts: EngineOptions
       : st.adjustment === 'minority_discount'
         ? -n(st.minorityDiscount) / 100
         : 0;
-  const stakeFactor = (stakePct / 100) * (1 + adjustmentRate);
+  // A control premium lifts only the comparables part of the blend: the DCF values the company's own
+  // cash flows, which already reflect control, while trading multiples are minority prices. A minority
+  // discount still applies to the whole value.
+  const compsWeight = 1 - wD / 100;
+  const compsEquity = compRange.map(toEquity) as Range3;
+  const premium = st.adjustment === 'control_premium' ? adjustmentRate : 0;
+  const discount = st.adjustment === 'minority_discount' ? adjustmentRate : 0;
   const stake: StakeResult = {
     percent: stakePct,
     adjustment: st.adjustment,
     adjustmentRate,
-    value: equityDisplay.map((v) => v * stakeFactor) as Range3,
+    value: equityDisplay.map((v, k) => (stakePct / 100) * (v + compsWeight * premium * Math.max(0, compsEquity[k])) * (1 + discount)) as Range3,
     used: stakePct !== 100 || adjustmentRate !== 0,
+    ...(premium ? { premiumBasis: 'comparables' as const, compsWeight } : {}),
   };
 
   /* Ratios --------------------------------------------------------------- */

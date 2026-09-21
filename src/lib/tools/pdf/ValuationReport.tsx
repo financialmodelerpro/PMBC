@@ -169,6 +169,35 @@ export function ValuationReport({ result, meta }: { result: ValuationResult; met
   const checks = checkItems(r);
   const warningCount = checks.filter((x) => x.status === 'warning').length;
   const perpetuityOnly = r.dcfBlock?.combination === 'perpetuity_only';
+  // Page 6's tax and balance sheet block, as two columns. "(borrowings less cash)" is dropped from the
+  // net debt label here: the two rows above it say so, and the long label wrapped onto a second line.
+  const taxTitle = r.tax.zakatApplies ? 'Tax and zakat' : 'Tax';
+  const taxR = taxRows(r);
+  const TIMING = new Set(['Valuation date', 'Last actual year end (assumed)', 'Stub period']);
+  const allTiming = timingRows(r).map(([k, v]) => [k.replace(/ \(borrowings less cash\)$/, ''), v] as [string, string]);
+  const timingR = allTiming.filter(([k]) => TIMING.has(k));
+  const balanceR: [string, string][] = [
+    ...allTiming.filter(([k]) => !TIMING.has(k)),
+    // Only when entered: it drives the returns checks, so the report states the figure they used.
+    ...(r.investedCapital ? ([['Invested capital', amt(r.investedCapital.total)]] as [string, string][]) : []),
+    // With no bridge items entered there is no row: the bridge on page 3 already shows every claim.
+    ...(bridgeItemsUsed
+      ? ([
+          ['End of service benefits', amt(b.eosb)],
+          ['Lease liabilities', amt(b.leases)],
+          ['Minority interest', amt(b.minorityInterest)],
+          ['Surplus assets', amt(b.surplusAssets)],
+        ] as [string, string][])
+      : []),
+    // Two rows, each with its unit: "1,720.0 to 1,845.0 PKR m" in one cell wrapped the unit.
+    ...(r.normalisation.used
+      ? ([
+          ['EBITDA, reported', amt(r.ltmEbitdaReported)],
+          ['EBITDA, normalised', amt(r.ltmEbitda)],
+        ] as [string, string][])
+      : ([['EBITDA', 'Reported, no adjustments']] as [string, string][])),
+  ];
+  const timingOnLeft = Math.max(taxR.length + timingR.length, balanceR.length) < Math.max(taxR.length, timingR.length + balanceR.length);
   // The WACC working for page 5, with the two weights on one line: the page holds five value factors
   // and a stake table above it, and one line fewer is what keeps that case on eight pages.
   const pdfWaccSteps = waccSteps(r.wacc, c).flatMap((x) =>
@@ -409,40 +438,20 @@ export function ValuationReport({ result, meta }: { result: ValuationResult; met
             {r.comparables.peerNames.join('; ')}.
           </Text>
         )}
-        {/* Row by row, so it can break across the page rather than moving whole. */}
+        {/* Kept whole (since 2026-09-21): a row such as "EBITDA, normalised" never lands on the next page
+            apart from its table. To fit page 6, the timing rows move to the shorter column when that makes the
+            block shorter, which it does whenever the balance sheet column is the long one. */}
         <View style={{ marginBottom: 10 }}>
           <PairedColumns
+            keepTogether
             // Wide label columns: a wrapped label costs a line on the tightest page.
             leftLabelWidth="55%"
             rightLabelWidth="64%"
-            left={{ title: r.tax.zakatApplies ? 'Tax and zakat' : 'Tax', rows: taxRows(r), note: notes.premiumAndDiscount }}
-            right={{
-              title: 'Balance sheet, EBITDA and timing',
-              rows: [
-                ...timingRows(r),
-                // Only when entered: it drives the returns checks, so the report states the figure they used.
-                ...(r.investedCapital ? ([['Invested capital', amt(r.investedCapital.total)]] as [string, string][]) : []),
-                ...(bridgeItemsUsed
-                  ? ([
-                      ['End of service benefits', amt(b.eosb)],
-                      ['Lease liabilities', amt(b.leases)],
-                      ['Minority interest', amt(b.minorityInterest)],
-                      ['Surplus assets', amt(b.surplusAssets)],
-                    ] as [string, string][])
-                  : // With none entered the row is left out: the bridge on page 3 already shows every claim,
-                    // and page 6 needs the line.
-                    ([] as [string, string][])),
-                // Two rows, each with its unit, rather than "1,720.0 to 1,845.0 PKR m" in one cell, which
-                // wrapped the unit onto a line of its own in the narrow value column.
-                ...(r.normalisation.used
-                  ? ([
-                      ['EBITDA, reported', amt(r.ltmEbitdaReported)],
-                      ['EBITDA, normalised', amt(r.ltmEbitda)],
-                    ] as [string, string][])
-                  : ([['EBITDA', 'Reported, no adjustments']] as [string, string][])),
-              ],
-            }}
+            // The note is printed below the block, so it can flow to the next page instead of moving the table.
+            left={{ title: timingOnLeft ? `${taxTitle} and timing` : taxTitle, rows: timingOnLeft ? [...taxR, ...timingR] : taxR }}
+            right={{ title: timingOnLeft ? 'Balance sheet and EBITDA' : 'Balance sheet, EBITDA and timing', rows: timingOnLeft ? balanceR : [...timingR, ...balanceR] }}
           />
+          {notes.premiumAndDiscount && <Note>{notes.premiumAndDiscount}</Note>}
         </View>
 
         <View wrap={false} style={{ marginBottom: 4 }}>

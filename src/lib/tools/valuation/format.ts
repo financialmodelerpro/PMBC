@@ -58,6 +58,21 @@ export function fmtBig(v: number, currency: Currency): string {
     : `${s}${currency.code} ${a.toFixed(a >= 100 ? 0 : 1)}m`;
 }
 
+/**
+ * A gap between two values, in whole percent, for "within X% of each other": rounded up, never
+ * below 1%, so a 0.3% gap reads "within 1%" and 12.2% "within 13%", never an understatement.
+ */
+export function fmtWithinPct(gap: number): string {
+  if (!Number.isFinite(gap)) return 'n/a';
+  return `${Math.max(1, Math.ceil(Math.abs(gap) * 100 - 1e-9))}%`;
+}
+
+/** A gap for "differ by X%": rounded, never below 1%, so a real difference never reads 0%. */
+export function fmtDifferPct(gap: number): string {
+  if (!Number.isFinite(gap)) return 'n/a';
+  return `${Math.max(1, Math.round(Math.abs(gap) * 100))}%`;
+}
+
 export function fmtMultiple(v: number): string {
   return Number.isFinite(v) ? v.toFixed(1) + 'x' : 'n/a';
 }
@@ -236,7 +251,10 @@ export function netDebtSentence(r: ValuationResult): string {
 export function stakeLabel(r: ValuationResult): string {
   const s = r.stake;
   const pct = `${+s.percent.toFixed(2)}% stake`;
-  if (s.adjustment === 'control_premium') return `${pct} with a ${fmtPct(s.adjustmentRate, 0)} control premium`;
+  if (s.adjustment === 'control_premium')
+    return s.premiumBasis === 'comparables'
+      ? `${pct} with a ${fmtPct(s.adjustmentRate, 0)} control premium on the comparables part`
+      : `${pct} with a ${fmtPct(s.adjustmentRate, 0)} control premium`;
   if (s.adjustment === 'minority_discount') return `${pct} with a ${fmtPct(-s.adjustmentRate, 0)} minority discount`;
   return pct;
 }
@@ -1041,8 +1059,8 @@ export function executiveSummary(r: ValuationResult): string[] {
   if (Number.isFinite(gap)) {
     out.push(
       gap <= WARNING_RULES.methodDivergence
-        ? `The two methods agree: the DCF base case of ${fmtBig(dcfBase, c)} and the comparables base case of ${fmtBig(compBase, c)} are within ${fmtPct(gap, 0)} of each other. ${weighting}`
-        : `The two methods diverge: ${higher} gives the higher value, and the DCF base case of ${fmtBig(dcfBase, c)} and the comparables base case of ${fmtBig(compBase, c)} differ by ${fmtPct(gap, 0)}. ${weighting}`,
+        ? `The two methods agree: the DCF base case of ${fmtBig(dcfBase, c)} and the comparables base case of ${fmtBig(compBase, c)} are within ${fmtWithinPct(gap)} of each other. ${weighting}`
+        : `The two methods diverge: ${higher} gives the higher value, and the DCF base case of ${fmtBig(dcfBase, c)} and the comparables base case of ${fmtBig(compBase, c)} differ by ${fmtDifferPct(gap)}. ${weighting}`,
     );
   }
 
