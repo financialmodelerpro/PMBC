@@ -4,6 +4,69 @@ Chronological build history for the PMBC website. Split out of `CLAUDE.md` to ke
 
 ---
 
+## Handoff, 2026-09-21 (read this first)
+
+**State at close.** `main` is `1bff88a`. Production was still serving `028d3c5` at close: the
+Vercel build of `1bff88a` failed on the Google font step (Source Serif 4, Turbopack, "next/font/google
+queries have exactly one entry") after restoring the build cache. The same commit builds locally.
+Redeploy it in Vercel with **Use existing Build Cache** unticked, then check `/api/health` shows the
+new sha. Until then the phone field style fix (below) is not live; the shared phone field itself is.
+
+**Pending.**
+1. **`CRON_SECRET` on Vercel (Production).** Until it is set, `/api/cron/tool-reminders` answers 503
+   and no reminder is sent.
+2. **Privacy policy update**, waiting for counsel (`PRIVACY_TOOLS_DRAFT.md`: retention, the booking
+   cookie, reminders).
+3. **Founder report highlights.** The founder profile's `founder_hero` section has a Report highlights
+   field (one per line, up to five) that ships empty; fill it in the page builder so the report's
+   partner block carries them.
+4. **SAIBOR.** `LENDING_RATES` uses the 27 August 2026 fixing; SAMA moved rates in mid-September.
+   Replace it with its date when a newer fixing is published.
+5. **Stop reminders on any booking with the same email.** Today a booking stops them only when made
+   through `/book` with the tool's booking cookie. Match Calendly bookings by email however they
+   were made (Calendly webhook or API), then record `booking_scheduled` against that email.
+6. **Reminder wording into the admin email template editor.** It is in code
+   (`buildReminderEmail`); give it `email_templates` rows as the results email has.
+7. **Arabic version**, to be decided later.
+
+---
+
+## 2026-09-16 to 2026-09-21: the Business Valuation tool, brief
+
+Every step is merged to `main` as its own branch; the detail is in `CLAUDE.md` section 7b and in
+each merge commit.
+
+- **09-16, go-live.** Free tools framework (registry, one Live or Hidden switch, leads, PDF, Brevo
+  webhook, engagement rules), version 2 of the tool, the Tools nav row. Business Valuation switched
+  Live by the owner. Writing scripts refuse production (`productionGuard`).
+- **09-17, version 3 and the report.** One canonical result object, valuation date and stub period,
+  terminal cash flow, tax and zakat, losses, raise; the eight page report on the letterhead theme;
+  founder portrait rule; short booking links and a clean `/book`; borrowings and cash entered
+  separately (input version 4); zakat rate, invested capital in parts, EV / EBIT; short amounts in
+  words; other tools on each tool page.
+- **09-21, review rounds.**
+  - https address everywhere, full figures in tables.
+  - Cost of capital worked through (cost of equity, cost of debt, WACC), with an optional borrowing rate.
+  - Cost of debt by country (lending base rate plus margin, source and date); SAIBOR rechecked and the
+    PKR conversion proved to happen once.
+  - Terminal reinvestment floor (RONIC), a check on the implied multiple against peers, the company
+    description on the cover and results.
+  - Normalisation carried into the forecast or warned; control premium on the comparables part and
+    minority discount on the DCF part only; year one margin warns both ways.
+  - Report layout: page 6 always fills, 8 pages in every case (`verify-report-layout`), check rows kept
+    on one page where they fit, EBITDA labels on the chart, cover tile label, report file name.
+  - Every run from the form is a new lead; only the results page updates a valuation.
+  - Leads grouped by email with projects; phone and country on the gate (migration 082, applied);
+    day 7 and day 14 reminders with signed unsubscribe (cron, needs `CRON_SECRET`); save and return
+    links; financial year end month; net income and P/E as a reference method.
+  - The gate's phone field became the contact form's own `PhoneField`, then took the valuation step's
+    field style; `verify-contact-and-legal` brought up to date (104 of 104).
+- **Verifier counts at close.** engine 518, v2 517, lead API 146, followup 39 (44 over HTTP), email
+  and PDF 414, dashboard harness 453, report layout 781 (default sample), booking links 48 (61 live),
+  Brevo webhook 168, visibility 97 (111 live), production guard 34, contact and legal 104.
+
+---
+
 ### 2026-08-13, Checkpoint: closing for the day
 
 Four commits, three phases, two migrations applied, and a documentation split.
