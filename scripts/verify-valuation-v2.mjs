@@ -777,7 +777,7 @@ console.log('11. Version 3');
   {
     const m = data.marketDataInUse();
     check('the September ERP is used, aligned with the Treasury month', m.aligned === true && m.erp.asOf === '2026-09-01' && m.erp.value === 4.14 && m.treasury.asOf === '2026-09-15');
-    check('the data version and its label moved with the ERP and the lending rates', data.VALUATION_DATA_VERSION === '2026-09-21' && data.dataVersionLabel('2026-09-21').includes('local lending rates 2026') && data.dataVersionLabel('2026-09-17').includes('September 2026') && data.dataVersionLabel('2026-09-16') === 'Damodaran January 2026, risk-free September 2026');
+    check('the data version and its label moved with the ERP and the lending rates', data.VALUATION_DATA_VERSION === '2026-09-22' && data.dataVersionLabel('2026-09-22').includes('local lending rates 2026') && data.dataVersionLabel('2026-09-21').includes('local lending rates 2026') && data.dataVersionLabel('2026-09-17').includes('September 2026') && data.dataVersionLabel('2026-09-16') === 'Damodaran January 2026, risk-free September 2026');
     const rf = data.SOURCE_NOTES.find((n) => n.label === 'Risk-free rate');
     check('the risk-free source prints the yield to two decimals and its exact date', rf.source.includes('5.00%') && rf.asOf === '15 September 2026' && !JSON.stringify(data.SOURCE_NOTES).includes('about 5.0%'));
     check('the market data line prints both exact dates', format.marketDataLine(reg).includes('15 September 2026') && format.marketDataLine(reg).includes('4.14% (1 September 2026)'));
@@ -982,13 +982,21 @@ console.log('15. Implied multiple against comparables');
 console.log('16. Cost of debt by country');
 {
   const M = data.ASSUMPTIONS.companyCreditSpread;
+  // Since 2026-09-22 a country without a benchmark rate on file has no entry: its cost of debt is
+  // built from the spreads, and the form leaves the field blank. The seven original countries all have one.
   for (const country of Object.keys(data.COUNTRIES)) {
     const l = data.LENDING_RATES[country];
-    check(`${country}: a sourced, dated lending rate`, Boolean(l && l.rate > 0 && l.rate < 30 && /^\d{4}-\d{2}-\d{2}$/.test(l.asOf) && l.source && l.name && l.short));
-    check(`${country}: default cost of debt is the lending rate plus the ${M}% margin`, close(data.defaultCostOfDebt(country), l.rate + M));
     const s = state.applyCountryDefaults({ ...state.initialState(), country });
+    if (!l) {
+      check(`${country}: no rate on file, so the cost of debt is left to the spread build`, data.defaultCostOfDebt(country) === null && s.wacc.kd === '', s.wacc.kd);
+      continue;
+    }
+    // The rate cap is the form's (below 50%); dates are a day, or a month where only a monthly figure is published.
+    check(`${country}: a sourced, dated lending rate`, Boolean(l.rate >= 0 && l.rate < 48 && /^\d{4}-\d{2}(-\d{2})?$/.test(l.asOf) && l.source && l.name && l.short));
+    check(`${country}: default cost of debt is the lending rate plus the ${M}% margin`, close(data.defaultCostOfDebt(country), +(l.rate + M).toFixed(2)));
     check(`${country}: choosing the country fills the cost of debt`, s.wacc.kd === String(data.defaultCostOfDebt(country)), s.wacc.kd);
   }
+  for (const country of data.PINNED_VALUATION_COUNTRIES) check(`${country}: has a lending rate`, Boolean(data.LENDING_RATES[country]));
   check('country default dates are no later than today', Object.values(data.LENDING_RATES).every((l) => l.asOf <= '2026-09-21'));
   // A typed rate belongs to its currency: a new country replaces it.
   const typed = { ...minimalCase(state), wacc: { ...minimalCase(state).wacc, kd: '9' } };
@@ -1001,7 +1009,14 @@ console.log('16. Cost of debt by country');
   check('Saudi default: the inputs list shows the base rate and the margin', format.waccBuildRows(sa).some(([k, v]) => k === '3-month SAIBOR' && v === '4.76%') && format.waccBuildRows(sa).some(([k]) => k === 'Typical margin, set by PaceMakers'));
   const src = format.sourceNotes(sa, 'Saudi Arabia');
   check('Saudi default: the sources name the rate, where it is from and its date', src.some((n) => n.label === 'Cost of debt' && n.source.includes('Argaam') && n.asOf === '27 August 2026'));
-  check('no cost of debt source line when it is built from the spreads', !format.sourceNotes(B, 'Saudi Arabia').some((n) => n.label === 'Cost of debt'));
+  // Since 2026-09-22 a built cost of debt says so, and why: cleared here, or no benchmark on file.
+  check('a cost of debt built from the spreads says the rate was not used', format.sourceNotes(B, 'Saudi Arabia').some((n) => n.label === 'Cost of debt' && n.source.startsWith('The benchmark lending rate was not used') && n.source.includes('default spread')));
+  {
+    const ng = run({ ...BASE, country: 'Nigeria', gccOwnership: null, wacc: { ...BASE.wacc, kd: null, crp: data.COUNTRIES.Nigeria.crp, ds: data.COUNTRIES.Nigeria.ds, tax: data.COUNTRIES.Nigeria.tax, inflationLocal: 12, inflationUs: 2.5 } });
+    check('a country with no benchmark rate says none is on file', ng.wacc.kdSource === 'built' && format.sourceNotes(ng, 'Nigeria').some((n) => n.label === 'Cost of debt' && n.source.startsWith('No benchmark lending rate for Nigeria is on file')));
+    const de = run({ ...BASE, country: 'Germany', gccOwnership: null, wacc: { ...BASE.wacc, kd: data.defaultCostOfDebt('Germany'), inflationLocal: 2, inflationUs: 2.5 } });
+    check('a shared currency (EUR) finds the country rate, not another user of the currency', format.defaultLending(de.wacc, de.currency)?.short === 'ECB rate' && format.sourceNotes(de, 'Germany').some((n) => n.label === 'Cost of debt' && n.source.includes('European Central Bank')));
+  }
   const changed = run({ ...BASE, wacc: { ...BASE.wacc, kd: 9 } });
   check('a changed rate is described as the visitor own rate', format.waccSteps(changed.wacc, changed.currency).find((x) => x.key === 'kd').formula === 'Your own borrowing rate');
   // Pakistan: KIBOR plus the margin, taken to dollars by the inflation gap.

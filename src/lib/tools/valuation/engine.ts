@@ -212,7 +212,11 @@ export type ValuationInputs = {
   cash?: number | null;
 };
 
-export type Currency = { code: string; pegged: boolean; sarPerUnit: number };
+/**
+ * `country` (since 2026-09-22) names whose currency this is, since EUR, USD and others are shared
+ * by several countries with different lending rates. Absent on results stored before then.
+ */
+export type Currency = { code: string; pegged: boolean; sarPerUnit: number; country?: string };
 
 /**
  * How the engine values, as opposed to what it values. The site always uses
@@ -243,7 +247,7 @@ export function countryFor(country: string): CountryRecord | null {
 export function currencyFor(country: string): Currency {
   const c = countryFor(country);
   return c
-    ? { code: c.code, pegged: c.pegged, sarPerUnit: c.sarPerUnit }
+    ? { code: c.code, pegged: c.pegged, sarPerUnit: c.sarPerUnit, country }
     : { code: 'SAR', pegged: true, sarPerUnit: 1 };
 }
 

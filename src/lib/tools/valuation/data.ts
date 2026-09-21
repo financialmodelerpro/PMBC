@@ -12,14 +12,17 @@
  *
  * HOW TO REFRESH (each January, after Damodaran publishes)
  *   1. Country risk premiums, default spreads and tax rates: "Country Default
- *      Spreads and Risk Premiums" and "Corporate Marginal Tax Rates by country".
+ *      Spreads and Risk Premiums" and "Corporate Marginal Tax Rates by country",
+ *      for every country in `COUNTRIES` (all Damodaran covers since 2026-09-22;
+ *      regenerate the block after the first seven rather than editing 166 lines).
  *   2. Unlevered beta (corrected for cash) and market D/E: the global
  *      "Betas by Sector" and "Debt Fundamentals by Sector" datasets.
  *   3. Mature market implied ERP (add the month to `IMPLIED_ERP_BY_MONTH`,
  *      ideally the same month as the Treasury yield) and the US default spread.
  *   4. The US 10-year Treasury yield, on the date of the refresh, and its date
  *      in `usTreasury10yAsOf`.
- *   5. FX to SAR and the inflation expectations for non-pegged currencies.
+ *   5. FX to SAR (and `FX_AS_OF`), the inflation expectations for non-pegged
+ *      currencies, and the benchmark rates in `LENDING_RATES`.
  *   6. Update every `asOf` below, bump `VALUATION_DATA_VERSION`, run
  *      `npm run verify-valuation-engine`. The verifier passes these values into
  *      the reference HTML itself; do not edit the reference file.
@@ -28,7 +31,7 @@
  */
 
 /** Stamped on every lead. Bump on any change to a value in this file. */
-export const VALUATION_DATA_VERSION = '2026-09-21';
+export const VALUATION_DATA_VERSION = '2026-09-22';
 
 /**
  * How each data version is described to a reader: the PDF report's cover and
@@ -41,6 +44,8 @@ export const DATA_VERSION_LABELS: Record<string, string> = {
   '2026-09-17': 'Market data: Damodaran 2026, risk-free 15 September 2026',
   // Local lending rates for the cost of debt and the terminal reinvestment floor.
   '2026-09-21': 'Market data: Damodaran 2026, risk-free 15 September 2026, local lending rates 2026',
+  // Every country Damodaran covers, with central bank policy rates from the BIS where no local benchmark was set.
+  '2026-09-22': 'Market data: Damodaran 2026, risk-free 15 September 2026, local lending rates 2026',
 };
 
 export function dataVersionLabel(version: string): string {
@@ -280,6 +285,33 @@ export type CountryData = {
   lossOffsetCap: number;
 };
 
+/**
+ * When the indicative exchange rates to SAR for the countries added on 2026-09-22 were taken
+ * (open.er-api.com, mid rates). The six GCC currencies are fixed pegs and the Pakistan rupee was
+ * set by the firm on 2026-09-16; those seven are unchanged. Refresh with the January update.
+ */
+export const FX_AS_OF = '2026-09-21';
+
+/** Listed first in the country search, in this order. Everything else follows alphabetically. */
+export const PINNED_VALUATION_COUNTRIES = ['Saudi Arabia', 'United Arab Emirates', 'Qatar', 'Kuwait', 'Oman', 'Bahrain', 'Pakistan'] as const;
+
+/**
+ * Every country in Damodaran's January 2026 country risk dataset (`ctryprem.xlsx`, "ERPs by
+ * country", rated and frontier tables), except the three emirates he lists separately from the
+ * United Arab Emirates, and North Korea and Somalia, which his corporate tax dataset does not
+ * cover. Country risk premium and default spread from that file, rounded to two decimals (for a
+ * frontier market without a rating the default spread is his CRP-implied figure); tax is the
+ * marginal corporate rate from his `countrytaxrates.xlsx`, January 2026.
+ *
+ * The seven countries first were set before 2026-09-22 and confirmed by the firm, so they are kept
+ * as they were, including the UAE's 9% (Damodaran shows 0%).
+ *
+ * `pegged` is true only for a currency fixed to the US dollar (or, for Macao, to the Hong Kong
+ * dollar) and for countries that use the dollar. Every other currency uses the inflation
+ * conversion Pakistan uses: `inflationLocal` is a long-term default set by PaceMakers from each
+ * central bank's target and medium-term IMF projections, the default growth is that inflation to
+ * the nearest half point, and the growth ceiling is inflation plus 2 points. All editable.
+ */
 export const COUNTRIES = {
   'Saudi Arabia': { crp: 0.78, ds: 0.51, tax: 20, code: 'SAR', pegged: true, sarPerUnit: 1, growth: 2.5, growthCeiling: 4.0, lossOffsetCap: 25 },
   'United Arab Emirates': { crp: 0.64, ds: 0.42, tax: 9, code: 'AED', pegged: true, sarPerUnit: 1.0211, growth: 2.5, growthCeiling: 4.0, lossOffsetCap: 75 },
@@ -300,6 +332,174 @@ export const COUNTRIES = {
     inflationLocal: 7.0,
     inflationUs: 2.5,
   },
+  // Every other country Damodaran covers, alphabetically. Generated on 2026-09-22 from his January
+  // 2026 country risk and tax datasets (see the note above COUNTRIES), exchange rates as at `FX_AS_OF`.
+  Albania: { crp: 4.66, ds: 3.06, tax: 15, code: 'ALL', pegged: false, sarPerUnit: 0.04689, growth: 3, growthCeiling: 5, inflationLocal: 3, inflationUs: 2.5, lossOffsetCap: 100 },
+  Algeria: { crp: 5.83, ds: 3.83, tax: 26, code: 'DZD', pegged: false, sarPerUnit: 0.02794, growth: 5, growthCeiling: 7, inflationLocal: 5, inflationUs: 2.5, lossOffsetCap: 100 },
+  Andorra: { crp: 2.07, ds: 1.36, tax: 10, code: 'EUR', pegged: false, sarPerUnit: 4.303, growth: 2, growthCeiling: 4, inflationLocal: 2, inflationUs: 2.5, lossOffsetCap: 100 },
+  Angola: { crp: 8.41, ds: 5.52, tax: 25, code: 'AOA', pegged: false, sarPerUnit: 0.004081, growth: 12, growthCeiling: 14, inflationLocal: 12, inflationUs: 2.5, lossOffsetCap: 100 },
+  Argentina: { crp: 9.71, ds: 6.37, tax: 35, code: 'ARS', pegged: false, sarPerUnit: 0.00248, growth: 20, growthCeiling: 22, inflationLocal: 20, inflationUs: 2.5, lossOffsetCap: 100 },
+  Armenia: { crp: 4.66, ds: 3.06, tax: 18, code: 'AMD', pegged: false, sarPerUnit: 0.01029, growth: 4, growthCeiling: 6, inflationLocal: 4, inflationUs: 2.5, lossOffsetCap: 100 },
+  Aruba: { crp: 2.85, ds: 1.87, tax: 22, code: 'AWG', pegged: true, sarPerUnit: 2.095, growth: 2.5, growthCeiling: 4, lossOffsetCap: 100 },
+  Australia: { crp: 0, ds: 0, tax: 30, code: 'AUD', pegged: false, sarPerUnit: 2.67, growth: 2.5, growthCeiling: 4.5, inflationLocal: 2.5, inflationUs: 2.5, lossOffsetCap: 100 },
+  Austria: { crp: 0.36, ds: 0.23, tax: 23, code: 'EUR', pegged: false, sarPerUnit: 4.303, growth: 2, growthCeiling: 4, inflationLocal: 2, inflationUs: 2.5, lossOffsetCap: 100 },
+  Azerbaijan: { crp: 2.85, ds: 1.87, tax: 20, code: 'AZN', pegged: false, sarPerUnit: 2.199, growth: 4, growthCeiling: 6, inflationLocal: 4, inflationUs: 2.5, lossOffsetCap: 100 },
+  Bahamas: { crp: 5.83, ds: 3.83, tax: 0, code: 'BSD', pegged: true, sarPerUnit: 3.75, growth: 2.5, growthCeiling: 4, lossOffsetCap: 100 },
+  Bangladesh: { crp: 7.12, ds: 4.67, tax: 27.5, code: 'BDT', pegged: false, sarPerUnit: 0.03047, growth: 6, growthCeiling: 8, inflationLocal: 6, inflationUs: 2.5, lossOffsetCap: 100 },
+  Barbados: { crp: 7.12, ds: 4.67, tax: 9, code: 'BBD', pegged: true, sarPerUnit: 1.875, growth: 2.5, growthCeiling: 4, lossOffsetCap: 100 },
+  Belarus: { crp: 26.66, ds: 17.5, tax: 25, code: 'BYN', pegged: false, sarPerUnit: 1.236, growth: 6, growthCeiling: 8, inflationLocal: 6, inflationUs: 2.5, lossOffsetCap: 100 },
+  Belgium: { crp: 0.78, ds: 0.51, tax: 25, code: 'EUR', pegged: false, sarPerUnit: 4.303, growth: 2, growthCeiling: 4, inflationLocal: 2, inflationUs: 2.5, lossOffsetCap: 100 },
+  Belize: { crp: 9.71, ds: 6.37, tax: 0, code: 'BZD', pegged: true, sarPerUnit: 1.875, growth: 2.5, growthCeiling: 4, lossOffsetCap: 100 },
+  Benin: { crp: 5.83, ds: 3.83, tax: 30, code: 'XOF', pegged: false, sarPerUnit: 0.006561, growth: 2, growthCeiling: 4, inflationLocal: 2, inflationUs: 2.5, lossOffsetCap: 100 },
+  Bermuda: { crp: 1.1, ds: 0.72, tax: 0, code: 'BMD', pegged: true, sarPerUnit: 3.75, growth: 2.5, growthCeiling: 4, lossOffsetCap: 100 },
+  Bolivia: { crp: 15.54, ds: 10.2, tax: 25, code: 'BOB', pegged: false, sarPerUnit: 0.3337, growth: 8, growthCeiling: 10, inflationLocal: 8, inflationUs: 2.5, lossOffsetCap: 100 },
+  'Bosnia and Herzegovina': { crp: 8.41, ds: 5.52, tax: 10, code: 'BAM', pegged: false, sarPerUnit: 2.2, growth: 2.5, growthCeiling: 4.5, inflationLocal: 2.5, inflationUs: 2.5, lossOffsetCap: 100 },
+  Botswana: { crp: 2.07, ds: 1.36, tax: 22, code: 'BWP', pegged: false, sarPerUnit: 0.2694, growth: 4.5, growthCeiling: 6.5, inflationLocal: 4.5, inflationUs: 2.5, lossOffsetCap: 100 },
+  Brazil: { crp: 3.24, ds: 2.13, tax: 34, code: 'BRL', pegged: false, sarPerUnit: 0.7294, growth: 3.5, growthCeiling: 5.5, inflationLocal: 3.5, inflationUs: 2.5, lossOffsetCap: 100 },
+  Brunei: { crp: 0.78, ds: 0.51, tax: 18.5, code: 'BND', pegged: false, sarPerUnit: 2.938, growth: 1.5, growthCeiling: 3.5, inflationLocal: 1.5, inflationUs: 2.5, lossOffsetCap: 100 },
+  Bulgaria: { crp: 2.07, ds: 1.36, tax: 10, code: 'EUR', pegged: false, sarPerUnit: 4.303, growth: 2.5, growthCeiling: 4.5, inflationLocal: 2.5, inflationUs: 2.5, lossOffsetCap: 100 },
+  'Burkina Faso': { crp: 9.71, ds: 6.37, tax: 27.5, code: 'XOF', pegged: false, sarPerUnit: 0.006561, growth: 2, growthCeiling: 4, inflationLocal: 2, inflationUs: 2.5, lossOffsetCap: 100 },
+  Cambodia: { crp: 7.12, ds: 4.67, tax: 20, code: 'KHR', pegged: false, sarPerUnit: 0.0009228, growth: 3, growthCeiling: 5, inflationLocal: 3, inflationUs: 2.5, lossOffsetCap: 100 },
+  Cameroon: { crp: 9.71, ds: 6.37, tax: 33, code: 'XAF', pegged: false, sarPerUnit: 0.006561, growth: 2.5, growthCeiling: 4.5, inflationLocal: 2.5, inflationUs: 2.5, lossOffsetCap: 100 },
+  Canada: { crp: 0, ds: 0, tax: 26.14, code: 'CAD', pegged: false, sarPerUnit: 2.68, growth: 2, growthCeiling: 4, inflationLocal: 2, inflationUs: 2.5, lossOffsetCap: 100 },
+  'Cape Verde': { crp: 7.12, ds: 4.67, tax: 21.42, code: 'CVE', pegged: false, sarPerUnit: 0.03903, growth: 2, growthCeiling: 4, inflationLocal: 2, inflationUs: 2.5, lossOffsetCap: 100 },
+  'Cayman Islands': { crp: 0.78, ds: 0.51, tax: 0, code: 'KYD', pegged: true, sarPerUnit: 4.5, growth: 2.5, growthCeiling: 4, lossOffsetCap: 100 },
+  Chile: { crp: 1.1, ds: 0.72, tax: 27, code: 'CLP', pegged: false, sarPerUnit: 0.003899, growth: 3, growthCeiling: 5, inflationLocal: 3, inflationUs: 2.5, lossOffsetCap: 100 },
+  China: { crp: 0.91, ds: 0.6, tax: 25, code: 'CNY', pegged: false, sarPerUnit: 0.5593, growth: 2, growthCeiling: 4, inflationLocal: 2, inflationUs: 2.5, lossOffsetCap: 100 },
+  Colombia: { crp: 2.85, ds: 1.87, tax: 35, code: 'COP', pegged: false, sarPerUnit: 0.001185, growth: 3.5, growthCeiling: 5.5, inflationLocal: 3.5, inflationUs: 2.5, lossOffsetCap: 100 },
+  'Cook Islands': { crp: 5.83, ds: 3.83, tax: 20, code: 'NZD', pegged: false, sarPerUnit: 2.145, growth: 2, growthCeiling: 4, inflationLocal: 2, inflationUs: 2.5, lossOffsetCap: 100 },
+  'Costa Rica': { crp: 3.9, ds: 2.56, tax: 30, code: 'CRC', pegged: false, sarPerUnit: 0.008356, growth: 3, growthCeiling: 5, inflationLocal: 3, inflationUs: 2.5, lossOffsetCap: 100 },
+  "Côte d'Ivoire": { crp: 3.9, ds: 2.56, tax: 25, code: 'XOF', pegged: false, sarPerUnit: 0.006561, growth: 2, growthCeiling: 4, inflationLocal: 2, inflationUs: 2.5, lossOffsetCap: 100 },
+  Croatia: { crp: 1.55, ds: 1.02, tax: 18, code: 'EUR', pegged: false, sarPerUnit: 4.303, growth: 2.5, growthCeiling: 4.5, inflationLocal: 2.5, inflationUs: 2.5, lossOffsetCap: 100 },
+  Cuba: { crp: 15.54, ds: 10.2, tax: 35, code: 'CUP', pegged: false, sarPerUnit: 0.1563, growth: 15, growthCeiling: 17, inflationLocal: 15, inflationUs: 2.5, lossOffsetCap: 100 },
+  'Curaçao': { crp: 2.85, ds: 1.87, tax: 22, code: 'XCG', pegged: true, sarPerUnit: 2.095, growth: 2.5, growthCeiling: 4, lossOffsetCap: 100 },
+  Cyprus: { crp: 1.55, ds: 1.02, tax: 12.5, code: 'EUR', pegged: false, sarPerUnit: 4.303, growth: 2, growthCeiling: 4, inflationLocal: 2, inflationUs: 2.5, lossOffsetCap: 100 },
+  'Czech Republic': { crp: 0.78, ds: 0.51, tax: 21, code: 'CZK', pegged: false, sarPerUnit: 0.1768, growth: 2, growthCeiling: 4, inflationLocal: 2, inflationUs: 2.5, lossOffsetCap: 100 },
+  'Democratic Republic of the Congo': { crp: 8.41, ds: 5.52, tax: 30, code: 'CDF', pegged: false, sarPerUnit: 0.00162, growth: 8, growthCeiling: 10, inflationLocal: 8, inflationUs: 2.5, lossOffsetCap: 100 },
+  Denmark: { crp: 0, ds: 0, tax: 22, code: 'DKK', pegged: false, sarPerUnit: 0.5753, growth: 2, growthCeiling: 4, inflationLocal: 2, inflationUs: 2.5, lossOffsetCap: 100 },
+  'Dominican Republic': { crp: 3.9, ds: 2.56, tax: 27, code: 'DOP', pegged: false, sarPerUnit: 0.06358, growth: 4, growthCeiling: 6, inflationLocal: 4, inflationUs: 2.5, lossOffsetCap: 100 },
+  Ecuador: { crp: 12.95, ds: 8.5, tax: 25, code: 'USD', pegged: true, sarPerUnit: 3.75, growth: 2.5, growthCeiling: 4, lossOffsetCap: 100 },
+  Egypt: { crp: 9.71, ds: 6.37, tax: 22.5, code: 'EGP', pegged: false, sarPerUnit: 0.07197, growth: 8, growthCeiling: 10, inflationLocal: 8, inflationUs: 2.5, lossOffsetCap: 100 },
+  'El Salvador': { crp: 8.41, ds: 5.52, tax: 30, code: 'USD', pegged: true, sarPerUnit: 3.75, growth: 2.5, growthCeiling: 4, lossOffsetCap: 100 },
+  Estonia: { crp: 0.91, ds: 0.6, tax: 20, code: 'EUR', pegged: false, sarPerUnit: 4.303, growth: 2.5, growthCeiling: 4.5, inflationLocal: 2.5, inflationUs: 2.5, lossOffsetCap: 100 },
+  Eswatini: { crp: 7.12, ds: 4.67, tax: 25, code: 'SZL', pegged: false, sarPerUnit: 0.2306, growth: 4.5, growthCeiling: 6.5, inflationLocal: 4.5, inflationUs: 2.5, lossOffsetCap: 100 },
+  Ethiopia: { crp: 11.66, ds: 7.65, tax: 30, code: 'ETB', pegged: false, sarPerUnit: 0.02325, growth: 12, growthCeiling: 14, inflationLocal: 12, inflationUs: 2.5, lossOffsetCap: 100 },
+  Fiji: { crp: 5.83, ds: 3.83, tax: 25, code: 'FJD', pegged: false, sarPerUnit: 1.686, growth: 3, growthCeiling: 5, inflationLocal: 3, inflationUs: 2.5, lossOffsetCap: 100 },
+  Finland: { crp: 0.36, ds: 0.23, tax: 20, code: 'EUR', pegged: false, sarPerUnit: 4.303, growth: 2, growthCeiling: 4, inflationLocal: 2, inflationUs: 2.5, lossOffsetCap: 100 },
+  France: { crp: 0.78, ds: 0.51, tax: 25.83, code: 'EUR', pegged: false, sarPerUnit: 4.303, growth: 2, growthCeiling: 4, inflationLocal: 2, inflationUs: 2.5, lossOffsetCap: 100 },
+  Gabon: { crp: 11.66, ds: 7.65, tax: 30, code: 'XAF', pegged: false, sarPerUnit: 0.006561, growth: 2.5, growthCeiling: 4.5, inflationLocal: 2.5, inflationUs: 2.5, lossOffsetCap: 100 },
+  Gambia: { crp: 7.12, ds: 4.67, tax: 27, code: 'GMD', pegged: false, sarPerUnit: 0.05035, growth: 8, growthCeiling: 10, inflationLocal: 8, inflationUs: 2.5, lossOffsetCap: 100 },
+  Georgia: { crp: 3.9, ds: 2.56, tax: 15, code: 'GEL', pegged: false, sarPerUnit: 1.437, growth: 3, growthCeiling: 5, inflationLocal: 3, inflationUs: 2.5, lossOffsetCap: 100 },
+  Germany: { crp: 0, ds: 0, tax: 29.93, code: 'EUR', pegged: false, sarPerUnit: 4.303, growth: 2, growthCeiling: 4, inflationLocal: 2, inflationUs: 2.5, lossOffsetCap: 100 },
+  Ghana: { crp: 9.71, ds: 6.37, tax: 25, code: 'GHS', pegged: false, sarPerUnit: 0.3244, growth: 8, growthCeiling: 10, inflationLocal: 8, inflationUs: 2.5, lossOffsetCap: 100 },
+  Greece: { crp: 2.85, ds: 1.87, tax: 22, code: 'EUR', pegged: false, sarPerUnit: 4.303, growth: 2, growthCeiling: 4, inflationLocal: 2, inflationUs: 2.5, lossOffsetCap: 100 },
+  Guatemala: { crp: 3.24, ds: 2.13, tax: 25, code: 'GTQ', pegged: false, sarPerUnit: 0.4898, growth: 4, growthCeiling: 6, inflationLocal: 4, inflationUs: 2.5, lossOffsetCap: 100 },
+  Guernsey: { crp: 0.91, ds: 0.6, tax: 0, code: 'GBP', pegged: false, sarPerUnit: 5.016, growth: 2, growthCeiling: 4, inflationLocal: 2, inflationUs: 2.5, lossOffsetCap: 100 },
+  Guinea: { crp: 11.66, ds: 7.65, tax: 25, code: 'GNF', pegged: false, sarPerUnit: 0.0004259, growth: 8, growthCeiling: 10, inflationLocal: 8, inflationUs: 2.5, lossOffsetCap: 100 },
+  'Guinea-Bissau': { crp: 9.71, ds: 6.37, tax: 25, code: 'XOF', pegged: false, sarPerUnit: 0.006561, growth: 2, growthCeiling: 4, inflationLocal: 2, inflationUs: 2.5, lossOffsetCap: 100 },
+  Guyana: { crp: 2.07, ds: 1.36, tax: 25, code: 'GYD', pegged: false, sarPerUnit: 0.01784, growth: 4, growthCeiling: 6, inflationLocal: 4, inflationUs: 2.5, lossOffsetCap: 100 },
+  Haiti: { crp: 12.95, ds: 8.5, tax: 30, code: 'HTG', pegged: false, sarPerUnit: 0.0286, growth: 12, growthCeiling: 14, inflationLocal: 12, inflationUs: 2.5, lossOffsetCap: 100 },
+  Honduras: { crp: 5.83, ds: 3.83, tax: 30, code: 'HNL', pegged: false, sarPerUnit: 0.1392, growth: 4, growthCeiling: 6, inflationLocal: 4, inflationUs: 2.5, lossOffsetCap: 100 },
+  'Hong Kong': { crp: 0.78, ds: 0.51, tax: 16.5, code: 'HKD', pegged: true, sarPerUnit: 0.478, growth: 2.5, growthCeiling: 4, lossOffsetCap: 100 },
+  Hungary: { crp: 2.46, ds: 1.62, tax: 9, code: 'HUF', pegged: false, sarPerUnit: 0.01181, growth: 3, growthCeiling: 5, inflationLocal: 3, inflationUs: 2.5, lossOffsetCap: 100 },
+  Iceland: { crp: 0.91, ds: 0.6, tax: 21, code: 'ISK', pegged: false, sarPerUnit: 0.03084, growth: 2.5, growthCeiling: 4.5, inflationLocal: 2.5, inflationUs: 2.5, lossOffsetCap: 100 },
+  India: { crp: 2.85, ds: 1.87, tax: 30, code: 'INR', pegged: false, sarPerUnit: 0.03904, growth: 4, growthCeiling: 6, inflationLocal: 4, inflationUs: 2.5, lossOffsetCap: 100 },
+  Indonesia: { crp: 2.46, ds: 1.62, tax: 22, code: 'IDR', pegged: false, sarPerUnit: 0.0002107, growth: 2.5, growthCeiling: 4.5, inflationLocal: 2.5, inflationUs: 2.5, lossOffsetCap: 100 },
+  Iran: { crp: 9.71, ds: 6.37, tax: 25, code: 'IRR', pegged: false, sarPerUnit: 0.00000246, growth: 30, growthCeiling: 32, inflationLocal: 30, inflationUs: 2.5, lossOffsetCap: 100 },
+  Iraq: { crp: 9.71, ds: 6.37, tax: 15, code: 'IQD', pegged: true, sarPerUnit: 0.002853, growth: 2.5, growthCeiling: 4, lossOffsetCap: 100 },
+  Ireland: { crp: 0.78, ds: 0.51, tax: 12.5, code: 'EUR', pegged: false, sarPerUnit: 4.303, growth: 2, growthCeiling: 4, inflationLocal: 2, inflationUs: 2.5, lossOffsetCap: 100 },
+  'Isle of Man': { crp: 0.78, ds: 0.51, tax: 0, code: 'GBP', pegged: false, sarPerUnit: 5.016, growth: 2, growthCeiling: 4, inflationLocal: 2, inflationUs: 2.5, lossOffsetCap: 100 },
+  Israel: { crp: 2.07, ds: 1.36, tax: 23, code: 'ILS', pegged: false, sarPerUnit: 1.236, growth: 2, growthCeiling: 4, inflationLocal: 2, inflationUs: 2.5, lossOffsetCap: 100 },
+  Italy: { crp: 2.46, ds: 1.62, tax: 27.81, code: 'EUR', pegged: false, sarPerUnit: 4.303, growth: 2, growthCeiling: 4, inflationLocal: 2, inflationUs: 2.5, lossOffsetCap: 100 },
+  Jamaica: { crp: 4.66, ds: 3.06, tax: 25, code: 'JMD', pegged: false, sarPerUnit: 0.0237, growth: 5, growthCeiling: 7, inflationLocal: 5, inflationUs: 2.5, lossOffsetCap: 100 },
+  Japan: { crp: 0.91, ds: 0.6, tax: 29.74, code: 'JPY', pegged: false, sarPerUnit: 0.02386, growth: 2, growthCeiling: 4, inflationLocal: 2, inflationUs: 2.5, lossOffsetCap: 100 },
+  Jersey: { crp: 0.78, ds: 0.51, tax: 0, code: 'GBP', pegged: false, sarPerUnit: 5.016, growth: 2, growthCeiling: 4, inflationLocal: 2, inflationUs: 2.5, lossOffsetCap: 100 },
+  Jordan: { crp: 4.66, ds: 3.06, tax: 20, code: 'JOD', pegged: true, sarPerUnit: 5.289, growth: 2.5, growthCeiling: 4, lossOffsetCap: 100 },
+  Kazakhstan: { crp: 2.07, ds: 1.36, tax: 20, code: 'KZT', pegged: false, sarPerUnit: 0.008386, growth: 6, growthCeiling: 8, inflationLocal: 6, inflationUs: 2.5, lossOffsetCap: 100 },
+  Kenya: { crp: 8.41, ds: 5.52, tax: 30, code: 'KES', pegged: false, sarPerUnit: 0.02894, growth: 5, growthCeiling: 7, inflationLocal: 5, inflationUs: 2.5, lossOffsetCap: 100 },
+  Kyrgyzstan: { crp: 8.41, ds: 5.52, tax: 10, code: 'KGS', pegged: false, sarPerUnit: 0.04272, growth: 6, growthCeiling: 8, inflationLocal: 6, inflationUs: 2.5, lossOffsetCap: 100 },
+  Laos: { crp: 11.66, ds: 7.65, tax: 20, code: 'LAK', pegged: false, sarPerUnit: 0.0001677, growth: 8, growthCeiling: 10, inflationLocal: 8, inflationUs: 2.5, lossOffsetCap: 100 },
+  Latvia: { crp: 1.55, ds: 1.02, tax: 20, code: 'EUR', pegged: false, sarPerUnit: 4.303, growth: 2.5, growthCeiling: 4.5, inflationLocal: 2.5, inflationUs: 2.5, lossOffsetCap: 100 },
+  Lebanon: { crp: 26.66, ds: 17.5, tax: 17, code: 'LBP', pegged: false, sarPerUnit: 0.0000419, growth: 10, growthCeiling: 12, inflationLocal: 10, inflationUs: 2.5, lossOffsetCap: 100 },
+  Liberia: { crp: 11.66, ds: 7.65, tax: 25, code: 'LRD', pegged: false, sarPerUnit: 0.02155, growth: 6, growthCeiling: 8, inflationLocal: 6, inflationUs: 2.5, lossOffsetCap: 100 },
+  Libya: { crp: 3.9, ds: 2.56, tax: 20, code: 'LYD', pegged: false, sarPerUnit: 0.5878, growth: 3, growthCeiling: 5, inflationLocal: 3, inflationUs: 2.5, lossOffsetCap: 100 },
+  Liechtenstein: { crp: 0, ds: 0, tax: 12.5, code: 'CHF', pegged: false, sarPerUnit: 4.555, growth: 1, growthCeiling: 3, inflationLocal: 1, inflationUs: 2.5, lossOffsetCap: 100 },
+  Lithuania: { crp: 1.1, ds: 0.72, tax: 15, code: 'EUR', pegged: false, sarPerUnit: 4.303, growth: 2.5, growthCeiling: 4.5, inflationLocal: 2.5, inflationUs: 2.5, lossOffsetCap: 100 },
+  Luxembourg: { crp: 0, ds: 0, tax: 24.94, code: 'EUR', pegged: false, sarPerUnit: 4.303, growth: 2, growthCeiling: 4, inflationLocal: 2, inflationUs: 2.5, lossOffsetCap: 100 },
+  Macao: { crp: 0.78, ds: 0.51, tax: 12, code: 'MOP', pegged: true, sarPerUnit: 0.4641, growth: 2.5, growthCeiling: 4, lossOffsetCap: 100 },
+  Madagascar: { crp: 8.41, ds: 5.52, tax: 20, code: 'MGA', pegged: false, sarPerUnit: 0.0008565, growth: 7, growthCeiling: 9, inflationLocal: 7, inflationUs: 2.5, lossOffsetCap: 100 },
+  Malawi: { crp: 12.95, ds: 8.5, tax: 30, code: 'MWK', pegged: false, sarPerUnit: 0.002145, growth: 15, growthCeiling: 17, inflationLocal: 15, inflationUs: 2.5, lossOffsetCap: 100 },
+  Malaysia: { crp: 1.55, ds: 1.02, tax: 24, code: 'MYR', pegged: false, sarPerUnit: 0.919, growth: 2, growthCeiling: 4, inflationLocal: 2, inflationUs: 2.5, lossOffsetCap: 100 },
+  Maldives: { crp: 11.66, ds: 7.65, tax: 15, code: 'MVR', pegged: false, sarPerUnit: 0.2425, growth: 3, growthCeiling: 5, inflationLocal: 3, inflationUs: 2.5, lossOffsetCap: 100 },
+  Mali: { crp: 11.66, ds: 7.65, tax: 30, code: 'XOF', pegged: false, sarPerUnit: 0.006561, growth: 2, growthCeiling: 4, inflationLocal: 2, inflationUs: 2.5, lossOffsetCap: 100 },
+  Malta: { crp: 1.1, ds: 0.72, tax: 35, code: 'EUR', pegged: false, sarPerUnit: 4.303, growth: 2, growthCeiling: 4, inflationLocal: 2, inflationUs: 2.5, lossOffsetCap: 100 },
+  Mauritius: { crp: 2.85, ds: 1.87, tax: 15, code: 'MUR', pegged: false, sarPerUnit: 0.07864, growth: 4, growthCeiling: 6, inflationLocal: 4, inflationUs: 2.5, lossOffsetCap: 100 },
+  Mexico: { crp: 2.46, ds: 1.62, tax: 30, code: 'MXN', pegged: false, sarPerUnit: 0.2176, growth: 3.5, growthCeiling: 5.5, inflationLocal: 3.5, inflationUs: 2.5, lossOffsetCap: 100 },
+  Moldova: { crp: 8.41, ds: 5.52, tax: 12, code: 'MDL', pegged: false, sarPerUnit: 0.2135, growth: 5, growthCeiling: 7, inflationLocal: 5, inflationUs: 2.5, lossOffsetCap: 100 },
+  Mongolia: { crp: 5.83, ds: 3.83, tax: 25, code: 'MNT', pegged: false, sarPerUnit: 0.00105, growth: 7, growthCeiling: 9, inflationLocal: 7, inflationUs: 2.5, lossOffsetCap: 100 },
+  Montenegro: { crp: 5.83, ds: 3.83, tax: 15, code: 'EUR', pegged: false, sarPerUnit: 4.303, growth: 2, growthCeiling: 4, inflationLocal: 2, inflationUs: 2.5, lossOffsetCap: 100 },
+  Montserrat: { crp: 2.85, ds: 1.87, tax: 30, code: 'XCD', pegged: true, sarPerUnit: 1.389, growth: 2.5, growthCeiling: 4, lossOffsetCap: 100 },
+  Morocco: { crp: 3.24, ds: 2.13, tax: 33, code: 'MAD', pegged: false, sarPerUnit: 0.3932, growth: 2, growthCeiling: 4, inflationLocal: 2, inflationUs: 2.5, lossOffsetCap: 100 },
+  Mozambique: { crp: 12.95, ds: 8.5, tax: 32, code: 'MZN', pegged: false, sarPerUnit: 0.05873, growth: 6, growthCeiling: 8, inflationLocal: 6, inflationUs: 2.5, lossOffsetCap: 100 },
+  Myanmar: { crp: 15.54, ds: 10.2, tax: 22, code: 'MMK', pegged: false, sarPerUnit: 0.001779, growth: 12, growthCeiling: 14, inflationLocal: 12, inflationUs: 2.5, lossOffsetCap: 100 },
+  Namibia: { crp: 5.83, ds: 3.83, tax: 32, code: 'NAD', pegged: false, sarPerUnit: 0.2306, growth: 4.5, growthCeiling: 6.5, inflationLocal: 4.5, inflationUs: 2.5, lossOffsetCap: 100 },
+  Nepal: { crp: 4.66, ds: 3.06, tax: 25, code: 'NPR', pegged: false, sarPerUnit: 0.0244, growth: 5.5, growthCeiling: 7.5, inflationLocal: 5.5, inflationUs: 2.5, lossOffsetCap: 100 },
+  Netherlands: { crp: 0, ds: 0, tax: 25.8, code: 'EUR', pegged: false, sarPerUnit: 4.303, growth: 2, growthCeiling: 4, inflationLocal: 2, inflationUs: 2.5, lossOffsetCap: 100 },
+  'New Zealand': { crp: 0, ds: 0, tax: 28, code: 'NZD', pegged: false, sarPerUnit: 2.145, growth: 2, growthCeiling: 4, inflationLocal: 2, inflationUs: 2.5, lossOffsetCap: 100 },
+  Nicaragua: { crp: 7.12, ds: 4.67, tax: 30, code: 'NIO', pegged: false, sarPerUnit: 0.1016, growth: 4, growthCeiling: 6, inflationLocal: 4, inflationUs: 2.5, lossOffsetCap: 100 },
+  Niger: { crp: 12.95, ds: 8.5, tax: 30, code: 'XOF', pegged: false, sarPerUnit: 0.006561, growth: 2, growthCeiling: 4, inflationLocal: 2, inflationUs: 2.5, lossOffsetCap: 100 },
+  Nigeria: { crp: 8.41, ds: 5.52, tax: 30, code: 'NGN', pegged: false, sarPerUnit: 0.002814, growth: 12, growthCeiling: 14, inflationLocal: 12, inflationUs: 2.5, lossOffsetCap: 100 },
+  'North Macedonia': { crp: 4.66, ds: 3.06, tax: 10, code: 'MKD', pegged: false, sarPerUnit: 0.06961, growth: 2.5, growthCeiling: 4.5, inflationLocal: 2.5, inflationUs: 2.5, lossOffsetCap: 100 },
+  Norway: { crp: 0, ds: 0, tax: 22, code: 'NOK', pegged: false, sarPerUnit: 0.3983, growth: 2, growthCeiling: 4, inflationLocal: 2, inflationUs: 2.5, lossOffsetCap: 100 },
+  Panama: { crp: 2.85, ds: 1.87, tax: 25, code: 'USD', pegged: true, sarPerUnit: 3.75, growth: 2.5, growthCeiling: 4, lossOffsetCap: 100 },
+  'Papua New Guinea': { crp: 7.12, ds: 4.67, tax: 30, code: 'PGK', pegged: false, sarPerUnit: 0.834, growth: 4.5, growthCeiling: 6.5, inflationLocal: 4.5, inflationUs: 2.5, lossOffsetCap: 100 },
+  Paraguay: { crp: 2.85, ds: 1.87, tax: 10, code: 'PYG', pegged: false, sarPerUnit: 0.0006284, growth: 4, growthCeiling: 6, inflationLocal: 4, inflationUs: 2.5, lossOffsetCap: 100 },
+  Peru: { crp: 2.07, ds: 1.36, tax: 29.5, code: 'PEN', pegged: false, sarPerUnit: 1.109, growth: 2, growthCeiling: 4, inflationLocal: 2, inflationUs: 2.5, lossOffsetCap: 100 },
+  Philippines: { crp: 2.46, ds: 1.62, tax: 25, code: 'PHP', pegged: false, sarPerUnit: 0.05963, growth: 3, growthCeiling: 5, inflationLocal: 3, inflationUs: 2.5, lossOffsetCap: 100 },
+  Poland: { crp: 1.1, ds: 0.72, tax: 19, code: 'PLN', pegged: false, sarPerUnit: 0.9859, growth: 2.5, growthCeiling: 4.5, inflationLocal: 2.5, inflationUs: 2.5, lossOffsetCap: 100 },
+  Portugal: { crp: 1.55, ds: 1.02, tax: 31.5, code: 'EUR', pegged: false, sarPerUnit: 4.303, growth: 2, growthCeiling: 4, inflationLocal: 2, inflationUs: 2.5, lossOffsetCap: 100 },
+  'Republic of the Congo': { crp: 11.66, ds: 7.65, tax: 28, code: 'XAF', pegged: false, sarPerUnit: 0.006561, growth: 3, growthCeiling: 5, inflationLocal: 3, inflationUs: 2.5, lossOffsetCap: 100 },
+  Romania: { crp: 2.85, ds: 1.87, tax: 16, code: 'RON', pegged: false, sarPerUnit: 0.8172, growth: 3, growthCeiling: 5, inflationLocal: 3, inflationUs: 2.5, lossOffsetCap: 100 },
+  Russia: { crp: 3.9, ds: 2.56, tax: 20, code: 'RUB', pegged: false, sarPerUnit: 0.04452, growth: 5, growthCeiling: 7, inflationLocal: 5, inflationUs: 2.5, lossOffsetCap: 100 },
+  Rwanda: { crp: 7.12, ds: 4.67, tax: 28, code: 'RWF', pegged: false, sarPerUnit: 0.002535, growth: 5, growthCeiling: 7, inflationLocal: 5, inflationUs: 2.5, lossOffsetCap: 100 },
+  'Saint Vincent and the Grenadines': { crp: 8.41, ds: 5.52, tax: 28, code: 'XCD', pegged: true, sarPerUnit: 1.389, growth: 2.5, growthCeiling: 4, lossOffsetCap: 100 },
+  Senegal: { crp: 9.71, ds: 6.37, tax: 30, code: 'XOF', pegged: false, sarPerUnit: 0.006561, growth: 2, growthCeiling: 4, inflationLocal: 2, inflationUs: 2.5, lossOffsetCap: 100 },
+  Serbia: { crp: 3.9, ds: 2.56, tax: 15, code: 'RSD', pegged: false, sarPerUnit: 0.03663, growth: 3, growthCeiling: 5, inflationLocal: 3, inflationUs: 2.5, lossOffsetCap: 100 },
+  'Sierra Leone': { crp: 8.41, ds: 5.52, tax: 25, code: 'SLE', pegged: false, sarPerUnit: 0.1505, growth: 10, growthCeiling: 12, inflationLocal: 10, inflationUs: 2.5, lossOffsetCap: 100 },
+  Singapore: { crp: 0, ds: 0, tax: 17, code: 'SGD', pegged: false, sarPerUnit: 2.938, growth: 2, growthCeiling: 4, inflationLocal: 2, inflationUs: 2.5, lossOffsetCap: 100 },
+  'Sint Maarten': { crp: 3.9, ds: 2.56, tax: 34.5, code: 'XCG', pegged: true, sarPerUnit: 2.095, growth: 2.5, growthCeiling: 4, lossOffsetCap: 100 },
+  Slovakia: { crp: 1.55, ds: 1.02, tax: 21, code: 'EUR', pegged: false, sarPerUnit: 4.303, growth: 2.5, growthCeiling: 4.5, inflationLocal: 2.5, inflationUs: 2.5, lossOffsetCap: 100 },
+  Slovenia: { crp: 1.55, ds: 1.02, tax: 22, code: 'EUR', pegged: false, sarPerUnit: 4.303, growth: 2, growthCeiling: 4, inflationLocal: 2, inflationUs: 2.5, lossOffsetCap: 100 },
+  'Solomon Islands': { crp: 9.71, ds: 6.37, tax: 30, code: 'SBD', pegged: false, sarPerUnit: 0.472, growth: 3, growthCeiling: 5, inflationLocal: 3, inflationUs: 2.5, lossOffsetCap: 100 },
+  'South Africa': { crp: 3.9, ds: 2.56, tax: 27, code: 'ZAR', pegged: false, sarPerUnit: 0.2306, growth: 4.5, growthCeiling: 6.5, inflationLocal: 4.5, inflationUs: 2.5, lossOffsetCap: 100 },
+  'South Korea': { crp: 0.64, ds: 0.42, tax: 26.4, code: 'KRW', pegged: false, sarPerUnit: 0.002704, growth: 2, growthCeiling: 4, inflationLocal: 2, inflationUs: 2.5, lossOffsetCap: 100 },
+  Spain: { crp: 1.55, ds: 1.02, tax: 25, code: 'EUR', pegged: false, sarPerUnit: 4.303, growth: 2, growthCeiling: 4, inflationLocal: 2, inflationUs: 2.5, lossOffsetCap: 100 },
+  'Sri Lanka': { crp: 15.54, ds: 10.2, tax: 30, code: 'LKR', pegged: false, sarPerUnit: 0.01132, growth: 5, growthCeiling: 7, inflationLocal: 5, inflationUs: 2.5, lossOffsetCap: 100 },
+  Sudan: { crp: 26.66, ds: 17.5, tax: 35, code: 'SDG', pegged: false, sarPerUnit: 0.007303, growth: 30, growthCeiling: 32, inflationLocal: 30, inflationUs: 2.5, lossOffsetCap: 100 },
+  Suriname: { crp: 9.71, ds: 6.37, tax: 36, code: 'SRD', pegged: false, sarPerUnit: 0.09836, growth: 10, growthCeiling: 12, inflationLocal: 10, inflationUs: 2.5, lossOffsetCap: 100 },
+  Sweden: { crp: 0, ds: 0, tax: 20.6, code: 'SEK', pegged: false, sarPerUnit: 0.3813, growth: 2, growthCeiling: 4, inflationLocal: 2, inflationUs: 2.5, lossOffsetCap: 100 },
+  Switzerland: { crp: 0, ds: 0, tax: 19.61, code: 'CHF', pegged: false, sarPerUnit: 4.555, growth: 1, growthCeiling: 3, inflationLocal: 1, inflationUs: 2.5, lossOffsetCap: 100 },
+  Syria: { crp: 15.54, ds: 10.2, tax: 25, code: 'SYP', pegged: false, sarPerUnit: 0.0307, growth: 20, growthCeiling: 22, inflationLocal: 20, inflationUs: 2.5, lossOffsetCap: 100 },
+  Taiwan: { crp: 0.78, ds: 0.51, tax: 20, code: 'TWD', pegged: false, sarPerUnit: 0.1178, growth: 1.5, growthCeiling: 3.5, inflationLocal: 1.5, inflationUs: 2.5, lossOffsetCap: 100 },
+  Tajikistan: { crp: 8.41, ds: 5.52, tax: 18, code: 'TJS', pegged: false, sarPerUnit: 0.4034, growth: 6, growthCeiling: 8, inflationLocal: 6, inflationUs: 2.5, lossOffsetCap: 100 },
+  Tanzania: { crp: 5.83, ds: 3.83, tax: 30, code: 'TZS', pegged: false, sarPerUnit: 0.001416, growth: 4, growthCeiling: 6, inflationLocal: 4, inflationUs: 2.5, lossOffsetCap: 100 },
+  Thailand: { crp: 2.07, ds: 1.36, tax: 20, code: 'THB', pegged: false, sarPerUnit: 0.1124, growth: 1.5, growthCeiling: 3.5, inflationLocal: 1.5, inflationUs: 2.5, lossOffsetCap: 100 },
+  Togo: { crp: 8.41, ds: 5.52, tax: 27, code: 'XOF', pegged: false, sarPerUnit: 0.006561, growth: 2, growthCeiling: 4, inflationLocal: 2, inflationUs: 2.5, lossOffsetCap: 100 },
+  'Trinidad and Tobago': { crp: 3.9, ds: 2.56, tax: 30, code: 'TTD', pegged: false, sarPerUnit: 0.5504, growth: 3, growthCeiling: 5, inflationLocal: 3, inflationUs: 2.5, lossOffsetCap: 100 },
+  Tunisia: { crp: 9.71, ds: 6.37, tax: 25, code: 'TND', pegged: false, sarPerUnit: 1.277, growth: 6, growthCeiling: 8, inflationLocal: 6, inflationUs: 2.5, lossOffsetCap: 100 },
+  Turkey: { crp: 4.66, ds: 3.06, tax: 22, code: 'TRY', pegged: false, sarPerUnit: 0.07685, growth: 15, growthCeiling: 17, inflationLocal: 15, inflationUs: 2.5, lossOffsetCap: 100 },
+  'Turks and Caicos Islands': { crp: 2.07, ds: 1.36, tax: 0, code: 'USD', pegged: true, sarPerUnit: 3.75, growth: 2.5, growthCeiling: 4, lossOffsetCap: 100 },
+  Uganda: { crp: 8.41, ds: 5.52, tax: 30, code: 'UGX', pegged: false, sarPerUnit: 0.0009564, growth: 5, growthCeiling: 7, inflationLocal: 5, inflationUs: 2.5, lossOffsetCap: 100 },
+  Ukraine: { crp: 15.54, ds: 10.2, tax: 18, code: 'UAH', pegged: false, sarPerUnit: 0.08381, growth: 6, growthCeiling: 8, inflationLocal: 6, inflationUs: 2.5, lossOffsetCap: 100 },
+  'United Kingdom': { crp: 0.78, ds: 0.51, tax: 19, code: 'GBP', pegged: false, sarPerUnit: 5.016, growth: 2, growthCeiling: 4, inflationLocal: 2, inflationUs: 2.5, lossOffsetCap: 100 },
+  'United States': { crp: 0.23, ds: 0.23, tax: 25.89, code: 'USD', pegged: true, sarPerUnit: 3.75, growth: 2.5, growthCeiling: 4, lossOffsetCap: 100 },
+  Uruguay: { crp: 2.07, ds: 1.36, tax: 25, code: 'UYU', pegged: false, sarPerUnit: 0.09298, growth: 4.5, growthCeiling: 6.5, inflationLocal: 4.5, inflationUs: 2.5, lossOffsetCap: 100 },
+  Uzbekistan: { crp: 4.66, ds: 3.06, tax: 12, code: 'UZS', pegged: false, sarPerUnit: 0.0003163, growth: 7, growthCeiling: 9, inflationLocal: 7, inflationUs: 2.5, lossOffsetCap: 100 },
+  Venezuela: { crp: 26.66, ds: 17.5, tax: 34, code: 'VES', pegged: false, sarPerUnit: 0.004414, growth: 50, growthCeiling: 52, inflationLocal: 50, inflationUs: 2.5, lossOffsetCap: 100 },
+  Vietnam: { crp: 3.9, ds: 2.56, tax: 20, code: 'VND', pegged: false, sarPerUnit: 0.0001442, growth: 4, growthCeiling: 6, inflationLocal: 4, inflationUs: 2.5, lossOffsetCap: 100 },
+  Yemen: { crp: 15.54, ds: 10.2, tax: 20, code: 'YER', pegged: false, sarPerUnit: 0.0158, growth: 15, growthCeiling: 17, inflationLocal: 15, inflationUs: 2.5, lossOffsetCap: 100 },
+  Zambia: { crp: 11.66, ds: 7.65, tax: 35, code: 'ZMW', pegged: false, sarPerUnit: 0.19, growth: 8, growthCeiling: 10, inflationLocal: 8, inflationUs: 2.5, lossOffsetCap: 100 },
+  Zimbabwe: { crp: 11.66, ds: 7.65, tax: 25.75, code: 'ZWG', pegged: false, sarPerUnit: 0.1407, growth: 15, growthCeiling: 17, inflationLocal: 15, inflationUs: 2.5, lossOffsetCap: 100 },
 } satisfies Record<string, CountryData>;
 
 export type CountryName = keyof typeof COUNTRIES;
@@ -444,7 +644,7 @@ export const SOURCE_NOTES: SourceNote[] = [
   },
   {
     label: 'Set by PaceMakers',
-    source: 'Indicative exchange rates to SAR, long-term inflation for non-pegged currencies, preset private company multiples, size premium bands and credit spread, reviewed annually',
+    source: `Long-term inflation for currencies not pegged to the US dollar (from central bank targets and IMF projections), preset multiples, size premium bands and credit spread. Indicative exchange rates to SAR, used only for size bands (mid rates as at ${formatDataDate(FX_AS_OF)}; GCC pegs and PKR set 16 September 2026). Reviewed annually`,
     asOf: 'September 2026',
   },
   {
@@ -466,9 +666,17 @@ export const SOURCE_NOTES: SourceNote[] = [
  * REFRESH with the January Damodaran update, and whenever a central bank moves: the Saudi figure
  * predates the September 2026 rate rises. Qatar uses the QCB lending rate because the QIBOR feed
  * looked inconsistent; Oman the CBO repo rate because the latest published OMIBOR was May 2026.
+ *
+ * Since 2026-09-22 every other country the BIS central bank policy rate series covers takes that
+ * rate as its base (the euro members the ECB's, the UK Crown Dependencies the Bank of England's,
+ * Liechtenstein the Swiss National Bank's), as at the latest observation fetched that day: daily,
+ * or the latest month for India and Israel, whose daily series stopped earlier. A country with no
+ * entry here has no benchmark on file: its cost of debt is built from the risk-free rate, its
+ * default spread and the same margin, and the report says so (`builtCostOfDebtNote`).
  */
 export type LendingRate = { name: string; short: string; rate: number; asOf: string; source: string };
-export const LENDING_RATES: Record<CountryName, LendingRate> = {
+const BIS = 'Bank for International Settlements, central bank policy rates';
+export const LENDING_RATES: Partial<Record<CountryName, LendingRate>> = {
   'Saudi Arabia': { name: '3-month SAIBOR', short: 'SAIBOR', rate: 4.76, asOf: '2026-08-27', source: 'SAIBOR fixing, Argaam' },
   'United Arab Emirates': { name: '3-month EIBOR', short: 'EIBOR', rate: 4.4, asOf: '2026-09-21', source: 'Trading Economics' },
   Qatar: { name: 'QCB lending rate', short: 'QCB rate', rate: 4.6, asOf: '2026-09-17', source: 'Qatar Central Bank, reported by The Peninsula' },
@@ -476,6 +684,67 @@ export const LENDING_RATES: Record<CountryName, LendingRate> = {
   Oman: { name: 'CBO repo rate', short: 'CBO repo', rate: 4.5, asOf: '2026-09-17', source: 'Central Bank of Oman, reported by the Oman Observer' },
   Bahrain: { name: '3-month BHIBOR', short: 'BHIBOR', rate: 5.43, asOf: '2026-09-20', source: 'Trading Economics' },
   Pakistan: { name: '3-month KIBOR (offer)', short: 'KIBOR', rate: 11.75, asOf: '2026-09-18', source: 'State Bank of Pakistan' },
+  // Central bank policy rates from the BIS series, for every other country the series covers.
+  Australia: { name: 'Reserve Bank of Australia policy rate', short: 'RBA rate', rate: 4.35, asOf: '2026-09-10', source: BIS },
+  Austria: { name: 'European Central Bank policy rate', short: 'ECB rate', rate: 2.25, asOf: '2026-09-15', source: BIS },
+  Belgium: { name: 'European Central Bank policy rate', short: 'ECB rate', rate: 2.25, asOf: '2026-09-15', source: BIS },
+  Brazil: { name: 'Central Bank of Brazil policy rate', short: 'Selic', rate: 14, asOf: '2026-09-15', source: BIS },
+  Bulgaria: { name: 'European Central Bank policy rate', short: 'ECB rate', rate: 2.25, asOf: '2026-09-15', source: BIS },
+  Canada: { name: 'Bank of Canada policy rate', short: 'BoC rate', rate: 2.25, asOf: '2026-09-14', source: BIS },
+  Chile: { name: 'Central Bank of Chile policy rate', short: 'BCCh rate', rate: 4.5, asOf: '2026-09-15', source: BIS },
+  China: { name: "People's Bank of China policy rate", short: 'PBoC rate', rate: 3, asOf: '2026-09-15', source: BIS },
+  Colombia: { name: 'Central Bank of Colombia policy rate', short: 'BanRep rate', rate: 12, asOf: '2026-09-08', source: BIS },
+  Croatia: { name: 'European Central Bank policy rate', short: 'ECB rate', rate: 2.25, asOf: '2026-09-15', source: BIS },
+  Cyprus: { name: 'European Central Bank policy rate', short: 'ECB rate', rate: 2.25, asOf: '2026-09-15', source: BIS },
+  'Czech Republic': { name: 'Czech National Bank policy rate', short: 'CNB rate', rate: 3.75, asOf: '2026-09-14', source: BIS },
+  Denmark: { name: 'Danmarks Nationalbank policy rate', short: 'DN rate', rate: 2.1, asOf: '2026-09-14', source: BIS },
+  Estonia: { name: 'European Central Bank policy rate', short: 'ECB rate', rate: 2.25, asOf: '2026-09-15', source: BIS },
+  Finland: { name: 'European Central Bank policy rate', short: 'ECB rate', rate: 2.25, asOf: '2026-09-15', source: BIS },
+  France: { name: 'European Central Bank policy rate', short: 'ECB rate', rate: 2.25, asOf: '2026-09-15', source: BIS },
+  Germany: { name: 'European Central Bank policy rate', short: 'ECB rate', rate: 2.25, asOf: '2026-09-15', source: BIS },
+  Greece: { name: 'European Central Bank policy rate', short: 'ECB rate', rate: 2.25, asOf: '2026-09-15', source: BIS },
+  Guernsey: { name: 'Bank of England policy rate', short: 'Bank Rate', rate: 3.75, asOf: '2026-09-14', source: BIS },
+  'Hong Kong': { name: 'Hong Kong Monetary Authority policy rate', short: 'HKMA base rate', rate: 4, asOf: '2026-09-09', source: BIS },
+  Hungary: { name: 'Hungarian National Bank policy rate', short: 'MNB rate', rate: 5.5, asOf: '2026-09-09', source: BIS },
+  Iceland: { name: 'Central Bank of Iceland policy rate', short: 'CBI rate', rate: 8, asOf: '2026-09-15', source: BIS },
+  India: { name: 'Reserve Bank of India policy rate', short: 'RBI repo', rate: 5.25, asOf: '2026-06', source: BIS },
+  Indonesia: { name: 'Bank Indonesia policy rate', short: 'BI rate', rate: 5.75, asOf: '2026-09-03', source: BIS },
+  Ireland: { name: 'European Central Bank policy rate', short: 'ECB rate', rate: 2.25, asOf: '2026-09-15', source: BIS },
+  'Isle of Man': { name: 'Bank of England policy rate', short: 'Bank Rate', rate: 3.75, asOf: '2026-09-14', source: BIS },
+  Israel: { name: 'Bank of Israel policy rate', short: 'BoI rate', rate: 3.5, asOf: '2026-07', source: BIS },
+  Italy: { name: 'European Central Bank policy rate', short: 'ECB rate', rate: 2.25, asOf: '2026-09-15', source: BIS },
+  Japan: { name: 'Bank of Japan policy rate', short: 'BoJ rate', rate: 1, asOf: '2026-09-15', source: BIS },
+  Jersey: { name: 'Bank of England policy rate', short: 'Bank Rate', rate: 3.75, asOf: '2026-09-14', source: BIS },
+  Latvia: { name: 'European Central Bank policy rate', short: 'ECB rate', rate: 2.25, asOf: '2026-09-15', source: BIS },
+  Liechtenstein: { name: 'Swiss National Bank policy rate', short: 'SNB rate', rate: 0, asOf: '2026-09-15', source: BIS },
+  Lithuania: { name: 'European Central Bank policy rate', short: 'ECB rate', rate: 2.25, asOf: '2026-09-15', source: BIS },
+  Luxembourg: { name: 'European Central Bank policy rate', short: 'ECB rate', rate: 2.25, asOf: '2026-09-15', source: BIS },
+  Malaysia: { name: 'Bank Negara Malaysia policy rate', short: 'OPR', rate: 2.75, asOf: '2026-09-14', source: BIS },
+  Malta: { name: 'European Central Bank policy rate', short: 'ECB rate', rate: 2.25, asOf: '2026-09-15', source: BIS },
+  Mexico: { name: 'Bank of Mexico policy rate', short: 'Banxico rate', rate: 6.5, asOf: '2026-09-15', source: BIS },
+  Morocco: { name: 'Bank Al-Maghrib policy rate', short: 'BAM rate', rate: 2.25, asOf: '2026-08-31', source: BIS },
+  Netherlands: { name: 'European Central Bank policy rate', short: 'ECB rate', rate: 2.25, asOf: '2026-09-15', source: BIS },
+  'New Zealand': { name: 'Reserve Bank of New Zealand policy rate', short: 'OCR', rate: 2.75, asOf: '2026-09-11', source: BIS },
+  'North Macedonia': { name: 'National Bank of the Republic of North Macedonia policy rate', short: 'NBRNM rate', rate: 4.25, asOf: '2026-09-15', source: BIS },
+  Norway: { name: 'Norges Bank policy rate', short: 'Norges Bank rate', rate: 4.25, asOf: '2026-09-11', source: BIS },
+  Peru: { name: 'Central Reserve Bank of Peru policy rate', short: 'BCRP rate', rate: 4.25, asOf: '2026-09-11', source: BIS },
+  Philippines: { name: 'Bangko Sentral ng Pilipinas policy rate', short: 'BSP rate', rate: 5, asOf: '2026-09-11', source: BIS },
+  Poland: { name: 'National Bank of Poland policy rate', short: 'NBP rate', rate: 3.75, asOf: '2026-09-15', source: BIS },
+  Portugal: { name: 'European Central Bank policy rate', short: 'ECB rate', rate: 2.25, asOf: '2026-09-15', source: BIS },
+  Romania: { name: 'National Bank of Romania policy rate', short: 'NBR rate', rate: 6.5, asOf: '2026-09-15', source: BIS },
+  Russia: { name: 'Bank of Russia policy rate', short: 'key rate', rate: 14, asOf: '2026-09-15', source: BIS },
+  Serbia: { name: 'National Bank of Serbia policy rate', short: 'NBS rate', rate: 5.75, asOf: '2026-09-11', source: BIS },
+  Slovakia: { name: 'European Central Bank policy rate', short: 'ECB rate', rate: 2.25, asOf: '2026-09-15', source: BIS },
+  Slovenia: { name: 'European Central Bank policy rate', short: 'ECB rate', rate: 2.25, asOf: '2026-09-15', source: BIS },
+  'South Africa': { name: 'South African Reserve Bank policy rate', short: 'repo rate', rate: 7, asOf: '2026-09-14', source: BIS },
+  'South Korea': { name: 'Bank of Korea policy rate', short: 'BoK rate', rate: 3, asOf: '2026-08-28', source: BIS },
+  Spain: { name: 'European Central Bank policy rate', short: 'ECB rate', rate: 2.25, asOf: '2026-09-15', source: BIS },
+  Sweden: { name: 'Sveriges Riksbank policy rate', short: 'Riksbank rate', rate: 1.75, asOf: '2026-09-15', source: BIS },
+  Switzerland: { name: 'Swiss National Bank policy rate', short: 'SNB rate', rate: 0, asOf: '2026-09-15', source: BIS },
+  Thailand: { name: 'Bank of Thailand policy rate', short: 'BoT rate', rate: 1, asOf: '2026-09-10', source: BIS },
+  Turkey: { name: 'Central Bank of the Republic of Turkey policy rate', short: 'CBRT rate', rate: 37, asOf: '2026-09-11', source: BIS },
+  'United Kingdom': { name: 'Bank of England policy rate', short: 'Bank Rate', rate: 3.75, asOf: '2026-09-14', source: BIS },
+  'United States': { name: 'US Federal Reserve policy rate', short: 'Fed funds', rate: 3.625, asOf: '2026-09-15', source: BIS },
 };
 
 /** The default pre-tax cost of debt for a country, percent: the local base rate plus the typical margin. Null for an unknown country. */
@@ -484,11 +753,34 @@ export function defaultCostOfDebt(country: string): number | null {
   return l ? +(l.rate + ASSUMPTIONS.companyCreditSpread).toFixed(2) : null;
 }
 
-/** The country whose currency this is, and its lending rate. Each supported country has its own currency. */
-export function lendingForCurrency(code: string): { country: string; lending: LendingRate } | null {
-  const country = Object.keys(COUNTRIES).find((k) => (COUNTRIES as Record<string, { code: string }>)[k].code === code);
-  const lending = country ? (LENDING_RATES as Record<string, LendingRate | undefined>)[country] : undefined;
-  return country && lending ? { country, lending } : null;
+/**
+ * The lending rate behind a result's cost of debt: the country's, when the result names it. Results
+ * stored before 2026-09-22 carry only the currency, which then identifies the country only when one
+ * country uses it (true of all seven countries offered at the time; not of EUR or USD since).
+ */
+export function lendingForCurrency(code: string, country?: string): { country: string; lending: LendingRate } | null {
+  const table = COUNTRIES as Record<string, { code: string }>;
+  let name = country && table[country] ? country : undefined;
+  if (!name) {
+    const users = Object.keys(table).filter((k) => table[k].code === code);
+    name = users.length === 1 ? users[0] : undefined;
+  }
+  const lending = name ? (LENDING_RATES as Record<string, LendingRate | undefined>)[name] : undefined;
+  return name && lending ? { country: name, lending } : null;
+}
+
+/**
+ * The source line for a cost of debt built from the spreads: always for a country with no benchmark
+ * rate on file, and for one that has a rate when the visitor cleared the field.
+ */
+export function builtCostOfDebtNote(country: string): SourceNote {
+  const hasRate = Boolean((LENDING_RATES as Record<string, LendingRate | undefined>)[country]);
+  const why = hasRate ? 'The benchmark lending rate was not used' : `No benchmark lending rate for ${country} is on file`;
+  return {
+    label: 'Cost of debt',
+    source: `${why}, so the pre-tax cost of debt is the risk-free rate plus the ${country} default spread (Damodaran) plus a ${ASSUMPTIONS.companyCreditSpread.toFixed(1)}% margin set by PaceMakers. Default spread as at`,
+    asOf: 'January 2026 update',
+  };
 }
 
 /** The source line for a country's default cost of debt, for the report and the results page. */

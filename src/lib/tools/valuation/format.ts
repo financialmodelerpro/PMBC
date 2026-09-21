@@ -14,7 +14,7 @@
  * `warningTexts`) still format them, from the fields they did have.
  */
 
-import { ASSUMPTIONS, COUNTRIES, SOURCE_NOTES, TAX, WARNING_RULES, formatDataDate, lendingForCurrency, lendingSourceNote, type LendingRate } from './data';
+import { ASSUMPTIONS, COUNTRIES, SOURCE_NOTES, TAX, WARNING_RULES, builtCostOfDebtNote, defaultCostOfDebt, formatDataDate, lendingForCurrency, lendingSourceNote, type LendingRate } from './data';
 import type {
   Check,
   Currency,
@@ -652,9 +652,10 @@ export function scenariosTable(r: ValuationResult): Table {
  */
 export function defaultLending(w: ValuationResult['wacc'], currency: Currency): LendingRate | null {
   if (w.kdSource !== 'entered' || typeof w.kdEntered !== 'number') return null;
-  const found = lendingForCurrency(currency.code);
+  const found = lendingForCurrency(currency.code, currency.country);
   if (!found) return null;
-  const def = found.lending.rate + ASSUMPTIONS.companyCreditSpread;
+  // The default as the form fills it, rounded to the hundredth of a point (3.625% + 2.0% is 5.63%).
+  const def = defaultCostOfDebt(found.country) as number;
   return Math.abs(w.kdEntered * 100 - def) < 0.005 ? found.lending : null;
 }
 
@@ -1214,11 +1215,13 @@ export function valueLevers(r: ValuationResult): { title: string; detail: string
 /**
  * The sources, from the data module, for the methodology page. With a result and its country, the
  * local lending rate behind the cost of debt follows the risk-free rate, when the cost of debt was
- * entered (the country default the form fills, or the visitor's own); a cost of debt built from the
- * spreads needs no such line.
+ * entered (the country default the form fills, or the visitor's own). A cost of debt built from the
+ * spreads says so and why (since 2026-09-22): the country has no benchmark rate on file, or it was
+ * cleared. Results stored before 2026-09-21 have no `kdSource` and keep the list they had.
  */
 export function sourceNotes(r?: ValuationResult, country?: string): { label: string; source: string; asOf: string }[] {
-  const lending = r && country && r.wacc.kdSource === 'entered' ? lendingSourceNote(country) : null;
+  const lending =
+    !r || !country ? null : r.wacc.kdSource === 'entered' ? lendingSourceNote(country) : r.wacc.kdSource === 'built' ? builtCostOfDebtNote(country) : null;
   if (!lending) return SOURCE_NOTES;
   const at = SOURCE_NOTES.findIndex((n) => n.label === 'Risk-free rate') + 1;
   return [...SOURCE_NOTES.slice(0, at), lending, ...SOURCE_NOTES.slice(at)];

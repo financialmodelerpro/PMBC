@@ -3,7 +3,9 @@
 /**
  * A searchable select on the ARIA combobox pattern: type to filter, arrow keys
  * to move, Enter to choose, Escape to close. Each option can carry a short tag,
- * used for the currency code beside each country.
+ * used for the currency code beside each country, extra search words (so "UAE" finds the United
+ * Arab Emirates), and a group: a heading is shown wherever the group changes, so pinned options
+ * can sit above the rest under their own label.
  *
  * Keyboard contract:
  *   ArrowDown / ArrowUp  open the list, or move the highlight
@@ -17,7 +19,7 @@ import { Check, ChevronDown } from 'lucide-react';
 
 import { inputClass } from './ui';
 
-export type SearchOption = { value: string; label: string; tag?: string };
+export type SearchOption = { value: string; label: string; tag?: string; keywords?: string; group?: string };
 
 export function SearchSelect({
   id,
@@ -47,7 +49,9 @@ export function SearchSelect({
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return options;
-    return options.filter((o) => o.label.toLowerCase().includes(q) || (o.tag ?? '').toLowerCase().includes(q));
+    return options.filter(
+      (o) => o.label.toLowerCase().includes(q) || (o.tag ?? '').toLowerCase().includes(q) || (o.keywords ?? '').toLowerCase().includes(q),
+    );
   }, [options, query]);
 
   useEffect(() => {
@@ -125,7 +129,16 @@ export function SearchSelect({
           className="absolute z-30 mt-1 max-h-72 w-full overflow-auto rounded-[2px] border border-[color:var(--pmbc-border-warm)] bg-white py-1 shadow-[0_12px_32px_rgba(20,48,79,0.14)]"
         >
           {filtered.length === 0 && <li className="px-3 py-2 text-[14px] text-[color:var(--pmbc-muted)]">No match</li>}
-          {filtered.map((o, i) => (
+          {filtered.map((o, i) => [
+            o.group && o.group !== filtered[i - 1]?.group ? (
+              <li
+                key={`group-${o.group}`}
+                role="presentation"
+                className="px-3 pt-2.5 pb-1 text-[11px] font-semibold tracking-[0.08em] text-[color:var(--pmbc-muted)] uppercase"
+              >
+                {o.group}
+              </li>
+            ) : null,
             <li
               key={o.value}
               id={`${listId}-${i}`}
@@ -148,8 +161,8 @@ export function SearchSelect({
               {o.tag && (
                 <span className="rounded-[2px] bg-[#1B3A5F] px-1.5 py-0.5 text-[11px] font-semibold tracking-[0.06em] text-white">{o.tag}</span>
               )}
-            </li>
-          ))}
+            </li>,
+          ])}
         </ul>
       )}
     </div>

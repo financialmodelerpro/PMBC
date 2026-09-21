@@ -74,7 +74,9 @@ export function WaccStep({
     const l = (LENDING_RATES as Record<string, LendingRate | undefined>)[state.country];
     return l
       ? `Set from the ${l.name}, ${l.rate.toFixed(2)}% as at ${formatDataDate(l.asOf)} (${l.source}), plus a ${ASSUMPTIONS.companyCreditSpread.toFixed(1)}% margin set by PaceMakers. In ${currency.code}. Change it to your own borrowing rate, or clear it to build it from the spreads.`
-      : `What the company pays on its borrowings, in ${currency.code}. Clear it to build it from the spreads.`;
+      : kdEntered
+        ? `What the company pays on its borrowings, in ${currency.code}. Clear it to build it from the spreads.`
+        : `No benchmark lending rate is on file for ${state.country || 'this country'}, so the cost of debt is built from the risk-free rate, the country default spread and a ${ASSUMPTIONS.companyCreditSpread.toFixed(1)}% margin. Enter the company's own rate in ${currency.code} to use it instead.`;
   };
   const hintFor = (s: Spec) =>
     (s.k === 'ds' || s.k === 'cs') && kdEntered

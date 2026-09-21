@@ -1,6 +1,6 @@
 'use client';
 
-import { COUNTRIES, INDUSTRIES, TAX } from '@/lib/tools/valuation/data';
+import { COUNTRIES, INDUSTRIES, PINNED_VALUATION_COUNTRIES, TAX } from '@/lib/tools/valuation/data';
 import { PROFILE_LIMITS } from '@/lib/tools/valuation/profile';
 import { financialYearEnd, type FieldErrors } from '@/lib/tools/valuation/engine';
 
@@ -14,7 +14,37 @@ const INDUSTRY_OPTIONS = Object.keys(INDUSTRIES).map((name) => ({ value: name, l
 /** A million figure for the net debt line: up to one decimal, grouped. */
 const millions = (v: number) => v.toLocaleString('en-US', { maximumFractionDigits: 1 });
 
-const COUNTRY_OPTIONS = Object.entries(COUNTRIES).map(([name, c]) => ({ value: name, label: name, tag: c.code }));
+/** Other names people search by. */
+const COUNTRY_KEYWORDS: Record<string, string> = {
+  'Saudi Arabia': 'KSA',
+  'United Arab Emirates': 'UAE Emirates Dubai Abu Dhabi',
+  'United Kingdom': 'UK Britain England Scotland Wales',
+  'United States': 'USA US America',
+  'South Korea': 'Korea',
+  'Czech Republic': 'Czechia',
+  Turkey: 'Türkiye Turkiye',
+  Eswatini: 'Swaziland',
+  'North Macedonia': 'Macedonia',
+  "Côte d'Ivoire": 'Cote Ivory Coast',
+  'Curaçao': 'Curacao',
+  'Democratic Republic of the Congo': 'DRC Congo',
+  'Republic of the Congo': 'Congo',
+};
+const pinned = new Set<string>(PINNED_VALUATION_COUNTRIES);
+// The GCC countries and Pakistan first, in the pinned order, then every other country alphabetically.
+const COUNTRY_OPTIONS = [
+  ...PINNED_VALUATION_COUNTRIES.map((name) => ({ name, group: 'GCC and Pakistan' })),
+  ...Object.keys(COUNTRIES)
+    .filter((name) => !pinned.has(name))
+    .sort((a, b) => a.localeCompare(b))
+    .map((name) => ({ name, group: 'All other countries' })),
+].map(({ name, group }) => ({
+  value: name,
+  label: name,
+  tag: (COUNTRIES as Record<string, { code: string }>)[name].code,
+  keywords: COUNTRY_KEYWORDS[name],
+  group,
+}));
 
 const BRIDGE_FIELDS: { k: BridgeKey; label: string; hint: string }[] = [
   {
@@ -75,7 +105,7 @@ export function CompanyStep({
     <Panel eyebrow="Step 1 of 4">
       <PanelTitle
         title="Company profile"
-        lead="Amounts are entered in millions of the local currency of the country you select. GCC currencies are pegged to the US dollar, so the Damodaran cost of capital applies directly. For Pakistan, the tool converts the US dollar cost of capital into rupee terms using expected inflation."
+        lead="Amounts are entered in millions of the local currency of the country you select. Where that currency is pegged to the US dollar, as the GCC currencies are, the Damodaran cost of capital applies directly. For any other currency, the tool converts the US dollar cost of capital into local terms using expected inflation."
       />
       <div className="mb-2 rounded-[2px] border border-[color:var(--pmbc-border-warm)] bg-[#FDFBF7] p-4 sm:p-5">
         <p className="mb-3 text-[13.5px] leading-[1.55] text-[#52606B]">
@@ -120,7 +150,7 @@ export function CompanyStep({
         </Field>
         <Field label="Country of operations" hint="Sets currency, country risk premium, default spread and tax rate." error={errors.country ?? ''}>
           {({ id, describedBy, invalid }) => (
-            <SearchSelect id={id} value={state.country} options={COUNTRY_OPTIONS} placeholder="Search countries" onChange={onCountry} describedBy={describedBy} invalid={invalid} />
+            <SearchSelect id={id} value={state.country} options={COUNTRY_OPTIONS} placeholder="Search countries or currencies" onChange={onCountry} describedBy={describedBy} invalid={invalid} />
           )}
         </Field>
       </div>

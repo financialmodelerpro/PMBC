@@ -1216,6 +1216,8 @@ Valuation - 21 Sep 2026.pdf", or "Indicative Business Valuation - Jane Smith -
 name survives. The company is the gate's, else step 1's. **Without a company the
 report title and footer read "Your business"**, not the person's name.
 
+**Every country Damodaran covers** (since 2026-09-22): 173 countries in `COUNTRIES`, the seven first unchanged, the rest generated from his January 2026 `ctryprem.xlsx` (rated and frontier tables) and `countrytaxrates.xlsx`. Left out: the three emirates he lists apart from the UAE, and North Korea and Somalia, which his tax file lacks. Each has its own currency and an indicative rate to SAR as at `FX_AS_OF` (size bands only). `pegged` is true only for dollar pegs and dollar users; every other currency takes the Pakistan inflation conversion, with a long-term inflation default set by PaceMakers. The country search pins the GCC and Pakistan (`PINNED_VALUATION_COUNTRIES`) above the rest and matches currency codes and common names ("UAE", "UK"). Cost of debt: the local benchmark where one was set (the seven), else the BIS central bank policy rate (60 countries, euro members on the ECB's), else built from risk-free plus default spread plus the margin, which `builtCostOfDebtNote` states in the sources. `Currency.country` identifies the country behind a shared currency such as EUR. Zakat stays Saudi Arabia only.
+
 **Cost of debt by country** (since 2026-09-21). Choosing a country fills the cost of
 debt on step 3 with its local lending base rate plus the 2.0% margin
 (`defaultCostOfDebt`), with the base rate, date and source in the field's hint and
