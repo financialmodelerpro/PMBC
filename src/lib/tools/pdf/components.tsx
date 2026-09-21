@@ -371,11 +371,13 @@ export function KeyValues({ rows, labelWidth = '56%' }: { rows: [string, string]
  * Two key-value columns laid out row by row, so the block can break between
  * rows across a page instead of moving whole.
  */
-export function PairedColumns({ left, right, leftLabelWidth = '50%', rightLabelWidth = '50%' }: {
+export function PairedColumns({ left, right, leftLabelWidth = '50%', rightLabelWidth = '50%', keepTogether = false }: {
   left: { title: string; rows: [string, string][]; note?: string | null };
   right: { title: string; rows: [string, string][] };
   leftLabelWidth?: string;
   rightLabelWidth?: string;
+  /** Never split across pages: the whole block moves if it does not fit. */
+  keepTogether?: boolean;
 }) {
   const count = Math.max(left.rows.length, right.rows.length);
   const cell = (row: [string, string] | undefined, labelWidth: string, side: 'left' | 'right') => (
@@ -389,7 +391,7 @@ export function PairedColumns({ left, right, leftLabelWidth = '50%', rightLabelW
     </View>
   );
   return (
-    <View>
+    <View wrap={!keepTogether}>
       <View style={{ flexDirection: 'row' }} minPresenceAhead={60}>
         <View style={{ width: '50%', paddingRight: 10 }}>
           <SubHead>{left.title}</SubHead>
