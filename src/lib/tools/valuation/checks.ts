@@ -117,7 +117,7 @@ export function buildChecks(r: ValuationResult, extra: { inflationLocal: number 
       const peers = r.comparables.source === 'peers';
       const what = peers ? 'the highest comparable' : 'the top of the preset range';
       const warn = implied > top;
-      const basis = onReported ? 'reported LTM EBITDA' : 'LTM EBITDA';
+      const basis = onReported ? 'reported LTM EBITDA' : nrm?.used ? 'normalised LTM EBITDA' : 'LTM EBITDA';
       add({
         id: 'multiple_vs_peers',
         label: 'Implied multiple against comparables',

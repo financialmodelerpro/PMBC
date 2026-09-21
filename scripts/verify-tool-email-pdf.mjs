@@ -502,6 +502,29 @@ console.log('File name and untitled report');
   check('no company: the cover title is "Your business", not the person', untitled[0].includes('Your business') && !untitled[0].replace('Prepared for Jane Smith', '').includes('Jane Smith'), untitled[0].slice(0, 200));
 }
 
+console.log('Cover multiple label and discounting');
+{
+  const fullT = await pageTexts(await pdfModule.renderValuationReport(full, { ...REPORT_META, company: 'Example Co', industry: 'I', country: 'C', bookingHref: BOOK }));
+  const plainT = await pageTexts(await pdfModule.renderValuationReport(saudi, { ...REPORT_META, company: 'Example Co', industry: 'I', country: 'C', bookingHref: BOOK }));
+  const squash = (x) => x.replace(/\s+/g, '').toLowerCase();
+  check('normalised EBITDA: the cover tile says (normalised), as the check does', full.normalisation.used && squash(fullT[0]).includes(squash('Implied EV / LTM EBITDA (normalised)')) && fullT.join(' ').includes('normalised LTM EBITDA'));
+  check('reported EBITDA: the cover tile has no (normalised)', !saudi.normalisation.used && squash(plainT[0]).includes(squash('Implied EV / LTM EBITDA')) && !squash(plainT[0]).includes('(normalised)'));
+  check('discounting reads "Mid-year" or "End of year"', format.terminalRows(saudi).some(([k, v]) => k === 'Discounting' && (v === 'Mid-year' || v === 'End of year')) && !JSON.stringify(format.terminalRows(saudi)).includes('convention'));
+}
+
+console.log('Revenue and EBITDA chart labels');
+{
+  const charts = await jiti.import(path.join(root, 'src/lib/tools/valuation/charts.ts'));
+  for (const [label, r] of [['Pakistan', pakistan], ['distressed', distressed]]) {
+    const u = format.amountUnit(r);
+    const fig = (v) => { const s = Math.round(Math.abs(v) * u.scale).toLocaleString('en-US'); return v < 0 ? `(${s})` : s; };
+    const texts = charts.revenueMarginChart(r).prims.filter((p) => p.t === 'text').map((p) => p.text);
+    check(`${label}: the chart labels every year's EBITDA as well as revenue`, r.ebitda.every((v) => texts.includes(fig(v))) && r.revenue.every((v) => texts.includes(fig(v))), JSON.stringify(r.ebitda.map(fig)));
+    const t = await pageTexts(await pdfModule.renderValuationReport(r, { ...REPORT_META, company: 'Example Co', industry: 'I', country: 'C', bookingHref: BOOK }));
+    check(`${label}: page 2 prints every EBITDA figure`, r.ebitda.every((v) => t[1].includes(fig(v))), r.ebitda.map(fig).filter((x) => !t[1].includes(x)).join(', '));
+  }
+}
+
 console.log('Brevo payload');
 {
   const captured = [];

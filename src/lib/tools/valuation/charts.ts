@@ -337,6 +337,10 @@ export function revenueMarginSeriesChart(
     const ye = yV(eb);
     prims.push({ t: 'rect', x: round(x + colW * 0.52), y: round(Math.min(ye, y0)), w: round(bw), h: round(Math.max(1, Math.abs(y0 - ye))), fill: eb < 0 ? P.negative : forecast ? P.ebitdaForecast : P.ebitdaActual, opacity: forecast ? P.forecastOpacity : 1, rx: 2, hint: `${l} EBITDA ${fmtAmount(eb, unit)}, margin ${fmtPct(margins[i], 1)}` });
     prims.push({ t: 'text', x: round(x + colW * 0.31), y: round(yr - 5), text: Math.round(rv * unit.scale).toLocaleString('en-US'), size: 9.5, fill: P.text, anchor: 'middle' });
+    // EBITDA's figure too (since 2026-09-21), above its bar; for a loss, in brackets as the tables print it,
+    // just above the zero line at the top of its downward bar, clear of the year labels below.
+    const ebLabel = Math.round(Math.abs(eb) * unit.scale).toLocaleString('en-US');
+    prims.push({ t: 'text', x: round(x + colW * 0.69), y: round(eb < 0 ? y0 - 4 : ye - 5), text: eb < 0 ? `(${ebLabel})` : ebLabel, size: 9.5, fill: P.text, anchor: 'middle' });
     prims.push({ t: 'text', x: round(x + colW / 2), y: height - 10, text: l, size: 11, fill: forecast ? P.forecastCaption : P.muted, anchor: 'middle', weight: forecast ? 400 : 600 });
   });
   const pts = margins.map((m, i) => [round(padL + i * colW + colW / 2), round(yM(m))] as const);

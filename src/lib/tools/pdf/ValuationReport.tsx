@@ -48,6 +48,7 @@ import { equityRangeBar, footballFieldChart, revenueMarginChart, sensitivityHeat
 import {
   INDICATIVE_NOTE,
   LABELS,
+  ltmMultipleLabel,
   dcfCombinedLabel,
   PRE_MONEY_NOTE,
   RELIANCE_STATEMENT,
@@ -149,27 +150,15 @@ export const REPORT_PAGE_TITLES = [
 /* The report                                                                */
 /* ------------------------------------------------------------------------ */
 
-export function ValuationReport({ result, meta }: { result: ValuationResult; meta: ReportMeta }) {
-  const r = result;
-  const h = headline(r);
-  const c = r.currency;
+/**
+ * Page 6's assumption tables as rows: the tax and balance sheet columns, and whether the timing rows
+ * sit on the left. Used to draw the page and, before drawing, to estimate its height (`checksFitOnPage6`).
+ */
+export function page6Tables(r: ValuationResult) {
   const u = amountUnit(r);
-  const unit = u.label;
   const amt = (v: number) => `${fmtAmount(v, u)} ${u.short}`;
-  const purposeValue = r.meta.purpose ?? meta.purpose;
-  const purpose = PURPOSES.find((p) => p.value === purposeValue)?.label;
-  const dateText = meta.generatedAt.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
-  // The report is about the business, not the person: without a company name it reads "Your business".
-  const who = meta.company?.trim() || 'Your business';
   const b = r.bridge;
   const bridgeItemsUsed = Boolean(b.eosb || b.leases || b.minorityInterest || b.surplusAssets);
-  const W = PAGE.contentWidth;
-  const brand = withBrandDefaults(meta.branding);
-  const partner = brand.partner;
-  const about = descriptionParagraphs(meta.description);
-  const checks = checkItems(r);
-  const warningCount = checks.filter((x) => x.status === 'warning').length;
-  const perpetuityOnly = r.dcfBlock?.combination === 'perpetuity_only';
   // Page 6's tax and balance sheet block, as two columns. "(borrowings less cash)" is dropped from the
   // net debt label here: the two rows above it say so, and the long label wrapped onto a second line.
   const taxTitle = r.tax.zakatApplies ? 'Tax and zakat' : 'Tax';
@@ -196,9 +185,59 @@ export function ValuationReport({ result, meta }: { result: ValuationResult; met
           ['EBITDA, reported', amt(r.ltmEbitdaReported)],
           ['EBITDA, normalised', amt(r.ltmEbitda)],
         ] as [string, string][])
-      : ([['EBITDA', 'Reported, no adjustments']] as [string, string][])),
+      : ([['EBITDA', 'As reported']] as [string, string][])),
   ];
   const timingOnLeft = Math.max(taxR.length + timingR.length, balanceR.length) < Math.max(taxR.length, timingR.length + balanceR.length);
+  return { taxTitle, taxR, timingR, balanceR, timingOnLeft };
+}
+
+/**
+ * Whether the check list fits whole on page 6 under the assumption tables, estimated before drawing.
+ * When it does, the list is kept on one page; when it may not, its rows break across pages 6 and 7,
+ * because a whole list that jumped a page would leave page 6 part empty (the nine-page report of
+ * 2026-09-21). Calibrated on 2026-09-21 against rendered reports: the heading lands at about 173pt
+ * plus 12.6pt per table row (residuals within 7pt), the first row 17.3pt below it, a row is 14.5pt
+ * on one line and up to 25pt on two, and content ends at 786pt. The wrap thresholds sit below the
+ * measured ones and a 12pt margin covers the rest, so an estimate that errs says "may not fit".
+ * `verify-report-layout` checks every case the estimate keeps whole really is on one page.
+ */
+export function checksFitOnPage6(r: ValuationResult, checks: { label: string; message: string }[]): boolean {
+  const t = page6Tables(r);
+  const terminal = terminalRows(r).length;
+  const comps = comparablesRows(r).filter(([k]) => !k.startsWith('Companies') && k !== 'After discount, EV / EBIT (reference)').length + (r.comparables.source === 'peers' ? 1 : 0);
+  const left = t.timingOnLeft ? t.taxR.length + t.timingR.length : t.taxR.length;
+  const right = t.timingOnLeft ? t.balanceR.length : t.timingR.length + t.balanceR.length;
+  const peers = r.comparables.peerNames.length ? r.comparables.peerNames.join('; ').length + 35 : 0;
+  const peerHeight = peers ? 8 + 11.5 * Math.ceil(peers / 100) : 0;
+  const noteHeight = disclosures(r).premiumAndDiscount ? 14 : 0;
+  const heading = 173 + 12.6 * (Math.max(terminal, comps) + Math.max(left, right)) + peerHeight + noteHeight;
+  const rows = checks.reduce((sum, x) => sum + (x.message.length > 86 || x.label.length > 27 ? 25 : 14.5), 0);
+  return heading + 17.3 + rows - 3 <= 786 - 12;
+}
+
+export function ValuationReport({ result, meta }: { result: ValuationResult; meta: ReportMeta }) {
+  const r = result;
+  const h = headline(r);
+  const c = r.currency;
+  const u = amountUnit(r);
+  const unit = u.label;
+  const amt = (v: number) => `${fmtAmount(v, u)} ${u.short}`;
+  const purposeValue = r.meta.purpose ?? meta.purpose;
+  const purpose = PURPOSES.find((p) => p.value === purposeValue)?.label;
+  const dateText = meta.generatedAt.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
+  // The report is about the business, not the person: without a company name it reads "Your business".
+  const who = meta.company?.trim() || 'Your business';
+  const b = r.bridge;
+  const bridgeItemsUsed = Boolean(b.eosb || b.leases || b.minorityInterest || b.surplusAssets);
+  const W = PAGE.contentWidth;
+  const brand = withBrandDefaults(meta.branding);
+  const partner = brand.partner;
+  const about = descriptionParagraphs(meta.description);
+  const checks = checkItems(r);
+  const checksTogether = checksFitOnPage6(r, checks);
+  const warningCount = checks.filter((x) => x.status === 'warning').length;
+  const perpetuityOnly = r.dcfBlock?.combination === 'perpetuity_only';
+  const { taxTitle, taxR, timingR, balanceR, timingOnLeft } = page6Tables(r);
   // The WACC working for page 5, with the two weights on one line: the page holds five value factors
   // and a stake table above it, and one line fewer is what keeps that case on eight pages.
   const pdfWaccSteps = waccSteps(r.wacc, c).flatMap((x) =>
@@ -214,7 +253,7 @@ export function ValuationReport({ result, meta }: { result: ValuationResult; met
   const kpis: [string, string][] = [
     [LABELS.wacc, h.wacc],
     [LABELS.tvShare, h.tvShare],
-    [LABELS.ltmMultiple, h.ltmMultiple],
+    [ltmMultipleLabel(r), h.ltmMultiple],
     [LABELS.weighted, h.weighted ?? 'n/a'],
   ];
   // Long company names step down so the cover never runs onto a second page.
@@ -449,6 +488,8 @@ export function ValuationReport({ result, meta }: { result: ValuationResult; met
             could not fit. Each row is kept whole; the heading stays with at least its first rows. */}
         {/* Heading and rows are direct children of the page, not wrapped in a container: react-pdf then
             moves rows one at a time, whereas a container of unsplittable rows was moved whole and left a gap. */}
+        {/* Kept on one page when the estimate says it fits (`checksFitOnPage6`), else broken between rows. */}
+        <View wrap={!checksTogether}>
         <View minPresenceAhead={50} style={{ marginTop: 4 }}>
           <SectionHeading title="Checks, all run on every valuation" />
         </View>
@@ -459,6 +500,7 @@ export function ValuationReport({ result, meta }: { result: ValuationResult; met
             <Text style={{ width: '65%', fontSize: 8, color: RC.muted, lineHeight: 1.3 }}>{x.message}</Text>
           </View>
         ))}
+        </View>
 
         <View wrap={false} style={{ marginBottom: 4 }}>
           {[notes.zakat, notes.valuationDate, notes.financialYearEnd].filter(Boolean).map((line) => (
