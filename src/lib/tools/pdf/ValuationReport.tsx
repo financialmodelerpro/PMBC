@@ -426,9 +426,14 @@ export function ValuationReport({ result, meta }: { result: ValuationResult; met
                       ['Surplus assets', amt(b.surplusAssets)],
                     ] as [string, string][])
                   : ([['Other claims, surplus assets', 'None entered']] as [string, string][])),
-                r.normalisation.used
-                  ? ['Normalised EBITDA', `${fmtAmount(r.ltmEbitdaReported, u)} to ${amt(r.ltmEbitda)}`]
-                  : ['EBITDA', 'Reported, no adjustments'],
+                // Two rows, each with its unit, rather than "1,720.0 to 1,845.0 PKR m" in one cell, which
+                // wrapped the unit onto a line of its own in the narrow value column.
+                ...(r.normalisation.used
+                  ? ([
+                      ['EBITDA, reported', amt(r.ltmEbitdaReported)],
+                      ['EBITDA, normalised', amt(r.ltmEbitda)],
+                    ] as [string, string][])
+                  : ([['EBITDA', 'Reported, no adjustments']] as [string, string][])),
               ],
             }}
           />

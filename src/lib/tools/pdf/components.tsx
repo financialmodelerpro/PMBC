@@ -70,6 +70,16 @@ export function AccentRule({ width = PAGE.contentWidth }: { width?: number }) {
 
 const pt = (u: number) => u * LH_SCALE;
 
+/**
+ * The header is drawn past the top and right edges. The layout grid is 595pt wide, but A4 is
+ * 595.28pt, so a header ending at the grid's edge left a 0.28pt white hairline down the right,
+ * and a bar starting exactly at y = 0 can show a light line at the top in some viewers. Drawing
+ * over the edge by `HEADER_BLEED` closes both; the page clips what falls outside. Since 2026-09-21.
+ */
+export const A4_WIDTH = 595.28;
+export const HEADER_BLEED = 1.5;
+const RIGHT_OVERHANG = A4_WIDTH - PAGE.width + HEADER_BLEED;
+
 /** One swoosh shape, starting at x on the top edge, in letterhead points. */
 function swooshPath(x: number): string {
   const L = LETTERHEAD;
@@ -94,7 +104,7 @@ function Swoosh({ scale, barHeight, id }: { scale: number; barHeight: number; id
       width={w * LH_SCALE * scale}
       height={h * LH_SCALE * scale}
       viewBox={`${left} 0 ${w} ${h}`}
-      style={{ position: 'absolute', top: 0, right: 0 }}
+      style={{ position: 'absolute', top: 0, right: -RIGHT_OVERHANG }}
     >
       <Defs>
         <LinearGradient id={`${id}A`} x1="0" y1="0" x2="0.35" y2="1">
@@ -124,7 +134,7 @@ export function LetterheadHeader({ brand }: { brand: ResolvedBrand }) {
   const logoHeight = pt(L.logo.bottom - L.logo.top);
   return (
     <View fixed style={{ position: 'absolute', top: 0, left: 0, width: PAGE.width, height: pt(L.logo.bottom) + 6 }}>
-      <View style={{ position: 'absolute', top: 0, left: 0, width: PAGE.width, height: pt(L.barHeight), backgroundColor: RC.navy }} />
+      <View style={{ position: 'absolute', top: -HEADER_BLEED, left: -HEADER_BLEED, width: A4_WIDTH + 2 * HEADER_BLEED, height: pt(L.barHeight) + HEADER_BLEED, backgroundColor: RC.navy }} />
       <Swoosh scale={1} barHeight={L.barHeight} id="lhHead" />
       <View style={{ position: 'absolute', left: pt(L.logo.x), top: pt(L.logo.top) }}>
         <BrandLogo brand={brand} height={logoHeight} />
@@ -141,7 +151,7 @@ export function InnerHeader() {
   const barHeight = 3.2;
   return (
     <View fixed style={{ position: 'absolute', top: 0, left: 0, width: PAGE.width, height: pt(LETTERHEAD.swooshBottom) * INNER_SWOOSH_SCALE }}>
-      <View style={{ position: 'absolute', top: 0, left: 0, width: PAGE.width, height: barHeight, backgroundColor: RC.navy }} />
+      <View style={{ position: 'absolute', top: -HEADER_BLEED, left: -HEADER_BLEED, width: A4_WIDTH + 2 * HEADER_BLEED, height: barHeight + HEADER_BLEED, backgroundColor: RC.navy }} />
       <Swoosh scale={INNER_SWOOSH_SCALE} barHeight={barHeight / LH_SCALE} id="lhInner" />
     </View>
   );
