@@ -1196,6 +1196,13 @@ in the report's sources. It stays editable; a typed rate is replaced when the
 country changes, since it is in that country's currency; clearing it builds the
 cost of debt from the spreads as before. `verify-valuation-engine` clears it, as
 the reference tool only knows the spread build, and so does the v2 regression case.
+**For a currency not pegged to the dollar the entered rate is converted once**:
+to dollars by the inflation gap, blended with the dollar cost of equity, and the
+blended WACC converted back once. `verify-valuation-v2` section 17 proves it: the
+PKR equivalent of the spread-built cost of debt reproduces the spread-built WACC
+exactly. The Saudi rate was rechecked on 2026-09-21: 27 August 2026 (Argaam) is
+still the latest public 3-month fixing found; SAMA raised rates in mid-September,
+so replace it when a later fixing is published.
 
 **Implied multiple against comparables** (`multiple_vs_peers`, since 2026-09-21):
 warns when the implied EV / LTM EBITDA is above the highest comparable EV / EBITDA
@@ -1246,7 +1253,7 @@ cases and rasterises every page to PNG for inspection.
 5. Checks in `verify-valuation-v2` for the item on its own and absent, then `verify-valuation-engine` to prove the neutral path.
 
 **Verifiers.** `verify-valuation-engine` (518: 514 reference parity plus 4 on the market data passed into the reference),
-`verify-valuation-v2` (465), `verify-tool-lead-api` (146),
+`verify-valuation-v2` (470), `verify-tool-lead-api` (146),
 `verify-valuation-dashboard` (300, the results page end to end at 1440, 1024 and 390, including the partner portrait's 4:5 frame and source ratio,
 against a local `next start`, every /api/ request intercepted so nothing is
 written), `verify-tool-email-pdf` (390, pdfjs text and operator list, including the report theme's footer, colour and logo rules, so a ligature glyph is

@@ -989,6 +989,28 @@ console.log('16. Cost of debt by country');
   check('Pakistan default: KIBOR plus margin, converted to dollars', close(pkW.kd, (1 + (data.LENDING_RATES.Pakistan.rate + M) / 100) / infl - 1));
 }
 
+console.log('17. Pakistan: the entered cost of debt is converted once');
+{
+  // KIBOR-based cost of debt is in PKR. It is taken to dollars by the inflation gap, blended with the
+  // dollar cost of equity, and the blended WACC converted back to PKR once. The proof: entering the
+  // exact PKR equivalent of the spread-built dollar cost of debt must give the spread-built WACC.
+  const pkBase = { rf: 4.77, erp: 4.14, crp: 9.71, bu: 0.56, de: 37.1, sp: 2, ds: 6.37, cs: 2, tax: 29, inflationLocal: 7, inflationUs: 2.5 };
+  const cur = engine.currencyFor('Pakistan');
+  const built = engine.computeWacc({ ...pkBase, kd: null }, cur);
+  const conv = 1.07 / 1.025;
+  const localEquivalent = ((1 + built.kd) * conv - 1) * 100;
+  const entered = engine.computeWacc({ ...pkBase, kd: localEquivalent }, cur);
+  check('the PKR equivalent of the built cost of debt gives the built WACC exactly', close(entered.kd, built.kd, 1e-12) && close(entered.wacc, built.wacc, 1e-12), `${entered.wacc} vs ${built.wacc}`);
+  // A double conversion (the rate converted, and the converted dollar WACC converted again) would not.
+  const doubled = (1 + entered.waccUsd) * conv * conv - 1;
+  check('a double conversion would differ by more than half a point', Math.abs(doubled - built.wacc) > 0.005);
+  // The KIBOR default: 13.75% PKR is 8.97% in dollars, and the PKR WACC is the dollar WACC converted once.
+  const kibor = engine.computeWacc({ ...pkBase, kd: data.defaultCostOfDebt('Pakistan') }, cur);
+  check('KIBOR default: dollar cost of debt is (1 + rate) / inflation gap - 1', close(kibor.kd, (1 + data.defaultCostOfDebt('Pakistan') / 100) / conv - 1));
+  check('KIBOR default: PKR WACC is the dollar WACC converted once', close(kibor.wacc, (1 + kibor.waccUsd) * conv - 1));
+  check('the cost of equity is a dollar rate and is not converted on its own', close(kibor.ke, kibor.rf + kibor.bl * kibor.erp + kibor.crp + kibor.sp));
+}
+
 console.log(`\n${checks - failures} of ${checks} checks passed.`);
 if (failures) {
   console.log(`${failures} FAILED`);
