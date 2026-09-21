@@ -27,7 +27,8 @@ import {
   type EmailTemplate,
 } from '../email/templates';
 import { fetchReportBranding } from '../brand/fetch';
-import { renderValuationReport, reportFileName } from '../pdf/ValuationReport';
+import { reportFileName } from '../pdf/fileName';
+import { renderValuationReport } from '../pdf/ValuationReport';
 import { DEAL_BAND_UNSURE, DEAL_BANDS_SAR } from '../valuation/data';
 import { dealBandLabel, currencyFor, type ValuationResult } from '../valuation/engine';
 import { ALERT_TAG, RESULTS_TAG } from '../engagement';
@@ -105,11 +106,13 @@ export async function sendResultsEmail(
   // so webhook events for the new message can only move it forward from here.
   if (opts.resend) await updateLead(lead.id, { email_status: 'pending', email_error: null });
 
+  // One company name for the title and the file name: the gate's, else the one typed on step 1.
+  const company = lead.company || (lead.inputs as { profile?: { companyName?: string | null } } | null)?.profile?.companyName || null;
   let attachments: { name: string; content: string }[] | undefined;
   try {
     const pdf = await renderValuationReport(result, {
       preparedFor: lead.name,
-      company: lead.company,
+      company,
       industry: lead.industry ?? '',
       country: lead.country ?? '',
       purpose: lead.purpose,
@@ -119,7 +122,7 @@ export async function sendResultsEmail(
       branding: await fetchReportBranding(),
       description: (lead.inputs as { profile?: { description?: string | null } } | null)?.profile?.description ?? null,
     });
-    attachments = [{ name: reportFileName(lead.company, lead.name, now), content: pdf.toString('base64') }];
+    attachments = [{ name: reportFileName(company, lead.name, now), content: pdf.toString('base64') }];
   } catch (err) {
     // The email still goes, without the report, and the failure is visible.
     console.error('[tool-leads] PDF render failed:', err);

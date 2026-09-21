@@ -106,20 +106,26 @@ export function buildChecks(r: ValuationResult, extra: { inflationLocal: number 
   // company discount (since 2026-09-21). A value above every comparable, even before the discount a
   // private company usually trades at, needs a reason. Run whenever last actual EBITDA is positive.
   {
-    const implied = r.ltmMultiple;
+    // When owner cost add-backs are not carried into the forecast, the DCF values reported earnings, so
+    // the implied multiple is measured on reported EBITDA (since 2026-09-21); otherwise on normalised.
+    const nrm = r.normalisation;
+    const onReported = Boolean(nrm?.used && nrm.ownerCosts !== 0 && !nrm.carryOwnerCosts);
+    const basisEbitda = onReported ? r.ltmEbitdaReported : r.ltmEbitda;
+    const implied = onReported ? (basisEbitda > 0 ? r.ev[1] / basisEbitda : NaN) : r.ltmMultiple;
     const top = r.comparables?.ebitdaMultiplesPre?.[2];
-    if (r.ltmEbitda > 0 && Number.isFinite(implied) && Number.isFinite(top)) {
+    if (basisEbitda > 0 && Number.isFinite(implied) && Number.isFinite(top)) {
       const peers = r.comparables.source === 'peers';
       const what = peers ? 'the highest comparable' : 'the top of the preset range';
       const warn = implied > top;
+      const basis = onReported ? 'reported LTM EBITDA' : 'LTM EBITDA';
       add({
         id: 'multiple_vs_peers',
         label: 'Implied multiple against comparables',
         status: warn ? 'warning' : 'pass',
         message: warn
-          ? `Implied ${fmtMultiple(implied)} LTM EBITDA is above ${what} (${fmtMultiple(top)}, before discount): the forecast or terminal value may carry more than the market pays.`
-          : `Implied ${fmtMultiple(implied)} LTM EBITDA is within ${what} (${fmtMultiple(top)}).`,
-        values: { implied, top, peers: peers ? 1 : 0 },
+          ? `Implied ${fmtMultiple(implied)} ${basis} is above ${what} (${fmtMultiple(top)}, before discount): the forecast or terminal value may carry more than the market pays.`
+          : `Implied ${fmtMultiple(implied)} ${basis} is within ${what} (${fmtMultiple(top)}).`,
+        values: { implied, top, peers: peers ? 1 : 0, onReported: onReported ? 1 : 0 },
       });
     }
   }
@@ -314,9 +320,12 @@ export function buildChecks(r: ValuationResult, extra: { inflationLocal: number 
         id: 'reinvestment',
         label: 'Growth and reinvestment',
         status: warn ? 'warning' : 'pass',
-        message: warn
-          ? `Reinvestment and returns support growth of about ${fmtPct(q.impliedGrowthFromReinvestment, 1)}, not the ${fmtPct(r.growth, 1)} assumed.`
-          : `Reinvestment and returns support growth close to the ${fmtPct(r.growth, 1)} assumed.`,
+        // Plain English (since 2026-09-21), in the direction of the gap.
+        message: !warn
+          ? `Your forecast reinvests about what long-term growth of ${fmtPct(r.growth, 1)} needs.`
+          : q.impliedGrowthFromReinvestment > r.growth
+            ? `Your forecast reinvests more than long-term growth of ${fmtPct(r.growth, 1)} needs (enough for about ${fmtPct(q.impliedGrowthFromReinvestment, 1)}). Check capex and working capital.`
+            : `Your forecast reinvests too little for long-term growth of ${fmtPct(r.growth, 1)} (enough for about ${fmtPct(q.impliedGrowthFromReinvestment, 1)}). Check capex and working capital, or the growth rate.`,
         values: { implied: q.impliedGrowthFromReinvestment, growth: r.growth, threshold: R.reinvestmentGapPoints },
       });
     }

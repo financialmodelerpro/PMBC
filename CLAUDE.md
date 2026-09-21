@@ -1177,17 +1177,29 @@ and in the report, and the admin lead list and version history.
 `verify-valuation-engine` converts the reference's words ("million") before
 comparing, so every figure is still matched exactly.
 
-**Running again: one lead per session** (since 2026-09-21). Once a lead exists,
-Run valuation skips the gate and posts to the version route with
-`sendEmail: false`: the lead gets a new version, **no results email and no admin
-alert** (the alert is sent once, when the lead is created). The lead and gate are
-kept in `sessionStorage` (`pmbcValuationLead`), so a reload in the same tab is the
-same session; a new tab is a new session. A re-run's event is source `results`
-with `payload.kind = 'rerun'`, because the `source` column's CHECK allows only its
-original values; emailed versions are counted as all versions less re-runs, so
-older events count as emailed. Re-runs have their own limit (30 an hour, 100 a
-day), so they never use up the emails. The admin version history says which
-kind replaced each version.
+**Every run from the form is a new lead** (since 2026-09-21, replacing a same-day
+rule that saved later runs in the tab under the first lead, which filed a second
+company's valuation under the first company). Run valuation always shows the name
+and email step, prefilled from `sessionStorage` (`pmbcValuationGate`: name, email,
+purpose, deal size, follow-up and raise amount only, never a token, a company or
+consent). The gate's company is step 1's name, or blank after a saved lead;
+consent is ticked again for each lead. Submitting clears the previous token
+first, so Email me this version and the PDF only ever reach the valuation on
+screen. **Only the results page updates a valuation**: the sliders, and Email me
+this version, which uses that lead's name and company and the current inputs.
+**Start a new valuation** on the results page clears the form. The retired key
+`pmbcValuationLead` is removed on load. The version route still accepts
+`sendEmail: false` and its separate limit, but the page no longer sends it.
+`verify-valuation-dashboard` runs, at each width: a second run (prefilled gate, a
+new lead, Email me this version on the new token), two companies in one session
+via Load an example company after a real valuation, and a blank company twice.
+
+**Report file name** (`src/lib/tools/pdf/fileName.ts`, one rule for the results
+download, the email attachment and admin): "Acme Clinics - Indicative Business
+Valuation - 21 Sep 2026.pdf", or "Indicative Business Valuation - Jane Smith -
+21 Sep 2026.pdf" without a company, sent with a UTF-8 `filename*` so an Arabic
+name survives. The company is the gate's, else step 1's. **Without a company the
+report title and footer read "Your business"**, not the person's name.
 
 **Cost of debt by country** (since 2026-09-21). Choosing a country fills the cost of
 debt on step 3 with its local lending base rate plus the 2.0% margin
@@ -1223,11 +1235,26 @@ of reported EBITDA** (`addbacks_large`, `WARNING_RULES.addBackShare`) warn.
 Gaps read "within X%" rounded up (`fmtWithinPct`) and "differ by X%" rounded,
 never 0%.
 
-**Page 6's tax and balance sheet block is kept whole** (`PairedColumns
-keepTogether`): no row lands on page 7 apart from its table. The timing rows sit
-in the shorter column when that makes the block shorter, the premium and
-discount note sits below the block, and the densest report (five factors, stake,
-add-backs) is a verifier case that must keep it on page 6 in eight pages.
+**Pages 6 and 7 flow; only the assumption tables are kept whole** (since
+2026-09-21). Page 6 starts with the terminal value and comparables tables, then
+the tax and balance sheet block (`PairedColumns keepTogether`, so "EBITDA,
+normalised" never leaves its table), both of bounded height. Everything after
+them breaks between rows or paragraphs: the check rows are direct children of
+the page (a container of unsplittable rows was moved whole, which left page 6
+half empty and gave nine pages), the methodology keeps only its title, heading
+and first paragraph together, and "Important" breaks between paragraphs. The
+timing rows sit in the shorter column when that is shorter ("Tax, zakat and
+timing"). **`npm run verify-report-layout`** renders a matrix of country, stake,
+normalisation, bridge items, peers, invested capital and margin (a spread of 120
+by default, `LAYOUT_FULL=1` for all 973, about an hour) and requires eight pages,
+page 6 at least 80% full, the block whole on page 6 and "Important" on page 7.
+The reported case (Pakistan, 35% minority, owner costs not carried, EOSB and
+leases) is first; it failed on the old layout.
+
+**The implied multiple check** measures against reported EBITDA when owner cost
+add-backs are not carried into the forecast, since the DCF then values reported
+earnings; otherwise normalised. **Growth and reinvestment** is worded in plain
+English, in the direction of the gap.
 
 **Implied multiple against comparables** (`multiple_vs_peers`, since 2026-09-21):
 warns when the implied EV / LTM EBITDA is above the highest comparable EV / EBITDA
@@ -1278,10 +1305,10 @@ cases and rasterises every page to PNG for inspection.
 5. Checks in `verify-valuation-v2` for the item on its own and absent, then `verify-valuation-engine` to prove the neutral path.
 
 **Verifiers.** `verify-valuation-engine` (518: 514 reference parity plus 4 on the market data passed into the reference),
-`verify-valuation-v2` (489), `verify-tool-lead-api` (146),
-`verify-valuation-dashboard` (300, the results page end to end at 1440, 1024 and 390, including the partner portrait's 4:5 frame and source ratio,
+`verify-valuation-v2` (496), `verify-tool-lead-api` (146), `verify-report-layout` (see above),
+`verify-valuation-dashboard` (375, the results page end to end at 1440, 1024 and 390, including the partner portrait's 4:5 frame and source ratio,
 against a local `next start`, every /api/ request intercepted so nothing is
-written), `verify-tool-email-pdf` (392, pdfjs text and operator list, including the report theme's footer, colour and logo rules, so a ligature glyph is
+written), `verify-tool-email-pdf` (399, pdfjs text and operator list, including the report theme's footer, colour and logo rules, so a ligature glyph is
 caught even though extracted text maps it back to letters),
 `verify-tools-visibility` (97), `verify-brevo-webhook` (168), `verify-booking-links` (61) and
 `verify-production-guard` (34). Each was

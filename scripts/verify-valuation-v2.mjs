@@ -1056,6 +1056,27 @@ console.log('18. Normalisation against the forecast, add-backs, gap wording');
   check('no result says within 0% or differ by 0%', !texts.some((t) => /within 0%|by 0%/.test(t)));
 }
 
+console.log('19. Implied multiple basis, reinvestment wording');
+{
+  const ebitdaR = B.ltmEbitdaReported;
+  const nrm = (ownerCosts, carry) => run({ ...BASE, normalisation: { oneOff: null, ownerCosts, carryOwnerCosts: carry } });
+  const notCarried = nrm(ebitdaR * 0.1, false), carried = nrm(ebitdaR * 0.1, true);
+  const cN = checkOf(notCarried, 'multiple_vs_peers'), cC = checkOf(carried, 'multiple_vs_peers');
+  check('owner costs not carried: implied multiple on reported EBITDA', close(cN.values.implied, notCarried.ev[1] / notCarried.ltmEbitdaReported) && cN.values.onReported === 1 && cN.message.includes('reported LTM EBITDA'));
+  check('owner costs carried: implied multiple on normalised EBITDA', close(cC.values.implied, carried.ltmMultiple) && cC.values.onReported === 0 && !cC.message.includes('reported'));
+  check('no normalisation: implied multiple is the headline LTM multiple', close(checkOf(B, 'multiple_vs_peers').values.implied, B.ltmMultiple));
+  // Reinvestment, in plain English, in the direction of the gap.
+  const withIc = (ic) => run({ ...BASE, investedCapital: ic });
+  const texts = [50, 100, 200, 400, 800, 1600].map((ic) => checkOf(withIc(ic), 'reinvestment')).filter(Boolean);
+  const more = texts.find((c) => c.status === 'warning' && c.values.implied > c.values.growth);
+  const less = texts.find((c) => c.status === 'warning' && c.values.implied < c.values.growth);
+  const pass = texts.find((c) => c.status === 'pass');
+  check('reinvestment: too much reads plainly', !more || (more.message.startsWith('Your forecast reinvests more than long-term growth') && more.message.endsWith('Check capex and working capital.')), more?.message);
+  check('reinvestment: too little reads plainly', !less || less.message.startsWith('Your forecast reinvests too little'), less?.message);
+  check('reinvestment: at least one direction exercised', Boolean(more || less), JSON.stringify(texts.map((c) => c.status)));
+  check('reinvestment: pass reads plainly', !pass || pass.message.startsWith('Your forecast reinvests about what'), pass?.message);
+}
+
 console.log(`\n${checks - failures} of ${checks} checks passed.`);
 if (failures) {
   console.log(`${failures} FAILED`);

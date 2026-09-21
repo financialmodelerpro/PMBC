@@ -70,65 +70,40 @@ export async function submitLead(body: unknown): Promise<{ result: ValuationResu
 }
 
 /* ------------------------------------------------------------------------ */
-/* Running again in the same session                                         */
+/* The gate's prefill                                                        */
 /* ------------------------------------------------------------------------ */
 
 /**
- * The lead this browser session created, so running the valuation again, even
- * after a reload in the same tab, updates it as a new version instead of
- * creating a second lead with a second admin alert. Session storage only: it
- * ends with the tab, and holds nothing the page did not already hold.
+ * The person's details from the last valuation in this tab, so the name and email step is quick the
+ * next time. Only these: never a lead token, a company or consent, because every run from the form is
+ * a new lead (since 2026-09-21). Until then the tab kept the lead itself (pmbcValuationLead) and a
+ * second valuation was saved under the first; that key is removed on read, so a browser still
+ * holding it from before is released.
  */
-const SESSION_LEAD_KEY = 'pmbcValuationLead';
+const PREFILL_KEY = 'pmbcValuationGate';
+const RETIRED_LEAD_KEY = 'pmbcValuationLead';
 
-export type SessionLead = {
-  lead: { name: string; email: string; token: string; booking: string | null };
-  /** The gate as submitted, less the honeypot. Its purpose and raise amount travel with each re-run. */
-  gate: { name: string; email: string; company: string; purpose: string; dealSize: string; consent: boolean; followUp: boolean; raiseAmount: string };
-};
+export type GatePrefill = { name: string; email: string; purpose: string; dealSize: string; followUp: boolean; raiseAmount: string };
 
-export function readSessionLead(): SessionLead | null {
+export function readGatePrefill(): Partial<GatePrefill> | null {
   try {
-    const raw = window.sessionStorage.getItem(SESSION_LEAD_KEY);
+    window.sessionStorage.removeItem(RETIRED_LEAD_KEY);
+    const raw = window.sessionStorage.getItem(PREFILL_KEY);
     if (!raw) return null;
-    const v = JSON.parse(raw) as SessionLead;
-    return typeof v?.lead?.token === 'string' && v.lead.token.length >= 20 ? v : null;
+    const v = JSON.parse(raw) as Partial<GatePrefill>;
+    const out: Partial<GatePrefill> = {};
+    for (const k of ['name', 'email', 'purpose', 'dealSize', 'raiseAmount'] as const) if (typeof v[k] === 'string') out[k] = v[k];
+    if (typeof v.followUp === 'boolean') out.followUp = v.followUp;
+    return out;
   } catch {
     return null;
   }
 }
 
-export function storeSessionLead(v: SessionLead | null): void {
+export function storeGatePrefill(v: GatePrefill): void {
   try {
-    if (v) window.sessionStorage.setItem(SESSION_LEAD_KEY, JSON.stringify(v));
-    else window.sessionStorage.removeItem(SESSION_LEAD_KEY);
+    window.sessionStorage.setItem(PREFILL_KEY, JSON.stringify(v));
   } catch {
-    // Storage can be unavailable (private windows). The session still works until a reload.
-  }
-}
-
-/**
- * A re-run: saves the inputs to the existing lead as a new version and sends
- * nothing (`sendEmail: false`). `unknown` means the lead no longer answers to
- * the token, so the caller starts a new lead through the gate. Any other
- * failure resolves to null and the page shows its own result.
- */
-export async function saveRerun(token: string, inputs: unknown): Promise<{ result: ValuationResult } | 'unknown' | null> {
-  try {
-    const res = await fetch('/api/tools/business-valuation/lead/version', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ token, inputs, sendEmail: false }),
-      signal: AbortSignal.timeout(20_000),
-    });
-    if (res.status === 404) return 'unknown';
-    const data = (await res.json().catch(() => ({}))) as { ok?: boolean; result?: unknown };
-    // A 429 still carries the recomputed result; it simply was not saved.
-    if (data.result) return { result: reviveResult(data.result) };
-    console.error('[valuation] re-run responded', res.status);
-    return null;
-  } catch (err) {
-    console.error('[valuation] re-run request failed', err);
-    return null;
+    // Storage can be unavailable (private windows): the gate is simply not prefilled.
   }
 }

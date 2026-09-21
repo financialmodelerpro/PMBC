@@ -3,7 +3,8 @@ import { NextResponse } from 'next/server';
 import { getAdminSession } from '@/lib/auth/requireAdmin';
 import { bookingLinkFor } from '@/lib/tools/leads/bookingLinkStore';
 import { getLead } from '@/lib/tools/leads/store';
-import { renderValuationReport, reportFileName } from '@/lib/tools/pdf/ValuationReport';
+import { attachmentHeader, reportFileName } from '@/lib/tools/pdf/fileName';
+import { renderValuationReport } from '@/lib/tools/pdf/ValuationReport';
 import { fetchReportBranding } from '@/lib/tools/brand/fetch';
 import { resultForReport } from '@/lib/tools/leads/reportResult';
 
@@ -20,9 +21,11 @@ export async function GET(_req: Request, props: { params: Promise<{ id: string }
   if (!lead) return NextResponse.json({ error: 'Lead not found' }, { status: 404 });
 
   const created = new Date(lead.created_at);
+  // One company name for the title and the file name: the gate's, else the one typed on step 1.
+  const company = lead.company || (lead.inputs as { profile?: { companyName?: string | null } } | null)?.profile?.companyName || null;
   const pdf = await renderValuationReport(resultForReport(lead), {
     preparedFor: lead.name,
-    company: lead.company,
+    company,
     industry: lead.industry ?? '',
     country: lead.country ?? '',
     purpose: lead.purpose,
@@ -35,7 +38,7 @@ export async function GET(_req: Request, props: { params: Promise<{ id: string }
   return new NextResponse(new Uint8Array(pdf), {
     headers: {
       'content-type': 'application/pdf',
-      'content-disposition': `attachment; filename="${reportFileName(lead.company, lead.name, created)}"`,
+      'content-disposition': attachmentHeader(reportFileName(company, lead.name, created)),
       'cache-control': 'no-store',
     },
   });

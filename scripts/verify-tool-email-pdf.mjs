@@ -283,7 +283,8 @@ for (const [label, result] of [['Saudi', saudi], ['full', full], ['Pakistan', pa
   check(`${label}: page 1 names the market data`, t[0].includes(DATA_LABEL));
   {
     const collapse = (x) => x.replace(/\s+/g, ' ');
-    const subject = label === 'distressed' ? 'Test Person' : 'Example Co';
+    // Without a company the report is about "Your business", in the title and the footer alike.
+    const subject = label === 'distressed' ? 'Your business' : 'Example Co';
     const details = collapse(components.detailsLine({ toolName: pdfModule.TOOL_NAME, subject, dateLabel: format.headline(result).valuationDate }));
     const tagline = theme.DEFAULT_TAGLINE;
     const footerOn = (pt, n) => pt.includes(details) && pt.includes(`Page ${n} of 8`);
@@ -412,7 +413,7 @@ for (const [label, result] of [['Saudi', saudi], ['full', full], ['Pakistan', pa
   }
   check('a result that does not reconcile is refused before rendering', refused);
 }
-check('file name is tidy', pdfModule.reportFileName('Acme & Sons / KSA', 'x', new Date('2026-09-16')) === 'PaceMakers valuation Acme  Sons  KSA 2026-09-16.pdf');
+check('file name is tidy', pdfModule.reportFileName('Acme & Sons / KSA', 'x', new Date('2026-09-16')) === 'Acme & Sons KSA - Indicative Business Valuation - 16 Sep 2026.pdf', pdfModule.reportFileName('Acme & Sons / KSA', 'x', new Date('2026-09-16')));
 
 console.log('Cost of capital working');
 {
@@ -483,6 +484,22 @@ console.log('Header reaches the page edges');
     const swooshBox = shapes.filter((b) => b.fill === NAVY && b.left > 100);
     check(`${name}: green swoosh and its drawing box reach past the right edge`, swoosh.length > 0 && swoosh.every((b) => b.right <= 0) && swooshBox.length > 0 && swooshBox.every((b) => b.right <= 0), JSON.stringify({ swoosh, swooshBox }));
   }
+}
+
+console.log('File name and untitled report');
+{
+  const fnm = await jiti.import(path.join(root, 'src/lib/tools/pdf/fileName.ts'));
+  const d = new Date('2026-09-21T10:00:00Z');
+  check('file name with a company', fnm.reportFileName('Acme Clinics', 'Jane Smith', d) === 'Acme Clinics - Indicative Business Valuation - 21 Sep 2026.pdf', fnm.reportFileName('Acme Clinics', 'Jane Smith', d));
+  check('file name without a company uses the person', fnm.reportFileName('', 'Jane Smith', d) === 'Indicative Business Valuation - Jane Smith - 21 Sep 2026.pdf' && fnm.reportFileName(null, 'Jane Smith', d) === fnm.reportFileName('  ', 'Jane Smith', d));
+  check('file name drops characters a file system refuses', fnm.reportFileName('A/B: "Co" <1>?', 'X', d) === 'A B Co 1 - Indicative Business Valuation - 21 Sep 2026.pdf', fnm.reportFileName('A/B: "Co" <1>?', 'X', d));
+  const arabic = fnm.reportFileName('شركة المثال', 'X', d);
+  const header = fnm.attachmentHeader(arabic);
+  check('download header carries an ASCII name and the full UTF-8 name', /filename="[\x20-\x7e]+"/.test(header) && fnm.fileNameFromHeader(header) === arabic);
+  check('the browser reads the plain name when there is no UTF-8 one', fnm.fileNameFromHeader('attachment; filename="a b.pdf"') === 'a b.pdf' && fnm.fileNameFromHeader(null) === null);
+  check('the report module still exports the same rule', pdfModule.reportFileName('Acme', 'J', d) === fnm.reportFileName('Acme', 'J', d));
+  const untitled = await pageTexts(await pdfModule.renderValuationReport(saudi, { ...REPORT_META, company: null, preparedFor: 'Jane Smith', industry: 'I', country: 'C', bookingHref: BOOK }));
+  check('no company: the cover title is "Your business", not the person', untitled[0].includes('Your business') && !untitled[0].replace('Prepared for Jane Smith', '').includes('Jane Smith'), untitled[0].slice(0, 200));
 }
 
 console.log('Brevo payload');

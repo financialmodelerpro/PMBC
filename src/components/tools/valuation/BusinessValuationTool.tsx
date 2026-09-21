@@ -59,7 +59,7 @@ import {
   type FormState,
 } from './state';
 import { StepBar, type StepState } from './StepBar';
-import { captureAttribution, readAttribution, readSessionLead, saveRerun, storeSessionLead, submitLead } from './submit';
+import { captureAttribution, readAttribution, readGatePrefill, storeGatePrefill, submitLead } from './submit';
 import { SummaryPanel } from './SummaryPanel';
 import { TerminalStep } from './TerminalStep';
 import { WaccStep } from './WaccStep';
@@ -92,17 +92,16 @@ export function BusinessValuationTool({ preview, partner }: ToolComponentProps) 
   const topRef = useRef<HTMLDivElement>(null);
   const mountedAt = useRef(Date.now());
 
-  const [resultNotice, setResultNotice] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
-  const rerunning = useRef(false);
+  // True once this run's lead is saved: the next run from the form is a new valuation, so the gate's
+  // company (unless step 1 names one) and consent start again, while the person's details stay.
+  const leadSaved = useRef(false);
 
   useEffect(() => {
     captureAttribution();
-    // A lead created earlier in this tab: running again updates it rather than starting another.
-    const kept = readSessionLead();
-    if (kept) {
-      setLead(kept.lead);
-      setGate((g) => ({ ...g, ...kept.gate }));
-    }
+    // The person's details from the last valuation in this tab prefill the gate. Nothing else is kept:
+    // every run from the form is a new lead (since 2026-09-21).
+    const prefill = readGatePrefill();
+    if (prefill) setGate((g) => ({ ...g, ...prefill }));
   }, []);
 
   const currency = useMemo(() => currencyFor(s.country), [s.country]);
@@ -172,44 +171,14 @@ export function BusinessValuationTool({ preview, partner }: ToolComponentProps) 
       return;
     }
     setPending(outcome.result);
-    // The company named in step 1 fills the gate's company field, unless the
-    // visitor has already typed one there.
+    // Every run from the form asks for the name and email again and saves a new lead (since 2026-09-21;
+    // a re-run once updated the previous lead, which filed a second company under the first). The gate is
+    // prefilled with the person's details; the company is step 1's, and consent is given again.
     const named = s.companyName.trim();
-    if (named) setGate((g) => (g.company.trim() ? g : { ...g, company: named }));
-
-    // Run again in the same session: the lead already exists, so the gate is not asked twice. The
-    // inputs are saved to it as a new version; no email goes to the visitor and no alert to the firm.
-    // The results email is sent again only from Email me this version.
-    if (lead?.token) {
-      if (rerunning.current) return;
-      rerunning.current = true;
-      setSubmitting(true);
-      const raise = gate.purpose === 'raise' ? num(gate.raiseAmount) : null;
-      const rerunInputs = { ...inputs, purpose: gate.purpose, raiseAmount: raise };
-      const local = runValuation(rerunInputs);
-      try {
-        const saved = await saveRerun(lead.token, rerunInputs);
-        if (saved === 'unknown') {
-          // The lead no longer answers to this token: start a new one through the gate.
-          storeSessionLead(null);
-          setLead(null);
-          go('gate');
-          return;
-        }
-        setSaved({ inputs: rerunInputs, result: saved?.result ?? (local.ok ? local.result : outcome.result) });
-        setResultNotice({
-          tone: 'ok',
-          text: saved
-            ? 'Updated with your changes and saved to your valuation. Nothing was emailed; use Email me this version to receive these figures and a new report.'
-            : 'Updated with your changes. They could not be saved just now, so use Email me this version to keep them.',
-        });
-        go('result');
-      } finally {
-        rerunning.current = false;
-        setSubmitting(false);
-      }
-      return;
-    }
+    // Read before the reset below: React runs the updater later, when the flag is already false.
+    const fresh = leadSaved.current;
+    setGate((g) => ({ ...g, company: named || (fresh ? '' : g.company), consent: fresh ? false : g.consent }));
+    leadSaved.current = false;
     go('gate');
   }
 
@@ -223,9 +192,9 @@ export function BusinessValuationTool({ preview, partner }: ToolComponentProps) 
     const raise = gate.purpose === 'raise' ? num(gate.raiseAmount) : null;
     const inputs = { ...toInputs(s), purpose: gate.purpose, raiseAmount: raise };
     const local = runValuation(inputs);
-    // A re-run keeps the earlier lead's token and booking link until the new save returns its own, so a
-    // refused save (the hourly limit, a network error) leaves Download PDF and Email me this version working.
-    setLead((l) => ({ name: gate.name.trim(), email: gate.email.trim(), token: l?.token ?? null, booking: l?.booking ?? null }));
+    // A new lead: the previous token goes first, so Email me this version and the PDF can only ever
+    // reach the valuation now on screen, never an earlier one.
+    setLead({ name: gate.name.trim(), email: gate.email.trim(), token: null, booking: null });
     try {
       const response = await submitLead({
         inputs,
@@ -245,13 +214,9 @@ export function BusinessValuationTool({ preview, partner }: ToolComponentProps) 
       // The server's recomputation is what was saved and emailed, so it is what
       // the visitor sees. The browser's own run is the fallback, never the source.
       setSaved({ inputs, result: response?.result ?? (local.ok ? local.result : pending) });
-      if (response?.token) {
-        setLead((l) => (l ? { ...l, token: response.token, booking: response.booking } : l));
-        const { website: _honeypot, ...kept } = gate;
-        void _honeypot;
-        storeSessionLead({ lead: { name: gate.name.trim(), email: gate.email.trim(), token: response.token, booking: response.booking }, gate: kept });
-      }
-      setResultNotice(null);
+      if (response?.token) setLead((l) => (l ? { ...l, token: response.token, booking: response.booking } : l));
+      leadSaved.current = true;
+      storeGatePrefill({ name: gate.name.trim(), email: gate.email.trim(), purpose: gate.purpose, dealSize: gate.dealSize, followUp: gate.followUp, raiseAmount: gate.raiseAmount });
     } finally {
       setSubmitting(false);
       setMaxReached(3);
@@ -414,7 +379,19 @@ export function BusinessValuationTool({ preview, partner }: ToolComponentProps) 
             baseResult={saved.result}
             lead={lead}
             preview={preview}
-            initialNotice={resultNotice}
+            onNew={() => {
+              // A new valuation: a clean form. The person's details stay for the gate; the next run is a new lead.
+              setS(initialState());
+              setSaved(null);
+              setPending(null);
+              setCompanyErrors({});
+              setFinError('');
+              setWaccError('');
+              setTermError('');
+              setMaxReached(0);
+              leadSaved.current = true;
+              go(0);
+            }}
             partner={partner}
             onEdit={() => go(3)}
             onVersionSaved={(inputs, result) => {
