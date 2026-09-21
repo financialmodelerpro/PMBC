@@ -1065,7 +1065,7 @@ Assumptions), then "Who you will work with" and the booking call to action.
 | Scenarios | Upside and downside move every forecast year's revenue growth and EBITDA margin by points (`scenarioFinancials`), each valued in full. Weights must total 100. `weightedEquity` is the weighted midpoint. |
 | Normalised EBITDA | One-off costs and owner costs above market are added back to the last actual year for comparables and the LTM multiple. Owner costs, and only those, can be carried into the forecast, which changes the DCF. |
 | Bridge items | End of service benefits, leases, minority interest (deducted) and surplus assets (added), beyond net debt. With none entered the reference's `ev - netDebt` is kept exactly. |
-| Stake | Percent of equity, times a minority discount, or with a control premium on the comparables part of the blend only (since 2026-09-21). Shown only when not 100% with no adjustment. **A stake of 50% or less defaults to a minority discount** (`syncStakeAdjustment`, until the visitor picks one); a control premium chosen for it is kept, used, and warned about. |
+| Stake | Percent of equity, with a minority discount on the DCF part of the blend only, or a control premium on the comparables part only (since 2026-09-21). Shown only when not 100% with no adjustment. **A stake of 50% or less defaults to a minority discount** (`syncStakeAdjustment`, until the visitor picks one); a control premium chosen for it is kept, used, and warned about. |
 | WACC adjustment | Points added by the exploration slider. Zero keeps the reference WACC bit for bit. |
 | Company profile (`inputs.profile`) | A company name (120 characters) and one or two paragraphs about the business (1,000 characters), typed on step 1. **Never read by the engine.** Cleaned to plain text by the API schema itself (control characters, whitespace, two paragraphs, the caps), so every endpoint stores and renders the same text. The name fills the gate's company field and the results headline; the description goes on the PDF cover, marked as the visitor's words and not reviewed by the firm. Optional, so it did not bump the input schema version. |
 
@@ -1207,9 +1207,12 @@ so replace it when a later fixing is published.
 **Control premium on the comparables part only** (since 2026-09-21). The DCF
 values the company's own cash flows, so it already reflects control; trading
 multiples are minority prices. Stake value = stake x (blended equity +
-comparables weight x premium x comparables equity). A minority discount still
-applies to the whole value. `StakeResult.premiumBasis` marks the new basis;
-results stored before keep the old one.
+comparables weight x premium x comparables equity). **A minority discount
+reduces the DCF part only** (same day): stake x (blended equity - DCF weight x
+discount x DCF equity). `StakeResult.premiumBasis` and `discountBasis` mark the
+new bases, the stake label says "on the comparables part" or "on the DCF part",
+and `stakeBasisNote` explains why on the results page (not in the PDF, whose
+page 5 has no line to spare). Results stored before keep the old basis.
 
 **Normalisation against the forecast** (`normalisation_forecast`, since
 2026-09-21): owner cost add-backs marked to continue are in every forecast year
@@ -1275,7 +1278,7 @@ cases and rasterises every page to PNG for inspection.
 5. Checks in `verify-valuation-v2` for the item on its own and absent, then `verify-valuation-engine` to prove the neutral path.
 
 **Verifiers.** `verify-valuation-engine` (518: 514 reference parity plus 4 on the market data passed into the reference),
-`verify-valuation-v2` (485), `verify-tool-lead-api` (146),
+`verify-valuation-v2` (489), `verify-tool-lead-api` (146),
 `verify-valuation-dashboard` (300, the results page end to end at 1440, 1024 and 390, including the partner portrait's 4:5 frame and source ratio,
 against a local `next start`, every /api/ request intercepted so nothing is
 written), `verify-tool-email-pdf` (392, pdfjs text and operator list, including the report theme's footer, colour and logo rules, so a ligature glyph is

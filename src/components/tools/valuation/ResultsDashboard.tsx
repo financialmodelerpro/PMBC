@@ -52,6 +52,7 @@ import {
   sourceNotes,
   sensitivityTable,
   sensitivityTitle,
+  stakeBasisNote,
   stakeLabel,
   taxNote,
   taxRows,
@@ -554,7 +555,9 @@ export function ResultsDashboard({
                       ['Indicative value of the stake', h.table.stakeRange ?? ''],
                     ]}
                   />
-                ) : (
+                ) : null}
+                {r.stake?.used && stakeBasisNote(r) && <p className="mt-3 text-[13px] text-[#52606B]">{stakeBasisNote(r)}</p>}
+                {r.stake?.used ? null : (
                   <p className="text-[14px] text-[#52606B]">
                     Valued at 100% of the equity with no premium or discount. Change the inputs to value a stake.
                   </p>
