@@ -5,7 +5,9 @@ import Link from 'next/link';
 import { CONSENT_TEXT, FOLLOW_UP_TEXT } from '@/lib/tools/consent';
 import { DEAL_BAND_UNSURE, PURPOSES } from '@/lib/tools/valuation/data';
 import { LIMITS } from '@/lib/tools/valuation/limits';
-import { CONTACT_COUNTRIES, PHONE_MESSAGE, cleanPhone, dialCodeFor, phoneDigitCount } from '@/lib/tools/contactCountries';
+import { PhoneField } from '@/components/public/PhoneField';
+import { DEFAULT_DIAL_COUNTRY } from '@/lib/public/countries';
+import { CONTACT_COUNTRIES, isoForContactCountry } from '@/lib/tools/contactCountries';
 
 import { Field, NumberInput, Panel, PanelTitle, Select, StepNav, inputClass } from './ui';
 
@@ -19,11 +21,11 @@ export type GateValues = {
   followUp: boolean;
   /** Optional, and only asked when raising equity. Millions of the local currency. */
   raiseAmount: string;
-  /** The person's own country (2026-09-21). It fills the phone code. Optional. */
+  /** The person's own country (2026-09-21). It sets the phone's country. Optional. */
   contactCountry: string;
-  /** The phone number's international code, "+966". Filled from the country, editable. */
-  phoneCode: string;
-  /** The phone number without its code. Optional. */
+  /** ISO code of the phone's dialling country, as on the contact form. */
+  phoneCountry: string;
+  /** The number as typed. Optional. Joined with its country by composePhone on submit. */
   phone: string;
   /** Honeypot. A person never sees it. */
   website: string;
@@ -39,12 +41,12 @@ export const EMPTY_GATE: GateValues = {
   followUp: false,
   raiseAmount: '',
   contactCountry: '',
-  phoneCode: '',
+  phoneCountry: DEFAULT_DIAL_COUNTRY,
   phone: '',
   website: '',
 };
 
-export type GateErrors = Partial<Record<'name' | 'email' | 'purpose' | 'dealSize' | 'consent' | 'raiseAmount' | 'phone', string>>;
+export type GateErrors = Partial<Record<'name' | 'email' | 'purpose' | 'dealSize' | 'consent' | 'raiseAmount', string>>;
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
@@ -55,8 +57,6 @@ export function validateGate(g: GateValues): GateErrors {
   if (!g.purpose) e.purpose = 'Select what the valuation is for.';
   if (!g.dealSize) e.dealSize = 'Select a transaction size range.';
   if (!g.consent) e.consent = 'Tick the box to agree before we show your results.';
-  const phone = cleanPhone(g.phoneCode, g.phone);
-  if (phone && (phoneDigitCount(g.phone) < 6 || phoneDigitCount(phone) > 15)) e.phone = PHONE_MESSAGE;
   if (g.purpose === 'raise' && g.raiseAmount.trim() !== '' && !(parseFloat(g.raiseAmount) >= 0)) {
     e.raiseAmount = 'Enter the amount to raise as a positive number, or leave it blank.';
   }
@@ -153,9 +153,9 @@ export function LeadGate({
                 value={values.contactCountry}
                 onChange={(e) => {
                   const country = e.target.value;
-                  // The phone code follows the country, unless it was typed and the country has none.
-                  const code = dialCodeFor(country);
-                  onChange({ contactCountry: country, phoneCode: code || values.phoneCode });
+                  // The phone's country follows, unless the country is not in the phone list ("Other").
+                  const iso = isoForContactCountry(country);
+                  onChange({ contactCountry: country, phoneCountry: iso || values.phoneCountry });
                 }}
               >
                 <option value="">Select</option>
@@ -167,31 +167,13 @@ export function LeadGate({
               </Select>
             )}
           </Field>
-          <Field label="Phone number (optional)" hint="With the country code, so we can call you about your valuation." error={errors.phone ?? ''}>
-            {({ id, describedBy, invalid }) => (
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  inputMode="tel"
-                  aria-label="Country code"
-                  placeholder="+966"
-                  maxLength={6}
-                  value={values.phoneCode}
-                  onChange={(e) => onChange({ phoneCode: e.target.value })}
-                  className={`${inputClass} w-[88px] shrink-0`}
-                />
-                <input
-                  id={id}
-                  type="tel"
-                  autoComplete="tel-national"
-                  maxLength={24}
-                  value={values.phone}
-                  onChange={(e) => onChange({ phone: e.target.value })}
-                  aria-describedby={describedBy}
-                  aria-invalid={invalid}
-                  className={inputClass}
-                />
-              </div>
+          <Field label="Phone number (optional)">
+            {({ id }) => (
+              <PhoneField
+                country={values.phoneCountry || DEFAULT_DIAL_COUNTRY}
+                onCountryChange={(code) => onChange({ phoneCountry: code })}
+                numberProps={{ id, maxLength: 40, value: values.phone, onChange: (e) => onChange({ phone: e.target.value }) }}
+              />
             )}
           </Field>
         </div>

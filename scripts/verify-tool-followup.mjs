@@ -37,6 +37,7 @@ const templates = await jiti.import(path.join(root, 'src/lib/tools/email/templat
 const leads = await jiti.import(path.join(root, 'src/lib/tools/leads/valuation.ts'));
 const state = await jiti.import(path.join(root, 'src/components/tools/valuation/state.ts'));
 const contact = await jiti.import(path.join(root, 'src/lib/tools/contactCountries.ts'));
+const countries = await jiti.import(path.join(root, 'src/lib/public/countries.ts'));
 
 let checks = 0, failures = 0;
 function check(label, ok, detail = '') {
@@ -77,10 +78,10 @@ console.log('2. Phone and country');
   check('a clean phone with its code and a listed country are accepted', ok.success, JSON.stringify(ok.error?.issues ?? '').slice(0, 200));
   check('phone and country are optional', leads.submissionSchema.safeParse(body({})).success);
   check('a country not on the list is refused', !leads.submissionSchema.safeParse(body({ contactCountry: 'Atlantis' })).success);
-  check('a phone with letters is refused', !leads.submissionSchema.safeParse(body({ phone: '+966 call me' })).success);
-  check('a phone with too few digits is refused', !leads.submissionSchema.safeParse(body({ phone: '+1 23' })).success);
-  check('the phone code follows the country', contact.dialCodeFor('Saudi Arabia') === '+966' && contact.dialCodeFor('Pakistan') === '+92' && contact.dialCodeFor('Other') === '');
-  check('cleanPhone keeps the code and digits, drops the rest', contact.cleanPhone('966', '(050) 123-4567') === '+966 050 123 4567' && contact.cleanPhone('+92', '') === null);
+  check('the phone is checked as the contact form checks it: at most 40 characters', !leads.submissionSchema.safeParse(body({ phone: '+966 ' + '5'.repeat(40) })).success && leads.submissionSchema.safeParse(body({ phone: '+966 50 123 4567 ext 2' })).success);
+  check('the country sets the phone picker, as on the contact form', contact.isoForContactCountry('Saudi Arabia') === 'SA' && contact.isoForContactCountry('Pakistan') === 'PK' && contact.isoForContactCountry('United Arab Emirates') === 'AE' && contact.isoForContactCountry('Other') === '');
+  check('every listed country but Other is in the phone picker', contact.CONTACT_COUNTRIES.filter((c) => c.name !== 'Other').every((c) => contact.isoForContactCountry(c.name)), contact.CONTACT_COUNTRIES.filter((c) => c.name !== 'Other' && !contact.isoForContactCountry(c.name)).map((c) => c.name).join(', '));
+  check('the number is joined as the contact form joins it', countries.composePhone('SA', '050 123 4567') === '+966 50 123 4567' && countries.composePhone('PK', '') === '' && countries.composePhone('SA', '+971 50 1') === '+971 50 1');
   const store = { inserted: [], async countSince() { return 0; }, async insert(row) { this.inserted.push(row); return { ok: true, id: '00000000-0000-4000-8000-000000000001' }; } };
   await leads.processValuationSubmission(body({ phone: '+92 300 1234567', contactCountry: 'Pakistan' }), { now: new Date('2026-09-16T12:00:00Z'), toolSlug: 'business-valuation', toolLive: true, isStaff: false, ipHash: 'a'.repeat(64), userAgent: 'x', newToken: () => 't'.repeat(48) }, store);
   check('the lead row carries the phone and country', store.inserted[0]?.phone === '+92 300 1234567' && store.inserted[0]?.contact_country === 'Pakistan');

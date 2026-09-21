@@ -60,7 +60,8 @@ import {
   type FormState,
 } from './state';
 import { StepBar, type StepState } from './StepBar';
-import { cleanPhone } from '@/lib/tools/contactCountries';
+import { composePhone } from '@/lib/public/countries';
+import { isoForContactCountry } from '@/lib/tools/contactCountries';
 import { captureAttribution, fetchResume, readAttribution, readGatePrefill, saveResumedRun, storeGatePrefill, submitLead } from './submit';
 import { SummaryPanel } from './SummaryPanel';
 import { TerminalStep } from './TerminalStep';
@@ -122,8 +123,8 @@ export function BusinessValuationTool({ preview, partner }: ToolComponentProps) 
         }
         setS(stateFromInputs(v.inputs as ValuationInputs));
         setLead(v.lead);
-        const [code, ...rest] = (v.gate.phone || '').split(' ');
-        setGate((g) => ({ ...g, ...v.gate, phoneCode: code?.startsWith('+') ? code : g.phoneCode, phone: code?.startsWith('+') ? rest.join(' ') : v.gate.phone, consent: true }));
+        // The stored number is already international ("+966 50 ..."), which composePhone keeps as typed.
+        setGate((g) => ({ ...g, ...v.gate, phoneCountry: isoForContactCountry(v.gate.contactCountry) || g.phoneCountry, consent: true }));
         setResumed({ project: v.project });
         setMaxReached(3);
       });
@@ -254,7 +255,7 @@ export function BusinessValuationTool({ preview, partner }: ToolComponentProps) 
           consent: gate.consent,
           followUp: gate.followUp,
           contactCountry: gate.contactCountry,
-          phone: cleanPhone(gate.phoneCode, gate.phone),
+          phone: composePhone(gate.phoneCountry, gate.phone),
         },
         attribution: readAttribution(),
         website: gate.website,
@@ -265,7 +266,7 @@ export function BusinessValuationTool({ preview, partner }: ToolComponentProps) 
       setSaved({ inputs, result: response?.result ?? (local.ok ? local.result : pending) });
       if (response?.token) setLead((l) => (l ? { ...l, token: response.token, booking: response.booking } : l));
       leadSaved.current = true;
-      storeGatePrefill({ name: gate.name.trim(), email: gate.email.trim(), purpose: gate.purpose, dealSize: gate.dealSize, followUp: gate.followUp, raiseAmount: gate.raiseAmount, contactCountry: gate.contactCountry, phoneCode: gate.phoneCode, phone: gate.phone });
+      storeGatePrefill({ name: gate.name.trim(), email: gate.email.trim(), purpose: gate.purpose, dealSize: gate.dealSize, followUp: gate.followUp, raiseAmount: gate.raiseAmount, contactCountry: gate.contactCountry, phoneCountry: gate.phoneCountry, phone: gate.phone });
     } finally {
       setSubmitting(false);
       setMaxReached(3);

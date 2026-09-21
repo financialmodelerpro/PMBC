@@ -11,7 +11,7 @@ import {
   PINNED_COUNTRIES,
   composePhone,
 } from '@/lib/public/countries';
-import { CountryCombobox } from './CountryCombobox';
+import { PhoneField } from './PhoneField';
 
 type Service = { slug: string; title: string };
 
@@ -211,31 +211,12 @@ export function ContactForm({
           />
         </Field>
         <Field label="Phone">
-          {/* Two controls, one value, stacked rather than side by side. The
-              combobox shows the country name next to the dial code, which is
-              what makes the list's order legible, and that does not fit beside
-              a number field in half a form row without truncating one of them. */}
-          <div className="grid gap-2">
-            <CountryCombobox
-              value={phoneCountry || DEFAULT_DIAL_COUNTRY}
-              onChange={(code) =>
-                setValue('phone_country', code, { shouldDirty: true })
-              }
-              ariaLabel="Phone country code"
-            />
-            <input
-              type="tel"
-              // The field's visible "Phone" label is inside a <label> that wraps
-              // both controls, so it attaches to the first one, the combobox,
-              // which then overrides it with its own aria-label. That leaves the
-              // number box unnamed unless it names itself.
-              aria-label="Phone number"
-              autoComplete="tel-national"
-              placeholder="5X XXX XXXX"
-              className={inputCls}
-              {...register('phone')}
-            />
-          </div>
+          {/* Shared with the free tools' name and email step (PhoneField). */}
+          <PhoneField
+            country={phoneCountry || DEFAULT_DIAL_COUNTRY}
+            onCountryChange={(code) => setValue('phone_country', code, { shouldDirty: true })}
+            numberProps={register('phone')}
+          />
         </Field>
         <Field label="Country">
           {/* The seven most likely answers first, then every country in

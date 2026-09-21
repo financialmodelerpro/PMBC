@@ -26,7 +26,7 @@ import { z } from 'zod';
 import { BELOW_MINIMUM_BAND, DEAL_BANDS_SAR, DEAL_BAND_UNSURE, PURPOSES, VALUATION_DATA_VERSION } from '../valuation/data';
 import { INPUT_SCHEMA_VERSION, isoDate, runValuation, TOTAL_YEARS, type ValuationInputs, type ValuationResult } from '../valuation/engine';
 import { LIMITS } from '../valuation/limits';
-import { PHONE_MESSAGE, isContactCountry, phoneDigitCount } from '../contactCountries';
+import { isContactCountry } from '../contactCountries';
 import { cleanProfile } from '../valuation/profile';
 import { serializeResult } from '../valuation/serialize';
 import { CONSENT_TEXT, FOLLOW_UP_TEXT } from '../consent';
@@ -161,9 +161,9 @@ export const submissionSchema = z.object({
     consent: z.literal(true, { message: 'Tick the box to agree before we show your results.' }),
     followUp: z.boolean(),
     // The person's country and phone (2026-09-21), both optional. The country must be one offered on the
-    // form; the phone arrives cleaned (`cleanPhone`) and must carry 6 to 15 digits.
+    // form; the phone is checked as the contact form's is: optional, at most 40 characters.
     contactCountry: optional(60).refine((v) => !v || isContactCountry(v), 'Choose a country from the list.'),
-    phone: optional(40).refine((v) => !v || (phoneDigitCount(v) >= 6 && phoneDigitCount(v) <= 15 && /^\+?[\d ]+$/.test(v)), PHONE_MESSAGE),
+    phone: optional(40),
   }),
   attribution: z
     .object({

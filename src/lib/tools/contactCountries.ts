@@ -1,9 +1,11 @@
 /**
  * The countries a person can choose on the name and email step, with each one's international
- * dialling code, which fills the phone number's code (since 2026-09-21). The firm's own markets come
+ * dialling code; choosing one sets the phone field's country (since 2026-09-21). The firm's own markets come
  * first, then the others alphabetically; "Other" leaves the code to be typed. Plain module, shared by
  * the form, the lead API's validation and the admin.
  */
+import { COUNTRIES } from '@/lib/public/countries';
+
 export type ContactCountry = { name: string; dial: string };
 
 export const CONTACT_COUNTRIES: ContactCountry[] = [
@@ -56,20 +58,7 @@ export function isContactCountry(country: string): boolean {
   return CONTACT_COUNTRIES.some((c) => c.name === country);
 }
 
-/**
- * A phone number as stored: the code and the number, spaces kept, anything else dropped. Null when
- * blank. The number must then carry 6 to 15 digits (E.164 allows at most 15), or it is refused.
- */
-export function cleanPhone(code: string, number: string): string | null {
-  const c = (code || '').replace(/[^\d+]/g, '').replace(/(?!^)\+/g, '');
-  const nRaw = (number || '').replace(/[^\d ]/g, ' ').replace(/\s+/g, ' ').trim();
-  if (!nRaw) return null;
-  const withPlus = c ? (c.startsWith('+') ? c : `+${c}`) : '';
-  return `${withPlus} ${nRaw}`.trim();
+/** The ISO code the phone picker uses for a country on this list, or '' ("Other", or not found). */
+export function isoForContactCountry(country: string): string {
+  return COUNTRIES.find((c) => c.name === country)?.code ?? '';
 }
-
-export function phoneDigitCount(phone: string): number {
-  return phone.replace(/\D/g, '').length;
-}
-
-export const PHONE_MESSAGE = 'Enter a phone number with 6 to 15 digits, or leave it blank.';

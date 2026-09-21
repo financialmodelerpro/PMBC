@@ -83,7 +83,7 @@ export async function submitLead(body: unknown): Promise<{ result: ValuationResu
 const PREFILL_KEY = 'pmbcValuationGate';
 const RETIRED_LEAD_KEY = 'pmbcValuationLead';
 
-export type GatePrefill = { name: string; email: string; purpose: string; dealSize: string; followUp: boolean; raiseAmount: string; contactCountry: string; phoneCode: string; phone: string };
+export type GatePrefill = { name: string; email: string; purpose: string; dealSize: string; followUp: boolean; raiseAmount: string; contactCountry: string; phoneCountry: string; phone: string };
 
 export function readGatePrefill(): Partial<GatePrefill> | null {
   try {
@@ -92,7 +92,7 @@ export function readGatePrefill(): Partial<GatePrefill> | null {
     if (!raw) return null;
     const v = JSON.parse(raw) as Partial<GatePrefill>;
     const out: Partial<GatePrefill> = {};
-    for (const k of ['name', 'email', 'purpose', 'dealSize', 'raiseAmount', 'contactCountry', 'phoneCode', 'phone'] as const) if (typeof v[k] === 'string') out[k] = v[k];
+    for (const k of ['name', 'email', 'purpose', 'dealSize', 'raiseAmount', 'contactCountry', 'phoneCountry', 'phone'] as const) if (typeof v[k] === 'string') out[k] = v[k];
     if (typeof v.followUp === 'boolean') out.followUp = v.followUp;
     return out;
   } catch {
