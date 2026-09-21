@@ -381,21 +381,21 @@ console.log('Email me this version');
 {
   const TOKEN = 'lead-token-' + 'y'.repeat(40);
   const original = { inputs: exampleInputs(), results: JSON.parse(expectedJson) };
-  function versionStore({ hour = 0, day = 0, saveFails = false } = {}) {
+  function versionStore({ hour = 0, day = 0, rerunHour = 0, rerunDay = 0, saveFails = false } = {}) {
     const lead = { id: '00000000-0000-4000-8000-000000000001', tool_slug: 'business-valuation', is_test: false, inputs: original.inputs, results: original.results, data_version: '2026-01-01' };
     const events = [];
     const saves = [];
     return {
       lead, events, saves,
       async findByToken(t) { return t === TOKEN ? lead : null; },
-      async countVersionsSince(_id, since) {
+      async countVersionsSince(_id, since, kind) {
         const ago = Date.parse('2026-09-16T12:00:00Z') - Date.parse(since);
-        return ago <= 3600_000 ? hour : day;
+        return kind === 'rerun' ? (ago <= 3600_000 ? rerunHour : rerunDay) : ago <= 3600_000 ? hour : day;
       },
-      async saveVersion(l, next) {
+      async saveVersion(l, next, kind) {
         if (saveFails) return false;
         // As the route does: the previous version is recorded first, then overwritten.
-        events.push({ event_type: 'version_saved', payload: { previous: { inputs: l.inputs, results: l.results, data_version: l.data_version } } });
+        events.push({ event_type: 'version_saved', payload: { kind, previous: { inputs: l.inputs, results: l.results, data_version: l.data_version } } });
         saves.push(next);
         Object.assign(l, next);
         return true;
@@ -417,6 +417,22 @@ console.log('Email me this version');
   check('version: previous inputs and results kept in the event', st.events.length === 1 && st.events[0].payload.previous.inputs.growth === original.inputs.growth && JSON.stringify(st.events[0].payload.previous.results) === expectedJson);
   check('version: previous data version kept', st.events[0].payload.previous.data_version === '2026-01-01');
   check('version: returns the lead for the resend', out.lead?.id === st.lead.id && out.result?.equityDisplay[1] === changedResult.equityDisplay[1]);
+  check('version: Email me this version is emailed, recorded as kind results', out.emailed === true && st.events[0].payload.kind === 'results');
+
+  // Running again in the same session: a new version on the same lead, nothing sent.
+  const rr = versionStore();
+  const rerun = await version.processVersionUpdate({ token: TOKEN, inputs: changed, sendEmail: false }, vctx(), rr);
+  check('re-run: saved to the same lead as a new version', rerun.kind === 'saved' && rr.saves.length === 1 && rr.lead.inputs.growth === 3 && rr.events.length === 1);
+  check('re-run: not emailed, recorded as kind rerun', rerun.emailed === false && rr.events[0].payload.kind === 'rerun');
+  check('re-run: previous version kept for the history', JSON.stringify(rr.events[0].payload.previous.results) === expectedJson);
+  const R = version.RERUN_RATE_LIMIT;
+  check('re-run limits are 30 an hour and 100 a day', R.perHour === 30 && R.perDay === 100);
+  check('re-runs do not use up the email limit', (await version.processVersionUpdate({ token: TOKEN, inputs: changed, sendEmail: false }, vctx(), versionStore({ hour: 9, day: 9 }))).kind === 'saved');
+  check('emailed versions do not use up the re-run limit', (await version.processVersionUpdate({ token: TOKEN, inputs: changed }, vctx(), versionStore({ rerunHour: 99, rerunDay: 99 }))).kind === 'saved');
+  const rrLimited = versionStore({ rerunHour: 30, rerunDay: 30 });
+  const rrOut = await version.processVersionUpdate({ token: TOKEN, inputs: changed, sendEmail: false }, vctx(), rrLimited);
+  check('re-run over its limit: 429 with the result, nothing saved', rrOut.status === 429 && Boolean(rrOut.body.result) && rrLimited.saves.length === 0);
+  check('sendEmail must be a boolean', (await version.processVersionUpdate({ token: TOKEN, inputs: changed, sendEmail: 'no' }, vctx(), versionStore())).status === 400);
 
   // The purpose is the lead's: a sale lead cannot be given a pre-money section by the browser.
   const saleStore = versionStore();

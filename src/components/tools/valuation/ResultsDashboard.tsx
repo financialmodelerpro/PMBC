@@ -159,6 +159,7 @@ export function ResultsDashboard({
   partner = null,
   onEdit,
   onVersionSaved,
+  initialNotice = null,
 }: {
   baseInputs: ValuationInputs;
   baseResult: ValuationResult;
@@ -167,6 +168,8 @@ export function ResultsDashboard({
   partner?: PartnerCardData | null;
   onEdit: () => void;
   onVersionSaved: (inputs: ValuationInputs, result: ValuationResult) => void;
+  /** Shown when the results open, for example after a re-run that was saved but not emailed. */
+  initialNotice?: { tone: 'ok' | 'error'; text: string } | null;
 }) {
   const [tab, setTab] = useState<TabId>('summary');
   const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
@@ -202,7 +205,7 @@ export function ResultsDashboard({
 
   /* Actions --------------------------------------------------------------- */
   const [busy, setBusy] = useState<'pdf' | 'email' | null>(null);
-  const [notice, setNotice] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
+  const [notice, setNotice] = useState<{ tone: 'ok' | 'error'; text: string } | null>(initialNotice);
   const canSave = Boolean(lead.token);
 
   async function onDownload() {
