@@ -73,7 +73,9 @@ When you find an em dash in *existing* content while doing other work, fix it as
 in Phase 9 is review rather than code: read the deployed site end to end, send one
 real contact submission, check the OG cards, clear the Supabase advisor. The
 public site renders on nineteen routes, every page's copy is editable in the page
-builder, and migrations to 081 are applied. **Free tools are live since 2026-09-16**: Business Valuation is Live and Tools is in the navbar; see "Go-live record" in section 7b. **Engine version 3 and the eight page report shipped 2026-09-17** (see "Business Valuation version 3" in section 7b).
+builder, and migrations to 082 are applied. **Free tools are live since 2026-09-16**: Business Valuation is Live and Tools is in the navbar; see "Go-live record" in section 7b. **Engine version 3 and the eight page report shipped 2026-09-17** (see "Business Valuation version 3" in section 7b). **On 2026-09-21** the tool gained leads grouped by email, phone and country, day 7 and 14 reminders, save and return links, a financial year end month and P/E (see "Leads by person, reminders and save and return" in section 7b).
+
+**Open items for the tool are listed in the handoff at the top of [`SESSION_LOG.md`](./SESSION_LOG.md)**: `CRON_SECRET` on Vercel, the privacy update for counsel, the founder report highlights, the SAIBOR refresh, stopping reminders on any booking by the same email, reminder wording in the template editor, and an Arabic version.
 
 **The per-phase summary index moved to [`PHASE_HISTORY.md`](./PHASE_HISTORY.md) on 2026-08-16**,
 along with the detailed rows that were already there. This file states where the
@@ -262,7 +264,7 @@ The following are in FMP but NOT in PMBC v1. Do not install them. They add maint
 | YouTube API | No video integration |
 | @auth/supabase-adapter for student auth | Admin-only auth |
 | Stripe or any payment SDK | No commerce |
-| Cron jobs | Nothing to run on schedule |
+| Cron jobs | Nothing to run on schedule. **Exception since 2026-09-21:** one Vercel cron (`vercel.json`) for the free tools' reminders, see section 7b. |
 
 ### Folder Structure
 
