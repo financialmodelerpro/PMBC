@@ -315,10 +315,40 @@ async function walk(width) {
   }
   await wait(300);
   check(`${label}: country and phone offered on the gate`, (await page.evaluate(text())).includes('Your country (optional)') && (await page.evaluate(text())).includes('Phone number (optional)'));
-  check(`${label}: gate country chosen`, (await page.evaluate(setField('Your country', 'Saudi Arabia'))) === true);
+  // The phone field is the contact form's (PhoneField): the country picker above the number.
+  const combo = () => page.evaluate(`document.querySelector('input[role=combobox][aria-label="Phone country code"]')?.value ?? null`);
+  check(`${label}: the phone field is the contact form's picker, Saudi Arabia by default`, (await combo()) === 'Saudi Arabia (+966)', String(await combo()));
+  check(`${label}: no separate code box`, (await page.evaluate(`document.querySelectorAll('input[aria-label="Country code"]').length`)) === 0);
+  await page.evaluate(`(() => { const i = document.querySelector('input[role=combobox][aria-label="Phone country code"]'); i.dispatchEvent(new MouseEvent('mousedown', { bubbles: true })); return true; })()`);
+  await wait(150);
+  await page.evaluate(`(() => { const i = document.querySelector('input[role=combobox][aria-label="Phone country code"]'); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(i, 'Qatar'); i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
+  await wait(150);
+  await page.evaluate(`document.querySelector('input[role=combobox][aria-label="Phone country code"]').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))`);
+  await wait(150);
+  check(`${label}: the picker searches and selects`, (await combo()) === 'Qatar (+974)', String(await combo()));
+  check(`${label}: gate country chosen`, (await page.evaluate(setField('Your country', 'Pakistan'))) === true);
   await wait(200);
-  check(`${label}: the country fills the phone code`, (await page.evaluate(`document.querySelector('input[aria-label="Country code"]')?.value`)) === '+966');
-  check(`${label}: gate phone entered`, (await page.evaluate(setField('Phone number', '50 123 4567'))) === true);
+  check(`${label}: the country sets the phone picker`, (await combo()) === 'Pakistan (+92)', String(await combo()));
+  check(`${label}: gate phone entered`, (await page.evaluate(setField('Phone number', '0300 1234567'))) === true);
+  // Alignment: the phone column matches the email field above it, and nothing reaches past it.
+  const geo = await page.evaluate(`(() => {
+    const r = (el) => { const b = el.getBoundingClientRect(); return { l: Math.round(b.left), r: Math.round(b.right), w: Math.round(b.width) }; };
+    const lbl = (t) => [...document.querySelectorAll('label')].find((x) => x.offsetParent !== null && x.textContent.trim().startsWith(t));
+    const email = document.getElementById(lbl('Work email').htmlFor);
+    const country = document.getElementById(lbl('Your country').htmlFor);
+    const num = document.getElementById(lbl('Phone number').htmlFor);
+    const combo = document.querySelector('input[role=combobox][aria-label="Phone country code"]');
+    const cell = num.closest('div.grid').parentElement;
+    const inputs = [...cell.querySelectorAll('input')].filter((x) => x.offsetParent !== null && x.type !== 'hidden');
+    const aside = document.querySelector('aside');
+    return { email: r(email), country: r(country), num: r(num), combo: r(combo), boxes: inputs.length, aside: aside && aside.offsetParent !== null ? r(aside) : null, vw: window.innerWidth };
+  })()`);
+  const d = JSON.stringify(geo);
+  check(`${label}: phone number box lines up with the email field`, Math.abs(geo.num.l - geo.email.l) <= 1 && Math.abs(geo.num.w - geo.email.w) <= 1, d);
+  check(`${label}: phone picker lines up with the number box`, Math.abs(geo.combo.l - geo.num.l) <= 1 && Math.abs(geo.combo.w - geo.num.w) <= 1, d);
+  check(`${label}: phone field has two boxes, the picker and the number`, geo.boxes === 2, d);
+  check(`${label}: country field the same width as the phone field`, Math.abs(geo.country.w - geo.num.w) <= 1, d);
+  check(`${label}: phone field stays clear of the summary panel and the screen edge`, geo.num.r <= geo.vw && geo.combo.r <= geo.vw && (!geo.aside || geo.aside.l >= geo.num.r || geo.aside.r <= geo.num.l), d);
   check(`${label}: raise amount field appears for raising equity`, (await page.evaluate(setField('Amount you plan to raise', '120'))) === true);
   const deal = await page.evaluate(`(() => { const s = [...document.querySelectorAll('select')].find((x) => [...x.options].some((o) => o.value === '50-200')); if (!s) return false; Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(s, '50-200'); s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
   check(`${label}: deal size chosen`, deal);
@@ -332,7 +362,7 @@ async function walk(width) {
   // The lead request and the figures on screen.
   const lead = log.lead[0];
   check(`${label}: one lead request, intercepted`, log.lead.length === 1 && lead?.outcome.kind === 'saved', JSON.stringify(lead?.outcome?.body).slice(0, 200));
-  check(`${label}: the request carries the phone with its code and the country`, lead?.body.gate.phone === '+966 50 123 4567' && lead?.body.gate.contactCountry === 'Saudi Arabia', JSON.stringify({ p: lead?.body.gate.phone, c: lead?.body.gate.contactCountry }));
+  check(`${label}: the request carries the phone with its code and the country`, lead?.body.gate.phone === '+92 300 1234567' && lead?.body.gate.contactCountry === 'Pakistan', JSON.stringify({ p: lead?.body.gate.phone, c: lead?.body.gate.contactCountry }));
   check(`${label}: the lead row stores them`, lead?.outcome.kind === 'saved');
   check(`${label}: the request carries the purpose, the raise amount, borrowings, cash and net debt`, lead?.body.inputs.purpose === 'raise' && lead?.body.inputs.raiseAmount === 120 && lead?.body.inputs.gccOwnership === 100 && lead?.body.inputs.debt === 75 && lead?.body.inputs.cash === 30 && lead?.body.inputs.netDebt === 45);
   const result = lead?.outcome.result;
