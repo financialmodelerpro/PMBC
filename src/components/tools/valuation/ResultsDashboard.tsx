@@ -29,6 +29,7 @@ import { runValuation, type ValuationInputs, type ValuationResult } from '@/lib/
 import {
   INDICATIVE_NOTE,
   LABELS,
+  ltmMultipleLabel,
   PRE_MONEY_NOTE,
   amountUnit,
   bridgeTable,
@@ -360,7 +361,7 @@ export function ResultsDashboard({
         <Tile label={LABELS.wacc} value={h.wacc} />
         <Tile label={`${LABELS.tvShare}, perpetuity DCF`} value={h.tvShare} />
         <Tile label={LABELS.impliedTerminalMultiple} value={h.impliedExitMultiple} />
-        <Tile label={LABELS.ltmMultiple} value={h.ltmMultiple} />
+        <Tile label={ltmMultipleLabel(r)} value={h.ltmMultiple} />
         {h.weighted && <Tile label={LABELS.weighted} value={h.weighted} accent />}
         {h.stakeRange && <Tile label={`Value of ${stakeLabel(r)}`} value={h.stakeRange} accent />}
       </div>

@@ -186,6 +186,11 @@ export const LABELS = {
   wacc: 'WACC',
 } as const;
 
+/** The implied multiple's label: "(normalised)" when EBITDA was normalised, as the check on page 6 says (since 2026-09-21). */
+export function ltmMultipleLabel(r: ValuationResult): string {
+  return r.normalisation?.used ? `${LABELS.ltmMultiple} (normalised)` : LABELS.ltmMultiple;
+}
+
 export function dcfCombinedLabel(r: ValuationResult): string {
   return canonical(r) && r.dcfBlock.combination === 'perpetuity_only' ? LABELS.dcfPerpetuityOnly : LABELS.dcfCombined;
 }
@@ -843,7 +848,8 @@ export function terminalRows(r: ValuationResult): [string, string][] {
       rows.push(['Implied terminal ROIC', Number.isFinite(r.terminal.impliedRoic) ? fmtPct(r.terminal.impliedRoic, 1) : 'Not meaningful (no reinvestment)']);
     }
   }
-  rows.push(['Discounting', r.midYear ? 'Mid-year convention' : 'End of year']);
+  // "Mid-year" beside its label "Discounting": "Mid-year convention" wrapped in the report's value column.
+  rows.push(['Discounting', r.midYear ? 'Mid-year' : 'End of year']);
   rows.push(['Weight on DCF', `${r.dcfWeight}%`]);
   return rows;
 }

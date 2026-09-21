@@ -1251,6 +1251,26 @@ page 6 at least 80% full, the block whole on page 6 and "Important" on page 7.
 The reported case (Pakistan, 35% minority, owner costs not carried, EOSB and
 leases) is first; it failed on the old layout.
 
+**Check rows stay on one page where they fit** (`checksFitOnPage6`, since
+2026-09-21): before drawing, the report estimates where the list lands (about
+173pt plus 12.6pt per table row, calibrated against renders, residuals within
+7pt) and its height (14.5pt a row, 25pt when the label or message may wrap), with
+a 12pt margin. When it fits, heading and rows are kept whole; when it may not,
+the rows break across pages 6 and 7 as before, so a gap never returns.
+`verify-report-layout` checks every case the estimate keeps whole really is on
+one page, and reports how many are (80 of 109 in the default sample; the rest are
+the densest cases, whose list is taller than what page 6 has left).
+
+**The revenue and EBITDA chart** (`revenueMarginSeriesChart`, report page 2, the
+results page and the financials step) labels every year's EBITDA as well as
+revenue since 2026-09-21: above the bar, or for a loss in brackets just above the
+zero line.
+
+**The cover tile** reads "Implied EV / LTM EBITDA (normalised)" when EBITDA is
+normalised (`ltmMultipleLabel`), as the results tile and the check do. The
+Discounting row reads "Mid-year", and unadjusted EBITDA "As reported", so neither
+wraps in the report's narrow value column.
+
 **The implied multiple check** measures against reported EBITDA when owner cost
 add-backs are not carried into the forecast, since the DCF then values reported
 earnings; otherwise normalised. **Growth and reinvestment** is worded in plain
@@ -1308,7 +1328,7 @@ cases and rasterises every page to PNG for inspection.
 `verify-valuation-v2` (496), `verify-tool-lead-api` (146), `verify-report-layout` (see above),
 `verify-valuation-dashboard` (375, the results page end to end at 1440, 1024 and 390, including the partner portrait's 4:5 frame and source ratio,
 against a local `next start`, every /api/ request intercepted so nothing is
-written), `verify-tool-email-pdf` (399, pdfjs text and operator list, including the report theme's footer, colour and logo rules, so a ligature glyph is
+written), `verify-tool-email-pdf` (406, pdfjs text and operator list, including the report theme's footer, colour and logo rules, so a ligature glyph is
 caught even though extracted text maps it back to letters),
 `verify-tools-visibility` (97), `verify-brevo-webhook` (168), `verify-booking-links` (61) and
 `verify-production-guard` (34). Each was
