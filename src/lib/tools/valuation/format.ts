@@ -248,6 +248,17 @@ export function netDebtSentence(r: ValuationResult): string {
   return `${entered}, less free cash flow earned from then to ${fmtDate(m.valuationDate)}${interest} gives net debt at the valuation date.`;
 }
 
+/**
+ * Why a stake adjustment applies to only part of the blend (since 2026-09-21), for the report and
+ * the results page. Null when there is no adjustment, or on results stored before the change.
+ */
+export function stakeBasisNote(r: ValuationResult): string | null {
+  const s = r.stake;
+  if (s?.premiumBasis === 'comparables') return 'The control premium lifts the comparables part only: the DCF already reflects control.';
+  if (s?.discountBasis === 'dcf') return 'The minority discount reduces the DCF part only: trading comparables are already minority prices.';
+  return null;
+}
+
 export function stakeLabel(r: ValuationResult): string {
   const s = r.stake;
   const pct = `${+s.percent.toFixed(2)}% stake`;
@@ -255,7 +266,10 @@ export function stakeLabel(r: ValuationResult): string {
     return s.premiumBasis === 'comparables'
       ? `${pct} with a ${fmtPct(s.adjustmentRate, 0)} control premium on the comparables part`
       : `${pct} with a ${fmtPct(s.adjustmentRate, 0)} control premium`;
-  if (s.adjustment === 'minority_discount') return `${pct} with a ${fmtPct(-s.adjustmentRate, 0)} minority discount`;
+  if (s.adjustment === 'minority_discount')
+    return s.discountBasis === 'dcf'
+      ? `${pct} with a ${fmtPct(-s.adjustmentRate, 0)} minority discount on the DCF part`
+      : `${pct} with a ${fmtPct(-s.adjustmentRate, 0)} minority discount`;
   return pct;
 }
 

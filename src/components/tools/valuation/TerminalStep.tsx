@@ -25,8 +25,8 @@ import {
 
 const STAKE_OPTIONS: { value: StakeAdjustment; label: string; hint: string }[] = [
   { value: 'none', label: 'No adjustment', hint: 'Pro rata share of equity value.' },
-  { value: 'control_premium', label: 'Control premium', hint: 'For a stake that brings control. Often 20% to 35%.' },
-  { value: 'minority_discount', label: 'Minority discount', hint: 'For a stake without control. Often 15% to 30%.' },
+  { value: 'control_premium', label: 'Control premium', hint: 'For a stake that brings control. Often 20% to 35%. Applied to the comparables part: the DCF already reflects control.' },
+  { value: 'minority_discount', label: 'Minority discount', hint: 'For a stake without control. Often 15% to 30%. Applied to the DCF part: comparables are already minority prices.' },
 ];
 
 export function TerminalStep({

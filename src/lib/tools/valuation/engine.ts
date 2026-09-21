@@ -1179,6 +1179,14 @@ export type StakeResult = {
   premiumBasis?: 'comparables';
   /** The comparables weight the premium was applied through, as a ratio. */
   compsWeight?: number;
+  /**
+   * Where a minority discount is applied: to the DCF part of the blend only (since 2026-09-21),
+   * because trading comparables are already minority prices. Absent on results stored before,
+   * whose discount was applied to the whole blend.
+   */
+  discountBasis?: 'dcf';
+  /** The DCF weight the discount was applied through, as a ratio. */
+  dcfWeight?: number;
 };
 
 /** One forecast year of the DCF, everything the FCFF table prints. */
@@ -1496,20 +1504,26 @@ function compute(i: ValuationInputs, withScenarios: boolean, opts: EngineOptions
       : st.adjustment === 'minority_discount'
         ? -n(st.minorityDiscount) / 100
         : 0;
-  // A control premium lifts only the comparables part of the blend: the DCF values the company's own
-  // cash flows, which already reflect control, while trading multiples are minority prices. A minority
-  // discount still applies to the whole value.
-  const compsWeight = 1 - wD / 100;
+  // Each adjustment applies only to the part of the blend that lacks it. The DCF values the company's
+  // own cash flows, so it is a control value: a minority discount reduces the DCF part only. Trading
+  // comparables are minority prices: a control premium lifts the comparables part only.
+  const dcfWeight = wD / 100;
+  const compsWeight = 1 - dcfWeight;
   const compsEquity = compRange.map(toEquity) as Range3;
+  const dcfEquity = dcfRange.map(toEquity) as Range3;
   const premium = st.adjustment === 'control_premium' ? adjustmentRate : 0;
   const discount = st.adjustment === 'minority_discount' ? adjustmentRate : 0;
   const stake: StakeResult = {
     percent: stakePct,
     adjustment: st.adjustment,
     adjustmentRate,
-    value: equityDisplay.map((v, k) => (stakePct / 100) * (v + compsWeight * premium * Math.max(0, compsEquity[k])) * (1 + discount)) as Range3,
+    // Floored at zero, as the equity display is.
+    value: equityDisplay.map((v, k) =>
+      (stakePct / 100) * Math.max(0, v + compsWeight * premium * Math.max(0, compsEquity[k]) + dcfWeight * discount * Math.max(0, dcfEquity[k])),
+    ) as Range3,
     used: stakePct !== 100 || adjustmentRate !== 0,
     ...(premium ? { premiumBasis: 'comparables' as const, compsWeight } : {}),
+    ...(discount ? { discountBasis: 'dcf' as const, dcfWeight } : {}),
   };
 
   /* Ratios --------------------------------------------------------------- */
