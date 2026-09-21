@@ -253,8 +253,8 @@ async function pageColours(buf) {
   return out;
 }
 
-const DATA_LABEL = data.dataVersionLabel('2026-09-17');
-check('market data label', DATA_LABEL === 'Market data: Damodaran 2026, risk-free 15 September 2026', DATA_LABEL);
+const DATA_LABEL = data.dataVersionLabel(data.VALUATION_DATA_VERSION);
+check('market data label', DATA_LABEL === 'Market data: Damodaran 2026, risk-free 15 September 2026, local lending rates 2026', DATA_LABEL);
 const pdfs = {};
 const texts = {};
 for (const [label, result] of [['Saudi', saudi], ['full', full], ['Pakistan', pakistan], ['distressed', distressed]]) {
@@ -386,7 +386,7 @@ for (const [label, result] of [['Saudi', saudi], ['full', full], ['Pakistan', pa
   check('WACC to two decimals on every page it appears', [...all.matchAll(/WACC,? (?:SAR |PKR |AED )?(\d+\.\d+)%/g)].every((x) => /\.\d{2}$/.test(x[1])));
   check('minimal: whole equity, no stake line', m.includes('The valuation is for 100% of the equity') && !m.includes('stake with a'));
   check('minimal: no bridge rows beyond net debt', !m.includes('Less lease liabilities') && !m.includes('Add surplus assets') && !m.includes('Less end of service benefits'));
-  check('minimal: assumptions say no other claims entered', /Other claims, surplus assets\s+None entered/.test(m));
+  check('minimal: no empty other claims row on the assumptions (the bridge shows the claims)', !/Other claims, surplus assets/.test(m));
   check('full: bridge rows on the report', f.includes('Less lease liabilities') && f.includes('Add surplus assets and investments'));
   check('closing page offers the booking link', texts.full[7].toLowerCase().includes('book'));
   const code = qr.qrMatrix(BOOK);
@@ -635,6 +635,16 @@ console.log('Company profile on the report');
     check(`${label}: both paragraphs present on the cover, in full`, prof.descriptionParagraphs(maxDescription).every((p) => squashed.includes(p.replace(/\s+/g, ''))));
     check(`${label}: attributed to the visitor`, t[0].includes('As described by') && t[0].includes('Not reviewed by PaceMakers'));
     check(`${label}: the long company name is on the cover`, squashed.includes(maxName.replace(/\s+/g, '')));
+  }
+  {
+    // A typical description sits in the cover's lower half (since 2026-09-21), not tight under the figures.
+    const typical = 'The business runs three clinics in Riyadh and Jeddah for family and occupational health.\n\nThe owners are considering a partial sale to fund a fourth site.';
+    const buf = await pdfModule.renderValuationReport(saudi, { ...REPORT_META, company: 'Example Co', industry: 'I', country: 'C', bookingHref: BOOK, description: typical });
+    const cover = await (await pdfjs.getDocument({ data: new Uint8Array(buf), verbosity: 0 }).promise).getPage(1);
+    const H = cover.getViewport({ scale: 1 }).height;
+    const first = (await cover.getTextContent()).items.find((i) => i.str.includes('The business runs three clinics'));
+    const top = first ? H - first.transform[5] : NaN;
+    check('typical description: in the lower half of the cover', top > H / 2, `${Math.round(top)} of ${Math.round(H)}pt from the top`);
   }
   const none = await pageTexts(await pdfModule.renderValuationReport(full, { ...REPORT_META, company: null, industry: 'I', country: 'C', bookingHref: BOOK }));
   check('no description: no About block', !none[0].includes('Not reviewed by PaceMakers'));

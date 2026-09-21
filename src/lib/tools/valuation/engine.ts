@@ -52,6 +52,7 @@ import {
   DEAL_BANDS_SAR,
   INDUSTRIES,
   TAX,
+  TERMINAL,
   V2_DEFAULTS,
   VALUATION_DATA_VERSION,
   marketDataInUse,
@@ -882,6 +883,12 @@ export type TerminalCashFlow = {
    * meaningful.
    */
   impliedRoic: number;
+  /**
+   * The return on new capital the reinvestment floor assumes (WACC plus `TERMINAL.ronicPremiumPoints`),
+   * and whether the floor set the reinvestment. Absent on results stored before 2026-09-21.
+   */
+  ronic?: number;
+  reinvestmentFloored?: boolean;
 };
 
 /**
@@ -895,8 +902,14 @@ export type TerminalCashFlow = {
  *               = (Capex_T - D&A_T) x (1 + g)        otherwise
  *   Working cap = (NWC_T / Rev_T) x Rev_T x g
  *   FCF         = NOPAT - Net capex - Working cap
+ *
+ * CHANGED 2026-09-21: reinvestment is at least NOPAT x g / RONIC (the value driver formula), with
+ * RONIC the base WACC plus `TERMINAL.ronicPremiumPoints`. Without it, a forecast growing faster
+ * than g left so little reinvestment that the perpetuity implied returns of 50% or more on new
+ * capital. The top-up is added to net capex, so the terminal column still adds up. `ronic` absent
+ * (the reference method, and callers that do not pass it) applies no floor.
  */
-export function terminalCashFlow(rows: ProjectionRow[], g: number, t: number, zakatShareRate = 0): TerminalCashFlow {
+export function terminalCashFlow(rows: ProjectionRow[], g: number, t: number, zakatShareRate = 0, ronic?: number): TerminalCashFlow {
   const last = rows[rows.length - 1], prev = rows[rows.length - 2];
   const ebit = Math.max(last.ebit, 0) * (1 + g);
   const zakat = zakatShareRate ? (last.zakatBase ?? 0) * (1 + g) * zakatShareRate : 0;
@@ -904,10 +917,13 @@ export function terminalCashFlow(rows: ProjectionRow[], g: number, t: number, za
   const nopat = ebit - tax;
   const growthFinalYear = last.rev / prev.rev - 1;
   const netCapexFinalYear = last.capex - last.da;
-  const netCapex = growthFinalYear > g && growthFinalYear > 0 ? netCapexFinalYear * (g / growthFinalYear) : netCapexFinalYear * (1 + g);
+  const netCapexScaled = growthFinalYear > g && growthFinalYear > 0 ? netCapexFinalYear * (g / growthFinalYear) : netCapexFinalYear * (1 + g);
   const nwc = last.nwc ?? 0;
   const wcIntensity = nwc / last.rev;
   const dWc = wcIntensity * last.rev * g;
+  const floor = ronic !== undefined && ronic > 0 && nopat > 0 && g > 0 ? (nopat * g) / ronic : -Infinity;
+  const reinvestmentFloored = netCapexScaled + dWc < floor;
+  const netCapex = reinvestmentFloored ? floor - dWc : netCapexScaled;
   const reinvestment = netCapex + dWc;
   const reinvestmentRate = nopat > 0 ? reinvestment / nopat : NaN;
   return {
@@ -920,10 +936,21 @@ export function terminalCashFlow(rows: ProjectionRow[], g: number, t: number, za
     reinvestment,
     reinvestmentRate,
     impliedRoic: reinvestmentRate > 0 ? g / reinvestmentRate : NaN,
+    ...(ronic !== undefined ? { ronic, reinvestmentFloored } : {}),
   };
 }
 
-export type TerminalBasis = { mode: EngineOptions['terminalCashFlow']; taxRate: number; zakatShareRate?: number };
+export type TerminalBasis = {
+  mode: EngineOptions['terminalCashFlow'];
+  taxRate: number;
+  zakatShareRate?: number;
+  /**
+   * Points over the WACC for the reinvestment floor's return on new capital. The floor uses the
+   * WACC of each run (every sensitivity cell and scenario), so a cell still equals a full run at
+   * that WACC. Absent: no floor (the reference method).
+   */
+  ronicPremium?: number;
+};
 
 export type DcfResult = {
   pv: number; dfs: number[]; dfN: number; tvG: number; tvX: number; evG: number; evX: number;
@@ -965,7 +992,8 @@ export function dcf(
   const last = rows[rows.length - 1];
   const periodN = rows.length - stub;
   const dfN = 1 / Math.pow(1 + wacc, periodN);
-  const tvFcf = basis.mode === 'normalised' ? terminalCashFlow(rows, g, basis.taxRate, basis.zakatShareRate ?? 0).fcf : last.fcf * (1 + g);
+  const ronic = basis.ronicPremium !== undefined ? wacc + basis.ronicPremium : undefined;
+  const tvFcf = basis.mode === 'normalised' ? terminalCashFlow(rows, g, basis.taxRate, basis.zakatShareRate ?? 0, ronic).fcf : last.fcf * (1 + g);
   const tvG = wacc > g ? tvFcf / (wacc - g) : NaN;
   const tvX = last.ebitda > 0 ? last.ebitda * mult : NaN;
   return { pv, dfs, dfN, tvG, tvX, evG: pv + tvG * dfN, evX: pv + tvX * dfN, periods, periodN, fcfValued, tvFcf };
@@ -1045,6 +1073,7 @@ export type CheckId =
   | 'terminal_gap'
   | 'tv_share'
   | 'peer_count'
+  | 'multiple_vs_peers'
   | 'capital_structure'
   | 'margin_step'
   | 'no_normalisation'
@@ -1366,7 +1395,9 @@ function compute(i: ValuationInputs, withScenarios: boolean, opts: EngineOptions
   const stub = stubPeriod(i.financialYear, x.valuationDate);
   const f = stub.fraction;
   const zakatShareRate = tax.zakatMethod === 'base' ? tax.gccOwnership * tax.zakatRate : 0;
-  const basis: TerminalBasis = { mode: opts.terminalCashFlow, taxRate: w.t, zakatShareRate };
+  // The reinvestment floor's return on new capital at the base WACC (with any exploration adjustment), for the terminal block.
+  const ronic = w.wacc + TERMINAL.ronicPremiumPoints / 100;
+  const basis: TerminalBasis = { mode: opts.terminalCashFlow, taxRate: w.t, zakatShareRate, ronicPremium: TERMINAL.ronicPremiumPoints / 100 };
 
   const reported = i.financials;
   const fin = normalisedFinancials(reported, x.normalisation);
@@ -1519,7 +1550,7 @@ function compute(i: ValuationInputs, withScenarios: boolean, opts: EngineOptions
     const cf = (base.fcfValued as number[])[k];
     return { ...r, year: years.forecast[k], fcfValued: cf, period: (base.periods as number[])[k], df: base.dfs[k], pv: cf * base.dfs[k] };
   });
-  const tcf = terminalCashFlow(rows, g, w.t, zakatShareRate);
+  const tcf = terminalCashFlow(rows, g, w.t, zakatShareRate, opts.terminalCashFlow === 'normalised' ? ronic : undefined);
   const terminal: TerminalResult = {
     ...tcf,
     // In the reference's method the perpetuity rests on the final year's cash flow instead.

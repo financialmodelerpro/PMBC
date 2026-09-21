@@ -41,7 +41,7 @@ import { Document, Text, View, renderToBuffer } from '@react-pdf/renderer';
 import { SERVICES } from '@/config/services';
 import { findTool } from '@/config/tools';
 
-import { PURPOSES, SOURCE_NOTES, dataVersionLabel } from '../valuation/data';
+import { PURPOSES, dataVersionLabel } from '../valuation/data';
 import { descriptionParagraphs } from '../valuation/profile';
 import { isCanonicalResult, type ValuationResult } from '../valuation/engine';
 import { equityRangeBar, footballFieldChart, revenueMarginChart, sensitivityHeatmap, waterfallChart } from '../valuation/charts';
@@ -69,6 +69,7 @@ import {
   profileRatios,
   raiseTable,
   scenariosTable,
+  sourceNotes,
   sensitivityTitle,
   stakeLabel,
   taxNote,
@@ -214,16 +215,19 @@ export function ValuationReport({ result, meta }: { result: ValuationResult; met
             </View>
           </View>
 
-          {/* The visitor's own words about the business, set apart as theirs. */}
+          {/* The visitor's own words about the business, set apart as theirs, centred in the cover's
+              empty lower half (since 2026-09-21; it sat tight under the figures before). */}
           {about.length > 0 && (
-            <View style={{ marginTop: 20, borderLeftWidth: 2, borderLeftColor: RC.green, paddingLeft: 12 }}>
-              <Eyebrow>About the business</Eyebrow>
-              {about.map((para, i) => (
-                <Text key={i} style={{ fontSize: 9, lineHeight: 1.45, color: RC.text, marginTop: i ? 4 : 5 }}>
-                  {para}
-                </Text>
-              ))}
-              <Text style={{ fontSize: 7, color: RC.muted, marginTop: 4 }}>As described by {meta.preparedFor}. Not reviewed by PaceMakers.</Text>
+            <View style={{ flex: 1, justifyContent: 'center', paddingVertical: 16 }}>
+              <View style={{ backgroundColor: RC.shade, borderLeftWidth: 3, borderLeftColor: RC.green, paddingVertical: 14, paddingHorizontal: 16 }}>
+                <Eyebrow>About the business</Eyebrow>
+                {about.map((para, i) => (
+                  <Text key={i} style={{ fontSize: 10, lineHeight: 1.5, color: RC.text, marginTop: i ? 5 : 7 }}>
+                    {para}
+                  </Text>
+                ))}
+                <Text style={{ fontSize: 7.5, color: RC.muted, marginTop: 7 }}>As described by {meta.preparedFor}. Not reviewed by PaceMakers.</Text>
+              </View>
             </View>
           )}
         </View>
@@ -425,7 +429,9 @@ export function ValuationReport({ result, meta }: { result: ValuationResult; met
                       ['Minority interest', amt(b.minorityInterest)],
                       ['Surplus assets', amt(b.surplusAssets)],
                     ] as [string, string][])
-                  : ([['Other claims, surplus assets', 'None entered']] as [string, string][])),
+                  : // With none entered the row is left out: the bridge on page 3 already shows every claim,
+                    // and page 6 needs the line.
+                    ([] as [string, string][])),
                 // Two rows, each with its unit, rather than "1,720.0 to 1,845.0 PKR m" in one cell, which
                 // wrapped the unit onto a line of its own in the narrow value column.
                 ...(r.normalisation.used
@@ -466,7 +472,7 @@ export function ValuationReport({ result, meta }: { result: ValuationResult; met
         <View minPresenceAhead={80}>
           <SectionHeading title="Sources" />
         </View>
-        {SOURCE_NOTES.map((note) => (
+        {sourceNotes(r, meta.country).map((note) => (
           <Text key={note.label} wrap={false} style={{ fontSize: 8.5, color: RC.muted, lineHeight: 1.4, marginBottom: 3 }}>
             <Text style={{ fontWeight: 600, color: RC.text }}>{note.label}. </Text>
             {note.source}

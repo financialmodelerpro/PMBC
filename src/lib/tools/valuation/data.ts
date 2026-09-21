@@ -28,7 +28,7 @@
  */
 
 /** Stamped on every lead. Bump on any change to a value in this file. */
-export const VALUATION_DATA_VERSION = '2026-09-17';
+export const VALUATION_DATA_VERSION = '2026-09-21';
 
 /**
  * How each data version is described to a reader: the PDF report's cover and
@@ -39,6 +39,8 @@ export const VALUATION_DATA_VERSION = '2026-09-17';
 export const DATA_VERSION_LABELS: Record<string, string> = {
   '2026-09-16': 'Damodaran January 2026, risk-free September 2026',
   '2026-09-17': 'Market data: Damodaran 2026, risk-free 15 September 2026',
+  // Local lending rates for the cost of debt and the terminal reinvestment floor.
+  '2026-09-21': 'Market data: Damodaran 2026, risk-free 15 September 2026, local lending rates 2026',
 };
 
 export function dataVersionLabel(version: string): string {
@@ -178,6 +180,19 @@ export const V2_DEFAULTS = {
   scenarioWeights: { downside: 25, base: 50, upside: 25 },
   /** Stake defaults, percent. 100% with no adjustment is neutral. */
   stake: { percent: 100, controlPremium: 25, minorityDiscount: 20 },
+} as const;
+
+/**
+ * Long-term reinvestment in the terminal value (since 2026-09-21). Growth after the forecast must
+ * be paid for: terminal reinvestment is at least NOPAT x g / RONIC, the value driver formula, where
+ * RONIC (return on new invested capital) is the WACC plus `ronicPremiumPoints`. At zero, new
+ * capital earns its cost, so growth beyond the forecast adds no value of its own: the neutral,
+ * conservative convention for a business without a proven lasting advantage. Before this, the
+ * final year's capex scaled to g could imply returns of 50% or more on new capital, which
+ * overstated the perpetuity value. A business whose own figures imply more reinvestment keeps them.
+ */
+export const TERMINAL = {
+  ronicPremiumPoints: 0,
 } as const;
 
 /**
@@ -434,4 +449,50 @@ export const SOURCE_NOTES: SourceNote[] = [
 ];
 
 /** The one-paragraph version shown under the WACC build. */
+
+/**
+ * Local lending base rates for the default pre-tax cost of debt (since 2026-09-21): the base a
+ * corporate loan is priced over in each country, plus `ASSUMPTIONS.companyCreditSpread` (2.0%, set
+ * by PaceMakers) as the typical margin. No published typical bank margin was found for any of these
+ * countries, so the margin is the firm's assumption and says so. Entered in the valuation currency;
+ * the form prefills it and the visitor can change it on the cost of capital step.
+ *
+ * REFRESH with the January Damodaran update, and whenever a central bank moves: the Saudi figure
+ * predates the September 2026 rate rises. Qatar uses the QCB lending rate because the QIBOR feed
+ * looked inconsistent; Oman the CBO repo rate because the latest published OMIBOR was May 2026.
+ */
+export type LendingRate = { name: string; short: string; rate: number; asOf: string; source: string };
+export const LENDING_RATES: Record<CountryName, LendingRate> = {
+  'Saudi Arabia': { name: '3-month SAIBOR', short: 'SAIBOR', rate: 4.76, asOf: '2026-08-27', source: 'SAIBOR fixing, Argaam' },
+  'United Arab Emirates': { name: '3-month EIBOR', short: 'EIBOR', rate: 4.4, asOf: '2026-09-21', source: 'Trading Economics' },
+  Qatar: { name: 'QCB lending rate', short: 'QCB rate', rate: 4.6, asOf: '2026-09-17', source: 'Qatar Central Bank, reported by The Peninsula' },
+  Kuwait: { name: 'CBK discount rate', short: 'CBK rate', rate: 3.5, asOf: '2026-09-16', source: 'Central Bank of Kuwait' },
+  Oman: { name: 'CBO repo rate', short: 'CBO repo', rate: 4.5, asOf: '2026-09-17', source: 'Central Bank of Oman, reported by the Oman Observer' },
+  Bahrain: { name: '3-month BHIBOR', short: 'BHIBOR', rate: 5.43, asOf: '2026-09-20', source: 'Trading Economics' },
+  Pakistan: { name: '3-month KIBOR (offer)', short: 'KIBOR', rate: 11.75, asOf: '2026-09-18', source: 'State Bank of Pakistan' },
+};
+
+/** The default pre-tax cost of debt for a country, percent: the local base rate plus the typical margin. Null for an unknown country. */
+export function defaultCostOfDebt(country: string): number | null {
+  const l = (LENDING_RATES as Record<string, LendingRate | undefined>)[country];
+  return l ? +(l.rate + ASSUMPTIONS.companyCreditSpread).toFixed(2) : null;
+}
+
+/** The country whose currency this is, and its lending rate. Each supported country has its own currency. */
+export function lendingForCurrency(code: string): { country: string; lending: LendingRate } | null {
+  const country = Object.keys(COUNTRIES).find((k) => (COUNTRIES as Record<string, { code: string }>)[k].code === code);
+  const lending = country ? (LENDING_RATES as Record<string, LendingRate | undefined>)[country] : undefined;
+  return country && lending ? { country, lending } : null;
+}
+
+/** The source line for a country's default cost of debt, for the report and the results page. */
+export function lendingSourceNote(country: string): SourceNote | null {
+  const l = (LENDING_RATES as Record<string, LendingRate | undefined>)[country];
+  if (!l) return null;
+  return {
+    label: 'Cost of debt',
+    source: `${l.name} of ${l.rate.toFixed(2)}% (${l.source}), plus a ${ASSUMPTIONS.companyCreditSpread.toFixed(1)}% margin set by PaceMakers, unless changed. Rate as at`,
+    asOf: formatDataDate(l.asOf),
+  };
+}
 export const WACC_SOURCE_SENTENCE = `Sources: country risk premiums, default spreads and tax rates from Aswath Damodaran, January 2026 update. Implied equity risk premium of ${pct2(MARKET_DATA.erp.value)}, Damodaran, as at ${ERP_DATE_TEXT}. Unlevered betas (corrected for cash) and D/E from Damodaran global industry data, January 2026. Risk-free rate uses the US 10-year Treasury yield of ${pct2(MARKET_DATA.treasury.value)} (${formatDataDate(MARKET_DATA.treasury.asOf)}), less the ${pct2(MARKET.usDefaultSpread)} US default spread per Damodaran’s method.`;

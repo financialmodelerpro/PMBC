@@ -1,6 +1,6 @@
 'use client';
 
-import { WACC_SOURCE_SENTENCE } from '@/lib/tools/valuation/data';
+import { ASSUMPTIONS, LENDING_RATES, WACC_SOURCE_SENTENCE, formatDataDate, type LendingRate } from '@/lib/tools/valuation/data';
 import type { Currency, WaccBreakdown } from '@/lib/tools/valuation/engine';
 import { fmtPct, waccSteps } from '@/lib/tools/valuation/format';
 
@@ -27,8 +27,8 @@ const EQUITY: Spec[] = [
 const DEBT: Spec[] = [
   {
     k: 'kd',
-    label: 'Your pre-tax borrowing rate (optional)',
-    hint: 'What the company pays on its borrowings. Leave blank to build it from the spreads.',
+    label: 'Pre-tax cost of debt',
+    hint: 'What the company pays on its borrowings. Clear it to build it from the spreads instead.',
     step: 0.1,
     suffix: '%',
   },
@@ -69,11 +69,18 @@ export function WaccStep({
   onNext: () => void;
 }) {
   const kdEntered = state.wacc.kd.trim() !== '';
+  // The default's source: the country's lending base rate, its date and source, plus the typical margin.
+  const kdHint = () => {
+    const l = (LENDING_RATES as Record<string, LendingRate | undefined>)[state.country];
+    return l
+      ? `Set from the ${l.name}, ${l.rate.toFixed(2)}% as at ${formatDataDate(l.asOf)} (${l.source}), plus a ${ASSUMPTIONS.companyCreditSpread.toFixed(1)}% margin set by PaceMakers. In ${currency.code}. Change it to your own borrowing rate, or clear it to build it from the spreads.`
+      : `What the company pays on its borrowings, in ${currency.code}. Clear it to build it from the spreads.`;
+  };
   const hintFor = (s: Spec) =>
     (s.k === 'ds' || s.k === 'cs') && kdEntered
-      ? 'Not used while your borrowing rate is entered.'
+      ? 'Not used while a cost of debt is set.'
       : s.k === 'kd'
-        ? `${s.hint} In ${currency.code}.`
+        ? kdHint()
         : s.k === 'crp' && state.country
       ? `Damodaran, ${state.country}`
       : s.k === 'bu' && state.industry

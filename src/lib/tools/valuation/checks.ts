@@ -102,6 +102,28 @@ export function buildChecks(r: ValuationResult, extra: { inflationLocal: number 
     });
   }
 
+  // 4b. The implied EV / LTM EBITDA against the highest comparable EV / EBITDA, before the private
+  // company discount (since 2026-09-21). A value above every comparable, even before the discount a
+  // private company usually trades at, needs a reason. Run whenever last actual EBITDA is positive.
+  {
+    const implied = r.ltmMultiple;
+    const top = r.comparables?.ebitdaMultiplesPre?.[2];
+    if (r.ltmEbitda > 0 && Number.isFinite(implied) && Number.isFinite(top)) {
+      const peers = r.comparables.source === 'peers';
+      const what = peers ? 'the highest comparable' : 'the top of the preset range';
+      const warn = implied > top;
+      add({
+        id: 'multiple_vs_peers',
+        label: 'Implied multiple against comparables',
+        status: warn ? 'warning' : 'pass',
+        message: warn
+          ? `Implied ${fmtMultiple(implied)} LTM EBITDA is above ${what} (${fmtMultiple(top)}, before discount): the forecast or terminal value may carry more than the market pays.`
+          : `Implied ${fmtMultiple(implied)} LTM EBITDA is within ${what} (${fmtMultiple(top)}).`,
+        values: { implied, top, peers: peers ? 1 : 0 },
+      });
+    }
+  }
+
   // 5. Capital structure: target D/E against net debt over base equity.
   {
     const target = r.wacc.de, equityBase = r.equity[1];
@@ -215,14 +237,19 @@ export function buildChecks(r: ValuationResult, extra: { inflationLocal: number 
   // so it runs whenever the implied return is measurable (reinvestment positive).
   if (Number.isFinite(r.terminal.impliedRoic)) {
     const roic = r.terminal.impliedRoic;
-    const low = roic < r.wacc.wacc;
+    // A tolerance: when the reinvestment floor sets the return, it equals the WACC in theory and can land a
+    // rounding error below it, which is not a warning.
+    const low = roic < r.wacc.wacc - 1e-9;
+    const floored = r.terminal.reinvestmentFloored === true;
     add({
       id: 'terminal_roic',
       label: 'Terminal returns against WACC',
       status: low ? 'warning' : 'pass',
       message: low
         ? `The terminal value implies a return on new capital of ${fmtPct(roic, 1)}, below the WACC of ${fmtPct(r.wacc.wacc)}, so growth in perpetuity destroys value.`
-        : `The terminal value implies a return on new capital of ${fmtPct(roic, 1)}, above the WACC of ${fmtPct(r.wacc.wacc)}.`,
+        : floored
+          ? `Reinvestment is set so new capital earns the WACC of ${fmtPct(r.wacc.wacc)}.`
+          : `The terminal value implies a return on new capital of ${fmtPct(roic, 1)}, above the WACC of ${fmtPct(r.wacc.wacc)}.`,
       values: { roic, wacc: r.wacc.wacc, reinvestmentRate: r.terminal.reinvestmentRate },
     });
   }
