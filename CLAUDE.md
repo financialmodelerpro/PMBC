@@ -538,13 +538,14 @@ Three flags matter when rebuilding:
 079  retire_tools_link_rows    removes 075's two rows; the footer link and CTA are now rendered from the visibility switch
 080  tool_hero_promise         DML, safe any time. The valuation hero subtitle becomes the one-line promise, only if still 074's wording
 081  tools_nav_item            DML, safe any time. A hidden "Tools" row in Pages & Nav after Financial Modeler Pro, only if no /tools row exists
+082  tool_lead_phone           **DDL, HAND-RUN.** phone and contact_country on tool_leads, plus an index on lower(email). Applied 2026-09-21. Missing columns: leads save without them
 ```
 
 **Every migration from 076 on states when it is safe to apply** in a `SAFE TO APPLY:` line in its header: before or after which deploy, and what the site does in the gap. 075 is why: it was applied before the routes it linked to were deployed, and previews share the production database, so the live footer linked to a 404.
 
 After running migrations, manually insert one admin_users row via SQL with a bcrypt hash for the password.
 
-**DDL migrations must be run by hand.** 031, 032, 033, 072, 076 and 077 use `ALTER TABLE` or `CREATE TABLE`, which supabase-js cannot execute. The Supabase CLI is not installed and `.env.local` carries no direct Postgres connection string, so the seed-script pattern used for 029 does not work for them. Paste them into the Supabase SQL editor. Every consumer of those columns degrades safely if the migration has not run: the page list treats a missing `is_system` as "system" so nothing is deletable, `writeAudit` retries without the diff columns rather than failing the mutation, and `/api/admin/site-pages` replays a write with `can_toggle` stripped when Postgres rejects the column (so Pages & Nav keeps working, minus pinning).
+**DDL migrations must be run by hand.** 031, 032, 033, 072, 076, 077 and 082 use `ALTER TABLE` or `CREATE TABLE`, which supabase-js cannot execute. The Supabase CLI is not installed and `.env.local` carries no direct Postgres connection string, so the seed-script pattern used for 029 does not work for them. Paste them into the Supabase SQL editor. Every consumer of those columns degrades safely if the migration has not run: the page list treats a missing `is_system` as "system" so nothing is deletable, `writeAudit` retries without the diff columns rather than failing the mutation, and `/api/admin/site-pages` replays a write with `can_toggle` stripped when Postgres rejects the column (so Pages & Nav keeps working, minus pinning).
 
 ---
 
@@ -1032,6 +1033,18 @@ not started is refused; the year still running is allowed and takes no stub.
 - **What counts as engagement** (`src/lib/tools/engagement.ts`). The internal alert never does: it has its own Brevo tag (`tool-lead-alert`) and `kind:alert` in the custom header, and an event that cannot be matched to either email (header, tags, message ids, recipient, in that order) is treated as the alert. A click on the results email **within 60 seconds of delivery** (or of the recorded send, before a delivered event arrives), or on a results email that **bounced or was blocked**, is likely a mail scanner: it is kept in the lead's history with `pmbc_engagement.likely_automated` and the reason in its payload, never moves `email_status`, and a booking click from the email link on those terms is recorded without adding to `booking_clicks`. Results page and PDF booking clicks are never judged. The lead detail badges each flagged event, labels alert events as not visitor engagement, and states how many clicks were not counted. Events stored before this rule shipped (2026-09-16) were not rewritten.
 - **Status writes are conditional, never read-then-write.** Brevo sends events as separate requests within the same second, and a fast bounce can arrive before the send has recorded `sent`. The first real lead bounced and stayed `sent` that way. `setEmailStatusIf` is one UPDATE that applies only where the stored status is weaker (`weakerStatuses`), the send records `sent` only from `pending`, and a resend resets to `pending` first. Brevo's `reason` is kept as the event detail only on bounces, blocks, deferrals, errors and complaints; a delivered event carries the reason "sent", which read as a fault.
 
+### Leads by person, reminders and save and return
+
+Added 2026-09-21 (`feat/valuation-crm`). Proved by `npm run verify-tool-followup` (39; 44 with `VERIFY_BASE`, GET only).
+
+- **One person is one email.** `/admin/tool-leads` lists people (`listPeople`, `groupLeadsByEmail` in `src/lib/tools/admin.ts`, matched case-insensitively), each valuation a **project** under them, named by its company or "Your business". Lead counts count each email once (`countPeople`); `/admin/tools` shows valuations beside them. Existing rows group the same way with no migration: nothing is merged in the database.
+- **Phone and country** (migration 082), both optional, on the name and email step. The country list is `src/lib/tools/contactCountries.ts`, GCC and Pakistan first; choosing one fills the phone code. Stored as `+966 50 123 4567`. Shown on the lead and in the internal alert. `contact_country` is the person's own country, not the company's country of operations.
+- **Reminders**, `src/lib/tools/leads/reminders.ts` (pure) and `runReminders.ts`: two only, day 7 and day 14 after the person's **latest** valuation, each only inside its own week, only when the follow-up box was ticked on it, never after an unsubscribe or a booked meeting. Sent by the Vercel cron (`vercel.json`, daily 06:00 UTC) calling `/api/cron/tool-reminders`, which needs `Authorization: Bearer $CRON_SECRET` and answers 503 while `CRON_SECRET` is unset, **so reminders do not run until it is set on Vercel**. Each send is claimed by a `reminder_sent` event with a unique dedupe key per email and number; a failed send releases it. The wording is in code (`buildReminderEmail`), not the template editor. Report email shell, booking button, edit link, signed unsubscribe link and a one-click `List-Unsubscribe` header. Brevo events carry `kind:reminder` and are not visitor engagement.
+- **Unsubscribe**: `/api/tools/unsubscribe?e=&s=`, an HMAC over the email (`TOOL_LEAD_IP_SALT`, else `NEXTAUTH_SECRET`). GET only shows a confirm button, so a mail scanner cannot unsubscribe anyone; the POST turns off follow-up on every lead with that email and records `reminders_unsubscribed`.
+- **Booked**: `CalendlyBookedListener` on `/book` posts Calendly's `event_scheduled` message to `/api/tools/book/scheduled`, which records `booking_scheduled` against the lead in the `pmbc_booking` cookie. A booking made without that cookie is not seen, so that person may still get a reminder.
+- **Save and return**: every results email (and reminder) carries an **Edit and rerun** link, `/tools/<slug>?resume=<id>`, 16 characters, stored as a `resume_link` event (`resumeLinks.ts`). The page loads the project's inputs from `/api/tools/<slug>/resume` (GET, 404 for unknown ids or a Hidden tool), drops the id from the address bar, and a run saves a new version of **that** project through the version route with `sendEmail: false` (no gate, no email; Email me this version still sends one). The link grants edit access to the project, like the access token, and the email says not to forward it.
+- **Net income and P/E**: optional net income (last actual year) on step 2 and a P/E column for peers. With two or more peer P/Es and positive net income, P/E gives equity (after the private company discount), shown plus net debt and claims as a reference row in value by method and the comparables table. Never blended. Kept off page 6.
+
 ### Brevo webhook setup
 
 1. Set `BREVO_WEBHOOK_TOKEN` on Vercel (Production) to a long random string, and redeploy.
@@ -1134,7 +1147,7 @@ downstream computes a value; rounding happens only in `format.ts`.
 | Area | Rule |
 |---|---|
 | Terminal value | Perpetuity on a normalised terminal cash flow (`terminalCashFlow`): NOPAT at g, net capex scaled to g over final year growth, working capital at g. **Reinvestment is at least NOPAT x g / RONIC** (since 2026-09-21), RONIC the WACC of each run plus `TERMINAL.ronicPremiumPoints` (0), so growth beyond the forecast adds no value it has not paid for; the scaled capex alone implied returns of 40% to 50% on new capital. A business whose own figures imply more reinvestment keeps them; the top-up is added to net capex. Implied terminal multiple, reinvestment rate and implied terminal ROIC (g over reinvestment rate) are reported. |
-| Valuation date | The server's date. Year one keeps (1 - f) of its cash flow, periods (1 - f) / 2 then (i - 0.5) - f, terminal at N - f (`stubPeriod`). A last actual year 12 months or more old is refused. Financial years are assumed to end 31 December. |
+| Valuation date | The server's date. Year one keeps (1 - f) of its cash flow, periods (1 - f) / 2 then (i - 0.5) - f, terminal at N - f (`stubPeriod`). A last actual year 12 months or more old is refused. Financial years end on the last day of the month chosen on step 1 (`fyEndMonth`, December by default, since 2026-09-21); the report says "assumed to end on 31 December" only for December (`financialYearEndNote`). |
 | Net debt | Borrowings less cash at the year end (both entered, from input version 4), rolled forward to the valuation date: less the elapsed year one forecast cash flow, plus after-tax interest on positive net debt at the pre-tax cost of debt. One figure for every scenario. |
 | Tax and zakat | Saudi / GCC ownership is required for Saudi Arabia, no default (the example company fills 100%). Income tax on the non-GCC share only; zakat 2.5% of an approximate base, working capital plus optional year end cash (`zakatBase`, cash held flat, floored at zero), disclosed as possibly understated when cash is blank. The same income tax rate is used for FCFF, terminal NOPAT, cost of debt and beta relevering. |
 | Losses | Carried forward from the actual years, offset capped per country (`lossOffsetCap`: Saudi Arabia 25%, UAE 75%, else 100%). |
@@ -1325,10 +1338,10 @@ cases and rasterises every page to PNG for inspection.
 5. Checks in `verify-valuation-v2` for the item on its own and absent, then `verify-valuation-engine` to prove the neutral path.
 
 **Verifiers.** `verify-valuation-engine` (518: 514 reference parity plus 4 on the market data passed into the reference),
-`verify-valuation-v2` (496), `verify-tool-lead-api` (146), `verify-report-layout` (see above),
-`verify-valuation-dashboard` (375, the results page end to end at 1440, 1024 and 390, including the partner portrait's 4:5 frame and source ratio,
+`verify-valuation-v2` (517), `verify-tool-lead-api` (146), `verify-tool-followup` (39), `verify-report-layout` (see above),
+`verify-valuation-dashboard` (423, the results page end to end, with phone and country, the year end month, P/E and the resume link, at 1440, 1024 and 390, including the partner portrait's 4:5 frame and source ratio,
 against a local `next start`, every /api/ request intercepted so nothing is
-written), `verify-tool-email-pdf` (406, pdfjs text and operator list, including the report theme's footer, colour and logo rules, so a ligature glyph is
+written), `verify-tool-email-pdf` (414, pdfjs text and operator list, including the report theme's footer, colour and logo rules, so a ligature glyph is
 caught even though extracted text maps it back to letters),
 `verify-tools-visibility` (97), `verify-brevo-webhook` (168), `verify-booking-links` (61) and
 `verify-production-guard` (34). Each was
@@ -1594,6 +1607,10 @@ TOOL_LEAD_IP_SALT=
 # Shared secret in the Brevo webhook URL (?token=) or its Bearer header. Unset,
 # /api/webhooks/brevo refuses every request with 503.
 BREVO_WEBHOOK_TOKEN=
+
+# Bearer secret for the daily reminder cron (/api/cron/tool-reminders). Vercel sends it
+# automatically once set. Unset, the route answers 503 and no reminders are sent.
+CRON_SECRET=
 
 # Optional
 NEXT_PUBLIC_GA_ID=

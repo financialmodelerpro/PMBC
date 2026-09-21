@@ -142,10 +142,10 @@ export function TerminalStep({
 
         <strong className="text-[15px] text-[color:var(--pmbc-text)]">Your own peer companies (optional)</strong>
         <div className="mb-2.5">
-          <Hint>Add at least two peers to replace the preset. The tool uses the lowest, median and highest of your peers. EV / EBIT, when entered for at least two, is shown as a cross-check and is not used in the blend.</Hint>
+          <Hint>Add at least two peers to replace the preset. The tool uses the lowest, median and highest of your peers. EV / EBIT and P/E, when entered for at least two, are shown as cross-checks and are not used in the blend. P/E also needs net income on step 2.</Hint>
         </div>
         <div className="pmbc-scroll-thin relative overflow-x-auto rounded-[2px] border border-[color:var(--pmbc-border-warm)]">
-          <table className="w-full min-w-[580px] border-collapse">
+          <table className="w-full min-w-[680px] border-collapse">
             <caption className="sr-only">Your peer companies</caption>
             <thead>
               <tr className="bg-[#F6F1E6] text-left text-[12.5px] text-[color:var(--pmbc-muted)]">
@@ -153,6 +153,7 @@ export function TerminalStep({
                 <th scope="col" className="px-1.5 py-2 font-semibold">EV / EBITDA (x)</th>
                 <th scope="col" className="px-1.5 py-2 font-semibold">EV / Revenue (x)</th>
                 <th scope="col" className="px-1.5 py-2 font-semibold">EV / EBIT (x, optional)</th>
+                <th scope="col" className="px-1.5 py-2 font-semibold">P/E (x, optional)</th>
                 <th scope="col" className="w-10"><span className="sr-only">Remove</span></th>
               </tr>
             </thead>
@@ -178,6 +179,9 @@ export function TerminalStep({
                   </td>
                   <td className="p-1.5">
                     <NumberInput step={0.1} value={p.evEbit} onValue={(v) => onPeer(p.id, { evEbit: v })} aria-label={`Peer ${idx + 1} EV / EBIT`} />
+                  </td>
+                  <td className="p-1.5">
+                    <NumberInput step={0.1} value={p.pe} onValue={(v) => onPeer(p.id, { pe: v })} aria-label={`Peer ${idx + 1} P/E`} />
                   </td>
                   <td className="p-1.5 text-center">
                     <button

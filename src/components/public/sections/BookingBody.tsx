@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { Mail, MessageCircle, CalendarDays } from 'lucide-react';
 
+import { CalendlyBookedListener } from '@/components/public/CalendlyBookedListener';
 import { CalendlyEmbed } from '@/components/public/CalendlyEmbed';
 import { SectionContainer } from '@/components/public/SectionContainer';
 import type { PmbcVariant } from '@/lib/public/tokens';
@@ -121,6 +122,7 @@ export function BookingBody({
 
           <div className="mt-10">
             <CalendlyEmbed url={bookingUrl} minHeight={700} />
+            <CalendlyBookedListener />
           </div>
 
           {(fallbackPrompt || fallbackLinkLabel) && (

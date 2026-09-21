@@ -23,7 +23,15 @@ export const supabaseLeadStore: LeadStore = {
   },
   async insert(row) {
     try {
-      const { data, error } = await toolsDb().from('tool_leads').insert(row).select('id').single();
+      let { data, error } = await toolsDb().from('tool_leads').insert(row).select('id').single();
+      // Before migration 082 there are no phone or contact_country columns: save the lead without them
+      // rather than lose it.
+      if (error && /phone|contact_country/.test(error.message ?? '')) {
+        const { phone: _p, contact_country: _c, ...rest } = row;
+        void _p;
+        void _c;
+        ({ data, error } = await toolsDb().from('tool_leads').insert(rest).select('id').single());
+      }
       if (error || !data) {
         return { ok: false, reason: isMissingSchema(error) ? 'missing_table' : 'error', message: error?.message };
       }

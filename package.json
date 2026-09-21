@@ -75,7 +75,8 @@
     "verify-booking-links": "node scripts/verify-booking-links.mjs",
     "verify-brevo-webhook": "node scripts/verify-brevo-webhook.mjs",
     "verify-production-guard": "node scripts/verify-production-guard.mjs",
-    "verify-report-layout": "node scripts/verify-report-layout.mjs"
+    "verify-report-layout": "node scripts/verify-report-layout.mjs",
+    "verify-tool-followup": "node scripts/verify-tool-followup.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

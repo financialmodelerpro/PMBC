@@ -83,7 +83,7 @@ export async function submitLead(body: unknown): Promise<{ result: ValuationResu
 const PREFILL_KEY = 'pmbcValuationGate';
 const RETIRED_LEAD_KEY = 'pmbcValuationLead';
 
-export type GatePrefill = { name: string; email: string; purpose: string; dealSize: string; followUp: boolean; raiseAmount: string };
+export type GatePrefill = { name: string; email: string; purpose: string; dealSize: string; followUp: boolean; raiseAmount: string; contactCountry: string; phoneCode: string; phone: string };
 
 export function readGatePrefill(): Partial<GatePrefill> | null {
   try {
@@ -92,7 +92,7 @@ export function readGatePrefill(): Partial<GatePrefill> | null {
     if (!raw) return null;
     const v = JSON.parse(raw) as Partial<GatePrefill>;
     const out: Partial<GatePrefill> = {};
-    for (const k of ['name', 'email', 'purpose', 'dealSize', 'raiseAmount'] as const) if (typeof v[k] === 'string') out[k] = v[k];
+    for (const k of ['name', 'email', 'purpose', 'dealSize', 'raiseAmount', 'contactCountry', 'phoneCode', 'phone'] as const) if (typeof v[k] === 'string') out[k] = v[k];
     if (typeof v.followUp === 'boolean') out.followUp = v.followUp;
     return out;
   } catch {
@@ -105,5 +105,48 @@ export function storeGatePrefill(v: GatePrefill): void {
     window.sessionStorage.setItem(PREFILL_KEY, JSON.stringify(v));
   } catch {
     // Storage can be unavailable (private windows): the gate is simply not prefilled.
+  }
+}
+
+/* ------------------------------------------------------------------------ */
+/* Save and return                                                           */
+/* ------------------------------------------------------------------------ */
+
+export type ResumedValuation = {
+  inputs: unknown;
+  lead: { name: string; email: string; token: string; booking: string | null };
+  gate: { name: string; email: string; company: string; purpose: string; dealSize: string; raiseAmount: string; contactCountry: string; phone: string };
+  project: string | null;
+};
+
+/** The saved valuation behind a resume link (`?resume=`), or null when the link is unknown. */
+export async function fetchResume(id: string): Promise<ResumedValuation | null> {
+  try {
+    const res = await fetch(`/api/tools/business-valuation/resume?r=${encodeURIComponent(id)}`, { cache: 'no-store', signal: AbortSignal.timeout(20_000) });
+    if (!res.ok) return null;
+    const data = (await res.json()) as ResumedValuation & { ok?: boolean };
+    return data.ok && data.lead?.token ? data : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * A run from a resumed valuation: saved as a new version of the same project, sending nothing
+ * (`sendEmail: false`); Email me this version sends the results again. A 429 still carries the
+ * recomputed result.
+ */
+export async function saveResumedRun(token: string, inputs: unknown): Promise<{ result: ValuationResult; saved: boolean } | null> {
+  try {
+    const res = await fetch('/api/tools/business-valuation/lead/version', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ token, inputs, sendEmail: false }),
+      signal: AbortSignal.timeout(20_000),
+    });
+    const data = (await res.json().catch(() => ({}))) as { result?: unknown };
+    return data.result ? { result: reviveResult(data.result), saved: res.ok } : null;
+  } catch {
+    return null;
   }
 }

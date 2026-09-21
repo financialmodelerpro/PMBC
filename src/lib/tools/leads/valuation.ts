@@ -26,6 +26,7 @@ import { z } from 'zod';
 import { BELOW_MINIMUM_BAND, DEAL_BANDS_SAR, DEAL_BAND_UNSURE, PURPOSES, VALUATION_DATA_VERSION } from '../valuation/data';
 import { INPUT_SCHEMA_VERSION, isoDate, runValuation, TOTAL_YEARS, type ValuationInputs, type ValuationResult } from '../valuation/engine';
 import { LIMITS } from '../valuation/limits';
+import { PHONE_MESSAGE, isContactCountry, phoneDigitCount } from '../contactCountries';
 import { cleanProfile } from '../valuation/profile';
 import { serializeResult } from '../valuation/serialize';
 import { CONSENT_TEXT, FOLLOW_UP_TEXT } from '../consent';
@@ -59,7 +60,7 @@ const inputsSchema = z.object({
   exitMultiple: cell,
   midYear: z.boolean(),
   peers: z
-    .array(z.object({ name: z.string().max(LIMITS.peerName), evEbitda: cell, evRevenue: cell, evEbit: cell.optional() }))
+    .array(z.object({ name: z.string().max(LIMITS.peerName), evEbitda: cell, evRevenue: cell, evEbit: cell.optional(), pe: cell.optional() }))
     .max(LIMITS.peers),
   privateDiscount: cell,
   dcfWeight: cell,
@@ -96,6 +97,10 @@ const inputsSchema = z.object({
   gccOwnership: cell.optional(),
   cash: cell.optional(),
   zakatRate: cell.optional(),
+  // The financial year end month, 1 to 12 (2026-09-21). Absent means December.
+  fyEndMonth: z.number().int().gte(1).lte(12).nullable().optional(),
+  // Net income for the last actual year, for the P/E reference method (2026-09-21).
+  netIncome: cell.optional(),
   investedCapitalParts: z.object({ workingCapital: cell, fixedAssets: cell }).nullable().optional(),
   raiseAmount: cell.optional(),
   purpose: z.string().max(40).nullable().optional(),
@@ -155,6 +160,10 @@ export const submissionSchema = z.object({
     dealSize: z.enum(dealValues, { message: 'Select a transaction size range.' }),
     consent: z.literal(true, { message: 'Tick the box to agree before we show your results.' }),
     followUp: z.boolean(),
+    // The person's country and phone (2026-09-21), both optional. The country must be one offered on the
+    // form; the phone arrives cleaned (`cleanPhone`) and must carry 6 to 15 digits.
+    contactCountry: optional(60).refine((v) => !v || isContactCountry(v), 'Choose a country from the list.'),
+    phone: optional(40).refine((v) => !v || (phoneDigitCount(v) >= 6 && phoneDigitCount(v) <= 15 && /^\+?[\d ]+$/.test(v)), PHONE_MESSAGE),
   }),
   attribution: z
     .object({
@@ -311,6 +320,9 @@ export async function processValuationSubmission(
     consent_text: CONSENT_TEXT,
     follow_up_consent: g.followUp,
     follow_up_consent_at: g.followUp ? nowIso : null,
+    // Migration 082. The store retries without these two if the columns are not there yet.
+    phone: g.phone || null,
+    contact_country: g.contactCountry || null,
     utm_source: a.utm_source || null,
     utm_medium: a.utm_medium || null,
     utm_campaign: a.utm_campaign || null,

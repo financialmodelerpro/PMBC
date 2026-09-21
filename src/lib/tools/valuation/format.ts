@@ -300,7 +300,7 @@ export function equityFloorNote(floor: EquityFloor): string | null {
 /* ------------------------------------------------------------------------ */
 
 export type FootballFieldRow = {
-  key: 'dcf_growth' | 'dcf_exit' | 'dcf_combined' | 'comps_ebit' | 'comps_ebitda' | 'comps_revenue' | 'blended' | 'scenarios';
+  key: 'dcf_growth' | 'dcf_exit' | 'dcf_combined' | 'comps_ebit' | 'comps_pe' | 'comps_ebitda' | 'comps_revenue' | 'blended' | 'scenarios';
   label: string;
   sub: string;
   /** Low, base case, high. The marker is always drawn at the base case. */
@@ -340,6 +340,18 @@ export function footballFieldRows(r: ValuationResult): FootballFieldRow[] {
             label: 'Comparables, EV / EBIT',
             sub: `Selected comparable companies (${r.comparables.ebitPeerCount}); for reference, not used in the blend`,
             range: r.comparables.ebitValue,
+            blend: false,
+          },
+        ] as FootballFieldRow[])
+      : []),
+    // P/E gives equity; plus net debt and other claims it sits on the enterprise value basis of this chart.
+    ...(canonical(r) && r.comparables.peValue
+      ? ([
+          {
+            key: 'comps_pe',
+            label: 'Comparables, P/E',
+            sub: `Selected comparable companies (${r.comparables.pePeerCount ?? 0}), equity plus net debt; for reference, not used in the blend`,
+            range: r.comparables.peValue,
             blend: false,
           },
         ] as FootballFieldRow[])
@@ -869,6 +881,7 @@ export function comparablesRows(r: ValuationResult): [string, string][] {
       ['After discount, EV / Revenue', list(cp.revenueMultiplesPost)],
     );
     if (cp.ebitMultiplesPost) rows.push(['After discount, EV / EBIT (reference)', list(cp.ebitMultiplesPost)]);
+    if (cp.peMultiplesPost) rows.push(['After discount, P/E (reference)', list(cp.peMultiplesPost)]);
     if (cp.peerNames.length) rows.push([`Companies (${cp.peerNames.length})`, cp.peerNames.join(', ')]);
   } else {
     rows.push(['EV / EBITDA used', list(r.comps.ebitda)], ['EV / Revenue used', list(r.comps.revenue)]);
@@ -969,6 +982,17 @@ export const ZAKAT_BASE_NOTE = `Zakat is ${TAX.zakatRate}% of an approximate zak
 export const ZAKAT_NO_CASH_NOTE = 'Cash was not entered, so the base is working capital alone and may be understated.';
 export const ZAKAT_FALLBACK_NOTE = `Invested capital was not entered, so the zakat base cannot be estimated; zakat is instead approximated as ${TAX.zakatRate}% of profit on the Saudi / GCC owned share.`;
 export const FINANCIAL_YEAR_END_NOTE = 'Financial years are assumed to end on 31 December.';
+
+/**
+ * The year end note for a result (since 2026-09-21): December keeps the wording above; another month
+ * names the day, as entered on step 1.
+ */
+export function financialYearEndNote(r: ValuationResult): string {
+  const m = r.meta?.fyEndMonth ?? 12;
+  if (m === 12) return FINANCIAL_YEAR_END_NOTE;
+  const end = fmtDate(r.meta.lastFyEnd);
+  return `Financial years end on ${end.slice(0, -5)}, as entered.`;
+}
 export const VALUATION_DATE_NOTE = 'Cash flow is valued from the valuation date. The elapsed part of the first forecast year uses forecast free cash flow, not actual results, and is assumed kept in the business (no distributions). Net debt at the valuation date is the year end figure, less that cash flow, plus after-tax interest on it at the cost of debt.';
 
 /** Shown under the free cash flow table. */
@@ -993,7 +1017,7 @@ export function disclosures(r: ValuationResult): {
 } {
   const method = canonical(r) ? r.tax.zakatMethod : 'none';
   return {
-    financialYearEnd: FINANCIAL_YEAR_END_NOTE,
+    financialYearEnd: financialYearEndNote(r),
     zakat: method === 'base' ? (r.tax.zakatBaseLtm?.cash === null ? `${zakatBaseNote(r)} ${ZAKAT_NO_CASH_NOTE}` : zakatBaseNote(r)) : method === 'profit_proxy' ? zakatFallbackNote(r) : null,
     valuationDate: canonical(r) && r.meta.stubFraction > 0 ? VALUATION_DATE_NOTE : null,
     evRevenue: r.ltmEbitda > 0 ? 'EV / Revenue shown for reference; not used in the blend.' : null,

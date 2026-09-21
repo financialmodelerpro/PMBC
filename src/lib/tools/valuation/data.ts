@@ -164,8 +164,12 @@ export const ASSUMPTIONS = {
  * would be refused by the stub period check once it is more than twelve months
  * old, which would break "Load an example company" every January.
  */
-export function defaultFinancialYearFor(today: Date = new Date()): number {
-  return Math.max(ASSUMPTIONS.defaultFinancialYear, today.getUTCFullYear() - 1);
+export function defaultFinancialYearFor(today: Date = new Date(), fyEndMonth = 12): number {
+  // The latest financial year that has ended: this calendar year's, when its year end month is past.
+  const m = Number.isInteger(fyEndMonth) && fyEndMonth >= 1 && fyEndMonth <= 12 ? fyEndMonth : 12;
+  const y = today.getUTCFullYear();
+  const endThisYear = Date.UTC(y, m, 0);
+  return Math.max(ASSUMPTIONS.defaultFinancialYear, today.getTime() > endThisYear ? y : y - 1);
 }
 
 /* ------------------------------------------------------------------------ */

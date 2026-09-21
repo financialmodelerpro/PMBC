@@ -24,6 +24,7 @@ const NULL_MEANS_ABSENT = new Set([
   'debt', 'cash', 'investedCapital', 'workingCapital', 'fixedAssets', 'zakatBaseLtm',
   'ebitMultiplesPre', 'ebitMultiplesPost', 'ebitValue',
   'kdEntered',
+  'peMultiplesPre', 'peMultiplesPost', 'peEquity', 'peValue',
 ]);
 
 export function serializeResult(result: ValuationResult): unknown {

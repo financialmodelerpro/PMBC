@@ -8,7 +8,7 @@ import { MigrationNotice } from '@/components/admin/tools/MigrationNotice';
 import { ToolLeadActions } from '@/components/admin/tools/ToolLeadActions';
 import { findTool } from '@/config/tools';
 import { ADMIN_COLORS, adminBadge, adminCard, adminPageMain } from '@/lib/admin/styles';
-import { emailStatusLabel } from '@/lib/tools/admin';
+import { emailStatusLabel, projectName, projectsForEmail } from '@/lib/tools/admin';
 import type { ToolLeadEventRow } from '@/lib/tools/db';
 import { dealSizeLabel } from '@/lib/tools/leads/deliver';
 import { AUTOMATED_REASON_TEXT, automatedReasonOf } from '@/lib/tools/engagement';
@@ -194,6 +194,8 @@ export default async function ToolLeadDetailPage(props: { params: Promise<{ id: 
     );
   }
   if (!lead) notFound();
+  // The person this project belongs to: every project under the same email (one lead per email).
+  const siblings = (await projectsForEmail(lead.email)).filter((p) => p.id !== lead.id);
 
   const result = reviveResult(lead.results);
   const h = headline(result);
@@ -252,6 +254,9 @@ export default async function ToolLeadDetailPage(props: { params: Promise<{ id: 
               rows={[
                 ['Name', lead.name],
                 ['Email', <a key="e" href={`mailto:${lead.email}`}>{lead.email}</a>],
+                ['Phone', lead.phone ? <a key="t" href={`tel:${lead.phone.replace(/s/g, '')}`}>{lead.phone}</a> : 'Not given'],
+                ['Their country', lead.contact_country || 'Not given'],
+                ['Project', projectName(lead.company)],
                 ['Company', lead.company || 'Not given'],
                 ['Purpose', purpose],
                 ['Planned transaction size', dealSizeLabel(lead.deal_size_band, lead.country)],
@@ -260,6 +265,21 @@ export default async function ToolLeadDetailPage(props: { params: Promise<{ id: 
                 ['Follow-up email', lead.follow_up_consent ? `Yes, ${when(lead.follow_up_consent_at)}` : 'No'],
               ]}
             />
+          </Card>
+
+          <Card title={`Other projects by this person (${siblings.length})`}>
+            {siblings.length ? (
+              <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, lineHeight: 1.7 }}>
+                {siblings.map((p) => (
+                  <li key={p.id}>
+                    <Link href={`/admin/tool-leads/${p.id}`}>{projectName(p.company)}</Link>{' '}
+                    <span style={muted}>{when(p.created_at)}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p style={{ ...muted, margin: 0 }}>This is their only project.</p>
+            )}
           </Card>
 
           <Card title="Actions">
@@ -328,6 +348,8 @@ export default async function ToolLeadDetailPage(props: { params: Promise<{ id: 
                 ['Industry', inputs.industry],
                 ['Country', `${inputs.country} (${result.currency.code})`],
                 ['Last financial year', n(inputs.financialYear)],
+                ['Financial year ends', ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][(inputs.fyEndMonth ?? 12) - 1] ?? 'December'],
+                ['Net income, last actual year', inputs.netIncome !== null && inputs.netIncome !== undefined ? `${n(inputs.netIncome)} ${result.currency.code} m` : 'Not entered'],
                 ...(inputs.debt !== null && inputs.debt !== undefined
                   ? ([
                       ['Borrowings', `${n(inputs.debt)} ${result.currency.code} m`],
@@ -383,7 +405,7 @@ export default async function ToolLeadDetailPage(props: { params: Promise<{ id: 
                   [
                     'Peers',
                     inputs.peers.length
-                      ? inputs.peers.map((p) => `${p.name || 'Unnamed'} (${n(p.evEbitda)}x, ${n(p.evRevenue)}x${p.evEbit !== null && p.evEbit !== undefined ? `, EV / EBIT ${p.evEbit}x` : ''})`).join('; ')
+                      ? inputs.peers.map((p) => `${p.name || 'Unnamed'} (${n(p.evEbitda)}x, ${n(p.evRevenue)}x${p.evEbit !== null && p.evEbit !== undefined ? `, EV / EBIT ${p.evEbit}x` : ''}${p.pe !== null && p.pe !== undefined ? `, P/E ${p.pe}x` : ''})`).join('; ')
                       : 'None, preset multiples used',
                   ],
                 ]}

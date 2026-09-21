@@ -47,7 +47,7 @@ export const WACC_KEYS: WaccKey[] = ['rf', 'erp', 'crp', 'bu', 'de', 'sp', 'ds',
 
 export type FillKey = 'growth' | 'ebitdaMargin' | 'daOfRevenue' | 'capexOfRevenue' | 'nwcOfRevenue';
 
-export type PeerRow = { id: number; name: string; evEbitda: string; evRevenue: string; evEbit: string };
+export type PeerRow = { id: number; name: string; evEbitda: string; evRevenue: string; evEbit: string; pe: string };
 
 export type BridgeKey = 'eosb' | 'leases' | 'minorityInterest' | 'surplusAssets';
 export type ScenarioKey = 'upsideGrowth' | 'upsideMargin' | 'downsideGrowth' | 'downsideMargin' | 'weightDownside' | 'weightBase' | 'weightUpside';
@@ -82,8 +82,12 @@ export type FormState = {
   /** Invested capital in two parts. Blank working capital means the last actual year's figure from the financials. */
   icWorkingCapital: string;
   icFixedAssets: string;
+  /** Net income, last actual year, millions. Optional: only the P/E reference method reads it. */
+  netIncome: string;
   /** The zakat rate, percent. Saudi Arabia only; 2.5 by default and editable. */
   zakatRate: string;
+  /** The month the financial year ends, "1" to "12". December by default. */
+  fyEndMonth: string;
   stake: { percent: string; adjustment: StakeAdjustment; controlPremium: string; minorityDiscount: string };
   /** True once the visitor picks an adjustment. Until then it follows the stake size. */
   stakeAdjustmentTouched: boolean;
@@ -98,9 +102,9 @@ export type FormState = {
 };
 
 let peerSeq = 0;
-export function newPeer(name = '', evEbitda = '', evRevenue = '', evEbit = ''): PeerRow {
+export function newPeer(name = '', evEbitda = '', evRevenue = '', evEbit = '', pe = ''): PeerRow {
   peerSeq += 1;
-  return { id: peerSeq, name, evEbitda, evRevenue, evEbit };
+  return { id: peerSeq, name, evEbitda, evRevenue, evEbit, pe };
 }
 
 export function initialState(): FormState {
@@ -137,7 +141,9 @@ export function initialState(): FormState {
     investedCapital: '',
     icWorkingCapital: '',
     icFixedAssets: '',
+    netIncome: '',
     zakatRate: String(TAX.zakatRate),
+    fyEndMonth: '12',
     stakeAdjustmentTouched: false,
     stake: {
       percent: String(d.stake.percent),
@@ -200,7 +206,7 @@ export function withForecastFrom(fin: FormState['fin'], filled: Financials): For
 }
 
 export function parsePeers(rows: PeerRow[]): Peer[] {
-  return rows.map((r) => ({ name: r.name.trim(), evEbitda: num(r.evEbitda), evRevenue: num(r.evRevenue), evEbit: num(r.evEbit ?? '') }));
+  return rows.map((r) => ({ name: r.name.trim(), evEbitda: num(r.evEbitda), evRevenue: num(r.evRevenue), evEbit: num(r.evEbit ?? ''), pe: num(r.pe ?? '') }));
 }
 
 export function parseWacc(w: FormState['wacc']): WaccInputs {
@@ -230,7 +236,8 @@ export function toInputs(s: FormState, valuationDate: string | null = todayIso()
     exitMultiple: num(s.exitMultiple),
     midYear: s.midYear,
     // Only rows with something in them travel, as the reference recorded.
-    peers: parsePeers(s.peers).filter((p) => p.name || p.evEbitda !== null || p.evRevenue !== null || p.evEbit !== null),
+    peers: parsePeers(s.peers).filter((p) => p.name || p.evEbitda !== null || p.evRevenue !== null || p.evEbit !== null || p.pe !== null),
+    netIncome: num(s.netIncome),
     privateDiscount: num(s.privateDiscount),
     dcfWeight: num(s.dcfWeight),
     normalisation: { oneOff: num(s.norm.oneOff), ownerCosts: num(s.norm.ownerCosts), carryOwnerCosts: s.norm.carryOwnerCosts },
@@ -262,6 +269,7 @@ export function toInputs(s: FormState, valuationDate: string | null = todayIso()
     profile: cleanProfile({ companyName: s.companyName, description: s.description }),
     gccOwnership: s.country === TAX.zakatCountry ? num(s.gccOwnership) : null,
     zakatRate: s.country === TAX.zakatCountry ? num(s.zakatRate) : null,
+    fyEndMonth: parseInt(s.fyEndMonth, 10) || 12,
     cash: num(s.cash),
     valuationDate,
   };
@@ -424,7 +432,8 @@ export function stateFromInputs(i: ValuationInputs): FormState {
     exitMultiple: d(i.exitMultiple),
     xmTouched: true,
     midYear: i.midYear,
-    peers: i.peers.length ? i.peers.map((p) => newPeer(p.name, d(p.evEbitda), d(p.evRevenue), d(p.evEbit ?? null))) : base.peers,
+    peers: i.peers.length ? i.peers.map((p) => newPeer(p.name, d(p.evEbitda), d(p.evRevenue), d(p.evEbit ?? null), d(p.pe ?? null))) : base.peers,
+    netIncome: d(i.netIncome ?? null),
     privateDiscount: d(i.privateDiscount),
     discountTouched: true,
     dcfWeight: d(i.dcfWeight),
@@ -438,6 +447,7 @@ export function stateFromInputs(i: ValuationInputs): FormState {
     icWorkingCapital: d(i.investedCapitalParts?.workingCapital ?? null),
     icFixedAssets: d(i.investedCapitalParts?.fixedAssets ?? null),
     zakatRate: d(i.zakatRate ?? TAX.zakatRate),
+    fyEndMonth: String(i.fyEndMonth ?? 12),
     stakeAdjustmentTouched: true,
     stake: i.stake
       ? { percent: d(i.stake.percent), adjustment: i.stake.adjustment, controlPremium: d(i.stake.controlPremium), minorityDiscount: d(i.stake.minorityDiscount) }
