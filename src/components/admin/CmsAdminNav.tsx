@@ -36,6 +36,7 @@ import {
   PanelTop,
   Settings,
   Share2,
+  TrendingUp,
   Type,
   UserCog,
   Users,
@@ -120,6 +121,8 @@ const NAV: NavEntry[] = [
   { kind: 'item', label: 'Users', href: '/admin/users', icon: UserCog, role: 'admin' },
   { kind: 'item', label: 'Change Password', href: '/admin/change-password', icon: KeyRound },
   { kind: 'item', label: 'Audit Log', href: '/admin/audit', icon: History, role: 'admin' },
+  { kind: 'divider', label: 'Growth' },
+  { kind: 'item', label: 'Growth', href: '/admin/growth', icon: TrendingUp },
 ];
 
 const EXTERNAL_LINKS: Array<{ label: string; href: string }> = [
