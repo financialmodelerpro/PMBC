@@ -635,13 +635,13 @@ Mirrors FMP's page of the same path. **Read from the real FMP source** at `D:/FM
 
 ### 2026-08-02 - Admin credential rotated, launch blocker 2 closed
 
-`Admin@2026` is dead. Rotated via the new `npm run rotate-admin-password`, bcrypt cost 12.
+[retired admin password] is dead. Rotated via the new `npm run rotate-admin-password`, bcrypt cost 12.
 
 **The new password is not written down in this repository, and that is the point.** The credential it replaces was worthless precisely because it was recorded in `CLAUDE.md`, in three verification scripts, and across a dozen `SESSION_LOG.md` entries, all of which are in public git history. Recording the replacement would reproduce the failure exactly. No lockout risk: `rotate-admin-password.mjs` uses the service-role key from `.env.local`, so a forgotten password is one command from being reset.
 
 **Verified independently of the rotation script's own report,** because a script confirming its own success is not much of a check:
 
-- Stored hash no longer matches `Admin@2026`, and is `$2b$12$`.
+- Stored hash no longer matches [retired admin password], and is `$2b$12$`.
 - Stored hash matches the intended literal, which rules out shell mangling. This mattered: the password contained `$%` and `!`, and an inline shell variable could have hashed a string nobody could reproduce later. It was passed through a quoted heredoc so bash performed no expansion at all.
 - End-to-end: the new password logs in and reaches `/admin` with HTTP 200.
 - End-to-end: the old password is refused, no session cookie issued.
@@ -650,7 +650,7 @@ Mirrors FMP's page of the same path. **Read from the real FMP source** at `D:/FM
 
 **Known weakness, recorded rather than glossed.** The replacement was typed into a chat transcript, so it is not fully private, and it is name-based, which is guessable in a targeted attack on a firm whose founder is named Ahmad. It is still a large improvement on a password published to GitHub. Rotating once more to a value that has never been transcribed is worth doing before launch and now costs one command with a hidden prompt.
 
-The `Admin@2026` references in this file's older entries and in `MIGRATION_PLAN.md` / `PROJECT_HANDOFF.md` are **left intact**. Rewriting history would not un-publish the string, and the string no longer opens anything.
+The [retired admin password] references in this file's older entries and in `MIGRATION_PLAN.md` / `PROJECT_HANDOFF.md` are **left intact**. Rewriting history would not un-publish the string, and the string no longer opens anything.
 
 ---
 
@@ -1094,7 +1094,7 @@ The 13 new presentation keys are **stored but not yet read by the public site**.
 3. `/admin/settings`: JSONB `site_settings` editor (admin email, social URLs, GA ID, etc.).
 4. `/admin/email-branding` and `/admin/email-templates`: single-row `email_branding`, two seeded `email_templates` rows.
 5. Decide: auto-save vs explicit Save button (CLAUDE.md §4 says pick one and stay consistent: recommend explicit Save for v1, auto-save in a later phase).
-6. Rotate `Admin@2026` to a strong production password before any deploy.
+6. Rotate [retired admin password] to a strong production password before any deploy.
 
 ### 2026-05-02 (PM), Phase 3: CMS Foundations
 
@@ -1126,7 +1126,7 @@ The 13 new presentation keys are **stored but not yet read by the public site**.
 3. Section editors for: `hero`, `paragraphs`, `stats_block`, `service_cards` (start with these four).
 4. Drag-and-drop section reorder (already have `@dnd-kit` installed).
 5. Visibility toggle and per-section save.
-6. Still pending: rotate `Admin@2026` to a strong production password before any deploy.
+6. Still pending: rotate [retired admin password] to a strong production password before any deploy.
 
 ### 2026-05-02 (evening), Phase 4: Page Builder
 
@@ -1162,7 +1162,7 @@ The 13 new presentation keys are **stored but not yet read by the public site**.
 1. Root layout with CMS-driven Navbar + Footer (read from `cms_content` `header_settings`/`footer_settings` discrete keys per the 009 split).
 2. Contact page form + `/api/contact` route + email templates wired up via Resend.
 3. Per-page metadata pulling from `cms_pages` (`meta_title` already wired in `(public)/[slug]/page.tsx`; needs root layout title template + the home slug variant).
-4. Still pending: rotate `Admin@2026` to a strong production password before any deploy.
+4. Still pending: rotate [retired admin password] to a strong production password before any deploy.
 
 ### 2026-05-02 (late), Phase 4.5: Admin Refactor (FMP alignment)
 
@@ -1204,7 +1204,7 @@ Aligned the admin CMS structurally with FMP's patterns (per `CMS_REFERENCE.md` p
 1. Apply migration 009 against the Supabase project (the fetcher tolerates the unmigrated state in dev, but production needs the discrete rows).
 2. Root layout with CMS-driven Navbar + Footer reading the post-009 discrete `header_settings` keys.
 3. Contact page form + `/api/contact` route + email templates wired up via Resend.
-4. Still pending: rotate `Admin@2026` to a strong production password before any deploy.
+4. Still pending: rotate [retired admin password] to a strong production password before any deploy.
 
 ### 2026-05-03, Phase 5: Public Pages (core)
 
@@ -1241,7 +1241,7 @@ Aligned the admin CMS structurally with FMP's patterns (per `CMS_REFERENCE.md` p
 3. Detail pages for individual services at `/services/[slug]` (currently `.gitkeep` only).
 4. Resend domain verification + `RESEND_API_KEY` / `EMAIL_FROM_DEFAULT` / `EMAIL_FROM_CONTACT` / `EMAIL_TO_ADMIN` populated in `.env.local` so the contact form actually emails.
 5. Apply migration 009 against the production Supabase project (still pending from Phase 4.5).
-6. Still pending: rotate `Admin@2026` to a strong production password before any deploy.
+6. Still pending: rotate [retired admin password] to a strong production password before any deploy.
 
 ### 2026-05-03 (PM), Phase 6: Remaining Section Types
 
@@ -1270,7 +1270,7 @@ Aligned the admin CMS structurally with FMP's patterns (per `CMS_REFERENCE.md` p
 1. `/services/[slug]` route: read `cms_pages` row keyed `service-{slug}` and render its `page_sections`. The `service_detail` renderer is already registry-ready.
 2. Populate page sections for sectors, approach, network, about, financial-modeler-pro, and the 9 service-detail pages with real content via the page builder (the smoke-seed rows can be deleted by re-running `seed-phase6` with an emptied `SEEDS` array, or kept as starter content).
 3. Add `images.remotePatterns` to `next.config.ts` for the host(s) where partner logos and founder/team photos will live, so the image-bearing renderers can load real assets.
-4. Still pending: `/admin/contact-submissions` inbox · apply migration 009 against production Supabase · rotate `Admin@2026` to a strong production password before any deploy.
+4. Still pending: `/admin/contact-submissions` inbox · apply migration 009 against production Supabase · rotate [retired admin password] to a strong production password before any deploy.
 
 ### 2026-05-03 (late), Phase 7: Remaining Pages
 
@@ -1319,7 +1319,7 @@ The Phase 6 `seed-phase6-sections.mjs` placed a `service_detail` `page_sections`
 2. JSON-LD organization schema in the root layout (`@type: FinancialService`).
 3. 404 page (`src/app/not-found.tsx`) with proper PMBC chrome instead of the default Next 404.
 4. Decide and apply: add a `production` cms_pages row update for the `service-{slug}` titles to drop the brand suffix (so the absolute-title fix gives consistent results across both data shapes), OR keep current data and rely on the title-absolute approach unchanged. Either is fine.
-5. Still pending: `/admin/contact-submissions` inbox · apply migrations 009 & 010 against production Supabase · `images.remotePatterns` in `next.config.ts` · rotate `Admin@2026` to a strong production password before any deploy.
+5. Still pending: `/admin/contact-submissions` inbox · apply migrations 009 & 010 against production Supabase · `images.remotePatterns` in `next.config.ts` · rotate [retired admin password] to a strong production password before any deploy.
 
 ### 2026-05-03 (night), Phase 8: SEO & Polish
 
@@ -1370,7 +1370,7 @@ The Phase 6 `seed-phase6-sections.mjs` placed a `service_detail` `page_sections`
 5. Final QA pass on every public route; confirm OG cards render correctly via the LinkedIn / Twitter card debuggers.
 6. Counsel review of `/privacy` and `/terms`; remove the "Subject to legal review" badge once approved.
 7. Build `/admin/contact-submissions` inbox so admin can triage form submissions.
-8. Rotate `Admin@2026` to a strong production password before any deploy.
+8. Rotate [retired admin password] to a strong production password before any deploy.
 
 ### 2026-05-03 (overnight), Phase 9 part 1: Home page production content
 
@@ -1412,7 +1412,7 @@ The user's content schema introduced fields the existing renderers didn't read (
 7. `/contact`: page_sections (intro/eyebrow + commitment-to-respond copy above the form)
 8. `/services/[slug]` × 9: `cms_content` rows under `section='service_<slug>'` keys `full_description`, `deliverables`, `timeline_text`, `target_audience_text`. Migration 010 already seeded placeholder copy; replace with the production write-up per service.
 
-After page content: `/admin/contact-submissions` inbox · DNS+SSL on Vercel · production env vars · sitemap to Search Console · counsel review of Privacy/Terms · rotate `Admin@2026`.
+After page content: `/admin/contact-submissions` inbox · DNS+SSL on Vercel · production env vars · sitemap to Search Console · counsel review of Privacy/Terms · rotate [retired admin password].
 
 ### 2026-05-04, End-of-session checkpoint
 
@@ -1435,7 +1435,7 @@ After page content: `/admin/contact-submissions` inbox · DNS+SSL on Vercel · p
    6. `/services`: overview page_sections (intro/eyebrow above the config-driven 9-card grid)
    7. `/services/[slug]` × 9: replace migration 010 placeholders in `cms_content` namespace `service_<slug>` with production copy
    8. `/contact`: page_sections (intro/eyebrow + commitment-to-respond copy above the form)
-3. After all page content: `/admin/contact-submissions` inbox, DNS+SSL on Vercel, production env vars, sitemap to Search Console, counsel review of Privacy/Terms, rotate `Admin@2026`.
+3. After all page content: `/admin/contact-submissions` inbox, DNS+SSL on Vercel, production env vars, sitemap to Search Console, counsel review of Privacy/Terms, rotate [retired admin password].
 
 **Style reminder for next session.** Every string drafted from now on must follow the **Content Style Rules** at the top of this file: no em dashes, no en dashes in prose. When generating section JSONB or fallback copy, scan once before saving.
 
@@ -1490,7 +1490,7 @@ Final verification: zero em dashes remain in any content row across `cms_pages`,
    - OG card auto-generated at `/api/og?…` reflects the cleaned-up title.
 2. **Continue Phase 9 page-by-page content population, starting with `/about`**: page_sections for the firm bio, founder section detail (already partially seeded as Phase 6 smoke content; replace with production copy), credentials, philosophy. Same pattern as the home page seed: write a `supabase/migrations/013_seed_about_page_content.sql` + companion `scripts/seed-about-page.mjs`, apply via the JS script, verify on `/about`.
 3. After /about, the remaining Phase 9 order: /sectors, /approach, /network, /financial-modeler-pro, /services overview, /services/[slug] × 9 (replace migration 010 placeholders), /contact intro section.
-4. Still pending: `/admin/contact-submissions` inbox · DNS+SSL on Vercel · production env vars · sitemap to Search Console · counsel review of Privacy/Terms · rotate `Admin@2026`.
+4. Still pending: `/admin/contact-submissions` inbox · DNS+SSL on Vercel · production env vars · sitemap to Search Console · counsel review of Privacy/Terms · rotate [retired admin password].
 
 **Style reminder, doubled down.** From here forward, every string drafted, every JSONB blob, every fallback copy line in a route file must be em-dash-free at the moment of authoring. The cleanup migration is now in the repo as both a backstop and a record, but the discipline is to never need it again.
 
@@ -1525,7 +1525,7 @@ Single-purpose session triggered by Supabase's Security Advisor flagging 10 RLS-
 **Open items for next session**
 1. **Refresh Supabase Security Advisor in the dashboard and confirm the 10 RLS errors are cleared.** This is a UI step the assistant cannot do.
 2. Resume Phase 9 page-by-page content population, starting with `/about` (now under migration filename `014_seed_about_page_content.sql`). After /about: /sectors, /approach, /network, /financial-modeler-pro, /services overview, /services/[slug] × 9, /contact intro section.
-3. Still pending pre-launch: `/admin/contact-submissions` inbox, DNS + SSL on Vercel, production env vars, sitemap to Search Console, counsel review of Privacy + Terms, rotate `Admin@2026` via `npm run seed-admin`.
+3. Still pending pre-launch: `/admin/contact-submissions` inbox, DNS + SSL on Vercel, production env vars, sitemap to Search Console, counsel review of Privacy + Terms, rotate [retired admin password] via `npm run seed-admin`.
 
 ### 2026-05-06 (later), Phase 9.5: Visual Polish (boutique private bank aesthetic)
 
@@ -1584,7 +1584,7 @@ Single-purpose visual pass after the user reviewed the home page on the live sit
 3. **Asset gaps**: `branding_config.logo_url` (real PMBC logo, currently rendering monogram fallback in navbar/footer), `home.founder_block.photo_url` (Ahmad portrait, currently rendering serif-initials fallback), `home.text_image.image_url` (network/region image), `network` page partner logos. The renderers handle each absence gracefully but adding the real assets is the obvious next visual upgrade. Add the host(s) to `next.config.ts` `images.remotePatterns` if uploading to a domain not already configured (Supabase host + cloudinary already there).
 4. **Resume Phase 9 page-by-page content population**, starting with `/about` (migration `014_seed_about_page_content.sql`).
 5. **Optional follow-up**: expose `background_variant` as a per-section field in the page builder UI (`SectionEditorPanel`) so admins can override the default rhythm if needed. Not required for launch: the defaults are sensible and the resolver fills in the gaps.
-6. Still pending pre-launch: `/admin/contact-submissions` inbox, DNS + SSL on Vercel, production env vars, sitemap to Search Console, counsel review of Privacy + Terms, rotate `Admin@2026` via `npm run seed-admin`.
+6. Still pending pre-launch: `/admin/contact-submissions` inbox, DNS + SSL on Vercel, production env vars, sitemap to Search Console, counsel review of Privacy + Terms, rotate [retired admin password] via `npm run seed-admin`.
 
 ### 2026-06-01, Docs: split session log out of CLAUDE.md
 
@@ -1626,7 +1626,7 @@ Continued Phase 9 page-by-page content population from where the prior session l
 **Open items for next session**
 1. **Review the new firm-page copy on the live site after deploy**, especially the `/about` founder bio and the reused track-record claims now also on `/sectors`. They describe a real person and firm; confirm accuracy. If any service-detail write-up should be refreshed, name it and it can be rewritten.
 2. **Migrations 014 to 020 were applied via the JS seed scripts against the shared Supabase.** The SQL files are the source of truth for a fresh project setup. Nothing further to apply for the current database.
-3. Phase 9 launch operations still pending (not content): `/admin/contact-submissions` inbox, DNS + SSL on Vercel, production env vars, submit sitemap to Search Console, counsel review of Privacy + Terms, rotate `Admin@2026` via `npm run seed-admin`.
+3. Phase 9 launch operations still pending (not content): `/admin/contact-submissions` inbox, DNS + SSL on Vercel, production env vars, submit sitemap to Search Console, counsel review of Privacy + Terms, rotate [retired admin password] via `npm run seed-admin`.
 4. Asset uploads remain the obvious next visual upgrade: real PMBC logo (`branding_config.logo_url`), Ahmad portrait (`home`/`about` founder photo), network/region images, partner logos. Add hosts to `next.config.ts` `images.remotePatterns` if not Supabase/Cloudinary.
 
 ### 2026-06-01, Admin contact-submissions inbox (last buildable Phase 9 feature)
@@ -1651,7 +1651,7 @@ The sidebar already carried the "Contact Submissions" link (`CmsAdminNav.tsx`), 
 - **Auto-mark-read on open** (not on hover/scroll) keeps the `new` count meaningful as a real "needs first attention" signal, and is the natural use of `read_at`. Kept non-fatal so a failed PATCH never blocks reading the message.
 - **Service-role bypass is the whole reason this works under RLS** (migration 013). All reads/writes go through `createSupabaseServerClient()`; the anon key cannot touch `contact_submissions`.
 
-**This closes the buildable side of Phase 9.** Everything still open is ops/review only: production env vars on Vercel (so the contact form actually emails via Resend), DNS + SSL, submit sitemap to Search Console, counsel review of Privacy + Terms, refresh Supabase Security Advisor, rotate `Admin@2026` via `npm run seed-admin`, and the copy/asset review noted above.
+**This closes the buildable side of Phase 9.** Everything still open is ops/review only: production env vars on Vercel (so the contact form actually emails via Resend), DNS + SSL, submit sitemap to Search Console, counsel review of Privacy + Terms, refresh Supabase Security Advisor, rotate [retired admin password] via `npm run seed-admin`, and the copy/asset review noted above.
 
 ### 2026-06-01, Checkpoint: pausing here, launch to-do captured in CLAUDE.md
 
@@ -1659,7 +1659,7 @@ Pausing the session with all buildable Phase 9 work done (page content + contact
 
 **Next-session pickup order (full detail in the CLAUDE.md checklist):**
 1. Production env vars on Vercel (Resend, hCaptcha, NextAuth, Supabase, site URL): without Resend the inbox still captures submissions but no emails send.
-2. Rotate `Admin@2026` via `npm run seed-admin` (assistant can set the password in the script first).
+2. Rotate [retired admin password] via `npm run seed-admin` (assistant can set the password in the script first).
 3. DNS + SSL for `pacemakersglobal.com`.
 4. Counsel review of `/privacy` + `/terms`, then remove the "Subject to legal review" badge.
 5. Post-deploy: submit sitemap to Search Console, refresh Supabase Security Advisor (migration 013), verify OG cards, review live copy (`/about` bio + `/sectors` claims).
@@ -1708,7 +1708,7 @@ PMBC drove the navbar from a single `cms_content` row edited at `/admin/header-s
 
 **Environment note:** a second checkout at `D:\PMBC - Cursor\PMBC-site` was running a dev server on port 3000 that hung mid-session; verification ran on a separate server on port 3100 from `D:\PMBC\PMBC-site`. The hung process was killed at end of session. Both checkouts were at the same commit.
 
-**Still open (unchanged by this session):** production env vars on Vercel, rotate `Admin@2026`, DNS + SSL, counsel review of `/privacy` + `/terms`, submit sitemap to Search Console, refresh the Supabase Security Advisor, real assets (logo, founder photo, network image, partner logos), and content for the four empty Phase 10 collections. Two inquiries are still sitting unread in `/admin/contact-submissions`, one of which looks genuine (dated 2026-06-21).
+**Still open (unchanged by this session):** production env vars on Vercel, rotate [retired admin password], DNS + SSL, counsel review of `/privacy` + `/terms`, submit sitemap to Search Console, refresh the Supabase Security Advisor, real assets (logo, founder photo, network image, partner logos), and content for the four empty Phase 10 collections. Two inquiries are still sitting unread in `/admin/contact-submissions`, one of which looks genuine (dated 2026-06-21).
 
 ### 2026-07-30, Checkpoint: closing for the day
 

@@ -87,7 +87,7 @@ Recommendation: port the scheduling **intent** but not the cron. Filter at read 
 
 **S6. Vocabulary leakage from FMP.** The nested schema names the article-author table `instructors` and exposes `/api/admin/instructors`, because the parent site taught courses. PMBC has no instructors. Porting the name would import a concept that does not exist in the business. Rename to `authors` on the way in.
 
-**S7. Pre-existing launch blockers, unchanged.** Documented in `CLAUDE.md`. Production env vars on Vercel, rotation of the `Admin@2026` debug password, DNS and SSL, and counsel review of `/privacy` and `/terms`. Also, **two contact submissions remain unread**, one of which (2026-06-21, Leslie Merricroft, Al-Mashrea Law Firm) appears genuine and is now roughly six weeks unanswered. That is a same-day action, independent of this plan.
+**S7. Pre-existing launch blockers, unchanged.** Documented in `CLAUDE.md`. Production env vars on Vercel, rotation of the [retired admin password] debug password, DNS and SSL, and counsel review of `/privacy` and `/terms`. Also, **two contact submissions remain unread**, one of which (2026-06-21, Leslie Merricroft, Al-Mashrea Law Firm) appears genuine and is now roughly six weeks unanswered. That is a same-day action, independent of this plan.
 
 ---
 
@@ -587,7 +587,7 @@ These outlive the migration.
 
 ### 9.5 Prerequisite for multi-editor governance
 
-The roles above assume more than one person can log in. Today there is one shared admin credential (`Admin@2026`, a documented debug password). Before a second editor exists, three things must land: **M2** (sanitization, because a second author is a second source of HTML), **per-user accounts** in `admin_users` rather than a shared login, and the **credential rotation** already listed as a launch blocker. Until then, the governance model is aspirational rather than enforced, and it should be described that way.
+The roles above assume more than one person can log in. Today there is one shared admin credential ([retired admin password], a documented debug password). Before a second editor exists, three things must land: **M2** (sanitization, because a second author is a second source of HTML), **per-user accounts** in `admin_users` rather than a shared login, and the **credential rotation** already listed as a launch blocker. Until then, the governance model is aspirational rather than enforced, and it should be described that way.
 
 ---
 

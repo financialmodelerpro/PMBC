@@ -1,0 +1,1753 @@
+# PaceMakers Business Consultants: Technical Handoff
+
+This document is the source of truth for building the PMBC website. It is written for Claude Code to use as project context. Drop this file at the root of the repository as `CLAUDE.md` and Claude Code will read it on every session.
+
+The patterns below mirror Financial Modeler Pro (FMP) where they make sense, but PMBC is a fully separate codebase, separate Supabase project, and separate Vercel deployment. There is no shared infrastructure between PMBC and FMP. The two sites are linked only by hyperlinks in their public content.
+
+---
+
+## 1. Project Identity
+
+| Item | Value |
+|------|-------|
+| Project | PaceMakers Business Consultants website |
+| Parent entity | PaceMakers Business Consultants LLP |
+| Domain | pacemakersglobal.com |
+| GitHub | financialmodelerpro/PMBC |
+| Vercel project | pmbc |
+| Hosting | Vercel |
+| Database | Supabase (new project, separate from FMP) |
+| Email | Brevo (transactional, sender domain `pacemakersglobal.com`). Migrated from Resend 2026-08-10. **On its own Brevo account since 2026-08-16**, separate from FMP's, so a key rotation on one property cannot take out the other's mail. |
+| Tagline | Advisory from Structure to Exit |
+| Positioning | Boutique corporate finance and transaction advisory firm serving KSA, GCC, and worldwide mandates |
+| Primary audience | Family offices, investment offices, real estate developers, corporates running M&A or valuation mandates |
+| Build path | Self-built by Ahmad Din using Claude Code |
+
+PMBC is the parent entity. Financial Modeler Pro is its flagship platform. The website's job is to convert referred prospects into conversations. It is a credibility document, not an inbound lead engine. Volume is not the metric. Quality of inbound is.
+
+---
+
+## Content Style Rules
+
+**Scope is universal, strengthened 2026-08-01.** These rules apply to everything written in a PMBC session, with no carve-outs:
+
+- public site copy, admin UI strings, fallback text, badge and button labels, alt text
+- **source code comments and JSDoc**
+- **git commit messages and PR bodies**
+- **SQL migration files, including their comment headers**
+- **this file, SESSION_LOG.md, and every other repo markdown doc**
+- **replies to the user in chat**
+- seeded JSONB, placeholder and hint text, validation and error messages, test fixtures
+
+An earlier version of this section exempted technical docs, code comments and commit messages. That exemption is revoked.
+
+1. **No em dashes (U+2014).** Replace with a comma, parentheses, a period, or a colon depending on the relationship being expressed:
+   - **Pause or aside:** comma or parentheses. *"Senior-led, analytically grounded."*
+   - **Strong break:** start a new sentence. *"We model. We advise."*
+   - **List intro or explanation:** colon. *"Three things matter: clarity, rigor, judgment."*
+   - **Range:** write the words. *"4 to 6 weeks"*.
+
+2. **No en dashes (U+2013) in prose.** Same fix. Acceptable only inside a numeric range where the format genuinely requires it, or inside copy the user hands over verbatim.
+
+**Enforcement.** Before finishing any phase, grep every touched file for the em dash character. It must return zero. Treat this as a release gate, not an afterthought. On Windows Git Bash a bare `grep -r` on the literal character can misbehave depending on shell encoding, so prefer the escape form:
+
+```sh
+for f in $(git status --porcelain | awk '{print $NF}'); do
+  n=$(grep -oP '\x{2014}' "$f" 2>/dev/null | wc -l)
+  [ "$n" -gt 0 ] && echo "VIOLATION $f : $n"
+done
+```
+
+When you find an em dash in *existing* content while doing other work, fix it as part of that work. Do not raise em-dash-only PRs.
+
+**Why this matters:** PMBC is intentionally institutional, considered, calm. The em dash reads as energetic and digital-marketing-flavored, which is exactly the tone we are not going for. The substitutions above scan as deliberate and senior. If a sentence feels like it needs an em dash, the sentence is usually doing too much. Split it.
+
+**Known pre-rule content that still contains em dashes.** Fix when next touching, not proactively, since a bulk rewrite would bury real diffs:
+`CMS_REFERENCE.md` (65) and `PACEMAKERS_ADMIN_CMS_SPEC.md` (30) are both inherited reference documents and are exempt. Live content: migrations 005, 008, 010, 011, 014 to 020 (all applied, so never edit them; fix the rendered content instead), the three `not-found`/`error` files, and the email templates seeded in migration 008. **`(public)/privacy` and `terms` are off this list**: both were measured on 2026-08-16 while their counsel-review edits were made, and both return zero, so whatever was there had already gone.
+
+---
+
+## Current Status
+
+**Development is complete.** Every phase is done bar Phase 9, and what remains
+in Phase 9 is review rather than code: read the deployed site end to end, send one
+real contact submission, check the OG cards, clear the Supabase advisor. The
+public site renders on nineteen routes, every page's copy is editable in the page
+builder, and migrations to 082 are applied. **Free tools are live since 2026-09-16**: Business Valuation is Live and Tools is in the navbar; see "Go-live record" in section 7b. **Engine version 3 and the eight page report shipped 2026-09-17** (see "Business Valuation version 3" in section 7b). **On 2026-09-21** the tool gained leads grouped by email, phone and country, day 7 and 14 reminders, save and return links, a financial year end month and P/E (see "Leads by person, reminders and save and return" in section 7b).
+
+**Open items for the tool are listed in the handoff at the top of [`SESSION_LOG.md`](./SESSION_LOG.md)**: the privacy update for counsel, the founder report highlights, the SAIBOR refresh, stopping reminders on any booking by the same email, reminder wording in the template editor, and an Arabic version.
+
+**The per-phase summary index moved to [`PHASE_HISTORY.md`](./PHASE_HISTORY.md) on 2026-08-16**,
+along with the detailed rows that were already there. This file states where the
+project is, not how it got here. Read the history when you need to know **why**
+something is the way it is before changing it.
+
+**Full detail for every phase, including the reasoning and the things that went wrong, is in [`PHASE_HISTORY.md`](./PHASE_HISTORY.md).** It was split out of this file on 2026-08-13 for the reason stated at the top of it: this file is loaded into context at the start of every session, and that table had grown to 75KB.
+
+**Admin login:** `meetahmadch@gmail.com`. **The password was rotated on 2026-08-02 and is deliberately not recorded here or anywhere else in this repository.** Writing it down is what made the previous one worthless. Ahmad holds it; if it is lost, `npm run rotate-admin-password` sets a new one using the service-role key in `.env.local`, so there is no lockout risk.
+
+The retired `Admin@2026` remains in this file's git history and in older `SESSION_LOG.md` entries. That history is left intact on purpose: rewriting it would not un-publish the string, and the password no longer opens anything. It is verified dead, not merely replaced (see the rotation entry in `SESSION_LOG.md`).
+
+**Rotate with `npm run rotate-admin-password`, not `npm run seed-admin`.** The rotation script reads the new password from a hidden prompt (no echo, entered twice to catch typos), never writes it to the repo, the terminal or any log, enforces a strength floor, hashes at bcrypt cost 12, then verifies both the stored hash and a real end-to-end NextAuth login. `seed-admin.mjs` hardcodes its password in the file, which is fine for creating a throwaway debug login and wrong for a production one; since the rotation it also refuses to overwrite a row whose hash no longer matches, so a stray run cannot silently downgrade the live credential back to the debug value (override with `ADMIN_SEED_FORCE=1`).
+
+The verification scripts (`smoke-admin`, `smoke-builder`, `verify-parity8`) read `process.env.ADMIN_PASSWORD` and fall back to the debug value, so **after rotation you must `export ADMIN_PASSWORD=...` before running them.** Do not put it in `.env.local`; that file is loaded by the seed scripts and would put the live credential back on disk.
+
+**Two verification scripts were renamed on 2026-08-16** because their names were one character apart and drove different things: `verify-fmp-page` is now **`verify-fmp-parent`** (the `/fmp` page itself) and `verify-fmp-pages` is now **`verify-fmp-subpages`** (the three pages fed from FMP's API). `verify-rename-refm` was retired the same day: it verified migration 047, a one-off rename completed on 2026-08-11. `PHASE_HISTORY.md` and `SESSION_LOG.md` still use the old names, correctly, since they record what was run at the time.
+
+---
+
+## Remaining Before Launch
+
+Updated 2026-08-16 at close of session. **Development is complete. What is left
+is review.**
+
+Every phase is done bar Phase 9, and Phase 9 no longer contains code. The public
+site renders on nineteen routes, every page's copy is editable in the page
+builder, the admin console is at parity with FMP and past it in three places
+(roles, page metadata, testimonial collection), and migrations to 081 are applied.
+
+Ordered by what stops a launch, not by when it was added.
+
+### Closed today
+
+Recorded here rather than deleted, because "was this done" is a question that
+gets asked again a week later.
+
+- ~~**DNS and SSL.**~~ Records moved to Vercel's current set, apex and `www`.
+- ~~**Google Search Console.**~~ Sitemap submitted and ownership verified.
+- ~~**Brevo.**~~ Moved to its own account, separate from FMP's, so a key rotation
+  on one property cannot take out the other's mail. The key is fresh rather than
+  one that has been through a chat transcript, which closes that rotation too.
+- ~~**hCaptcha.**~~ Replaced by a honeypot and a timing floor, so
+  `HCAPTCHA_SECRET_KEY` and `NEXT_PUBLIC_HCAPTCHA_SITE_KEY` are **no longer
+  needed on Vercel**. The hCaptcha path is still wired and dormant: setting both
+  keys turns it back on with no code change.
+- ~~**Counsel review of the three legal statements.**~~ Badge removed, all three
+  dated 16 August 2026, governing law and forum stated plainly.
+- ~~**Content pass over the whole site.**~~ Every page read end to end and
+  corrected.
+- ~~**Carousel images, the `/fmp` platform rows, migrations 072 and 073.**~~
+
+### Review, which is all that is left
+
+1. **Read the site as a visitor on the deployed build**, on a phone as well as a
+   laptop. Everything below the surface has been measured; what has not been done
+   is one person reading the whole thing in order, on the real domain, with fresh
+   eyes.
+
+2. **Send one real contact submission and read both emails.** The templates, the
+   shell and the send wrapper are each verified separately, but the assembled
+   HTML has never been sent, because sending it writes a row into the live
+   enquiry list and mails the advisory inbox. Worth doing once now that Brevo is
+   its own account. [user]
+
+3. **Verify the OG cards** through the LinkedIn and Twitter debuggers, now the
+   domain resolves. [user]
+
+4. **Refresh the Supabase Security Advisor** and confirm the 10 RLS errors from
+   migration 013 are cleared. [user, Supabase dashboard]
+
+5. **The 2026-06-21 enquiry still has no reply recorded.** Leslie Merricroft,
+   Al-Mashrea Law Firm, in `/admin/contact-submissions`. Opened but not marked
+   responded, now roughly eight weeks on. The other submission, 2026-07-02, is
+   spam. Read is not answered, and this is the oldest thing on this page. [user]
+
+### Content that can arrive whenever
+
+None of this blocks a launch, and each degrades gracefully today.
+
+6. **Case Studies and Insights have no rows**, so both are out of the sitemap and
+   their footer links are hidden. **Both reverse themselves as content arrives,
+   but not the same way.** The sitemap is derived from the row count, so the
+   first entry puts a page back with no code change. The footer link is a switch
+   in **Footer Links**. The routes are untouched and still return 200. `/team`
+   is the pattern to copy if either is turned on: one line each in
+   `fetchSuppressedNavHrefs`, and the footer link can then ship visible.
+
+7. **Testimonials has no rows either**, but it is now the collection most likely
+   to fill on its own: the submission form is placed on `/contact` and home and
+   needs only the switch under Testimonials turned on, or a private link sent to
+   a specific client. Both section placements ship hidden as well, so turning the
+   switch on is two steps rather than one.
+
+8. **`/team` is live but thin**, holding the founding partner alone. Adding the
+   analytical bench is content work, not code.
+
+9. **Partner logos** on `/network`. The page degrades without them. A new image
+   host needs a line in `next.config.ts` `images.remotePatterns`; Supabase and
+   Cloudinary are already allowed. [user provides; assistant wires]
+
+### Credential rotations
+
+10. Two left, neither blocking. The Brevo key closed itself when the account
+    moved.
+    - **FMP API key.** Pasted into a chat transcript on 2026-08-11, live in
+      `.env.local`, and needed on Vercel. Read-only content feed, so the blast
+      radius is small. Rotate on FMP, update both places.
+    - **Admin password.** Rotated 2026-08-02 and verified dead against the old
+      value, but the replacement was typed into a chat transcript. The console now
+      has a **Change Password** screen with an emailed code, so this no longer
+      needs `npm run rotate-admin-password` or a terminal at all.
+
+### Decisions, not gaps
+
+11. **Two nav rows are hidden.** `site_pages` carries **Approach** and **Founder**
+    with `visible = false`. `/approach` is unreferenced everywhere, so it renders
+    only for someone holding the URL: it should either be restored to the
+    navigation or retired properly. `/about/ahmad-din` is different, since the
+    home founder card still links to it, which is a content link rather than
+    navigation. Restoring either is one switch in Pages & Nav plus one line in
+    `sitemap.ts`.
+
+12. **LinkedIn on the home founder card.** The URL is live on the
+    `/about/ahmad-din` hero and the company URL is in the footer. The home card's
+    secondary slot carries "Book a Meeting". Decide whether it should carry
+    LinkedIn as well as, or instead of, booking. One line either way.
+
+### Not ours
+
+13. **FMP edge caching.** FMP's public feed sets `Cache-Control: public,
+    max-age=60` on an authenticated endpoint, and Vercel's edge cache key does
+    not vary on `x-api-key`. For up to 60 seconds after any legitimate fetch,
+    that URL is served from the edge to anyone, with no key or a wrong one.
+    Verified: with a cache-busting query string the endpoint correctly returns
+    401, so the auth logic is right and only the caching header is at fault.
+    `s-maxage=0`, `private` or `Vary: x-api-key` closes it. **Does not affect
+    PMBC.** [user, FMP repo]
+
+### Rebuilding this database
+
+Run every migration in order, and remember that **031, 032 and 033 are DDL and
+need the Supabase SQL editor**: supabase-js cannot execute `ALTER TABLE` and this
+repository has no direct Postgres connection string. All three are applied and
+verified live on the current database. Everything that reads those columns
+degrades safely when they are absent, which is what let Pages & Nav keep working
+before 033 was run.
+
+---
+
+## 2. Architecture Overview
+
+Single Next.js application, single domain (pacemakersglobal.com), no subdomain routing. Public marketing site plus admin CMS. No student auth, no public registration, no payment flows, no third-party integrations beyond Brevo and Supabase.
+
+### Stack
+
+| Layer | Technology | Version | Notes |
+|-------|------------|---------|-------|
+| Framework | Next.js (App Router) | ^15 | Latest stable. Match FMP's discipline but no need for v16 features. |
+| Language | TypeScript strict | ^5 | strict mode on |
+| Styling | Tailwind CSS 4 | ^4 | Same as FMP |
+| State | Zustand | ^5 | Only if needed; most pages are server components |
+| Database | Supabase (@supabase/supabase-js) | ^2 | New project, separate from FMP |
+| Auth | NextAuth.js (JWT, admin-only) | ^4 | Single admin role, no public users |
+| Email | Brevo v3 REST API | no SDK | Contact form notifications. Plain `fetch`, see section 7. |
+| Image | sharp | ^0.34 | OG image logo conversion |
+| OG Images | next/og (satori ImageResponse) | built-in | Dynamic OG cards |
+| Icons | lucide-react | ^1 | Lucide moved to a 1.x major in 2024. v1.x is current and correct : do **not** "downgrade" to 0.x. |
+| Forms | react-hook-form + zod | latest | Contact form validation |
+| Rich Text | @tiptap/react | latest | Admin content editing |
+| Captcha | @hcaptcha/react-hcaptcha | ^2 | Contact form spam protection |
+| Passwords | bcryptjs | ^3 | Admin password hashing |
+| PDF | @react-pdf/renderer | ^4 | Free tool PDF reports, rendered on the server. Kept out of the bundle via `serverExternalPackages`; fonts traced in with `outputFileTracingIncludes`. See "Free Tools". |
+
+### Explicitly NOT Used in v1
+
+The following are in FMP but NOT in PMBC v1. Do not install them. They add maintenance burden without value for a credibility site.
+
+| Excluded | Reason |
+|----------|--------|
+| Google Apps Script | No external roster system |
+| pdf-lib | No certificate generation. **`@react-pdf/renderer` was on this line and was lifted on 2026-09-16** for the free tools' PDF reports; one PDF library is enough, so pdf-lib stays excluded. |
+| exceljs | No spreadsheet export |
+| Recharts | No data visualizations |
+| @anthropic-ai/sdk | No AI features in v1 |
+| YouTube API | No video integration |
+| @auth/supabase-adapter for student auth | Admin-only auth |
+| Stripe or any payment SDK | No commerce |
+| Cron jobs | Nothing to run on schedule. **Exception since 2026-09-21:** one Vercel cron (`vercel.json`) for the free tools' reminders, see section 7b. |
+
+### Folder Structure
+
+```
+src/
+├── app/
+│   ├── (public)/
+│   │   ├── page.tsx                    # Home
+│   │   ├── services/page.tsx           # Services overview
+│   │   ├── services/[slug]/page.tsx    # Individual service detail
+│   │   ├── sectors/page.tsx            # Sector coverage
+│   │   ├── approach/page.tsx           # Engagement methodology
+│   │   ├── network/page.tsx            # Sky Gulf, Lynkers
+│   │   ├── about/page.tsx              # Firm and founder
+│   │   ├── contact/page.tsx            # Contact form
+│   │   ├── financial-modeler-pro/page.tsx   # FMP introduction page
+│   │   ├── privacy/page.tsx            # Privacy policy
+│   │   └── terms/page.tsx              # Terms of engagement
+│   ├── admin/
+│   │   ├── login/page.tsx
+│   │   ├── page.tsx                    # Dashboard
+│   │   ├── page-builder/page.tsx       # List all CMS pages (Builder button per row)
+│   │   ├── page-builder/[slug]/page.tsx
+│   │   ├── pages/page.tsx              # Pages & Nav: navbar menu items (site_pages)
+│   │   ├── leads/page.tsx              # Redirect alias to contact-submissions
+│   │   ├── content/page.tsx            # Key-value CMS editor
+│   │   ├── branding/page.tsx           # Logo, colors, footer
+│   │   ├── header-settings/page.tsx
+│   │   ├── contact-submissions/page.tsx
+│   │   ├── email-branding/page.tsx
+│   │   ├── email-templates/page.tsx
+│   │   └── settings/page.tsx
+│   ├── api/
+│   │   ├── auth/[...nextauth]/route.ts
+│   │   ├── contact/route.ts
+│   │   ├── og/route.tsx
+│   │   ├── admin/
+│   │   │   ├── pages/route.ts
+│   │   │   ├── page-sections/route.ts
+│   │   │   ├── content/route.ts
+│   │   │   ├── branding/route.ts
+│   │   │   ├── contact-submissions/route.ts
+│   │   │   └── ...
+│   ├── layout.tsx                      # Root layout
+│   ├── globals.css
+│   └── not-found.tsx
+├── components/
+│   ├── layout/
+│   │   ├── Navbar.tsx
+│   │   ├── NavbarServer.tsx
+│   │   ├── Footer.tsx
+│   │   └── FooterServer.tsx
+│   ├── public/
+│   │   ├── Hero.tsx
+│   │   ├── StatsBlock.tsx
+│   │   ├── ServiceCards.tsx
+│   │   ├── SectorGrid.tsx
+│   │   ├── ProcessSteps.tsx
+│   │   ├── NetworkPartners.tsx
+│   │   ├── FounderBlock.tsx
+│   │   ├── TextImage.tsx
+│   │   ├── ContactForm.tsx
+│   │   └── ...
+│   ├── admin/
+│   │   ├── PageBuilder.tsx
+│   │   ├── SectionEditor.tsx
+│   │   ├── editors/
+│   │   │   ├── HeroEditor.tsx
+│   │   │   ├── StatsEditor.tsx
+│   │   │   ├── ServiceCardsEditor.tsx
+│   │   │   ├── SectorGridEditor.tsx
+│   │   │   ├── ProcessStepsEditor.tsx
+│   │   │   ├── NetworkPartnersEditor.tsx
+│   │   │   ├── FounderEditor.tsx
+│   │   │   ├── TextImageEditor.tsx
+│   │   │   └── ParagraphsEditor.tsx
+│   │   ├── ContactSubmissionsTable.tsx
+│   │   └── ...
+│   └── ui/                             # Shared primitives
+├── lib/
+│   ├── supabase/
+│   │   ├── server.ts                   # Server client factory
+│   │   └── client.ts                   # Browser client (rare use)
+│   ├── auth/
+│   │   ├── config.ts                   # NextAuth config
+│   │   └── middleware.ts               # Admin route protection
+│   ├── cms/
+│   │   ├── content.ts                  # cms_content fetchers
+│   │   ├── pages.ts                    # page_sections fetchers
+│   │   └── branding.ts                 # branding_config fetcher
+│   ├── email/
+│   │   ├── send.ts                     # Brevo wrapper
+│   │   ├── templates/
+│   │   │   ├── _base.ts                # baseLayoutBranded()
+│   │   │   ├── contactNotification.ts
+│   │   │   └── contactAcknowledgement.ts
+│   │   └── branding.ts
+│   ├── og/
+│   │   └── logo.ts                     # SVG to PNG via sharp
+│   └── utils/
+│       ├── slugify.ts
+│       ├── format.ts
+│       └── seo.ts
+├── config/
+│   ├── site.ts                         # Static config (URLs, defaults)
+│   ├── navigation.ts                   # Default nav items
+│   └── services.ts                     # Service definitions (slug, title, summary)
+├── types/
+│   ├── cms.ts
+│   ├── pages.ts
+│   ├── auth.ts
+│   └── database.ts                     # Generated Supabase types
+└── middleware.ts                       # Admin route protection
+```
+
+---
+
+## 3. Database Schema
+
+PMBC uses a single Supabase project. All tables below live in the `public` schema. Migrations are numbered starting at 001 and applied in order via the Supabase dashboard SQL editor or CLI.
+
+### Migration Numbering
+
+Match FMP's pattern: three-digit prefix (`001_initial_schema.sql`, `002_admin_users.sql`, etc.), each migration is one logical change, never edit a migration after it's been applied. Keep all migrations in `supabase/migrations/`.
+
+### Tables
+
+**The full `CREATE TABLE` statements are in `supabase/migrations/001` to `004`, and
+the generated TypeScript shapes in `src/types/database.ts`.** They were duplicated
+here until 2026-08-16, which meant three copies of every column and no way to tell
+which was authoritative. This is the index; read the migration for the columns.
+
+| Table | Shape | What it holds |
+|-------|-------|---------------|
+| `admin_users` | one row per admin, one in practice | Email, bcrypt hash, name, role, `last_login_at`. Only `admin` is implemented; the column exists for later. |
+| `audit_log` | append only | Who changed what: `action`, `entity_type`, `entity_id`, `metadata`, plus `before_value` / `after_value` / `reason` from migration 032. |
+| `cms_content` | key-value, unique on `(section, key)` | Global content only since migration 067: header, footer, contact details, SEO defaults. Page copy lives in `page_sections`. |
+| `cms_pages` | one row per page | Slug, title, meta title and description, OG override, `status`, and `is_system` (migration 031) which blocks deletion of a real route. |
+| `page_sections` | one row per block | `page_slug`, `section_type`, `content` JSONB, `styles` JSONB, `display_order`, `visible`. The page builder writes this table and nothing else. |
+| `branding_config` | single row, `CHECK (id = 1)` | Logos, favicon, brand name, tagline, the three palette colours. |
+| `site_settings` | single row, `CHECK (id = 1)` | One JSONB blob, deliberately: contact addresses, WhatsApp, booking URL, socials, analytics. A blob avoids a migration per setting. |
+| `contact_submissions` | append only | The enquiry inbox. `status` is `new` / `read` / `responded` / `archived`, and `notes` is admin-only. |
+| `email_branding` | single row, `CHECK (id = 1)` | Email logo, primary colour, signature and footer HTML. |
+| `email_templates` | one row per `template_key` | Two keys in v1: `contact_notification` and `contact_acknowledgement`. |
+| Collections | one row per item | `services`, `case_studies`, `team_members`, `articles`, `testimonials`, added in migrations 021 to 026 and edited through the shared `CollectionManager`. **`testimonials` is the one without `updated_at`**, which broke every write until 2026-08-01. |
+
+**Two things about this schema are worth knowing before you change it.** The
+single-row tables use `CHECK (id = 1)` rather than convention, so a second row is
+impossible rather than merely unexpected. And `site_settings` is one JSONB column
+on purpose: settings arrive faster than migrations, and a blob costs nothing to
+extend.
+
+
+**Section types for v1:**
+- `hero`: main page hero with badge, headline, subtitle, CTA
+- `stats_block`: large number callouts (100+, SAR 20B+, etc.)
+- `service_cards`: grid of service cards with number, title, description, link
+- `service_detail`: full detail block for a single service (used on /services/[slug]). Carries `show_header`, which is **false on all nine service pages** because the hero above already prints the number, title and summary, and true anywhere else so a detail block dropped onto another page still says which service it describes. It began as a route prop and moved into the row in migration 067, when these pages started rendering through the section registry, which passes nothing beyond the row
+- `sector_grid`: sector coverage grid
+- `process_steps`: numbered methodology steps
+- `network_partners`: Sky Gulf and Lynkers blocks
+- `founder_block`: founder photo, name, credentials, bio
+- `text_image`: alternating text-image rows
+- `paragraphs`: rich text paragraphs (Tiptap-rendered HTML), with an optional heading and, since 2026-08-16, an optional eyebrow above it. Both are opt-in on the same contract: a section carrying neither key renders exactly as it did before the key existed
+- `cta_block`: single call-to-action panel
+- `quote`: pull quote with attribution
+- `fmp_intro`: Financial Modeler Pro introduction block (one specific section type for the FMP page)
+- `founder_hero`: page-leading founder identity (portrait, name, two-line title, credentials, CTAs). Added 2026-08-02 for `/about/ahmad-din`. Distinct from `founder_block`, which is the mid-page summary card on home and about. **Each stores its own `photo_url`**, and there is no shared founder-photo source in `branding_config`, `site_settings` or `team_members`. That is by design (a section owns its content, and a card may want a different crop), but it means uploading a portrait in the page builder sets it on one section only. `npm run sync-founder-photo` copies it onto any card still empty without touching one deliberately given a different image
+- `founder_credentials`: heading plus a list of short strings, rendered as `numbered`, `pills`, or `cards` per a `display` key. One type rather than three, because the three founder-profile list blocks differ only in presentation
+- `feature_cards`: large cards carrying a code, metadata chips, a description, a bullet list, a note and a per-card CTA. `service_cards` has none of the last four. A `layout` key chooses between `cards` (side by side, the default) and `rows` (added 2026-08-13: full width, stacked, each card's media on the opposite side to the one above it, starting with the media on the right). Rows carry a per-card media slot on the same key set every other media field uses, including `media_max_height`, which is read per card because two rows hold two different assets. The slot wears the shared gold frame (`MediaFrameChrome`, split out of `SectionMediaFrame` on 2026-08-14 so the two cannot drift), takes the asset's own proportions, and letterboxes under a ceiling rather than cropping. A blank slot renders a navy monogram panel in a 4:3 box rather than collapsing the row
+- `audience_carousel`: one wide card at a time, each with an image beside its copy, advancing on a timer with arrows for manual control. Added 2026-08-12 for the home "Who we serve" block, which had been a three-across `service_cards` grid with no room for imagery. Holds on hover and on keyboard focus; with `prefers-reduced-motion` it neither advances nor animates, and the arrows still work. Off-screen slides are `inert`. A card with no `image_url` renders a navy monogram panel rather than a gap
+- `testimonial_form`: lets a client submit their own testimonial, placeable on any page. **Two locks, both of which must be open**: the section must be visible, and the site-wide switch under Testimonials must be on. A `?t=TOKEN` in the URL overrides the switch, because the point of sending a client a private link is that it works whether or not the firm is soliciting publicly. The gate is a client component (`TestimonialFormGate`), since only the browser knows the URL by the time a section renders. Added 2026-08-16. Collects name, role, company, the testimonial, an optional LinkedIn URL and an optional photo, behind an **unticked consent box the form cannot be submitted without**, because `/confidentiality` commits the firm to not publishing a client's involvement without agreement and the `consent_given` column is what makes that checkable later. Carries the same honeypot and three-second floor as the contact form. **Everything arrives `pending`**; nothing it collects can reach a public page without approval. A `?t=TOKEN` on whatever page carries it stamps the submission with the private link it came through
+- `testimonials`: approved client quotes under an editable eyebrow and heading, addable to any page. `max_items` caps how many show, blank meaning all of them; home is set to two, since it is a proof point inside a long page rather than the page's subject. Registered 2026-08-16; the component had existed since Phase 10 and rendered nowhere, because the public half was never put in the registry. **The quotes are not section content**: they come from the `testimonials` table so `/admin/testimonials` stays the one place a quote is approved, ordered or withdrawn. An `only_landing` switch narrows it to the quotes flagged for the homepage, which is how a short selection goes on one page and the full set on another. With nothing approved it renders **nothing at all**, not an empty band under a heading. **This is the one section type whose data `SectionList` fetches itself**, rather than the route supplying it through the context: the block can be added to any page, and a route that forgot to pass the quotes would render it as silence. The fetch only runs when the page actually carries one
+- `service_grid`: the nine service cards on `/services`, under an editable eyebrow, heading and standfirst. Added 2026-08-16 by migration 068. **The cards are not section content**: they come from the managed Services collection, falling back to `config/services.ts`, because the same nine feed each detail page's related-services cards, the contact form's dropdown, the sitemap and the JSON-LD
+- `contact_body`: the `/contact` enquiry form panel and the direct-contact column beside it, including the booking callout inside the panel and the founder card under the addresses. Added 2026-08-16 by migration 066, which moved thirteen `cms_content` rows into it. **One section rather than one per visual block**, because the two columns are one grid: split into a section each they would render as stacked bands, which would have been a layout rewrite rather than a move. Carries no addresses: those are the firm's rather than the page's, the footer publishes the same values, and they stay in Site Settings
+- `booking_body`: the `/book` calendar band and the direct routes under it, from eight `cms_content` rows. The Calendly URL is not part of it and stays in Site Settings, since one URL serves every booking surface. That setting also decides which of the section's two states renders: **the empty state is reached only while the URL is blank**, so it is not a widget-failure fallback and should be worded for a calendar that is switched off rather than one that failed to load
+- `media`: one image, GIF or video standing on its own in the page order, with an optional eyebrow, heading and a `width` of `full` / `wide` / `narrow` (1200 / 960 / 720px). Added 2026-08-11. Distinct from the shared media panel every other section carries: that panel attaches an asset **to** a section, so it moves when that section is reordered, whereas this is an asset that belongs to the **page** and can be dragged between any two sections. Reuses the same `media_url` key set, so it is excluded from the shared panel via `SECTION_TYPES_WITH_OWN_MEDIA`. Blank `media_url` renders nothing at all, not an empty frame. `width` caps the frame; `media_max_height` (added 2026-08-12, shared with the panel) caps the asset inside it, letterboxing rather than cropping
+
+#### Branding, settings, forms and email
+
+Indexed in the table above. Two notes that the SQL does not carry:
+
+**`branding_config.accent_color` still defaults to the original 003 value.**
+Migration 028 retunes the live row to `#C69C3E` (see section 9), so a fresh setup
+that runs 003 then 028 lands on the current palette. The column default is left
+alone deliberately: applied migrations are never edited.
+
+**`site_settings` is one JSONB blob rather than a column per setting**, to avoid a
+migration every time a setting is added. `contact_submissions.status` moves
+`new` to `read` to `responded` or `archived`, and `email_templates` carries exactly
+two keys in v1.
+
+
+### Migration Order
+
+Every migration's own header carries the full reasoning: what was wrong, what was
+chosen instead, and why. **Read the file before re-running one.** The list below
+is an index, not a substitute.
+
+Three flags matter when rebuilding:
+- **DDL** migrations (031, 032, 033, 072) use `ALTER TABLE`, which supabase-js cannot
+  execute. Paste them into the Supabase SQL editor by hand. Everything that reads
+  those columns degrades safely if they are absent.
+- **Destructive on re-run** (034, 048, 049) delete and reinsert, so re-applying
+  discards later admin edits to those pages.
+- Everything else is DML and idempotent, applied by the `npm run` script named
+  beside it, and most support `--dry-run`.
+
+```
+001  initial_schema            admin_users, audit_log
+002  cms_tables                cms_content, cms_pages, page_sections
+003  branding_settings         branding_config, site_settings
+004  contact_email             contact_submissions, email_branding, email_templates
+005  seed_default_pages        cms_pages rows for all v1 pages
+006  seed_default_content      cms_content rows for header, footer, contact
+007  seed_default_sections     page_sections placeholders
+008  seed_email_templates      the two transactional templates (rewritten by 056)
+009  split_header_settings     (header_settings, config) blob split into discrete keys
+010-020                        content seeds: service details, home, the six firm pages
+021-026                        Phase 10 collections + four public-read storage buckets
+027  site_pages_nav            site_pages table. The navbar's source of truth
+028  retune_brand_colors       accent_color to #C69C3E across branding + email_branding
+029  header_settings_keys      13 header presentation keys, additive
+030  header_layout_key         header_layout (default|centered|spread)
+031  cms_pages_is_system       DDL. Marks the 17 live pages undeletable in the admin
+032  audit_log_diff_columns    DDL. before_value / after_value / reason + two indexes
+033  site_pages_can_toggle     DDL. Pins a nav item against hide and delete. /contact pinned
+034  seed_founder_profile      /about/ahmad-din, 9 sections. DESTRUCTIVE ON RE-RUN
+035  founder_prose_alignment   justify on the two long founder prose blocks
+036  strip_empty_paragraphs    removes stored empty <p> so the value matches the render
+037  sync_founder_photo        copies the founder_hero portrait onto empty founder cards
+038  booking_page              /book, site_settings.booking_url, hero, 10 content rows
+039  booking_cta_prominence    navbar CTA to /book, contact callout, home card second CTA
+040  footer_logo_sizing        three footer logo keys (height, width, enabled)
+041  home_hero_eyebrow         home hero eyebrow off the brand name
+042  contact_addresses         three published addresses; repoints admin_email to advisory@
+043  service_media_keys        five media keys, blank, on each of the 9 service namespaces
+044  firm_prominence           the founder's career figures separated from the firm's own
+045  merge_about_into_home     /about retired into home; nav slot relabelled Founder
+046  restore_home_founder_card the full founder card back at display_order 80
+047  rename_real_estate_service  service 06 to /services/refm. Four join keys, all UPDATEs
+048  fmp_parent_page           /financial-modeler-pro as a nine-section overview. Re-run replaces
+049  fmp_page_rebuild          the page rebuilt for /fmp, 7 sections. Re-run replaces
+050  fmp_hero_tags             the eight capability tags folded into the hero
+051  home_sequence_and_carousel  what-we-do below the track record, credentials deleted, carousel
+052  unlink_approach           the five remaining CMS links to /approach cleared
+053  home_network_mention_and_fmp_carousel  network block cut to a mention; /fmp carousel
+054  footer_links              (footer_settings, links). The footer's links become content
+055  fmp_certification_line    the band naming 3SFM and BVM becomes a statement and a CTA
+056  email_branding_and_templates  signature, footer, and both transactional emails rebuilt
+057  fmp_two_platforms_rows    the two platforms become full-width rows with media slots
+058  header_background         (header_settings, header_background). white | cream | navy_deep
+059  team_page                 the founding partner's card, derived from the founder profile, plus the footer link and the nav row
+060  logo_trim                 the two logo files trimmed of their transparent margins, and the five heights that depended on the old aspect ratio
+061  home_content_pass         the count that did not match its list, the founder proof points labelled, the engagement model rewritten, one CTA per section
+062  home_founder_card_body    the founder card stops restating the firm introduction's delivery model
+063  fmp_page_pass             the intro cut and corrected, the checklist restored to six, one CTA per section, the certification section folded into the card
+064  contact_page_copy         the /contact body copy becomes content: six strings out of the route file, and the booking callout's three keys moved from `booking` to `contact`
+065  contact_copy_fixes        the eyebrow stops repeating the hero, the response-time line is cleared, and the founder card says partner-led rather than naming one person
+066  page_owned_copy           /contact and /book copy moves out of cms_content into `contact_body` and `booking_body` sections. 21 rows become 2 section rows
+067  service_pages_own_copy    the nine service_<slug> namespaces become one service_detail section per service page. 81 rows become 9 section rows
+068  services_grid_section     the /services card grid becomes a `service_grid` section at order 25, so the builder order is the page order
+069  services_engagement_block "How an engagement runs" on /services at order 27, a `paragraphs` section between the cards and the closing CTA
+070  collection_page_heroes  /team, /case-studies and /insights get a cms_pages row and a hero section. The last routes whose copy was code only
+071  team_meta_description   the /team meta description stops promising "practitioners who lead every mandate", which is the plural claim the firm does not make
+072  testimonial_submissions **DDL, HAND-RUN.** Six columns on `testimonials` plus the `testimonial_links` table, for client-submitted testimonials
+073  place_testimonial_sections  the form on /contact and home, the quotes on home between the founder card and the network line, all shipped hidden
+074  tools_pages               cms_pages rows and hero sections for /tools and /tools/business-valuation (`npm run seed-tools-pages`)
+075  tools_links               a footer link and a service page CTA into the tools. Applied early by hand, hidden the same day, retired by 079
+076  tool_visibility           **DDL.** Per-tool Hidden or Live, seeded Hidden. Missing table means every tool Hidden
+077  tool_leads                **DDL.** tool_leads and tool_lead_events. Missing tables mean results still shown, nothing saved
+078  tool_email_templates      the results email and lead alert rows in email_templates. Code carries the same defaults
+079  retire_tools_link_rows    removes 075's two rows; the footer link and CTA are now rendered from the visibility switch
+080  tool_hero_promise         DML, safe any time. The valuation hero subtitle becomes the one-line promise, only if still 074's wording
+081  tools_nav_item            DML, safe any time. A hidden "Tools" row in Pages & Nav after Financial Modeler Pro, only if no /tools row exists
+082  tool_lead_phone           **DDL, HAND-RUN.** phone and contact_country on tool_leads, plus an index on lower(email). Applied 2026-09-21. Missing columns: leads save without them
+```
+
+**Every migration from 076 on states when it is safe to apply** in a `SAFE TO APPLY:` line in its header: before or after which deploy, and what the site does in the gap. 075 is why: it was applied before the routes it linked to were deployed, and previews share the production database, so the live footer linked to a 404.
+
+After running migrations, manually insert one admin_users row via SQL with a bcrypt hash for the password.
+
+**DDL migrations must be run by hand.** 031, 032, 033, 072, 076, 077 and 082 use `ALTER TABLE` or `CREATE TABLE`, which supabase-js cannot execute. The Supabase CLI is not installed and `.env.local` carries no direct Postgres connection string, so the seed-script pattern used for 029 does not work for them. Paste them into the Supabase SQL editor. Every consumer of those columns degrades safely if the migration has not run: the page list treats a missing `is_system` as "system" so nothing is deletable, `writeAudit` retries without the diff columns rather than failing the mutation, and `/api/admin/site-pages` replays a write with `can_toggle` stripped when Postgres rejects the column (so Pages & Nav keeps working, minus pinning).
+
+---
+
+## 4. CMS Architecture
+
+### Two-Layer Pattern
+
+PMBC uses the same two-layer CMS pattern as FMP:
+
+**Layer 1: cms_content (key-value)**: for content that doesn't belong to a specific page or section. Logo URLs, brand name, contact email, footer copyright, default SEO description, social URLs. Section + key + value structure. Read once, cached for the request.
+
+**Namespace convention:** one row per atomic key. JSON-array values (e.g. `(header_settings, nav_items)`) are allowed when the value is naturally a list, but discrete keys are preferred over bundled JSON blobs: `(header_settings, cta_label)`, `(header_settings, show_cta)`, etc., not a single `config` row that contains all of them. Migration 009 splits the legacy `config` blob accordingly.
+
+**Layer 2: page_sections (block-based)**: for the main body content of each page. One row per content block, ordered by `display_order`, rendered through a section-type registry. Editable via drag-and-drop page builder.
+
+### Section Renderer Pattern
+
+```typescript
+// src/components/public/SectionRenderer.tsx
+import { Hero } from './Hero';
+import { StatsBlock } from './StatsBlock';
+import { ServiceCards } from './ServiceCards';
+// ... other section components
+
+const SECTION_REGISTRY = {
+  hero: Hero,
+  stats_block: StatsBlock,
+  service_cards: ServiceCards,
+  sector_grid: SectorGrid,
+  process_steps: ProcessSteps,
+  network_partners: NetworkPartners,
+  founder_block: FounderBlock,
+  text_image: TextImage,
+  paragraphs: Paragraphs,
+  cta_block: CtaBlock,
+  quote: Quote,
+  fmp_intro: FmpIntro,
+};
+
+export function SectionRenderer({ section }) {
+  const Component = SECTION_REGISTRY[section.section_type];
+  if (!Component) return null;
+  return <Component content={section.content} styles={section.styles} />;
+}
+```
+
+### Page Renderer Pattern
+
+```typescript
+// src/app/(public)/services/page.tsx
+import { fetchPageSections } from '@/lib/cms/pages';
+import { SectionRenderer } from '@/components/public/SectionRenderer';
+
+export default async function ServicesPage() {
+  const sections = await fetchPageSections('services');
+  return (
+    <main>
+      {sections.map(s => <SectionRenderer key={s.id} section={s} />)}
+    </main>
+  );
+}
+```
+
+### CMS Fetchers
+
+```typescript
+// src/lib/cms/pages.ts
+export async function fetchPageSections(slug: string) {
+  const supabase = createSupabaseServerClient();
+  const { data } = await supabase
+    .from('page_sections')
+    .select('*')
+    .eq('page_slug', slug)
+    .eq('visible', true)
+    .order('display_order', { ascending: true });
+  return data || [];
+}
+
+// src/lib/cms/content.ts
+export async function fetchContentBySection(section: string) {
+  const supabase = createSupabaseServerClient();
+  const { data } = await supabase
+    .from('cms_content')
+    .select('key, value')
+    .eq('section', section);
+  return Object.fromEntries((data || []).map(r => [r.key, r.value]));
+}
+```
+
+### Editor Pattern
+
+Each section type has a corresponding editor component in `src/components/admin/editors/`. The page-builder admin page renders the list of sections for a given page slug, allows reordering via drag-and-drop, and opens the appropriate editor when a section is clicked.
+
+Editors should:
+- Accept a `content` JSONB blob and an `onChange` callback
+- Validate input client-side with zod schemas
+- Auto-save every 2 seconds of inactivity, OR on explicit Save button (FMP uses both patterns; pick one and stay consistent)
+- Show a preview of the rendered section beneath the form
+
+---
+
+## 5. Public Pages
+
+### Sitemap
+
+| URL | Page slug | Purpose |
+|-----|-----------|---------|
+| `/` | home | The firm in full: hero, firm introduction, firm track record, what we do (a short statement linking to /services, not a card grid), who we serve (an `audience_carousel`), delivery approach, founder card, a three sentence network mention linking to /network, quote, CTA. Resequenced by migration 051, network block cut by 053. **/about was merged into this page and now 301s here** (migration 045). The founder card is the full `founder_block` treatment (portrait, credentials line, bio, proof points, both CTAs), restored by migration 046 after 045 had briefly reduced it to a one-line mention. |
+| `/services` | services | Overview of all 9 services: hero, video, the nine cards, how an engagement runs, closing CTA. **The grid is a `service_grid` section since migration 068**, so its place on the page is its row in the builder; before that it was written into the route file and always rendered last, which put a closing CTA above it. The nine cards themselves come from the Services collection, not from the section. The engagement block (migration 069) is a `paragraphs` section at order 27. |
+| `/services/[slug]` | service-{slug} | Detail page for one service. Slugs from config/services.ts. **Body content is a `service_detail` section on the `service-{slug}` page since migration 067**, edited in the page builder like every other page, and sections added after it render after it. The number, title and summary still come from `config/services.ts`, since the same three drive the /services grid, the related-services cards, the contact form dropdown, `generateStaticParams`, the sitemap and the JSON-LD. |
+| `/sectors` | sectors | Sector coverage grid with descriptions |
+| `/approach` | approach | Engagement methodology (Understand, Analyse, Model, Advise). **Unreferenced since 2026-08-12**: the nav item was hidden in Pages & Nav, and migration 052 removed the five remaining internal links (home firm introduction, home delivery approach CTA, /network and /sectors CTAs, /services secondary hero CTA), along with the footer link and the sitemap entry. The page, its route and its content are untouched and it still returns 200; restoring the nav item and the sitemap line brings it back. |
+| `/network` | network | Sky Gulf and Lynkers detail. Why the network matters. |
+| `/about/ahmad-din` | about-ahmad-din | Founder profile. Nine CMS sections mirroring the structure of FMP's page of the same path. |
+| `/fmp` | financial-modeler-pro | The platform arm in full: hero with capability tags, what FMP is, who it is for (an `audience_carousel` since migration 053), the Modeling and Training Hubs, CTA. Five sections since migration 063 cut the certification block: it restated the Training Hub card immediately above it, bullet for bullet, down to the same CTA to the same page, and the one thing it added ("assessed rather than attendance-based") folded into that card. Migration 055 had already reduced it once, removing the band that named 3SFM and BVM, since their session counts, hour counts and course UUIDs are facts about FMP's catalogue that this page cannot track. **The intro answers why an advisory firm carries a platform**, which was previously left to the closing block at the bottom of the page. **Moved from `/financial-modeler-pro`, which 301s here** (migration 049). The three sub-pages beneath the old path are retained, unlinked and out of the sitemap. |
+| `/team` | team | The firm's people. **The hero is a CMS section since migration 070**; the cards below it are fed entirely by the `team_members` table rather than by `page_sections`. The founding partner leads the page in a wider card carrying the gold-framed portrait, and links through to `/about/ahmad-din` rather than repeating the bio that already lives there; everyone else follows in the three-up card grid the other collection pages use. Which member is the founder is not hardcoded: `src/lib/cms/founderProfile.ts` asks the profile page's own `founder_hero` section for the name, so a rename in the page builder moves the match with it. **Offered in the navbar and footer only while a member is published** (see `src/lib/public/collectionGates.ts`), the same row-count test the sitemap has used since 2026-08-13. |
+| `/contact` | contact | Contact form, direct contact info. **Two sections since migration 066**: the CMS hero, then a `contact_body` carrying every string on the page. The three published addresses stay in Site Settings, since the footer publishes the same ones. |
+| `/book` | book | Booking page. CMS hero plus a `booking_body` section (migration 066) around a Calendly inline embed reading `site_settings.booking_url`. Deliberately not in the top nav (footer and CTAs only). |
+| `/privacy` | privacy | Privacy policy (static, hardcoded for v1) |
+| `/terms` | terms | Terms of engagement (static, hardcoded for v1) |
+| `/tools` | tools | The free tools hub. **404 while no tool is Live.** Hero is a CMS section (074); the cards come from the registry and the visibility switch. See section 7b. |
+| `/tools/[slug]` | tool-{slug} | One free tool. **404 and noindex while Hidden**, Admin preview for signed-in staff. Compact hero from the CMS page; the calculator is code. |
+| `/confidentiality` | confidentiality | How information shared before, during and after an engagement is treated. Static and hardcoded, for the same reason as the two above: a statement settled by counsel should not be editable from an admin console afterwards. |
+
+### Service Slugs
+
+```typescript
+// src/config/services.ts
+export const SERVICES = [
+  { slug: 'financial-modeling', number: '01', title: 'Financial Modeling' },
+  { slug: 'business-valuation', number: '02', title: 'Business Valuation' },
+  { slug: 'financial-due-diligence', number: '03', title: 'Financial Due Diligence' },
+  { slug: 'transaction-advisory', number: '04', title: 'Transaction Advisory' },
+  { slug: 'mergers-acquisitions', number: '05', title: 'M&A Advisory' },
+  { slug: 'refm', number: '06', title: 'Real Estate Financial Modeling' },
+  { slug: 'project-finance', number: '07', title: 'Project Finance' },
+  { slug: 'investment-memorandums', number: '08', title: 'Investment Memorandums' },
+  { slug: 'cfo-advisory', number: '09', title: 'CFO Advisory' },
+];
+```
+
+### Navigation
+
+Top nav (desktop), as live: Services, Sectors, Network, Financial Modeler Pro, Team, Contact. **Team is conditional**: its `site_pages` row is visible, but `NavbarServer` drops it while no team member is published, so it appears and disappears with the collection rather than with an operator's memory. **Services opens a dropdown** listing all nine service pages in two columns (`NavDropdown`, added 2026-08-12); the parent still links to /services, and below the navbar breakpoint the nine are listed under it inside the mobile menu. The **Approach** and **Founder** rows are still in `site_pages` with `visible = false`, so both are one switch from returning.
+Top nav (mobile): hamburger menu with same items
+Persistent CTA in nav: "Book a Meeting", linking to /book (repointed by migration 039).
+
+`/book` is deliberately kept out of the top nav. It is reached from the navbar CTA, the founder profile, the contact page, and the footer.
+
+`/approach` is a different case: it is out of the nav AND out of everything else. Nothing on the site links to it, it is absent from the sitemap, and `scripts/verify-page-rhythm.mjs` asserts that on every page. A route in that state should either be linked or retired, so if it stays unreferenced for long, retiring it properly is the tidier end.
+
+Footer columns, three since 2026-08-13:
+- **Brand**: short PMBC description, tagline
+- **Firm**: every link is a row in `(footer_settings, links)` and is editable at `/admin/footer-links`, including whether it renders. Shipped visible: Services, Network, Sectors, Financial Modeler Pro, Team, Contact. Shipped hidden: Case Studies and Insights, since both collections are empty and a link onto an empty state is a weaker impression than no link. **Team ships visible but is gated**, so it is withheld while `team_members` has no published row and returns on its own; setting it hidden in Footer Links still wins, because the gate can only subtract. The nine service pages used to have a column of their own and are now one Services link, because `/services` lists all nine with a summary each. Approach and Founder were removed on 2026-08-12 when their nav rows were hidden, and are absent from the seeded list rather than hidden in it.
+- **Contact**: email, WhatsApp, location, LinkedIn, then any link whose `column` is `contact`. Book a Meeting is seeded there: it is a way of reaching the firm, like the address above it, rather than another page in the Firm list.
+- **Legal**, in the bottom strip: Privacy, Terms, Confidentiality. Not editable in Footer Links, by design: a switch that can hide a privacy policy by accident is a switch worth not having.
+
+---
+
+## 6. Admin Panel
+
+### Roles
+
+Two, in `admin_users.role`, which is plain TEXT with no CHECK, so adding the
+second needed no DDL.
+
+| | `admin` | `editor` |
+|---|---|---|
+| Create and edit content | yes | yes |
+| Hide anything | yes | yes |
+| **Delete anything** | yes | **no** |
+| Site Settings, Header Settings, Footer Links | yes | no |
+| Users, Audit Log | yes | no |
+| Pages and Nav, Page Builder, collections, media, email | yes | yes |
+| Change their own password | yes | yes |
+
+**The line is deletion, not editing.** An editor can change any page and hide any
+part of it, which reaches the same end as deleting without the part that cannot
+be undone.
+
+**Enforced in three places, and only the third one counts.** The middleware
+redirects an editor away from an admin-only URL, the admin layout repeats that
+check server side in case the matcher changes, and every route checks for
+itself. `ADMIN_ONLY_PREFIXES` in `src/lib/auth/adminAccess.ts` is the one list
+the first two read. On the API side: `getAdminSession` means **any** signed-in
+staff member, which is the trap to watch, since a route that should be admin-only
+and calls it is open to editors and will pass any test that only signs in as an
+admin. `requireOwner` is the admin-only gate and returns a 403 rather than a 401,
+because an editor is signed in perfectly well and telling them to log in again is
+wrong advice. `canDelete` gates the delete paths.
+
+The UI hides what a role cannot use, through `AdminRoleProvider`. That is a
+courtesy so nobody is offered an action that would fail, not a control.
+
+### Auth
+
+NextAuth credentials provider, JWT sessions (1 hour), single admin role. Login at `/admin/login`. All `/admin/*` routes (except login) protected by middleware that checks for valid session with `role=admin`.
+
+```typescript
+// src/middleware.ts
+export const config = {
+  matcher: ['/admin/:path*'],
+};
+
+export default async function middleware(req) {
+  if (req.nextUrl.pathname === '/admin/login') return NextResponse.next();
+  const token = await getToken({ req });
+  if (!token || token.role !== 'admin') {
+    return NextResponse.redirect(new URL('/admin/login', req.url));
+  }
+}
+```
+
+### Admin Pages
+
+| Route | Purpose |
+|-------|---------|
+| `/admin` | Dashboard: recent contact submissions, page count, last updated timestamps |
+| `/admin/page-builder` | Pages list, with a Builder button per row, a **New Page** modal (five templates) and per-row delete for non-system pages |
+| `/admin/page-builder/[slug]` | Three-pane section editor. **Per-section Save** since parity 3, plus a StyleEditor per section since parity 5 |
+| `/admin/pages` | Pages & Nav: the navigation menu that drives the public navbar (`site_pages` rows). Nav links only, not page content. **Inline-edit table** since parity 8: label and href pend until that row's Save; visibility, pinning and reorder save immediately |
+| `/admin/footer-links` | Footer Links: the footer's counterpart to Pages & Nav, over the `(footer_settings, links)` JSON array. Same save model, plus a Column select (Firm or Contact). Added 2026-08-13 |
+| `/admin/testimonials` | Testimonials, and everything that feeds it. A **Collecting testimonials** panel at the top carries the site-wide switch for whether the submission form is public (admin only, since it is a site setting) and the private-link list, which had its own sidebar entry until 2026-08-16. Below it the moderation queue: status filter tabs, per-row Approve and Reject, Revoke and Reconsider, inline Featured and Show-on-homepage switches, checkbox bulk actions. Drawer editor for the wording |
+| `/admin/content` | Key-value editor for cms_content (grouped by section) |
+| `/admin/branding` | **Redirect to `/admin/header-settings`** since parity 1. Kept for older bookmarks |
+| `/admin/header-settings` | Brand colours, logo, branding text, header icon, header layout, CTA and mobile. Seven cards, one Save All. Owns the 17 `header_settings` keys plus the `branding_config` row. **Header background** lives in the Header layout card: white, cream or deep navy, the same three surfaces the page builder offers a section. Everything that follows from it (link colours, the CTA treatment, the monogram, the mobile panel, and whether the light logo is used) is resolved in `src/lib/public/headerSurface.ts`, which is why it is an enum rather than a hex field |
+| `/admin/contact-submissions` | List and view contact form submissions, change status, add notes |
+| `/admin/email-branding` | Email logo, signature, footer. Previews are sanitised through `sanitizeEmailHtml` |
+| `/admin/email-templates` | Edit email subject and body for the two templates |
+| `/admin/audit` | Audit log viewer: filters (admin, action, date range), 100-row paging, before/after JSON diff |
+| `/admin/settings` | Misc site settings (analytics IDs, social URLs, etc.) |
+| `/admin/tools` | Free tools: Live or Hidden per tool (admin only to switch), lead counts, visibility history. See section 7b |
+| `/admin/tool-leads` | Leads from the free tools, one row per email with its valuations behind an arrow (closed by default), with filters (tool, dates, deal size, below minimum, email status, test leads), detail with stored inputs and results, email events, resend and PDF download. **Admins can delete** a lead, a single valuation, or several ticked leads, each behind a confirmation |
+
+### Sidebar (`src/components/admin/CmsAdminNav.tsx`)
+
+Single component handling both desktop and mobile chrome (no separate `AdminSidebar` / `AdminMobileNav` / `LogoutButton` components: those were collapsed into this one in Phase 4.5).
+
+- 240px expanded · 64px collapsed (icons only)
+- Collapse persisted to `localStorage['pmbcAdminSidebarCollapsed']`
+- Scroll position persisted to `sessionStorage['admin_sidebar_scroll']`, restored on `pathname` change
+- Off-canvas drawer below 768px viewport with hamburger button + body-scroll lock + click-backdrop-to-close
+- Active state by exact-match OR prefix-match against per-item `matchPaths` (e.g. "Page Builder" stays highlighted while inside `/admin/page-builder/...`, "Inquiries" also matches `/admin/leads`)
+- Active item gets `#1B3A5F` background + **3px gold (`#C69C3E`) left border**
+- Group dividers labeled `Content` / `Collections` / `Leads` / `Email` / `System` (FMP-parity order set in Phase 11). `Collections` holds the PMBC-only Phase 10 tables that have no FMP counterpart.
+- Footer: external links to `https://www.pacemakersglobal.com` (View Live Site) and `https://www.financialmodelerpro.com` (Visit FMP), both `target="_blank"`. Sign-out lives below those.
+
+### Admin styling
+
+All admin pages use **inline styles**, not Tailwind utility classes. Shared design tokens live in `src/lib/admin/styles.ts`: colors, layout constants, and ready-made `CSSProperties` presets (`adminCard`, `adminInput`, `adminButtonPrimary`, etc.). This intentionally isolates the admin console from the public-site theme so future public-site work can't accidentally restyle the dashboard. The PMBC palette (deep navy `#0F2540` sidebar, navy `#1B3A5F` primary, gold `#C69C3E` accent, page bg `#F4F7FC`) is anchored here. Note the isolation is about structure, not the brand accent: Phase 11 moved the admin gold in step with the public gold (`#D4A93A` to `#C69C3E`) so the console does not visibly diverge from the site, while the structural colors (sidebar `#0F2540`, primary `#1B4F8A`) stay independent.
+
+### Admin API conventions
+
+- All `/api/admin/*` routes session-gate via `getAdminSession()` (401 if absent), zod-validate the body, and write an `audit_log` row on success.
+- Mutations accept both `PATCH` (FMP-style) and `POST` (legacy alias) on `/api/admin/{content,branding,settings,email-branding,email-templates,header-settings}`.
+- `/api/admin/content` GET returns `{ rows: [...] }`; PATCH does upsert (try update, then insert) on `(section, key)` pairs.
+- `/api/admin/branding` GET returns `{ row: ... }`; mutations return the updated row in `{ row: ... }`.
+- Errors always: `{ error: string }` + non-2xx status.
+
+### Page Builder
+
+Three-pane layout matching FMP's pattern:
+- **Left pane**: list of sections on the current page with drag handles, visibility toggle, delete button, and "Add Section" button at bottom
+- **Center pane**: editor for the currently selected section (the appropriate editor component from `editors/`), with that section's own Save header above it and a collapsible **StyleEditor** below it
+- **Right pane**: live preview iframe pointed at the page (with `?preview=1` so hidden sections still render). **Hidden by default since 2026-08-02**, behind a "Preview" toggle in the top bar; the preference persists in `localStorage['pmbcPageBuilderPreviewVisible']`. Open, the centre splits 60/40 editor/preview; closed, the editor takes the full column. The pane unmounts rather than hiding with CSS, so a closed preview costs no page load. It still re-keys after every Save / Add / Delete / reorder. The "Open preview" link (new tab) stays regardless.
+
+**Slug is not the URL.** `cms_pages.slug` and the public route diverged in Phase 7, when the catch-all `(public)/[slug]` was replaced by bespoke routes. Use `publicPathForPageSlug` / `previewPathForPageSlug` from `src/lib/cms/pageRoutes.ts`, never `` `/${slug}` ``. The exceptions are `home` to `/`, `service-<x>` to `/services/<x>` (9 pages), and `about-ahmad-din` to `/about/ahmad-din`. Both the page-builder preview and `/admin/og-preview` had hardcoded `` `/${slug}` `` and were pointing at 404s. A new nested page needs a line in that file.
+
+**Save model (parity 3, matching FMP).** Each section owns its own Save. There is no global Save button. Dirty state is tracked per section id, never per page, so saving one section cannot flush another section's half-finished edit.
+
+| Operation | Persists |
+|---|---|
+| Reorder (drag) | Immediately on drop |
+| Add section | Immediately, server side, so the row has a stable id to edit against |
+| Delete section | Immediately, behind the confirm dialog |
+| Content edit | Pending until that section's Save |
+| Visibility toggle | Pending until that section's Save |
+
+Sections with pending edits show an amber dot in the left rail, and the top bar shows a count. A `beforeunload` guard fires while anything is unsaved.
+
+---
+
+## 7. Email System
+
+### Brevo Setup
+
+**Migrated from Resend to Brevo on 2026-08-10.** One Brevo account, one authenticated sending domain (`pacemakersglobal.com`). Create the API key under **SMTP & API, then API Keys**. Domain authentication (SPF, DKIM, DMARC) follows Brevo's standard flow and must be completed or mail lands in spam.
+
+No SDK. `src/lib/email/send.ts` posts to `https://api.brevo.com/v3/smtp/email` with plain `fetch`. Sending is a single POST to a single endpoint, so `@getbrevo/brevo` buys nothing while costing loose OpenAPI-generated types, a transitive HTTP stack, and CJS/ESM friction inside the Next server bundle. The request and response are typed by hand in that file.
+
+The exported surface (`sendEmail`, `SendEmailArgs`, `SendEmailResult`) is unchanged from the Resend implementation, so no caller was edited. The graceful fallback is unchanged too: a missing `BREVO_API_KEY` or sender logs a warning and returns `{ ok: false, reason: 'not_configured' }` without throwing, so the contact form still saves to the admin inbox on a deployment where email is not wired up.
+
+`from` accepts either a bare address or `Name <addr@example.com>`; Brevo needs the two parts separately, and the old Resend setup used the angled form, so both are parsed. `EMAIL_FROM_NAME` supplies the display name when the address carries none.
+
+### Templates
+
+For v1, only two templates exist. Both are stored in `email_templates` table and editable via admin.
+
+**contact_notification**: sent to admin when contact form submitted. Recipient: configured admin email from `site_settings.admin_email`. Variables: name, email, company, phone, country, service_interest, message, source_page, submission_id.
+
+**contact_acknowledgement**: sent to the person who submitted the form. Recipient: their email. Variables: name. Body confirms receipt and sets a 1-2 business day response expectation.
+
+### Base Layout
+
+```typescript
+// src/lib/email/templates/_base.ts
+export async function baseLayoutBranded(content: string): Promise<string> {
+  const branding = await fetchEmailBranding();
+  return `
+    <!DOCTYPE html>
+    <html>
+    <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <div style="background: ${branding.primary_color}; padding: 20px; text-align: center;">
+        ${branding.logo_url ? `<img src="${branding.logo_url}" alt="PaceMakers" height="40" />` : '<h1 style="color: white;">PaceMakers</h1>'}
+      </div>
+      <div style="padding: 30px 20px;">
+        ${content}
+      </div>
+      <div style="border-top: 1px solid #eee; padding: 20px; font-size: 12px; color: #666;">
+        ${branding.footer_html || ''}
+      </div>
+    </body>
+    </html>
+  `;
+}
+```
+
+### Send Wrapper
+
+```typescript
+// src/lib/email/send.ts (shape only, see the file for the real implementation)
+const BREVO_ENDPOINT = 'https://api.brevo.com/v3/smtp/email';
+
+export async function sendEmail(args: SendEmailArgs): Promise<SendEmailResult> {
+  const apiKey = process.env.BREVO_API_KEY;
+  const sender = parseAddress(args.from || process.env.EMAIL_FROM_DEFAULT || '');
+  if (!apiKey || !sender) return { ok: false, reason: 'not_configured' };
+
+  const res = await fetch(BREVO_ENDPOINT, {
+    method: 'POST',
+    headers: { 'api-key': apiKey, 'content-type': 'application/json' },
+    body: JSON.stringify({
+      sender,
+      to: recipients(args.to),
+      subject: args.subject,
+      htmlContent: args.html,
+    }),
+  });
+  // ... error handling, returns { ok: true, id } on success
+}
+```
+
+---
+
+## 7b. Free Tools
+
+Added 2026-09-16. Free calculators at `/tools`, first the Business Valuation
+tool (DCF and comparables) at `/tools/business-valuation`, ported from
+`reference/tools/business-valuation.html`. See Critical Reminder 1 for the
+recorded reversal that allows them.
+
+### Where things live
+
+| What | Where |
+|------|-------|
+| Which tools exist, their copy, their service page CTA | `src/config/tools.ts` (the registry) |
+| Each tool's component | `src/components/tools/toolComponents.ts`, then `src/components/tools/<tool>/` |
+| Form state and every form transition (defaults, peer sync, inputs out) | `src/components/tools/valuation/state.ts`, plain functions the verifiers drive |
+| Chart geometry, drawn by both the page (`ChartSvg`) and the PDF (`PdfChart`) | `src/lib/tools/valuation/charts.ts` |
+| Warning thresholds, version 2 defaults, growth ceilings, the market data label | `src/lib/tools/valuation/data.ts` (`WARNING_RULES`, `V2_DEFAULTS`, `growthCeiling`, `DATA_VERSION_LABELS`) |
+| Email me this version | `src/lib/tools/leads/version.ts` (pure), route `src/app/api/tools/[slug]/lead/version/route.ts` |
+| Download PDF for what is on screen | `src/app/api/tools/[slug]/pdf/route.ts`, writes nothing |
+| Company name and description a visitor adds to their report | `src/lib/tools/valuation/profile.ts` (cleaning and limits, shared by the form, the API and the PDF) |
+| Logo and partner card in the report and on the results | `src/lib/tools/brand/partner.ts` (pure), `src/lib/tools/brand/fetch.ts` (server), `src/components/tools/PartnerCard.tsx`. **The partner card reads only the founder profile's `founder_hero`**; its career highlights are that section's **Report highlights** field (one per line, up to five), which the profile page itself does not show and which ships empty. Home's founder card is never read, so editing it cannot change a report. Reports draw the Header Settings colour logo on white and its white logo on any dark background (trimmed and resized, never recoloured), with the brand name, tagline and Site Settings contact details (`fetchReportBranding`). **The founder portrait is framed by one rule everywhere** (home founder card, profile hero, results partner card, PDF): `src/lib/public/portrait.ts`, a fixed 4:5 frame with the image cropped to cover it at a face-anchored focus (50% 30%), never stretched. On the results card the frame carries `self-start`: in a flex row it otherwise stretches to the text beside it, which drew the portrait as a 150 by 244 strip until 2026-09-17 |
+| Booking link | `src/lib/tools/booking.ts` (always the site's `/book`), short links and attribution in `src/lib/tools/bookingLinks.ts`, redirect rules in `bookingRedirect.ts`, storage and click recording in `src/lib/tools/leads/bookingLinkStore.ts`, routes `src/app/b/[slug]/route.ts` and `src/app/api/tools/book/route.ts` |
+| **Every tunable number** (Damodaran data, FX, market rates, presets, deal bands) | `src/lib/tools/valuation/data.ts`, and nowhere else |
+| The valuation arithmetic | `src/lib/tools/valuation/engine.ts`, pure, no UI |
+| Every sentence and number format shown about a result | `src/lib/tools/valuation/format.ts`, shared by the page, the PDF and the emails |
+| Whether a tool is public | `tool_visibility` table, switched at `/admin/tools`, read only through `src/lib/tools/visibility.ts` |
+| Lead submission rules | `src/lib/tools/leads/valuation.ts` (pure), route `src/app/api/tools/[slug]/lead/route.ts` |
+| Results email and alert | `src/lib/tools/email/templates.ts`, sent by `src/lib/tools/leads/deliver.ts`, editable at `/admin/email-templates` |
+| PDF report | `src/lib/tools/pdf/ValuationReport.tsx` (content only), on the shared report theme `src/lib/tools/pdf/theme.ts` and `components.tsx` (see "Report theme"), fonts in `src/lib/tools/pdf/fonts/` |
+| Brevo webhook | `src/lib/tools/webhook.ts` (pure), route `src/app/api/webhooks/brevo/route.ts` |
+| Booking click tracking | `src/app/api/tools/book/route.ts`, redirecting to `/book` |
+| Admin | `/admin/tools`, `/admin/tools/[slug]`, `/admin/tool-leads`, `/admin/tool-leads/[id]` |
+
+### Visibility: one switch per tool
+
+A tool is Live only when the registry marks it `build: 'ready'` **and** its
+`tool_visibility` row says `live`. Everything else is Hidden, including a
+missing row, a missing table and a failed read. That one answer decides, and
+nothing else may decide:
+
+- `/tools/[slug]`: 404 and noindex when Hidden. Signed-in staff see the page with an amber **Admin preview** banner.
+- `/tools`: 404 while no tool is Live. Lists Live tools only.
+- `sitemap.xml`: `/tools` and each Live tool. The sitemap is rendered per request.
+- `WebApplication` JSON-LD: only on a Live tool's public page.
+- Service page CTA and each tool page: the tool's own Live or Hidden status only.
+
+### Tools in the navbar: Pages & Nav decides
+
+**Since 2026-09-16 the Tools nav item is an ordinary Pages & Nav row** (`site_pages`, link `/tools`, seeded hidden by migration 081). The operator sets its label, its place in the order and whether it is on, like any other page. Nothing adds it automatically any more. Two switches, each with one job:
+
+| Switch | Where | Decides |
+|---|---|---|
+| Tools row Visible | Pages & Nav | Whether Tools is offered in the navbar, and the footer "Free Tools" link with it |
+| Tool Live or Hidden | Tools | Whether each tool page is public, and so whether the hub has anything to show |
+
+The rules, in `src/lib/tools/navSetting.ts` (pure, shared by the navbar, Pages & Nav and the verifier):
+
+- **Row off:** no Tools link and no Free Tools link, for anyone.
+- **Row on, nothing Live:** the public sees no link (the hub would 404). Signed-in staff see the link with a **Hidden** badge so they can check it, and Pages & Nav shows a warning beside the row with a link to Tools. The session is only read in this one case.
+- **Row on, a tool Live:** the public sees Tools under the operator's label and position, the footer shows Free Tools after Financial Modeler Pro, and the hub lists the Live tools.
+- `/tools` itself is unchanged: a 404 to the public while nothing is Live, the hub with the Admin preview banner for signed-in staff.
+
+"Free Tools" is still not a Footer Links row: any stored `/tools` footer link is removed, so there is never a third switch. Pages & Nav has no footer placement control; the link sits after Financial Modeler Pro in the Firm column.
+- Service page CTA: the tool's `serviceCta`, while it is Live. **Not** a page builder section.
+- Lead API: refuses a Hidden tool unless the caller is staff.
+
+Switching is admin only (not editors), confirms first, and writes an audit entry
+(`entity_type` `tool`, action `tool_visibility`) that is the history on the tool
+detail page. `npm run verify-tools-visibility` proves all of this; with
+`VERIFY_BASE` it checks a running site as a logged-out visitor.
+
+**Local verification without touching the switch.** Local builds read the
+production database, so flipping a tool to check a Hidden or Live page would
+change the public site. `TOOLS_VISIBILITY_OVERRIDE=hidden` or `=live` on a local
+`next start` makes that server behave as if every tool were Hidden or Live. It
+is **ignored whenever `VERCEL` is set**, which Vercel sets on every deployment,
+and the verifier asserts that. `TOOLS_NAV_OVERRIDE=on` or `=off` does the same for
+the Pages & Nav Tools row, with the same guard.
+
+**Any submission by signed-in staff is a test lead** (`is_test`), on a Hidden or
+a Live tool, and test leads are excluded from counts and from the lead list by
+default.
+
+### Adding a tool
+
+1. Registry entry in `src/config/tools.ts` with `build: 'draft'`. It is now listed at `/admin/tools` as In development and cannot be switched Live.
+2. Data and engine under `src/lib/tools/<slug>/`, pure, with every tunable value in a data module.
+3. Component under `src/components/tools/<slug>/`, registered in `toolComponents.ts`.
+4. A lead processor like `leads/valuation.ts`, added to the `slug` check in the lead route, and its email and PDF if it sends them.
+5. A `cms_pages` row `tool-<slug>` with a hero section, by migration, stating when it is safe to apply.
+6. A verifier against whatever the tool was specified from.
+7. `build: 'ready'`, deploy, preview it signed in, then switch it Live at `/admin/tools`.
+
+**Other tools on each tool page.** Below every tool, "Try our other free tools" lists the other Live tools as the same cards the hub uses (`ToolCard`), in registry order, so a new tool is offered on every tool page the moment it is switched Live, with no code change. Staff previews also show ready tools that are still Hidden, marked Hidden; drafts never appear. With nothing to offer the section renders nothing, which is the state while Business Valuation is the only Live tool. Rules in `src/lib/tools/otherTools.ts`, proved by `verify-tools-visibility`.
+
+### Refreshing the Damodaran data each January
+
+Damodaran publishes his annual update in early January. All values are in
+`src/lib/tools/valuation/data.ts`, and its header lists these steps too.
+
+1. Country risk premiums, default spreads and marginal tax rates for each country in `COUNTRIES`.
+2. Unlevered beta (corrected for cash) and market debt to equity for each industry in `INDUSTRIES`, from the global datasets.
+3. `MARKET.matureErp` (implied ERP) and `MARKET.usDefaultSpread`.
+4. `MARKET.usTreasury10y` on the day of the refresh.
+5. FX to SAR (`sarPerUnit`) and the inflation expectations for non-pegged currencies. Review the preset multiples and size premium bands while there.
+6. Update every `asOf` in `SOURCE_NOTES` and the `WACC_SOURCE_SENTENCE`, and bump `VALUATION_DATA_VERSION`.
+7. **Local lending rates** (`LENDING_RATES`, since 2026-09-21): the base rate for each country with its source and date, refreshed at the same time and whenever a central bank moves. The default pre-tax cost of debt is that rate plus `ASSUMPTIONS.companyCreditSpread`; no published typical bank margin exists for these markets, so the margin is the firm's. `lendingSourceNote` prints the line in the sources.
+8. `npm run verify-valuation-engine`. **Do not edit `reference/tools/business-valuation.html`**: it stays exactly as ported, and the verifier writes the current Treasury yield, default spread and implied ERP from `marketDataInUse` into its CONFIG before each case. Add a `DATA_VERSION_LABELS` line for the new version (it is printed in the report footer, so keep it short).
+
+Old leads keep the results they were given: `results` is stored as computed and
+never recomputed, and each lead records its `data_version`. **A result field that
+can be null must be listed in `NULL_MEANS_ABSENT`** (`serialize.ts`), or a stored
+null revives as NaN, passes a `!== null` test and prints "n/a". Borrowings, cash,
+invested capital and EV / EBIT did that from 2026-09-17 to 2026-09-21.
+
+**The form cannot accept what the server refuses.** Text and list limits (peer
+names, peer count, the gate's name, email and company) live in
+`src/lib/tools/valuation/limits.ts`, read by both the zod schema and the form. A
+refused save shows the visitor local results with no lead, no email and no PDF,
+and no message, so a mismatch here loses the lead silently. The same goes for the
+date: the form's `todayIso` is UTC, as the server's is. A financial year that has
+not started is refused; the year still running is allowed and takes no stub.
+
+### Leads, email and tracking
+
+- **The server recomputes.** The browser posts inputs and gate details; the API validates to the form's limits, reruns the engine, and stores and returns its own result. The page shows the server's result, or its own if the request fails, so a visitor always sees results.
+- **Spam:** honeypot field, a 3 second minimum from page load, and 5 per hour or 20 per day per hashed IP (staff exempt). All three answer exactly as a real save does and store nothing.
+- **Emails run after the response** (`after()`), so a slow PDF or Brevo never delays results. Outcomes are written to the lead (`email_status`, `alert_status`, errors) and as events. Staff can resend and download the PDF from the lead.
+- **The alert** goes to `site_settings.admin_email`, then `EMAIL_TO_ADMIN`.
+- **Tracking:** every tool email carries `X-Mailin-custom: lead:<id>|kind:<results|alert>` and Brevo tags. The webhook records delivered, opened, clicked, bounced, blocked, deferred and complaint events against the lead. `email_status` only moves to stronger evidence (complaint > bounced > blocked > clicked > opened > delivered > deferred > sent). **Opens are a weak signal**; clicks and booking clicks are the real one.
+- **Booking clicks** from the results page, the email, the PDF and its QR code go through a **short link, `/b/<id><channel>`** (since 2026-09-17): 12 random characters from a 56 character alphabet (about 70 bits), issued when the lead is saved and stored as one `booking_link` event whose unique `dedupe_key` is the lookup (no new table), then one letter for the channel (`r` results, `e` email, `p` PDF). **A short link only opens the booking page**: it is not the access token, is never accepted where the token is (lead versions, the PDF download, the lead API), and an unknown or malformed id redirects to `/book` recording nothing. A known one records the click once and sets the first-party **`pmbc_booking`** cookie (30 days: `utm_source=pacemakersglobal`, `utm_medium=free-tool`, `utm_campaign=<slug>`, `utm_content=<channel>` and `ref=<link id>`; never a name, email or token), then redirects to **`/book` with no query string**. The long links already sent (`/api/tools/book?t=<access_token>&src=...`) behave the same way, issuing a short id for an older lead so its cookie can carry a reference. On `/book`, tracking parameters from any source (utm tags, `ref`, click ids) are stored in the same cookie and cleared from the address bar without a reload (`BookingUrlCleaner`); the page passes the attribution to the calendar as utm tags, with the lead reference as `utm_term=ref-<id>`, and prefills name and email from the lead the reference points to. Leads saved before short links keep their long links in the admin PDF until a click issues one. `npm run verify-booking-links` (61 with `VERIFY_BASE`, GET only and unknown ids only, so safe against production). The cookie is described in `PRIVACY_TOOLS_DRAFT.md` with a question for counsel. **Never to Calendly directly**: `/book` passes the known keys into the embedded calendar (`withBookingPrefill`), so the visitor stays on the site and the booking is still attributed. Email security scanners can open links, so check the user agent on an email-sourced click.
+- **What counts as engagement** (`src/lib/tools/engagement.ts`). The internal alert never does: it has its own Brevo tag (`tool-lead-alert`) and `kind:alert` in the custom header, and an event that cannot be matched to either email (header, tags, message ids, recipient, in that order) is treated as the alert. A click on the results email **within 60 seconds of delivery** (or of the recorded send, before a delivered event arrives), or on a results email that **bounced or was blocked**, is likely a mail scanner: it is kept in the lead's history with `pmbc_engagement.likely_automated` and the reason in its payload, never moves `email_status`, and a booking click from the email link on those terms is recorded without adding to `booking_clicks`. Results page and PDF booking clicks are never judged. The lead detail badges each flagged event, labels alert events as not visitor engagement, and states how many clicks were not counted. Events stored before this rule shipped (2026-09-16) were not rewritten.
+- **Status writes are conditional, never read-then-write.** Brevo sends events as separate requests within the same second, and a fast bounce can arrive before the send has recorded `sent`. The first real lead bounced and stayed `sent` that way. `setEmailStatusIf` is one UPDATE that applies only where the stored status is weaker (`weakerStatuses`), the send records `sent` only from `pending`, and a resend resets to `pending` first. Brevo's `reason` is kept as the event detail only on bounces, blocks, deferrals, errors and complaints; a delivered event carries the reason "sent", which read as a fault.
+
+### Leads by person, reminders and save and return
+
+Added 2026-09-21 (`feat/valuation-crm`). Proved by `npm run verify-tool-followup` (48; 53 with `VERIFY_BASE`, GET only).
+
+- **One person is one email.** `/admin/tool-leads` lists people (`listPeople`, `groupLeadsByEmail` in `src/lib/tools/admin.ts`, matched case-insensitively), each valuation a **project** under them, named by its company or "Your business". Lead counts count each email once (`countPeople`); `/admin/tools` shows valuations beside them. Existing rows group the same way with no migration: nothing is merged in the database.
+- **Phone and country** (migration 082), both optional, on the name and email step. **The phone field is the contact form's own component** (`src/components/public/PhoneField.tsx`: the searchable country picker above the number, joined by `composePhone`, at most 40 characters as on the contact form), shared by both forms since 2026-09-21. The contact form keeps its own field style; the valuation step passes its `inputClass` (`inputClassName`) so the two boxes match its other fields. The country list is `src/lib/tools/contactCountries.ts`, GCC and Pakistan first; choosing one sets the phone picker (`isoForContactCountry`). Stored as `+966 50 123 4567`. Shown on the lead and in the internal alert. `contact_country` is the person's own country, not the company's country of operations.
+- **Reminders**, `src/lib/tools/leads/reminders.ts` (pure) and `runReminders.ts`: two only, day 7 and day 14 after the person's **latest** valuation, each only inside its own week, only when the follow-up box was ticked on it, never after an unsubscribe or a booked meeting. Sent by the Vercel cron (`vercel.json`, daily 06:00 UTC) calling `/api/cron/tool-reminders`, which needs `Authorization: Bearer $CRON_SECRET` and answers 503 while `CRON_SECRET` is unset, **which is why it is set on Vercel Production (since 2026-09-22)**. Each send is claimed by a `reminder_sent` event with a unique dedupe key per email and number; a failed send releases it. The wording is in code (`buildReminderEmail`), not the template editor. Report email shell, booking button, edit link, signed unsubscribe link and a one-click `List-Unsubscribe` header. Brevo events carry `kind:reminder` and are not visitor engagement.
+- **Unsubscribe**: `/api/tools/unsubscribe?e=&s=`, an HMAC over the email (`TOOL_LEAD_IP_SALT`, else `NEXTAUTH_SECRET`). GET only shows a confirm button, so a mail scanner cannot unsubscribe anyone; the POST turns off follow-up on every lead with that email and records `reminders_unsubscribed`.
+- **Booked**: `CalendlyBookedListener` on `/book` posts Calendly's `event_scheduled` message to `/api/tools/book/scheduled`, which records `booking_scheduled` against the lead in the `pmbc_booking` cookie. A booking made without that cookie is not seen, so that person may still get a reminder.
+- **Save and return**: every results email (and reminder) carries an **Edit and rerun** link, `/tools/<slug>?resume=<id>`, 16 characters, stored as a `resume_link` event (`resumeLinks.ts`). The page loads the project's inputs from `/api/tools/<slug>/resume` (GET, 404 for unknown ids or a Hidden tool), drops the id from the address bar, and a run saves a new version of **that** project through the version route with `sendEmail: false` (no gate, no email; Email me this version still sends one). The link grants edit access to the project, like the access token, and the email says not to forward it.
+- **Deleting leads** (since 2026-09-22): `DELETE /api/admin/tool-leads` with `emails` (a whole person, every valuation under the email, whatever the list's filters show) and or `ids` (single valuations), at most 200 each, admins only (`canDelete`). Events cascade with the lead (077's foreign key), and reminders need no row: with no valuation left the run finds nobody. **Deleting one valuation while others remain first moves the person's `reminder_sent`, `reminders_unsubscribed` and `booking_scheduled` events to their newest remaining valuation** (`planLeadDeletion` in `src/lib/tools/leads/deleteLeads.ts`), or the next run could resend a reminder or restart them after an unsubscribe. One audit row per valuation (`tool_leads`, `delete`), holding the row without results, access token or IP hash, with the scope and events removed in `metadata`.
+- **Net income and P/E**: optional net income (last actual year) on step 2 and a P/E column for peers. With two or more peer P/Es and positive net income, P/E gives equity (after the private company discount), shown plus net debt and claims as a reference row in value by method and the comparables table. Never blended. Kept off page 6.
+
+### Brevo webhook setup
+
+1. Set `BREVO_WEBHOOK_TOKEN` on Vercel (Production) to a long random string, and redeploy.
+2. In Brevo: **Transactional**, then **Settings**, then **Webhook**, then **Add a new webhook** (menu names as of September 2026; Brevo moves them occasionally).
+3. URL: `https://www.pacemakersglobal.com/api/webhooks/brevo?token=<BREVO_WEBHOOK_TOKEN>`. Use the `www` host: the apex redirects, and a webhook should not depend on a redirect.
+4. Events: Delivered, Opened, Clicked, Hard bounce, Soft bounce, Spam, Blocked, Invalid email, Deferred, Error, Unsubscribed. Proxy open and First opening are optional; they are recorded as opens.
+5. Save, then use Brevo's test button: the response is 200 with `ignored: 1`, because the test event matches no lead.
+6. Alternatively create it through the API with `"auth": {"type": "bearer", "token": "<BREVO_WEBHOOK_TOKEN>"}` and the URL without `?token=`. Both are accepted.
+
+`npm run verify-brevo-webhook` covers authentication, matching, status ordering and duplicates; with `VERIFY_BASE` it confirms a running site refuses a missing or wrong token.
+
+### Business Valuation version 2
+
+Everything below is on by default in a neutral state, so a visitor who touches
+none of it gets exactly the version 1 figures, and `verify-valuation-engine`
+still matches the reference at 493 checks.
+
+**The page.** Navy hero with the promise and three chips (registry `chips`), a
+numbered step bar where reached steps are clickable, Back on every step and the
+gate, and a sticky live summary beside the form on large screens (a compact
+expanding bar below 1024px). The summary unlocks the range once the gate is
+passed. Results are a dashboard: count-up range card, tiles, exploration
+sliders, and six tabs (Summary, DCF, Comparables, Scenarios, Sensitivity,
+Assumptions), then "Who you will work with" and the booking call to action.
+
+**What the engine added** (`engine.ts`, all optional inputs):
+
+| Feature | Rule |
+|---|---|
+| Private company discount | Applies to the exit multiple as well as the comparables (`exitMultipleApplied`). Defaults to 20% once two or more peers are in use (`syncPrivateDiscount`), 0 otherwise; a typed value (`discountTouched`) is kept. |
+| Scenarios | Upside and downside move every forecast year's revenue growth and EBITDA margin by points (`scenarioFinancials`), each valued in full. Weights must total 100. `weightedEquity` is the weighted midpoint. |
+| Normalised EBITDA | One-off costs and owner costs above market are added back to the last actual year for comparables and the LTM multiple. Owner costs, and only those, can be carried into the forecast, which changes the DCF. |
+| Bridge items | End of service benefits, leases, minority interest (deducted) and surplus assets (added), beyond net debt. With none entered the reference's `ev - netDebt` is kept exactly. |
+| Stake | Percent of equity, with a minority discount on the DCF part of the blend only, or a control premium on the comparables part only (since 2026-09-21). Shown only when not 100% with no adjustment. **A stake of 50% or less defaults to a minority discount** (`syncStakeAdjustment`, until the visitor picks one); a control premium chosen for it is kept, used, and warned about. |
+| WACC adjustment | Points added by the exploration slider. Zero keeps the reference WACC bit for bit. |
+| Company profile (`inputs.profile`) | A company name (120 characters) and one or two paragraphs about the business (1,000 characters), typed on step 1. **Never read by the engine.** Cleaned to plain text by the API schema itself (control characters, whitespace, two paragraphs, the caps), so every endpoint stores and renders the same text. The name fills the gate's company field and the results headline; the description goes on the PDF cover, marked as the visitor's words and not reviewed by the firm. Optional, so it did not bump the input schema version. |
+
+**Warning rules** (`WARNING_RULES` in `data.ts`, text in `format.ts`):
+terminal value above 75% of the DCF; perpetual growth above the currency's
+`growthCeiling` (4.0 for the GCC currencies, 9.0 for PKR); exit multiple after
+the discount more than 30% from the multiple implied by perpetuity growth;
+negative free cash flow in the final forecast year; a first forecast year margin
+more than 10 points from the last actual (normalised); ROIC below WACC; and
+growth more than 2 points from reinvestment rate times ROIC (these two need
+invested capital); terminal growth more than 1 point below or 2 points above
+expected local inflation (the inflation entered on step 3, or long-run US
+inflation, `MARKET.usInflationLongRun`, for the pegged currencies); and a control
+premium on a stake of 50% or less. Each is proved triggering and silent,
+including at its edges, by `verify-valuation-v2`.
+
+**Numbers quoted in prose come from the table they refer to.** The cost of
+capital lever ("What would increase your value") is read from the sensitivity
+grid by `waccLeverFromSensitivity`: the centre cell and one point lower WACC at
+the same growth. It once used the flexed range, which also moved growth half a
+point, and quoted a figure the table on the same report did not show. The
+executive summary says the forecast carries most of the answer only when the DCF
+weight is above 50%.
+
+**Input schema versioning.** Stored inputs carry `schemaVersion`
+(`INPUT_SCHEMA_VERSION`, now 4) inside the `inputs` JSONB, stamped by the server
+whatever the browser sends. No migration: every version 2 block is optional and
+`resolveExtras` fills an absent one with its neutral default, so a version 1
+lead revives and formats unchanged. Bump the version when a stored input changes
+meaning, and branch on it in `resolveExtras`, never by guessing from shape.
+Version 3: Saudi / GCC ownership is required for Saudi Arabia with no default
+(the example company fills it); older inputs without it mean 0% (corporate tax,
+as they were valued). Version 4: borrowings (`debt`) and cash are entered
+separately, both required (0 allowed) in every country, and the engine derives
+net debt as borrowings less cash on every run (`withNetDebtFromBalances`), so
+a net debt figure the browser sends is ignored; cash also adds to the Saudi
+zakat base. The server stamps version 4 only when borrowings are sent, so a
+page from before the change still saves, as version 3 with net debt as entered.
+`balancesFromInputs` splits version 3 inputs into borrowings and cash with the
+same net debt and zakat cash.
+
+Added 2026-09-17, all optional and neutral when unused (no schema bump):
+**zakat rate** (`zakatRate`, Saudi Arabia only, 2.5% by default via
+`TAX.zakatRate`, 0 to `TAX.maxZakatRate` 10%; notes and assumptions state the
+rate used); **invested capital in two parts** (`investedCapitalParts`: working
+capital, blank meaning the last actual year's net working capital, plus net
+fixed assets; `withDerivedInputs` sums them, overriding a single
+`investedCapital`, which stored inputs and verifiers may still use); and
+**EV / EBIT from peers** (`Peer.evEbit`, at least two needed, on last actual
+EBIT after the private company discount), a reference row in value by method
+and on the results page that never enters the blend. The PDF keeps it off page
+6, the tightest page.
+
+### Business Valuation version 3
+
+Shipped 2026-09-17 (`feat/valuation-engine-report-v3`). Input schema version 3.
+
+**One result object.** `engine.ts` returns a canonical `ValuationResult`
+(`forecast`, `terminal`, `dcfBlock`, `comparables`, `blend`, `bridge`,
+`scenarios`, `raise`, `checks`, `recommendations`, `tax`, `meta`) and the
+results page, PDF, emails, admin view and verifiers all read it. Nothing
+downstream computes a value; rounding happens only in `format.ts`.
+
+**Method changes from the reference** (all marked CHANGED in `engine.ts`):
+
+| Area | Rule |
+|---|---|
+| Terminal value | Perpetuity on a normalised terminal cash flow (`terminalCashFlow`): NOPAT at g, net capex scaled to g over final year growth, working capital at g. **Reinvestment is at least NOPAT x g / RONIC** (since 2026-09-21), RONIC the WACC of each run plus `TERMINAL.ronicPremiumPoints` (0), so growth beyond the forecast adds no value it has not paid for; the scaled capex alone implied returns of 40% to 50% on new capital. A business whose own figures imply more reinvestment keeps them; the top-up is added to net capex. Implied terminal multiple, reinvestment rate and implied terminal ROIC (g over reinvestment rate) are reported. |
+| Valuation date | The server's date. Year one keeps (1 - f) of its cash flow, periods (1 - f) / 2 then (i - 0.5) - f, terminal at N - f (`stubPeriod`). A last actual year 12 months or more old is refused. Financial years end on the last day of the month chosen on step 1 (`fyEndMonth`, December by default, since 2026-09-21); the report says "assumed to end on 31 December" only for December (`financialYearEndNote`). |
+| Net debt | Borrowings less cash at the year end (both entered, from input version 4), rolled forward to the valuation date: less the elapsed year one forecast cash flow, plus after-tax interest on positive net debt at the pre-tax cost of debt. One figure for every scenario. |
+| Tax and zakat | Saudi / GCC ownership is required for Saudi Arabia, no default (the example company fills 100%). Income tax on the non-GCC share only; zakat 2.5% of an approximate base, working capital plus optional year end cash (`zakatBase`, cash held flat, floored at zero), disclosed as possibly understated when cash is blank. The same income tax rate is used for FCFF, terminal NOPAT, cost of debt and beta relevering. |
+| Losses | Carried forward from the actual years, offset capped per country (`lossOffsetCap`: Saudi Arabia 25%, UAE 75%, else 100%). |
+| Raise | Optional amount when raising equity: pre-money, post-money, investor stake. |
+| Market data | Treasury 5.00% dated 15 September 2026 (`usTreasury10yAsOf`), implied ERP 4.14% as at 1 September 2026 (`IMPLIED_ERP_BY_MONTH`), data version 2026-09-17, footer "Market data: Damodaran 2026, risk-free 15 September 2026". |
+
+`REFERENCE_METHOD` (old terminal cash flow, no loss carry-forward) exists only
+for `verify-valuation-engine`, run with no valuation date and 0% ownership.
+
+**Checks** (`checks.ts`) run on every result and report Pass or Warning: DCF
+against comparables, terminal value methods, terminal value share, comparable
+companies, capital structure, year one margin, EBITDA normalisation, last actual
+EBITDA, growth ceiling, growth against inflation, terminal cash flow, terminal
+returns against WACC (whenever implied terminal ROIC is measurable), and, with
+invested capital, returns against WACC and growth against reinvestment; a
+control premium check only when one is chosen. Thresholds are `WARNING_RULES`.
+**Recommendations** (`recommendations.ts`) are chosen by rule and worded in
+`format.ts`, never promising a higher value.
+
+**Reconciliation.** `reconcile.ts` runs before every PDF render: headline and
+bridge equity, blend, equity bridge for blended, DCF and each scenario,
+probability weighting, sensitivity centre, terminal value share, implied EV /
+LTM EBITDA, discount factors, and output hygiene. Throws outside production, logs
+in production.
+
+**Stored leads from before version 3** get their PDF and resend through
+`leads/reportResult.ts`, which reruns their inputs under `REFERENCE_METHOD` and
+so reproduces the figures they were sent.
+
+**Pages.** The PDF is eight pages (below). Amounts print in thousands when
+enterprise value and revenue are both under 10 million (`amountUnit`).
+**Amounts in words are short** (`fmtBig`, since 2026-09-17): "SAR 450k", "SAR 12.5m",
+"SAR 245m", "SAR 1.25bn", on the results page, in the emails and in the report,
+which share the formatter, **in headlines, KPI tiles and sentences only**.
+**A table cell prints the full figure** (`fmtTableAmount`, `headline().table`, since
+2026-09-21): "SAR 385.2 million", or thousands for a small business as the other
+tables. That covers the email summary tables, the stake tables on the results page
+and in the report, and the admin lead list and version history.
+`verify-tool-email-pdf` fails on a short amount in an email table cell.
+`verify-valuation-engine` converts the reference's words ("million") before
+comparing, so every figure is still matched exactly.
+
+**Every run from the form is a new lead** (since 2026-09-21, replacing a same-day
+rule that saved later runs in the tab under the first lead, which filed a second
+company's valuation under the first company). Run valuation always shows the name
+and email step, prefilled from `sessionStorage` (`pmbcValuationGate`: name, email,
+purpose, deal size, follow-up and raise amount only, never a token, a company or
+consent). The gate's company is step 1's name, or blank after a saved lead;
+consent is ticked again for each lead. Submitting clears the previous token
+first, so Email me this version and the PDF only ever reach the valuation on
+screen. **Only the results page updates a valuation**: the sliders, and Email me
+this version, which uses that lead's name and company and the current inputs.
+**Start a new valuation** on the results page clears the form. The retired key
+`pmbcValuationLead` is removed on load. The version route still accepts
+`sendEmail: false` and its separate limit, but the page no longer sends it.
+`verify-valuation-dashboard` runs, at each width: a second run (prefilled gate, a
+new lead, Email me this version on the new token), two companies in one session
+via Load an example company after a real valuation, and a blank company twice.
+
+**Report file name** (`src/lib/tools/pdf/fileName.ts`, one rule for the results
+download, the email attachment and admin): "Acme Clinics - Indicative Business
+Valuation - 21 Sep 2026.pdf", or "Indicative Business Valuation - Jane Smith -
+21 Sep 2026.pdf" without a company, sent with a UTF-8 `filename*` so an Arabic
+name survives. The company is the gate's, else step 1's. **Without a company the
+report title and footer read "Your business"**, not the person's name.
+
+**Every country Damodaran covers** (since 2026-09-22): 173 countries in `COUNTRIES`, the seven first unchanged, the rest generated from his January 2026 `ctryprem.xlsx` (rated and frontier tables) and `countrytaxrates.xlsx`. Left out: the three emirates he lists apart from the UAE, and North Korea and Somalia, which his tax file lacks. Each has its own currency and an indicative rate to SAR as at `FX_AS_OF` (size bands only). `pegged` is true only for dollar pegs and dollar users; every other currency takes the Pakistan inflation conversion, with a long-term inflation default set by PaceMakers. The country search pins the GCC and Pakistan (`PINNED_VALUATION_COUNTRIES`) above the rest and matches currency codes and common names ("UAE", "UK"). Cost of debt: the local benchmark where one was set (the seven), else the BIS central bank policy rate (60 countries, euro members on the ECB's), else built from risk-free plus default spread plus the margin, which `builtCostOfDebtNote` states in the sources. `Currency.country` identifies the country behind a shared currency such as EUR. Zakat stays Saudi Arabia only.
+
+**Since 2026-09-23:** a benchmark rate more than 5 points above the country's inflation default (`ASSUMPTIONS.maxBenchmarkAboveInflationPoints`, `benchmarkStatus`) is not used and the cost of debt is built from the spreads, with the reason in the sources (Brazil, Colombia, Iceland, Russia, Turkey; Pakistan at 4.75 keeps KIBOR). Expected inflation of 15% or more, entered or default (`highInflationPercent`, `highInflationWarning`), puts a "Highly uncertain result" notice above the tiles on the results page and under the figures on the report cover. Exchange rates to SAR: ExchangeRate-API (open.er-api.com) mid rates as at `FX_AS_OF`, PKR included (0.0135), GCC at their pegs, with their own line in the report sources. `verify-valuation-engine` passes the current `sarPerUnit` values into the reference, as it does the market data.
+
+**Cost of debt by country** (since 2026-09-21). Choosing a country fills the cost of
+debt on step 3 with its local lending base rate plus the 2.0% margin
+(`defaultCostOfDebt`), with the base rate, date and source in the field's hint and
+in the report's sources. It stays editable; a typed rate is replaced when the
+country changes, since it is in that country's currency; clearing it builds the
+cost of debt from the spreads as before. `verify-valuation-engine` clears it, as
+the reference tool only knows the spread build, and so does the v2 regression case.
+**For a currency not pegged to the dollar the entered rate is converted once**:
+to dollars by the inflation gap, blended with the dollar cost of equity, and the
+blended WACC converted back once. `verify-valuation-v2` section 17 proves it: the
+PKR equivalent of the spread-built cost of debt reproduces the spread-built WACC
+exactly. The Saudi rate was rechecked on 2026-09-21: 27 August 2026 (Argaam) is
+still the latest public 3-month fixing found; SAMA raised rates in mid-September,
+so replace it when a later fixing is published.
+
+**Control premium on the comparables part only** (since 2026-09-21). The DCF
+values the company's own cash flows, so it already reflects control; trading
+multiples are minority prices. Stake value = stake x (blended equity +
+comparables weight x premium x comparables equity). **A minority discount
+reduces the DCF part only** (same day): stake x (blended equity - DCF weight x
+discount x DCF equity). `StakeResult.premiumBasis` and `discountBasis` mark the
+new bases, the stake label says "on the comparables part" or "on the DCF part",
+and `stakeBasisNote` explains why on the results page (not in the PDF, whose
+page 5 has no line to spare). Results stored before keep the old basis.
+
+**Normalisation against the forecast** (`normalisation_forecast`, since
+2026-09-21): owner cost add-backs marked to continue are in every forecast year
+(`normalisedFinancials`); owner costs not carried leave the DCF on reported
+earnings, which is a warning. One-off costs never carry. **Add-backs above 20%
+of reported EBITDA** (`addbacks_large`, `WARNING_RULES.addBackShare`) warn.
+**Year one margin** warns both ways, against the last actual (normalised) margin.
+Gaps read "within X%" rounded up (`fmtWithinPct`) and "differ by X%" rounded,
+never 0%.
+
+**Pages 6 and 7 flow; only the assumption tables are kept whole** (since
+2026-09-21). Page 6 starts with the terminal value and comparables tables, then
+the tax and balance sheet block (`PairedColumns keepTogether`, so "EBITDA,
+normalised" never leaves its table), both of bounded height. Everything after
+them breaks between rows or paragraphs: the check rows are direct children of
+the page (a container of unsplittable rows was moved whole, which left page 6
+half empty and gave nine pages), the methodology keeps only its title, heading
+and first paragraph together, and "Important" breaks between paragraphs. The
+timing rows sit in the shorter column when that is shorter ("Tax, zakat and
+timing"). **`npm run verify-report-layout`** renders a matrix of country, stake,
+normalisation, bridge items, peers, invested capital and margin (a spread of 120
+by default, `LAYOUT_FULL=1` for all 973, about an hour) and requires eight pages,
+page 6 at least 80% full, the block whole on page 6 and "Important" on page 7.
+The reported case (Pakistan, 35% minority, owner costs not carried, EOSB and
+leases) is first; it failed on the old layout.
+
+**Check rows stay on one page where they fit** (`checksFitOnPage6`, since
+2026-09-21): before drawing, the report estimates where the list lands (about
+173pt plus 12.6pt per table row, calibrated against renders, residuals within
+7pt) and its height (14.5pt a row, 25pt when the label or message may wrap), with
+a 12pt margin. When it fits, heading and rows are kept whole; when it may not,
+the rows break across pages 6 and 7 as before, so a gap never returns.
+`verify-report-layout` checks every case the estimate keeps whole really is on
+one page, and reports how many are (80 of 109 in the default sample; the rest are
+the densest cases, whose list is taller than what page 6 has left).
+
+**The revenue and EBITDA chart** (`revenueMarginSeriesChart`, report page 2, the
+results page and the financials step) labels every year's EBITDA as well as
+revenue since 2026-09-21: above the bar, or for a loss in brackets just above the
+zero line.
+
+**The cover tile** reads "Implied EV / LTM EBITDA (normalised)" when EBITDA is
+normalised (`ltmMultipleLabel`), as the results tile and the check do. The
+Discounting row reads "Mid-year", and unadjusted EBITDA "As reported", so neither
+wraps in the report's narrow value column.
+
+**The implied multiple check** measures against reported EBITDA when owner cost
+add-backs are not carried into the forecast, since the DCF then values reported
+earnings; otherwise normalised. **Growth and reinvestment** is worded in plain
+English, in the direction of the gap.
+
+**Implied multiple against comparables** (`multiple_vs_peers`, since 2026-09-21):
+warns when the implied EV / LTM EBITDA is above the highest comparable EV / EBITDA
+before the private company discount (the top of the preset range without peers).
+
+**The company description** is on the cover's lower half and the results page's
+Summary tab, as well as the admin lead view.
+
+**Cost of capital working** (since 2026-09-21). `waccSteps` in `format.ts` works
+the WACC through: levered beta, cost of equity, pre-tax and after-tax cost of
+debt, weights, WACC, and for a currency not pegged to the dollar the conversion.
+For those currencies the build runs in US dollars and every dollar line says so,
+which is why a PKR WACC can sit above both component rates. Shown on step 3, on
+the results page and on report page 5. **The company's own borrowing rate**
+(`wacc.kd`, optional, in the valuation currency, above 0% and below 50%) replaces
+the spread build; for an unpegged currency it is taken to dollar terms by the same
+inflation gap. Blank keeps every earlier figure bit for bit.
+
+**Exploration and versions.** The sliders recompute in the browser and save
+nothing. **Email me this version** posts the explored inputs; the server
+recomputes, keeps the replaced inputs and results as a `version_saved` event,
+overwrites the lead, and resends the results email with a new report, limited
+to 5 an hour and 20 a day per lead (staff exempt). The emailed version becomes
+the new base, so Reset to base returns to it. **Download PDF** renders what is on
+screen and writes nothing. Both need the lead's access token. The admin lead
+detail shows the version 2 inputs, the warnings the visitor saw, and the version
+history.
+
+**The PDF is eight pages** (`REPORT_PAGE_TITLES`): valuation at a glance (cover with
+range bar and KPI row), executive summary with financial profile, valuation
+summary (value by method, bridge, pre and post-money when raising), FCFF with
+the terminal column and sensitivity, scenarios and the factors that could
+support a higher valuation, then checks and key assumptions flowing into
+methodology, sources and disclaimer (pages 6 and 7 are one flowing section, so a
+long check list moves text rather than adding a page), and working with
+PaceMakers. Amounts print in thousands when enterprise value and revenue are
+both under 10 million (`amountUnit`). Every serif style sets
+`fontFeatureSettings: NO_LIGATURES`; a unitless `lineHeight` needs `fontSize` on
+the same element. The logo and partner card come through `meta.branding`,
+optional at every point. `npm run render-valuation-qa -- <dir>` renders ten test
+cases and rasterises every page to PNG for inspection.
+
+**Adding a scenario input or a bridge item.**
+1. The type and its neutral default in `engine.ts` (`BridgeInputs` or `ScenarioInputs`, `defaultExtras`) and, for defaults a person tunes, `V2_DEFAULTS` in `data.ts`.
+2. Validation in `validateCompany` or `validateTerminal`, and the arithmetic in `compute`, keeping the no-input path identical to today.
+3. The zod schema in `leads/valuation.ts` (optional), the form field and `toInputs`/`stateFromInputs` in `state.ts`.
+4. The rows in `format.ts` (`bridgeTable`, `bridgeSteps`, `scenariosTable`), which the page, the PDF, the email and the admin detail all read.
+5. Checks in `verify-valuation-v2` for the item on its own and absent, then `verify-valuation-engine` to prove the neutral path.
+
+**Verifiers.** `verify-valuation-engine` (518: 514 reference parity plus 4 on the market data passed into the reference),
+`verify-valuation-v2` (517), `verify-tool-lead-api` (146), `verify-tool-followup` (48), `verify-report-layout` (see above),
+`verify-valuation-dashboard` (453, the results page end to end, with the phone field lined up with the fields above it, the year end month, P/E and the resume link, at 1440, 1024 and 390, including the partner portrait's 4:5 frame and source ratio,
+against a local `next start`, every /api/ request intercepted so nothing is
+written), `verify-tool-email-pdf` (414, pdfjs text and operator list, including the report theme's footer, colour and logo rules, so a ligature glyph is
+caught even though extracted text maps it back to letters),
+`verify-tools-visibility` (97), `verify-brevo-webhook` (168), `verify-booking-links` (61) and
+`verify-production-guard` (34). Each was
+break-tested. `npm run render-valuation-examples -- <dir>` renders the minimal and
+full-feature reports for review, reading the logo and partner read-only.
+
+### Report theme
+
+Added 2026-09-17 (`feat/report-brand-theme`). **Every tool PDF report uses one
+shared theme**, so the Investor Readiness Scorecard and any later report look
+like the valuation report without copying it.
+
+| What | Where |
+|---|---|
+| Letterhead colours and the legal line, shared with the tool emails | `src/lib/brand/letterhead.ts` |
+| Report colours (`RC`), chart palette (`REPORT_CHART_PALETTE`), type scale, page geometry, fonts, letterhead geometry, branding types | `src/lib/tools/pdf/theme.ts` |
+| Cover, inner page, closing page, footer, section heading, tables, KPI tiles, partner block, services, booking panel | `src/lib/tools/pdf/components.tsx` |
+| The source letterhead | `reference/brand/PMBC Letterhead 09172026.pdf` (the header layout since 2026-09-17; colours unchanged from `PMBC_Letterhead.pdf`) |
+
+**Colours, sampled from the letterhead** (vector fills and a 3x render, matching
+the Header Settings logo file): navy `#153D64`, green `#2E8B3A`, deep green
+`#1E5825`, gold `#C9A227`, grey `#595959`. The website keeps its own tokens;
+the results dashboard charts use `SITE_CHART_PALETTE` (the default in
+`charts.ts`) and are unchanged, while reports pass `REPORT_CHART_PALETTE`.
+
+- **Navy is primary**: headings, rules, table headers, actual years in charts.
+- **Green is the accent**: forecast series, free cash flow, positive indicators, section markers, small accent shapes, the booking button.
+- **Gold is minimal**: the tagline, the base case marker, at most one small highlight on a page. No gold fills, no large gold text.
+- White pages, light neutral table shading, warnings in `#B3412F`.
+
+**Pages.**
+- **Cover** (`ReportCover`): the letterhead header, measured from the letterhead PDF's vector paths and a 3x render (`LETTERHEAD` in `theme.ts`): a navy bar at the very top edge, the green swoosh (three copies of one shape, two shaded and one solid) hanging from it on the right, and the logo on the left below the bar, drawn 22% smaller than the letterhead's (31.7pt tall), as the owner chose. **No tagline in the header** on any page: the tagline appears in the footer only (the letterhead file prints one below the swoosh; reports deliberately do not). Everything is scaled by the same factor in both directions, so the swoosh is never stretched or cut off. **The bar and the swoosh are drawn 1.5pt past the top and right edges** (`HEADER_BLEED`, since 2026-09-21): the layout grid is 595pt but A4 is 595.28pt, and a header ending at the grid left a white hairline down the right at zoom. `verify-tool-email-pdf` reads the drawing operators on the cover, an inner page and the closing page and fails on any gap. Then company, report title, headline range and date, and the report footer.
+- **Inner pages** (`ReportPage`): `InnerHeader`, a thin navy bar at the top edge with a small copy of the same swoosh on the right (scale 0.42). No logo or tagline in the header; content starts high; the footer.
+- **Footer**, the same on every page, cover and closing page included (no page carries the letterhead's footer band): small logo, "PaceMakers Business Consultants LLP" and the tagline on the left; tool name, company, date and "Page X of Y" on the right; the same navy rule with a green accent above it. Long company names are shortened.
+- **Closing page** (`ClosingPage`): the letterhead header, the closing content, the **legal line and contact details, stated once in the report** (`LegalAndContact`), and the report footer. The contact details come from Site Settings (advisory email, site, office location); the letterhead's phone number is not in Site Settings and is not printed.
+- **Logos**: `BrandLogo` uses the colour file on white and the white file on a dark background, **the original Header Settings files exactly as stored** (not resized, trimmed, traced, flattened or recoloured; since 2026-09-17, after reduced copies looked blurry), drawn at each file's own proportions (`imageRatio`). react-pdf embeds the file once however many pages draw it, so the report stays under 400 KB. Bundled byte-for-byte copies in `src/lib/tools/pdf/brand/` are the fallback, and the tool emails use byte-for-byte copies in `public/email/` (`pacemakers-logo.png` colour, `pacemakers-logo-on-navy.png` white), drawn at 22px high with explicit width and height attributes. **Replace all four copies when Header Settings changes the logo.** The PDF copies are traced into the PDF routes next to the fonts (`next.config.ts`).
+- **Branding is never silently missing**: `renderValuationReport` fetches branding itself when `meta.branding` is left out, so a render without it still has the logo, the founder block and the contact details; pass `null` only to render deliberately without them. The website address is always `SITE_ADDRESS`, printed in full as `https://www.pacemakersglobal.com` (since 2026-09-21), never the environment, so a local render cannot print localhost. Every absolute link a PDF or tool email carries (booking links and their QR code, the alert's dashboard link, the email footers) is built on `SITE_HREF` for the same reason. The cover's market data label is the one for the data behind the figures (`result.meta.dataVersion`).
+- An absolutely positioned block that reaches into the page's bottom padding must be `fixed`, or react-pdf keeps moving it to a new page and never finishes the render.
+
+**Adding a tool report.**
+1. Fetch branding with `fetchReportBranding()` and resolve it with `withBrandDefaults`.
+2. Build a `ReportDetails` (tool name from the registry, company or person, date).
+3. Compose `ReportCover`, then `ReportPage`s, then `ClosingPage` with `PartnerBlock`, `ServicesGrid` and `BookingPanel`, from `Section`, `DataTable`, `KeyValues`, `Tiles`, `KpiRow`, `Callout` and `PdfChart` with `REPORT_CHART_PALETTE`. No colours or page chrome in the tool's own file.
+4. Emails: `baseLayoutBranded(body, { variant: 'report' })` gives the letterhead shell (the original colour logo `public/email/pacemakers-logo.png`, green and navy accent, legal line). The contact, password and testimonial emails keep the site shell, and `email_branding` overrides apply to the site shell only.
+5. Add the footer, colour and logo checks for the new report, as `verify-tool-email-pdf` does for the valuation report.
+
+The letterhead's legal line reads "LLP Act, 2007"; reports use the Act's actual year, 2017, as the site's legal pages do.
+
+### Go-live record
+
+**2026-09-16.** Business Valuation version 2 and the Tools nav item went live.
+
+| Item | State at go-live |
+|---|---|
+| Code | `feat/tools-v2` merged to main as `f7bf9ce`, then `fix/verifier-prod-guard` as `4e1e03a`; `/api/health` matched HEAD each time |
+| Business Valuation | Live, switched by the owner at /admin/tools (13:55 UTC) |
+| Tools nav item | `site_pages` row "Tools", `/tools`, order 25 after Financial Modeler Pro, visible; Contact moved to 26 |
+| Migrations | 080 applied. **081 did not reach this database**: both runs went to another Supabase project (the first failed on an `updated_at` column this table has, the second changed nothing here). The row it describes was written directly, with the owner's approval, to the same effect. Check the Financial Modeler Pro project's `site_pages` for a stray hidden Tools row |
+| Leads | All 7 tool leads and their 46 events deleted with approval: every one was testing, including one created by a verifier posting to production after the tool went Live. `contact_submissions` untouched (7) |
+| Logged-out checks | Navbar and phone menu show Tools; footer shows Free Tools; /tools lists Business Valuation; the tool page loads on desktop and phone with no console errors; service page CTA; sitemap lists /tools and /tools/business-valuation; WebApplication JSON-LD present; webhook refuses a missing or wrong token (401); visibility verifier over HTTP 103 of 103 |
+
+**Scripts that write never run against production.** Every script that sends
+POST, PUT, PATCH or DELETE calls `refuseWritesAgainstProduction`
+(`scripts/lib/productionGuard.mjs`) and exits 2 against pacemakersglobal.com or a
+`*.vercel.app` deployment, which shares the production database. There is no
+override. `npm run verify-production-guard` proves it without sending a request.
+Production checks are GET only: `VERIFY_BASE=https://www.pacemakersglobal.com
+EXPECT_LIVE=business-valuation EXPECT_TOOLS_NAV=on npm run verify-tools-visibility`.
+
+### Privacy
+
+`PRIVACY_TOOLS_DRAFT.md` holds proposed policy wording and open questions for
+counsel (retention period, tracking consent). The live `/privacy` was not
+changed. Settle it before switching a tool Live.
+
+## 8. SEO and OG
+
+### Metadata
+
+Per-page metadata via Next.js `generateMetadata`. Read from `cms_pages` (meta_title, meta_description, og_image_url) with sensible defaults from `site_settings`.
+
+### OG Image Route
+
+`/api/og/route.tsx` generates a dynamic OG card using `next/og` (satori). Default content reads from page_sections of the home page hero, falling back to cms_content, falling back to hardcoded brand defaults. Logo is fetched from branding_config.logo_url, converted SVG → PNG via sharp if needed, and embedded as base64.
+
+Pattern matches FMP's `/api/og/main`. Image is 1200x630, navy background, white text, logo top-left, headline center, tagline below.
+
+### Sitemap and Robots
+
+```typescript
+// src/app/sitemap.ts
+export default async function sitemap() {
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://pacemakersglobal.com';
+  const services = SERVICES.map(s => ({ url: `${baseUrl}/services/${s.slug}`, lastModified: new Date() }));
+  return [
+    { url: baseUrl, lastModified: new Date() },
+    { url: `${baseUrl}/services`, lastModified: new Date() },
+    ...services,
+    { url: `${baseUrl}/sectors`, lastModified: new Date() },
+    // /approach removed 2026-08-12, see the sitemap table above.
+    { url: `${baseUrl}/network`, lastModified: new Date() },
+    { url: `${baseUrl}/about`, lastModified: new Date() },
+    { url: `${baseUrl}/financial-modeler-pro`, lastModified: new Date() },
+    { url: `${baseUrl}/contact`, lastModified: new Date() },
+    // /team, /case-studies and /insights are conditional, not listed: since
+    // 2026-08-13 each appears only while its collection has rows. All three are
+    // empty, so the live sitemap carries 19 URLs. Deriving it from the content
+    // rather than a hardcoded list means the first entry written into a
+    // collection puts its page back with no code change, which is the state
+    // this repository has twice had to remember to undo by hand.
+  ];
+}
+
+// src/app/robots.ts
+export default function robots() {
+  return {
+    rules: [{ userAgent: '*', allow: '/', disallow: ['/admin', '/api'] }],
+    sitemap: `${process.env.NEXT_PUBLIC_SITE_URL}/sitemap.xml`,
+  };
+}
+```
+
+### Structured Data
+
+Add JSON-LD organization schema in root layout:
+
+```typescript
+const orgSchema = {
+  '@context': 'https://schema.org',
+  '@type': 'FinancialService',
+  name: 'PaceMakers Business Consultants',
+  url: 'https://pacemakersglobal.com',
+  logo: 'https://pacemakersglobal.com/logo.png',
+  description: 'Boutique corporate finance and transaction advisory firm serving KSA, GCC, and worldwide mandates.',
+  areaServed: ['Saudi Arabia', 'GCC', 'Worldwide'],
+  // ... contact, address etc. from site_settings
+};
+```
+
+---
+
+## 9. Branding and Design
+
+### Color Palette
+
+Derived from the PMBC logo (navy + green + thin gold accent):
+
+| Token | Hex | Usage |
+|-------|-----|-------|
+| `--color-primary` | `#1B3A5F` | Navy. Primary background, headers, hero. |
+| `--color-primary-deep` | `#14304F` | Deeper navy for contrast layers, footers, panels. |
+| `--color-secondary` | `#3FA663` | Green. Accent for CTAs, success states, highlights. |
+| `--color-accent` | `#C69C3E` | Gold. Sparingly used for premium accent: borders, dividers, badges. |
+| `--color-accent-muted` | `#A88530` | Muted gold for uppercase eyebrow text and secondary accents. |
+
+**Live token values are in `src/app/globals.css` (`--pmbc-*`) and mirrored in `src/lib/public/tokens.ts`. Keep the two in sync.** Phase 11 retuned the palette: primary navy `#153D64` to `#1B3A5F` (warmer, less black), deep navy `#0F2F4F` to `#14304F`, gold `#D4A93A` to `#C69C3E` (richer, less bright), muted gold `#B89530` to `#A88530`. Cream `#FAF7F2` unchanged. The hero radial gradient was re-anchored on these tokens (`#1F4269` / `#1B3A5F` / `#14304F`); its old stops bottomed out at `#0C2741`, which was the main reason the hero read as too dark.
+| `--color-text-primary` | `#0F1B2D` | Body text on light. |
+| `--color-text-on-dark` | `#E8EEF5` | Body text on navy. |
+| `--color-muted` | `#6B7280` | Secondary text, captions. |
+| `--color-surface` | `#FFFFFF` | Default light surface. |
+| `--color-surface-alt` | `#F7F9FC` | Alternate light surface for section separation. |
+
+Critical positioning point: PMBC's design language should feel **distinct from FMP**. FMP is approachable and modern (a learning platform). PMBC is institutional and senior (a credibility document for family offices). Both can share base colors but the way they're used should differ. PMBC leans more on:
+
+- Heavier use of navy (deeper, more authoritative)
+- More whitespace
+- Larger type sizes
+- More serif accents (consider Source Serif Pro or similar for headlines, paired with Inter for body)
+- Less green (FMP uses green liberally; PMBC uses it sparingly as a credibility accent)
+- Gold thread used minimally for premium signaling
+
+### Empty is not absent
+
+**A section's copy is read through `sectionCopy` in `src/lib/public/sectionCopy.ts`, never with `||`.** The two states mean different things and a truthiness check collapses them:
+
+- **Key absent**: the section predates the field, or was added by hand in the builder. Fall back to the wording the page shipped with, so an older row still renders a complete page.
+- **Key present and empty**: an operator cleared the field and saved. That is an instruction to remove the line, and the renderer renders nothing.
+
+This was a real bug, twice. `form_response_note` was cleared on `/contact` in migration 065 and came back on every request; the booking callout's three fields were cleared in the builder on 2026-08-16 and did the same. In both cases the save succeeded, the row held empty strings, and the page put the defaults back, which from the operator's side is indistinguishable from a save that failed.
+
+Composite blocks drop whole when every field in them is cleared, rather than leaving a frame around nothing: the `/contact` booking callout, the `/contact` founder card, and the `/book` alternatives block.
+
+### Rich text (`.pmbc-prose`)
+
+**This project does not install `@tailwindcss/typography`, and must not start using `prose` classes.** Tailwind's preflight resets everything to `margin: 0`, so before 2026-08-02 every `prose` / `prose-neutral` / `prose-invert` class in the codebase was a no-op and all CMS body copy rendered with zero spacing between paragraphs, site-wide. The replacement is a hand-written `.pmbc-prose` layer at the end of `src/app/globals.css`: paragraph and list spacing, serif headings on PMBC's scale, gold list markers and blockquote rule, gold-underlined links, and a `p:empty` rule so a deliberate blank line from the editor survives.
+
+- Use `pmbc-prose` on any element rendering operator HTML. Add `pmbc-prose-invert` on navy sections.
+- `PROSE_MEASURE` (780px) in `src/lib/public/prose.ts` is the shared column width for long-form copy, roughly 70 characters at the 17px body size. Section backgrounds still span the full 1200px container; only the text column narrows.
+- `paragraphs` sections carry an optional `align` (`left` default, plus `center` / `right` / `justify`). Justified copy also gets `pmbc-prose-justify`, which turns on automatic hyphenation.
+- Inline `margin` is deliberately **not** allowlisted in the sanitiser. Paragraph rhythm is a stylesheet concern; letting one operator edit set arbitrary margins would break the vertical rhythm unpredictably. `text-align`, `color` and `font-size` are allowlisted.
+- **Empty paragraphs are removed, not styled.** Word, Google Docs and TipTap all express a blank line between paragraphs as an empty `<p></p>`, which is redundant here because `.pmbc-prose p` already carries a bottom margin. Left in, they double or triple the gap, and since authors are inconsistent about inserting them the column loses its rhythm. `collapseEmptyParagraphs` in `src/lib/cms/richText.ts` drops them, and it runs in three places: inside `sanitizeRichHtml` at render (so existing content is correct with no admin work), on the `page_sections` save path (so stored content matches what renders), and as a one-off backfill in migration 036. A paragraph containing only an image or other void element is **not** treated as empty. **Never give `p:empty` height in CSS**, which was tried once and stacked a full line box on top of both adjoining margins.
+- Normalisation happens at the save boundary, never in the editor's `onChange`: stripping an empty paragraph mid-keystroke would delete the one the author just created by pressing Enter, and fight the cursor.
+
+### Typography
+
+| Element | Font | Size | Weight |
+|---------|------|------|--------|
+| Hero headline | Source Serif Pro / Playfair Display | 56-72px | 600 |
+| Section headline | Source Serif Pro / Playfair Display | 36-48px | 600 |
+| Subheadline | Inter | 18-22px | 400 |
+| Body | Inter | 16-18px | 400 |
+| Caption / label | Inter | 12-14px | 500 (uppercase, tracked) |
+
+Decision pending on serif choice: present both during build phase. Both load via Google Fonts with `next/font`.
+
+### Layout Tokens
+
+- Max content width: 1200px everywhere, via `PAGE_GUTTER` + `PAGE_INNER` in `src/lib/public/layout.ts`. **Use those two constants rather than a fresh `max-w-[...]` literal.** The navbar and footer previously carried their own `max-w-[1280px] px-6 lg:px-8` while sections used `max-w-[1200px]` inside a `px-6` wrapper, so the logo sat 32px left of the content beneath it at 1440px. Matching the numbers alone would not have fixed it: a single element carrying both `max-w` and `px` puts padding *inside* the max width under `box-sizing: border-box`, while the section pattern puts it outside. Both halves are exported so every surface uses the same two-element structure. Heroes keep a narrower 1100px inner box on purpose; their text is centred, so that box is not a left-edge reference.
+
+  **Check this by measuring, not by reading.** `npm run verify-container-widths` drives headless Chrome over `/`, `/team`, `/services`, `/contact`, `/fmp`, `/sectors` and `/network` at 1440 and 1920, and asserts that every container in the header, the sections and the footer reports the same left edge and the same width. Which constants a file imports does not settle where the pixels land. It also asserts that the desktop nav does not close up against the CTA: the header container is capped at 1200px, so the room the nav has is fixed above 1248px, and adding one nav item too many silently spends it. Adding Team on 2026-08-15 left a 1px gap, which is why the nav gap went from `gap-9` to `gap-6` and the actions group gained `md:ml-6` as a floor. There is now 43px.
+
+  **A flush container does not guarantee a flush logo.** The brand box can start exactly on the container edge while the mark still looks indented, because the padding is inside the PNG and CSS cannot see transparent pixels. That is what was actually wrong: the two logo files carried roughly 490px of transparent margin down their left edges and were only 52.5% ink vertically, which put 22px of dead space before the mark. **Migration 060 fixed it at the source**, and the rule it leaves behind is that a logo file must be trimmed before it is uploaded.
+
+  **If the logo is ever replaced, five numbers move with it.** Every surface sizes this asset by height and lets the width follow, so a new file with a different aspect ratio silently resizes the mark everywhere. `logo_height_px` and `header_height_px` in Header Settings, `footer_logo_height_px` in the footer, the `width`/`height` pair in `src/app/api/og/route.tsx`, and the `height` attribute plus `max-height` in `src/lib/email/templates/_base.ts`. The email needs both halves because Outlook honours the attribute and ignores much of the style. `npm run seed-logo-trim` re-inspects the live files and reports what it would remove, so it is also the quickest way to check whether a newly uploaded logo carries padding.
+- Section vertical padding: 96px desktop, 80px tablet, 64px mobile, via `SECTION_PADDING` in `src/lib/public/layout.ts`. The shipped value had drifted to `lg:py-32` (128px) and was brought back to the documented 96px in Phase 38. Heroes are separate: `HERO_FRAME` in the same file, 70vh with `py-16`, shared by `hero`, `PageHeroFallback` and `founder_hero`
+- Inner block padding: 32px
+- Card radius: 8px (less rounded than FMP's 12-16px to feel more institutional)
+
+---
+
+## 10. Environment Variables
+
+```bash
+# Supabase (new project, separate from FMP)
+SUPABASE_URL=
+SUPABASE_SERVICE_ROLE_KEY=
+SUPABASE_ANON_KEY=
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+
+# NextAuth
+NEXTAUTH_SECRET=
+NEXTAUTH_URL=https://pacemakersglobal.com
+NEXT_PUBLIC_SITE_URL=https://pacemakersglobal.com
+
+# Brevo (transactional email)
+BREVO_API_KEY=
+EMAIL_FROM_DEFAULT=info@pacemakersglobal.com
+EMAIL_FROM_NAME=PaceMakers Business Consultants
+EMAIL_TO_ADMIN=advisory@pacemakersglobal.com
+# Optional, overrides the From on the acknowledgement to the enquirer.
+EMAIL_FROM_CONTACT=
+
+# Financial Modeler Pro public content feed (server-only, no NEXT_PUBLIC_)
+# Powers /financial-modeler-pro/{modeling-hub,refm,training-hub}. The key is
+# FMP's own FMP_PUBLIC_API_KEY. FMP fails closed, so an unset key means PMBC
+# serves its stored copy, then the graceful notice.
+FMP_API_URL=https://app.financialmodelerpro.com
+FMP_API_KEY=
+
+# hCaptcha. NOT REQUIRED since 2026-08-16: the contact and testimonial forms use
+# a honeypot and a timing floor instead. The hCaptcha path is still wired and
+# dormant, so setting both of these turns it back on with no code change. Unset,
+# verifyHcaptcha passes everything through.
+HCAPTCHA_SECRET_KEY=
+NEXT_PUBLIC_HCAPTCHA_SITE_KEY=
+
+# Free tools (see "Free Tools")
+# Secret for hashing visitor IPs before they are stored for rate limiting. Any
+# long random string. Falls back to NEXTAUTH_SECRET when unset; changing it
+# resets rate limiting, nothing else.
+TOOL_LEAD_IP_SALT=
+# Shared secret in the Brevo webhook URL (?token=) or its Bearer header. Unset,
+# /api/webhooks/brevo refuses every request with 503.
+BREVO_WEBHOOK_TOKEN=
+
+# Bearer secret for the daily reminder cron (/api/cron/tool-reminders). Vercel sends it
+# automatically once set. Unset, the route answers 503 and no reminders are sent.
+CRON_SECRET=
+
+# Optional
+NEXT_PUBLIC_GA_ID=
+```
+
+---
+
+## 11. Build Sequence
+
+**Complete.** Phases 1 to 8 shipped between 2026-04-30 and 2026-05-03, and every
+phase since has been an improvement on a working site rather than a step in the
+original plan. Phase 9 is the only one still open, and everything left in it is
+operational: see the launch checklist above.
+
+The original nine-phase plan, including what each phase was scoped to deliver,
+moved to [`PHASE_HISTORY.md`](./PHASE_HISTORY.md) on 2026-08-16.
+
+## 12. What's NOT in v1 (Phase 2 Backlog)
+
+Document this list at project kickoff so you don't accidentally build any of it. Each item should be revisited only when there's a real need or a real piece of content to support it.
+
+> **Update (Phase 10, 2026-06-10):** Articles/Insights and Case Studies are now BUILT (see the Phase 10 row in `PHASE_HISTORY.md`); `PACEMAKERS_ADMIN_CMS_SPEC.md` re-scoped them in as managed collections. The two bullets marked **(BUILT Phase 10)** below are retained for history; they render empty/graceful until real content is added.
+
+- **Articles / Blog (BUILT Phase 10)**: now a managed `articles` table, admin at `/admin/articles`, public `/insights` + `/insights/[slug]`. The original deferral (mirror/syndicate from FMP) is superseded; PMBC now authors its own insights. Cross-posting from FMP remains an option but is not wired.
+- **Newsletter subscriber list**: No email capture for marketing in v1. Contact form only.
+- **Case study detail pages (BUILT Phase 10)**: `case_studies` table, admin at `/admin/case-studies`, public `/case-studies` + `/case-studies/[slug]` with a headline-metrics (`metrics` JSONB) block. Still needs real anonymized write-ups before anything renders publicly.
+- **Multi-language (Arabic)**: Add `/ar/*` routes only if KSA market response demands it. Significant content work.
+- **Client portal**: Probably never. PMBC clients get deliverables via email/secure file transfer.
+- **Booking integration**: Direct Calendly or Microsoft Bookings link in contact section is enough. No embedded booking widget.
+- **AI features**: No content suggestions, no chatbot, no AI-generated services pages.
+- **Search**: Site is small enough that nav suffices.
+- **Comments / community features**: No.
+- **Pricing pages**: PMBC engagements are bespoke. No published pricing.
+
+---
+
+## 13. Cross-Property Content (PMBC ↔ FMP)
+
+PMBC and FMP are fully separate codebases and Supabase projects. They do not share data. They are linked only by hyperlinks.
+
+### From PMBC to FMP
+
+- The `/financial-modeler-pro` page on PMBC introduces FMP and ends with a primary CTA "Visit Financial Modeler Pro" → links to `https://financialmodelerpro.com`
+- Footer column "Platform" includes a link to FMP
+- The About / Founder block on PMBC mentions FMP as Ahmad's platform. **Since 2026-08-02 the full bio lives on PMBC's own `/about/ahmad-din`,** not on FMP. The home founder card links there ("Read the full profile"). See the reversal note under Critical Reminder 4.
+
+### From FMP to PMBC
+
+(Already exists.) FMP's home page has a "Powered by PaceMakers Business Consultants" section with a "Visit PaceMakers" button → links to `https://pacemakersglobal.com`.
+
+### Articles (Phase 2)
+
+When articles are added: they live on FMP (which already has the articles infrastructure). PMBC will either link to FMP article pages directly, or syndicate selected articles by manual cross-posting. Decision deferred until there's actual published content.
+
+---
+
+## 14. Code Patterns and Conventions
+
+### Server vs Client Components
+
+Default to server components. Use `'use client'` only for:
+- Forms with user interaction (contact form, admin editors)
+- Components with browser-only APIs (Tiptap, drag-and-drop)
+- Interactive UI primitives (modal, dropdown)
+
+### Data Fetching
+
+All public page data fetched in server components via `lib/cms/*` helpers. No client-side fetching for content. Admin pages may use client-side mutations via API routes.
+
+### Error Handling
+
+Public pages: graceful degradation. If CMS fetch fails, show fallback content from `config/site.ts`. Never break the page.
+
+Admin pages: surface errors clearly with toast notifications (use a small custom toast or `sonner`).
+
+API routes: structured error responses `{ error: string, code?: string }` with appropriate HTTP status codes.
+
+### Type Safety
+
+Generate Supabase types: `npx supabase gen types typescript --project-id <id> > src/types/database.ts`. Re-run after every migration. Use `Database` type for all Supabase queries.
+
+### File Naming
+
+- Components: PascalCase (`Hero.tsx`, `ServiceCards.tsx`)
+- Utilities: camelCase (`slugify.ts`, `formatDate.ts`)
+- Routes: kebab-case folders (`page-builder`, `contact-submissions`)
+- API routes: kebab-case (`/api/contact-submissions`)
+
+### Commit Messages
+
+Conventional Commits style: `feat:`, `fix:`, `chore:`, `docs:`, `refactor:`. Keep scope concise. Example: `feat(admin): add contact submissions table`.
+
+---
+
+## 15. Critical Reminders
+
+0. **"PMBC" never appears in public copy.** The firm is PaceMakers to a reader, and PMBC is a name for this repository, the Vercel project and these documents. The abbreviation had reached one live surface, the closing eyebrow on all nine service detail pages, and was removed on 2026-08-16. **Composed copy needs the same care:** the heading beneath that eyebrow was built as `Discuss a {title.toLowerCase()} mandate` and produced "Discuss a m&a advisory mandate" on three of the nine pages. Use `withIndefiniteArticle` from `src/lib/public/grammar.ts` rather than a hardcoded "a", and never lowercase a proper title.
+1. ~~**PMBC is a credibility document, not a lead engine.** Every decision should be evaluated against this. Heavy SEO content and lead magnets are not v1.~~ **Partly reversed 2026-09-16 by explicit instruction: free tools are part of the site.** A tool is a lead magnet by design, which is exactly what this rule excluded, so the reversal is recorded rather than the rule quietly deleted. What survives of it: the site is still a credibility document first, a tool is published only when it is good enough to carry the firm's name (every tool ships Hidden and is switched Live by hand at /admin/tools), and quality of inbound still outranks volume, which is why each lead records the planned deal size and a below-minimum flag. Heavy SEO content remains out of scope.
+2. **Design feels institutional, not modern-startup.** No gradient backgrounds, no animated icons, no playful microcopy. Senior, considered, calm.
+3. **Honest credentials only, and the firm's are not the partner's.** PMBC's own track record is 30+ mandates since 2017 across biofuel, oil and gas, waste management, data centers, construction, and industrial services. Ahmad's broader career (200+ engagements, 200+ valuations, SAR 20B+ real estate NAV, SAR 300M+ deployed via equity research, ACWA Power, Saudi Aramco-backed projects) is attributed to him as a professional and lives in his credentials, never in a firm statistic. **Migration 044 fixed a live instance of exactly this**: home and about were presenting his career totals as PMBC's track record. Keep the two separate.
+
+3b. **Delivery model, as reflected in the copy since 2026-08-10.** The partner wins and leads every mandate and reviews all work personally; analysts and associates are engaged per engagement; there is no permanent pyramid and no junior handoff. **Individual analysts are never named.** Sky Gulf and Lynkers are referral, origination and market-access relationships only: they do not execute mandates. The site previously called Sky Gulf an "Execution Partner", which was the most misleading claim on it.
+4. ~~**No duplication of FMP's founder content.** Link out to FMP for the deep professional bio.~~ **Reversed 2026-08-02 by explicit instruction.** PMBC now hosts its own founder profile at `/about/ahmad-din`, mirroring the structure of FMP's page of the same path. The reasoning for the original rule still deserves a hearing, so it is recorded rather than deleted: two near-identical bios on two domains is duplicate content, and it splits the SEO signal for "Ahmad Din" between them. The counter-argument that won: PMBC is the parent entity and the credibility document for family offices, and sending a prospective client off-site to a training platform to find out who is leading their mandate is worse than the SEO cost. **The two pages are deliberately not identical**: PMBC's carries "Why PaceMakers" (advisory positioning) where FMP's carries "Why Financial Modeler Pro" (platform positioning), and PMBC omits FMP's Notable Projects and booking-led CTAs. If both pages ever converge on identical copy, revisit this, and consider a canonical pointing at PMBC as the parent entity.
+5. **Pakistan is operational headquarters, not the marketing-front geography.** Lead with KSA and GCC. Lahore is mentioned only as where the analytical work happens.
+6. **CMS-first.** Every public page section should be editable from the admin panel. If something is hardcoded, it should be a deliberate exception (privacy/terms only).
+7. **One admin user.** Ahmad. Don't build user management, role hierarchies, or invite flows in v1.
+8. **Match FMP's quality bar, not its complexity.** Clean migration discipline, typed Supabase queries, server-first rendering, branded emails, OG images. But no Apps Script, no dual auth, no quizzes, no certificates.
+
+---
+
+End of technical handoff. Read this in full before starting any new task. Update this file as architectural decisions are made or change.
+
+---
+
+## Where the rest of the history lives
+
+This file is loaded into context at the start of every session, so it carries the
+current state and nothing else. Two companion files carry the past, and both were
+split out for that reason:
+
+| File | What it holds | Read it when |
+|------|---------------|--------------|
+| [`PHASE_HISTORY.md`](./PHASE_HISTORY.md) | One row per phase, as written at the time: what was wrong, what was chosen instead, and what the verification measured. | You need to know **why** something is the way it is before changing it. |
+| [`SESSION_LOG.md`](./SESSION_LOG.md) | The chronological account of each working session, including what was tried and abandoned. | You are picking up mid-thread, or want the reasoning behind a decision in narrative form. |
+
+Neither was edited on the way across. A claim about what was true in June stays a
+claim about June, which is the point of keeping them.
+
+**Keep this file current, and keep it short.** When a phase lands, add one line to
+the status table here and the full row to `PHASE_HISTORY.md`. On 2026-08-13 this
+file was 177KB, of which 75KB was a phase table nobody needed in full on most
+sessions and 25KB was migration rationale that already lived in the migration
+files' own headers. It is now under half that.

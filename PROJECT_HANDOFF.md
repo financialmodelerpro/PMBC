@@ -29,7 +29,7 @@ Two bugs were found and fixed along the way that predate the parity work: the un
 
 Two design-language notes: Phase 9.5 established the token layer (`src/lib/public/tokens.ts`, `SectionContainer`, three background variants with sequence-aware resolution). Phase 11 retuned the values to primary navy `#1B3A5F`, deep navy `#14304F`, cream `#FAF7F2`, gold `#C69C3E`, muted gold `#A88530`, cream-on-navy `#E8DDC4`, and re-anchored the hero gradient. Phase 11 also fixed the admin structure to match FMP: `/admin/page-builder` is the pages list, `/admin/pages` is the navbar menu editor over the `site_pages` table, and nav editing was removed from `/admin/header-settings` so the navbar has one source of truth.
 
-**Remaining before launch:** production env vars on Vercel (without `BREVO_API_KEY` the contact form saves to the inbox but sends no email); rotate the `Admin@2026` dev password; DNS and SSL for `pacemakersglobal.com`; counsel review of Privacy and Terms, then remove the badge; submit the sitemap to Search Console; refresh the Supabase Security Advisor; real asset uploads (logo, founder photo, network image, partner logos); and content for the four empty collections (Case Studies, Insights, Testimonials, Team), which degrade gracefully to empty until then. **There is also a genuine client enquiry from 2026-06-21 sitting unread in the inbox.** See the "Remaining Before Launch" checklist in `CLAUDE.md` for owners per item.
+**Remaining before launch:** production env vars on Vercel (without `BREVO_API_KEY` the contact form saves to the inbox but sends no email); rotate the [retired admin password] dev password; DNS and SSL for `pacemakersglobal.com`; counsel review of Privacy and Terms, then remove the badge; submit the sitemap to Search Console; refresh the Supabase Security Advisor; real asset uploads (logo, founder photo, network image, partner logos); and content for the four empty collections (Case Studies, Insights, Testimonials, Team), which degrade gracefully to empty until then. **There is also a genuine client enquiry from 2026-06-21 sitting unread in the inbox.** See the "Remaining Before Launch" checklist in `CLAUDE.md` for owners per item.
 
 ---
 
@@ -189,7 +189,7 @@ The FMP founder page (`financialmodelerpro.com/about/ahmad-din`) is the canonica
 3. **Claude (in chat)** drafts content for each page as Phase 9 progresses, section angles confirmed first, then full copy written, per stated working preference.
 4. **Claude Code** continues all coding, scaffolding, and feature implementation against `CLAUDE.md`.
 5. **Before launch:**
-   - Rotate `Admin@2026` (the dev seed password for `meetahmadch@gmail.com`) to a strong production credential via `npm run seed-admin`. With RLS now on `admin_users`, the dashboard table editor cannot insert; the seed script (which uses the service-role key) is the right path.
+   - Rotate [retired admin password] (the dev seed password for `meetahmadch@gmail.com`) to a strong production credential via `npm run seed-admin`. With RLS now on `admin_users`, the dashboard table editor cannot insert; the seed script (which uses the service-role key) is the right path.
    - DNS + SSL on Vercel for the apex and `www`.
    - Production env vars populated (`NEXT_PUBLIC_SITE_URL`, `BREVO_API_KEY`, `EMAIL_FROM_*`, `EMAIL_TO_ADMIN`, `HCAPTCHA_*`, Supabase service role key).
    - Sitemap submitted to Google Search Console.
