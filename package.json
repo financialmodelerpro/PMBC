@@ -79,9 +79,11 @@
     "verify-tool-followup": "node scripts/verify-tool-followup.mjs",
     "verify-growth-data": "node scripts/verify-growth-data.mjs",
     "verify-growth-kb": "node scripts/verify-growth-kb.mjs",
-    "verify-growth-settings": "node scripts/verify-growth-settings.mjs"
+    "verify-growth-settings": "node scripts/verify-growth-settings.mjs",
+    "verify-growth-ai": "node scripts/verify-growth-ai.mjs"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.127.0",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",

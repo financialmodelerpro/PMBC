@@ -4,7 +4,13 @@
  * `getGrowthSettings` is how every later unit reads its limits. It reports
  * whether the row was read; when it was not, callers that send or spend must
  * refuse to act rather than fall back to the defaults.
+ *
+ * Row 1 is the one real settings row. Row 2 exists only for verifiers
+ * (migration 087, marked is_test) so tests never touch the real row.
  */
+
+export const REAL_SETTINGS_ROW = 1;
+export const TEST_SETTINGS_ROW = 2;
 
 import { isMissingSchema } from '@/lib/tools/db';
 
@@ -38,10 +44,10 @@ function fromRow(r: Row): GrowthSettings {
   };
 }
 
-export async function getGrowthSettings(): Promise<SettingsRead> {
+export async function getGrowthSettings(rowId: number = REAL_SETTINGS_ROW): Promise<SettingsRead> {
   try {
-    let { data, error } = await growthDb().from('growth_settings').select(COLUMNS_086).eq('id', 1).maybeSingle();
-    if (missingPriority(error)) ({ data, error } = await growthDb().from('growth_settings').select(COLUMNS).eq('id', 1).maybeSingle());
+    let { data, error } = await growthDb().from('growth_settings').select(COLUMNS_086).eq('id', rowId).maybeSingle();
+    if (missingPriority(error)) ({ data, error } = await growthDb().from('growth_settings').select(COLUMNS).eq('id', rowId).maybeSingle());
     if (error) return { settings: DEFAULT_SETTINGS, source: isMissingSchema(error) ? 'missing' : 'error', updatedAt: null, updatedBy: null, error: error.message ?? null };
     if (!data) return { settings: DEFAULT_SETTINGS, source: 'missing', updatedAt: null, updatedBy: null, error: 'The settings row is missing' };
     const row = data as unknown as Row;
@@ -58,13 +64,14 @@ export type SettingsWrite = { ok: true; settings: GrowthSettings } | { ok: false
  * trigger logs each changed field's old and new value with the actor.
  * `isTest` marks a verifier's change so its log rows are test rows.
  */
-export async function updateGrowthSettings(input: SettingsInput, actor: Actor, opts: { isTest?: boolean } = {}): Promise<SettingsWrite> {
+export async function updateGrowthSettings(input: SettingsInput, actor: Actor, opts: { isTest?: boolean; rowId?: number } = {}): Promise<SettingsWrite> {
+  const rowId = opts.rowId ?? REAL_SETTINGS_ROW;
   const meta = { updated_by: actor.id, updated_by_name: actor.name, last_change_is_test: Boolean(opts.isTest) };
-  let { data, error } = await growthDb().from('growth_settings').update({ ...input, ...meta }).eq('id', 1).select(COLUMNS_086).maybeSingle();
+  let { data, error } = await growthDb().from('growth_settings').update({ ...input, ...meta }).eq('id', rowId).select(COLUMNS_086).maybeSingle();
   if (missingPriority(error)) {
     // Before migration 086: save everything else, and keep the priority list at its default.
     const { priority_services: _unused, ...before086 } = input;
-    ({ data, error } = await growthDb().from('growth_settings').update({ ...before086, ...meta }).eq('id', 1).select(COLUMNS).maybeSingle());
+    ({ data, error } = await growthDb().from('growth_settings').update({ ...before086, ...meta }).eq('id', rowId).select(COLUMNS).maybeSingle());
   }
   if (error) {
     if (isMissingSchema(error)) return { ok: false, status: 503, error: 'The settings table is missing. Apply 085_growth_settings.sql.' };

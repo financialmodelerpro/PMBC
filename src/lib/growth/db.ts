@@ -27,6 +27,8 @@ export const GROWTH_TABLE_MIGRATIONS = {
   growth_kb_items: '084_growth_knowledge_base.sql',
   growth_settings: '085_growth_settings.sql',
   growth_suppressions: '085_growth_settings.sql',
+  growth_ai_usage: '087_growth_ai_usage.sql',
+  growth_ai_alerts: '087_growth_ai_usage.sql',
 } as const;
 export type GrowthTable = keyof typeof GROWTH_TABLE_MIGRATIONS;
 export const GROWTH_TABLES = Object.keys(GROWTH_TABLE_MIGRATIONS) as GrowthTable[];
