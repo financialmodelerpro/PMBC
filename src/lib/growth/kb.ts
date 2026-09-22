@@ -19,6 +19,8 @@ import {
   approvalProblems,
   approvedSnapshot,
   cleanKbContent,
+  cleanRelatedServices,
+  SITE_SERVICE_OPTIONS,
   kbKind,
   validSiteServiceSlug,
   type KbContent,
@@ -39,6 +41,7 @@ export type KbItem = {
   content: KbContent;
   site_service_slug: string | null;
   case_study_id: string | null;
+  related_service_slugs: string[];
   status: KbStatus;
   approved_title: string | null;
   approved_content: KbSnapshot | null;
@@ -51,13 +54,20 @@ export type KbItem = {
 
 export type Actor = { id: string; name: string };
 
-const COLUMNS =
+/** Without related_service_slugs, for a database where migration 086 has not run. */
+const COLUMNS_BEFORE_086 =
   'id, created_at, updated_at, is_test, kind, item_key, sort_order, title, content, site_service_slug, case_study_id, status, approved_title, approved_content, approved_at, approved_by, approved_by_name, updated_by, updated_by_name';
+
+const missingRelated = (error: { message?: string } | null) => Boolean(error && /related_service_slugs/.test(error.message ?? ''));
+const withRelated = (rows: unknown[]) => (rows as KbItem[]).map((r) => ({ ...r, related_service_slugs: r.related_service_slugs ?? [] }));
+
+const COLUMNS =
+  'id, created_at, updated_at, is_test, kind, item_key, sort_order, title, content, site_service_slug, case_study_id, related_service_slugs, status, approved_title, approved_content, approved_at, approved_by, approved_by_name, updated_by, updated_by_name';
 
 /** True when an approved item's working copy differs from what was approved. */
 export function hasUnapprovedEdits(item: KbItem): boolean {
   if (!item.approved_content || item.approved_title === null) return false;
-  const snap = approvedSnapshot({ kind: item.kind, title: item.title, content: item.content, site_service_slug: item.site_service_slug, case_study_id: item.case_study_id });
+  const snap = approvedSnapshot({ kind: item.kind, title: item.title, content: item.content, site_service_slug: item.site_service_slug, case_study_id: item.case_study_id, related_service_slugs: item.related_service_slugs });
   return item.title !== item.approved_title || JSON.stringify(snap) !== JSON.stringify(item.approved_content);
 }
 
@@ -65,21 +75,26 @@ export type KbList = { items: KbItem[]; missingTable: boolean; error: string | n
 
 export async function listKbItems(filters: { kind?: KbKind | null; status?: KbStatus | null; includeTest?: boolean } = {}): Promise<KbList> {
   try {
-    let q = growthDb().from('growth_kb_items').select(COLUMNS).order('kind').order('sort_order').order('created_at');
-    if (filters.kind) q = q.eq('kind', filters.kind);
-    if (filters.status) q = q.eq('status', filters.status);
-    if (!filters.includeTest) q = q.eq('is_test', false);
-    const { data, error } = await q;
+    const run = (cols: string) => {
+      let q = growthDb().from('growth_kb_items').select(cols).order('kind').order('sort_order').order('created_at');
+      if (filters.kind) q = q.eq('kind', filters.kind);
+      if (filters.status) q = q.eq('status', filters.status);
+      if (!filters.includeTest) q = q.eq('is_test', false);
+      return q;
+    };
+    let { data, error } = await run(COLUMNS);
+    if (missingRelated(error)) ({ data, error } = await run(COLUMNS_BEFORE_086));
     if (error) return { items: [], missingTable: isMissingSchema(error), error: isMissingSchema(error) ? null : error.message };
-    return { items: (data ?? []) as KbItem[], missingTable: false, error: null };
+    return { items: withRelated(data ?? []), missingTable: false, error: null };
   } catch (err) {
     return { items: [], missingTable: false, error: err instanceof Error ? err.message : 'load failed' };
   }
 }
 
 export async function getKbItem(id: string): Promise<KbItem | null> {
-  const { data } = await growthDb().from('growth_kb_items').select(COLUMNS).eq('id', id).maybeSingle();
-  return (data as KbItem | null) ?? null;
+  let { data, error } = await growthDb().from('growth_kb_items').select(COLUMNS).eq('id', id).maybeSingle();
+  if (missingRelated(error)) ({ data, error } = await growthDb().from('growth_kb_items').select(COLUMNS_BEFORE_086).eq('id', id).maybeSingle());
+  return data ? withRelated([data])[0] : null;
 }
 
 export type KbActivity = { id: string; created_at: string; action: string; summary: string | null; actor_type: string; actor_id: string | null; metadata: Record<string, unknown> };
@@ -110,13 +125,23 @@ export async function listCaseStudyOptions(): Promise<CaseStudyOption[]> {
 
 export type KbWriteResult = { ok: true; item: KbItem } | { ok: false; status: number; error: string };
 
-function links(kind: KbKind, input: { site_service_slug?: string | null; case_study_id?: string | null }): { site_service_slug: string | null; case_study_id: string | null } | string {
+/**
+ * The links an item may carry, by kind. A service always links to its own
+ * site page, fixed by its key; an offer links to any of the nine services; a
+ * case study to its record. Anything else is dropped.
+ */
+function links(
+  kind: KbKind,
+  input: { case_study_id?: string | null; related_service_slugs?: string[] | null },
+  itemKey: string | null,
+): { site_service_slug: string | null; case_study_id: string | null; related_service_slugs: string[] } | string {
   const cfg = kbKind(kind);
-  const slug = input.site_service_slug ?? null;
-  if (cfg.link === 'site_service' && slug !== null && !validSiteServiceSlug(slug)) return 'Unknown public site service';
+  const related = input.related_service_slugs ?? [];
+  if (cfg.link === 'related_services' && related.some((slug) => !validSiteServiceSlug(slug))) return 'Unknown site service';
   return {
-    site_service_slug: cfg.link === 'site_service' ? slug : null,
+    site_service_slug: cfg.link === 'site_page' ? itemKey : null,
     case_study_id: cfg.link === 'case_study' ? input.case_study_id ?? null : null,
+    related_service_slugs: cfg.link === 'related_services' ? cleanRelatedServices(related) : [],
   };
 }
 
@@ -127,49 +152,42 @@ function writeError(error: { code?: string; message?: string }): KbWriteResult {
 }
 
 export async function createKbItem(
-  input: { kind: KbKind; title: string; content: unknown; site_service_slug?: string | null; case_study_id?: string | null },
+  input: { kind: KbKind; title: string; content: unknown; site_service_slug?: string | null; case_study_id?: string | null; related_service_slugs?: string[] | null },
   actor: Actor,
   opts: { isTest?: boolean } = {},
 ): Promise<KbWriteResult> {
   if (kbKind(input.kind).fixed) return { ok: false, status: 422, error: `${kbKind(input.kind).label} are fixed: edit the existing items` };
-  const l = links(input.kind, input);
+  const l = links(input.kind, input, null);
   if (typeof l === 'string') return { ok: false, status: 422, error: l };
-  const { data, error } = await growthDb()
-    .from('growth_kb_items')
-    .insert({
-      kind: input.kind,
-      title: input.title.trim(),
-      content: cleanKbContent(input.kind, input.content),
-      ...l,
-      is_test: Boolean(opts.isTest),
-      updated_by: actor.id,
-      updated_by_name: actor.name,
-    })
-    .select(COLUMNS)
-    .single();
+  const row = { kind: input.kind, title: input.title.trim(), content: cleanKbContent(input.kind, input.content), ...l, is_test: Boolean(opts.isTest), updated_by: actor.id, updated_by_name: actor.name };
+  let { data, error } = await growthDb().from('growth_kb_items').insert(row).select(COLUMNS).single();
+  if (missingRelated(error)) {
+    const { related_service_slugs: _unused, ...before086 } = row;
+    ({ data, error } = await growthDb().from('growth_kb_items').insert(before086).select(COLUMNS_BEFORE_086).single());
+  }
   if (error) return writeError(error);
-  return { ok: true, item: data as KbItem };
+  return { ok: true, item: withRelated([data])[0] };
 }
 
 /** Edits the working copy only. An approved item stays approved, on its approved copy. */
 export async function editKbItem(
   id: string,
-  input: { title: string; content: unknown; site_service_slug?: string | null; case_study_id?: string | null },
+  input: { title: string; content: unknown; site_service_slug?: string | null; case_study_id?: string | null; related_service_slugs?: string[] | null },
   actor: Actor,
 ): Promise<KbWriteResult> {
   const current = await getKbItem(id);
   if (!current) return { ok: false, status: 404, error: 'Item not found' };
   if (current.status === 'archived') return { ok: false, status: 409, error: 'Restore the item before editing it' };
-  const l = links(current.kind, input);
+  const l = links(current.kind, input, current.item_key);
   if (typeof l === 'string') return { ok: false, status: 422, error: l };
-  const { data, error } = await growthDb()
-    .from('growth_kb_items')
-    .update({ title: input.title.trim(), content: cleanKbContent(current.kind, input.content), ...l, updated_by: actor.id, updated_by_name: actor.name })
-    .eq('id', id)
-    .select(COLUMNS)
-    .single();
+  const patch = { title: input.title.trim(), content: cleanKbContent(current.kind, input.content), ...l, updated_by: actor.id, updated_by_name: actor.name };
+  let { data, error } = await growthDb().from('growth_kb_items').update(patch).eq('id', id).select(COLUMNS).single();
+  if (missingRelated(error)) {
+    const { related_service_slugs: _unused, ...before086 } = patch;
+    ({ data, error } = await growthDb().from('growth_kb_items').update(before086).eq('id', id).select(COLUMNS_BEFORE_086).single());
+  }
   if (error) return writeError(error);
-  return { ok: true, item: data as KbItem };
+  return { ok: true, item: withRelated([data])[0] };
 }
 
 /**
@@ -183,7 +201,7 @@ export async function actOnKbItem(id: string, action: 'approve' | 'archive' | 'r
   let patch: Record<string, unknown>;
   if (action === 'approve') {
     if (current.status === 'archived') return { ok: false, status: 409, error: 'Restore the item before approving it' };
-    const draft = { kind: current.kind, title: current.title, content: current.content, site_service_slug: current.site_service_slug, case_study_id: current.case_study_id };
+    const draft = { kind: current.kind, title: current.title, content: current.content, site_service_slug: current.site_service_slug, case_study_id: current.case_study_id, related_service_slugs: current.related_service_slugs };
     const problems = approvalProblems(draft);
     if (problems.length) return { ok: false, status: 422, error: `Not ready to approve: ${problems.join('; ')}` };
     patch = {
@@ -201,14 +219,12 @@ export async function actOnKbItem(id: string, action: 'approve' | 'archive' | 'r
     if (current.status !== 'archived') return { ok: true, item: current };
     patch = { status: 'draft' };
   }
-  const { data, error } = await growthDb()
-    .from('growth_kb_items')
-    .update({ ...patch, updated_by: actor.id, updated_by_name: actor.name })
-    .eq('id', id)
-    .select(COLUMNS)
-    .single();
+  const write = (cols: string) => growthDb().from('growth_kb_items').update({ ...patch, updated_by: actor.id, updated_by_name: actor.name }).eq('id', id).select(cols).single();
+  // PostgREST refuses an unknown column before running the update, so the retry cannot write twice.
+  let { data, error } = await write(COLUMNS);
+  if (missingRelated(error)) ({ data, error } = await write(COLUMNS_BEFORE_086));
   if (error) return writeError(error);
-  return { ok: true, item: data as KbItem };
+  return { ok: true, item: withRelated([data])[0] };
 }
 
 export type ApprovedKbItem = {
@@ -219,7 +235,10 @@ export type ApprovedKbItem = {
   content: KbContent;
   approvedAt: string;
   approvedBy: string | null;
-  siteService?: { slug: string } | null;
+  /** A service's own site page. */
+  siteService?: { slug: string; title: string; href: string } | null;
+  /** An offer's related services, with their site pages. */
+  relatedServices?: { slug: string; title: string; href: string }[];
   caseStudy?: CaseStudyOption | null;
 };
 
@@ -254,11 +273,16 @@ export async function getApprovedKnowledge(opts: { includeTest?: boolean } = {})
 
   for (const r of rows) {
     if (!r.approved_content || !r.approved_title || !r.approved_at) continue;
-    const { site_service_slug, case_study_id, ...content } = r.approved_content;
+    const { site_service_slug, case_study_id, related_service_slugs, ...content } = r.approved_content;
     const slug = typeof site_service_slug === 'string' ? site_service_slug : null;
     const caseId = typeof case_study_id === 'string' ? case_study_id : null;
     const item: ApprovedKbItem = { id: r.id, kind: r.kind, key: r.item_key, title: r.approved_title, content: content as KbContent, approvedAt: r.approved_at, approvedBy: r.approved_by_name };
-    if (kbKind(r.kind).link === 'site_service') item.siteService = slug ? { slug } : null;
+    const page = (s: string) => {
+      const svc = SITE_SERVICE_OPTIONS.find((o) => o.slug === s);
+      return svc ? { slug: svc.slug, title: svc.title, href: `/services/${svc.slug}` } : null;
+    };
+    if (kbKind(r.kind).link === 'site_page') item.siteService = slug ? page(slug) : null;
+    if (kbKind(r.kind).link === 'related_services') item.relatedServices = (Array.isArray(related_service_slugs) ? related_service_slugs : []).map(page).filter((x): x is NonNullable<typeof x> => x !== null);
     if (kbKind(r.kind).link === 'case_study') item.caseStudy = caseId ? cases.get(caseId) ?? null : null;
     out[r.kind].push(item);
   }

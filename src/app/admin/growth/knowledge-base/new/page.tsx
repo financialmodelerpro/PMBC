@@ -25,7 +25,7 @@ export default async function NewKbItemPage(props: { searchParams: Promise<Recor
       </Link>
       <div style={{ height: 12 }} />
       <AdminPageHeader eyebrow="Knowledge Base" title={`New ${cfg.singular.toLowerCase()}`} description={`${cfg.purpose} It starts as a draft: AI agents do not read it until you approve it.`} />
-      <KbEditor item={{ id: null, kind, title: '', content: {}, site_service_slug: null, case_study_id: null, status: 'draft' }} caseStudies={caseStudies} />
+      <KbEditor item={{ id: null, kind, title: '', content: {}, site_service_slug: null, case_study_id: null, related_service_slugs: [], status: 'draft' }} caseStudies={caseStudies} />
     </>
   );
 }

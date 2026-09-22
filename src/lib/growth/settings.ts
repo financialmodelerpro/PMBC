@@ -16,8 +16,10 @@ export type SettingsRead = { settings: GrowthSettings; source: 'database' | 'mis
 
 const COLUMNS =
   'daily_cold_email_cap, send_timezone, send_days, send_start, send_end, follow_up_days, max_follow_ups, ai_monthly_budget_usd, ai_alert_threshold_pct, ai_alert_email, retention_months, updated_at, updated_by_name';
+const COLUMNS_086 = `${COLUMNS}, priority_services`;
+const missingPriority = (error: { message?: string } | null) => Boolean(error && /priority_services/.test(error.message ?? ''));
 
-type Row = Omit<GrowthSettings, 'ai_monthly_budget_usd'> & { ai_monthly_budget_usd: number | string | null; updated_at: string; updated_by_name: string | null };
+type Row = Omit<GrowthSettings, 'ai_monthly_budget_usd' | 'priority_services'> & { priority_services?: string[]; ai_monthly_budget_usd: number | string | null; updated_at: string; updated_by_name: string | null };
 
 function fromRow(r: Row): GrowthSettings {
   return {
@@ -32,12 +34,14 @@ function fromRow(r: Row): GrowthSettings {
     ai_alert_threshold_pct: r.ai_alert_threshold_pct,
     ai_alert_email: r.ai_alert_email,
     retention_months: r.retention_months,
+    priority_services: r.priority_services ?? [...DEFAULT_SETTINGS.priority_services],
   };
 }
 
 export async function getGrowthSettings(): Promise<SettingsRead> {
   try {
-    const { data, error } = await growthDb().from('growth_settings').select(COLUMNS).eq('id', 1).maybeSingle();
+    let { data, error } = await growthDb().from('growth_settings').select(COLUMNS_086).eq('id', 1).maybeSingle();
+    if (missingPriority(error)) ({ data, error } = await growthDb().from('growth_settings').select(COLUMNS).eq('id', 1).maybeSingle());
     if (error) return { settings: DEFAULT_SETTINGS, source: isMissingSchema(error) ? 'missing' : 'error', updatedAt: null, updatedBy: null, error: error.message ?? null };
     if (!data) return { settings: DEFAULT_SETTINGS, source: 'missing', updatedAt: null, updatedBy: null, error: 'The settings row is missing' };
     const row = data as unknown as Row;
@@ -55,12 +59,13 @@ export type SettingsWrite = { ok: true; settings: GrowthSettings } | { ok: false
  * `isTest` marks a verifier's change so its log rows are test rows.
  */
 export async function updateGrowthSettings(input: SettingsInput, actor: Actor, opts: { isTest?: boolean } = {}): Promise<SettingsWrite> {
-  const { data, error } = await growthDb()
-    .from('growth_settings')
-    .update({ ...input, updated_by: actor.id, updated_by_name: actor.name, last_change_is_test: Boolean(opts.isTest) })
-    .eq('id', 1)
-    .select(COLUMNS)
-    .maybeSingle();
+  const meta = { updated_by: actor.id, updated_by_name: actor.name, last_change_is_test: Boolean(opts.isTest) };
+  let { data, error } = await growthDb().from('growth_settings').update({ ...input, ...meta }).eq('id', 1).select(COLUMNS_086).maybeSingle();
+  if (missingPriority(error)) {
+    // Before migration 086: save everything else, and keep the priority list at its default.
+    const { priority_services: _unused, ...before086 } = input;
+    ({ data, error } = await growthDb().from('growth_settings').update({ ...before086, ...meta }).eq('id', 1).select(COLUMNS).maybeSingle());
+  }
   if (error) {
     if (isMissingSchema(error)) return { ok: false, status: 503, error: 'The settings table is missing. Apply 085_growth_settings.sql.' };
     if (error.code === '23514') return { ok: false, status: 422, error: 'The database refused a value outside its limits' };

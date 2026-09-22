@@ -66,12 +66,15 @@ check('default follow-ups 4, 10, 20 and max 3 in both', JSON.stringify(D.follow_
 check('default threshold 80 and alert email in both', D.ai_alert_threshold_pct === 80 && D.ai_alert_email === 'ahmad.din@pacemakersglobal.com' && sql.includes('DEFAULT 80') && sql.includes("DEFAULT 'ahmad.din@pacemakersglobal.com'"));
 check('budget has no default: null until set', D.ai_monthly_budget_usd === null && /ai_monthly_budget_usd NUMERIC\(10, 2\) CHECK/.test(sql));
 check('default retention 12 months in both', D.retention_months === 12 && sql.includes('retention_months INTEGER NOT NULL DEFAULT 12'));
+const sql086 = fs.readFileSync(path.join(root, 'supabase/migrations/086_growth_nine_services.sql'), 'utf8');
+check('default priority services: the five, in both', JSON.stringify(D.priority_services) === JSON.stringify(['financial-modeling', 'business-valuation', 'financial-due-diligence', 'mergers-acquisitions', 'refm']) && sql086.includes("DEFAULT ARRAY['financial-modeling', 'business-valuation', 'financial-due-diligence', 'mergers-acquisitions', 'refm']::TEXT[]"));
 const L = sm.SETTINGS_LIMITS;
 check('limits match the migration', sql.includes(`BETWEEN ${L.dailyCap.min} AND ${L.dailyCap.max}`) && sql.includes(`BETWEEN ${L.thresholdPct.min} AND ${L.thresholdPct.max}`) && sql.includes(`BETWEEN ${L.retentionMonths.min} AND ${L.retentionMonths.max}`) && sql.includes(`BETWEEN ${L.maxFollowUps.min} AND ${L.maxFollowUps.max}`) && sql.includes(`<= ${L.budgetUsd.max}`));
 check('SAFE TO APPLY, RLS and revoke in the migration', /^-- SAFE TO APPLY:/m.test(sql) && sql.includes('ALTER TABLE growth_settings ENABLE ROW LEVEL SECURITY;') && sql.includes('ALTER TABLE growth_suppressions ENABLE ROW LEVEL SECURITY;') && sql.includes('REVOKE ALL ON TABLE growth_settings, growth_suppressions FROM anon, authenticated;'));
 {
   const ok = { ...D, ai_monthly_budget_usd: null };
   check('defaults pass the form schema', sm.settingsSchema.safeParse(ok).success);
+  check('no priority services is allowed', sm.settingsSchema.safeParse({ ...ok, priority_services: [] }).success);
   const bad = {
     'cap 0': { daily_cold_email_cap: 0 },
     'cap 501': { daily_cold_email_cap: 501 },
@@ -87,6 +90,8 @@ check('SAFE TO APPLY, RLS and revoke in the migration', /^-- SAFE TO APPLY:/m.te
     'threshold 101': { ai_alert_threshold_pct: 101 },
     'bad alert email': { ai_alert_email: 'not an email' },
     'retention 0': { retention_months: 0 },
+    'an unknown priority service': { priority_services: ['financial-modeling', 'feasibility_study'] },
+    'a priority service twice': { priority_services: ['refm', 'refm'] },
   };
   for (const [label, patch] of Object.entries(bad)) check(`form refuses ${label}`, !sm.settingsSchema.safeParse({ ...ok, ...patch }).success);
   check('parseDayList reads "4, 10, 20"', JSON.stringify(sm.parseDayList('4, 10, 20')) === '[4,10,20]' && Number.isNaN(sm.parseDayList('4, x')[1]));
@@ -201,14 +206,14 @@ async function writePhase(svc) {
     check('import is safe to run again (adds nothing new)', again.added === 0 && again.errors.length === 0);
 
     // Settings: a logged test change, then restored exactly.
-    const changed = { ...original.settings, daily_cold_email_cap: original.settings.daily_cold_email_cap === 11 ? 12 : 11, retention_months: original.settings.retention_months === 6 ? 7 : 6, ai_alert_threshold_pct: original.settings.ai_alert_threshold_pct === 75 ? 76 : 75 };
+    const changed = { ...original.settings, daily_cold_email_cap: original.settings.daily_cold_email_cap === 11 ? 12 : 11, retention_months: original.settings.retention_months === 6 ? 7 : 6, ai_alert_threshold_pct: original.settings.ai_alert_threshold_pct === 75 ? 76 : 75, priority_services: original.settings.priority_services.includes('cfo-advisory') ? original.settings.priority_services.filter((x) => x !== 'cfo-advisory') : [...original.settings.priority_services, 'cfo-advisory'] };
     const w1 = await settingsLib.updateGrowthSettings(changed, actor, { isTest: true });
     check('settings change saved', w1.ok, w1.error);
     const { data: log1 } = await svc.from('growth_activity').select('action, is_test, actor_id, metadata').eq('action', 'settings.changed').gte('created_at', runStart).order('created_at').order('seq');
     const entry = (log1 ?? [])[0];
     const c = entry?.metadata?.changes ?? {};
     check('settings change logged as a test row, with who', entry && entry.is_test === true && entry.actor_id === actor.id && entry.metadata.actor_name === actor.name);
-    check('log holds old and new for each changed field, and only those', c.daily_cold_email_cap?.old === original.settings.daily_cold_email_cap && c.daily_cold_email_cap?.new === changed.daily_cold_email_cap && c.retention_months?.new === changed.retention_months && c.ai_alert_threshold_pct?.new === changed.ai_alert_threshold_pct && Object.keys(c).length === 3, JSON.stringify(c));
+    check('log holds old and new for each changed field, and only those', c.daily_cold_email_cap?.old === original.settings.daily_cold_email_cap && c.daily_cold_email_cap?.new === changed.daily_cold_email_cap && c.retention_months?.new === changed.retention_months && c.ai_alert_threshold_pct?.new === changed.ai_alert_threshold_pct && JSON.stringify(c.priority_services?.new) === JSON.stringify(changed.priority_services) && Object.keys(c).length === 4, JSON.stringify(c));
     const w2 = await settingsLib.updateGrowthSettings(original.settings, actor, { isTest: true });
     const back = await settingsLib.getGrowthSettings();
     check('settings restored exactly', w2.ok && JSON.stringify(back.settings) === JSON.stringify(original.settings));
@@ -225,6 +230,7 @@ async function writePhase(svc) {
       'day 7': { send_days: [7] },
       'upper-case alert email': { ai_alert_email: 'AHMAD@EXAMPLE.COM' },
       'another timezone': { send_timezone: 'UTC' },
+      'an unknown priority service': { priority_services: ['financial-modeling', 'feasibility_study'] },
     };
     for (const [label, patch] of Object.entries(invalid)) {
       const { error } = await svc.from('growth_settings').update({ ...patch, last_change_is_test: true }).eq('id', 1);
