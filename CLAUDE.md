@@ -69,7 +69,7 @@ Single Next.js App Router application (^15), one domain, no subdomain routing: t
 ## 5. Database and migrations
 
 - Migrations live in `supabase/migrations/`, three-digit prefix, one logical change each. **Never edit a migration after it has been applied.** Read a migration's header before re-running it.
-- **DDL migrations (031, 032, 033, 072, 076, 077, 082) must be pasted into the Supabase SQL editor by hand**: supabase-js cannot run DDL and there is no direct Postgres connection string. Everything else is DML applied by its `npm run` script, most with `--dry-run`.
+- **DDL migrations (031, 032, 033, 072, 076, 077, 082, 083) must be pasted into the Supabase SQL editor by hand**: supabase-js cannot run DDL and there is no direct Postgres connection string. Everything else is DML applied by its `npm run` script, most with `--dry-run`.
 - **034, 048 and 049 are destructive on re-run** (they delete and reinsert).
 - **Every migration from 076 on states a `SAFE TO APPLY:` line** in its header: before or after which deploy, and what the site does in the gap. Previews share the production database, so applying early can publish links to routes not yet deployed (075 did exactly that).
 - **Code that reads new columns or tables degrades safely when the migration has not run.** Keep that true for every new one.
@@ -85,7 +85,7 @@ Single Next.js App Router application (^15), one domain, no subdomain routing: t
 
 ## 7. Admin console
 
-- **Roles: `admin` and `editor`.** The line is deletion: an editor can create, edit and hide anything, but cannot delete, and cannot open Site Settings, Header Settings, Footer Links, Users or the Audit Log. Keep it to these two roles; no role hierarchies or invite flows.
+- **Roles: `admin` and `editor`.** The line is deletion: an editor can create, edit and hide anything, but cannot delete, and cannot open Site Settings, Header Settings, Footer Links, Users, the Audit Log or the Growth Engine. Keep it to these two roles; no role hierarchies or invite flows.
 - **Only the route check counts.** The middleware and the admin layout redirect (from `ADMIN_ONLY_PREFIXES` in `src/lib/auth/adminAccess.ts`) and the UI hides controls via `AdminRoleProvider`, but every API route checks for itself. **`getAdminSession` means any signed-in staff member**: an admin-only route uses `requireOwner` (403, not 401), and delete paths use `canDelete`.
 - Every `/api/admin/*` route: session gate (401 when absent), zod-validated body, an `audit_log` row on success. Errors are `{ error: string }` with a non-2xx status. The settings-style routes accept `PATCH` and a legacy `POST`.
 - **Admin pages use inline styles from `src/lib/admin/styles.ts`, not Tailwind**, so public-site work cannot restyle the console.
