@@ -13,11 +13,14 @@
 // and refuses to overwrite a rotated credential; this script sets a new,
 // strength-checked password on an existing row.
 //
-//   node scripts/rotate-admin-password.mjs
+// Interactive: run with no variable set and type the password at the hidden
+// prompt, twice.
 //   npm run rotate-admin-password
 //
-// Non-interactive (CI, or a shell where you have disabled history):
-//   ADMIN_NEW_PASSWORD='...' node scripts/rotate-admin-password.mjs
+// Non-interactive (CI, or a shell where you have disabled history): export
+// ADMIN_NEW_PASSWORD first, from a secret store or a hidden read, then run the
+// script, and unset it afterwards. Never write the value inline in the command.
+//   npm run rotate-admin-password
 //
 // Target a different admin with ADMIN_EMAIL=someone@example.com.
 

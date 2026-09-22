@@ -290,7 +290,7 @@ cases and rasterises every page to PNG for inspection.
 5. Checks in `verify-valuation-v2` for the item on its own and absent, then `verify-valuation-engine` to prove the neutral path.
 
 **Verifiers.** `verify-valuation-engine` (518: 514 reference parity plus 4 on the market data passed into the reference),
-`verify-valuation-v2` (517), `verify-tool-lead-api` (146), `verify-tool-followup` (48), `verify-report-layout` (see above),
+`verify-valuation-v2` (875), `verify-tool-lead-api` (146), `verify-tool-followup` (48), `verify-report-layout` (see above),
 `verify-valuation-dashboard` (453, the results page end to end, with the phone field lined up with the fields above it, the year end month, P/E and the resume link, at 1440, 1024 and 390, including the partner portrait's 4:5 frame and source ratio,
 against a local `next start`, every /api/ request intercepted so nothing is
 written), `verify-tool-email-pdf` (414, pdfjs text and operator list, including the report theme's footer, colour and logo rules, so a ligature glyph is
