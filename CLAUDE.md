@@ -1037,7 +1037,7 @@ not started is refused; the year still running is allowed and takes no stub.
 
 ### Leads by person, reminders and save and return
 
-Added 2026-09-21 (`feat/valuation-crm`). Proved by `npm run verify-tool-followup` (48; 54 with `VERIFY_BASE`, GET only).
+Added 2026-09-21 (`feat/valuation-crm`). Proved by `npm run verify-tool-followup` (48; 53 with `VERIFY_BASE`, GET only).
 
 - **One person is one email.** `/admin/tool-leads` lists people (`listPeople`, `groupLeadsByEmail` in `src/lib/tools/admin.ts`, matched case-insensitively), each valuation a **project** under them, named by its company or "Your business". Lead counts count each email once (`countPeople`); `/admin/tools` shows valuations beside them. Existing rows group the same way with no migration: nothing is merged in the database.
 - **Phone and country** (migration 082), both optional, on the name and email step. **The phone field is the contact form's own component** (`src/components/public/PhoneField.tsx`: the searchable country picker above the number, joined by `composePhone`, at most 40 characters as on the contact form), shared by both forms since 2026-09-21. The contact form keeps its own field style; the valuation step passes its `inputClass` (`inputClassName`) so the two boxes match its other fields. The country list is `src/lib/tools/contactCountries.ts`, GCC and Pakistan first; choosing one sets the phone picker (`isoForContactCountry`). Stored as `+966 50 123 4567`. Shown on the lead and in the internal alert. `contact_country` is the person's own country, not the company's country of operations.
