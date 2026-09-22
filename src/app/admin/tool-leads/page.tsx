@@ -3,6 +3,7 @@ import Link from 'next/link';
 
 import { AdminPageHeader } from '@/components/admin/AdminPageHeader';
 import { MigrationNotice } from '@/components/admin/tools/MigrationNotice';
+import { type PersonView, ToolLeadsTable } from '@/components/admin/tools/ToolLeadsTable';
 import { TOOLS } from '@/config/tools';
 import {
   ADMIN_COLORS,
@@ -48,6 +49,9 @@ export default async function ToolLeadsPage(props: { searchParams: Promise<Recor
   const versions = await versionCounts(people.flatMap((p) => p.projects.map((x) => x.id)));
   const when = (iso: string) => new Date(iso).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
   const pages = Math.max(1, Math.ceil(total / LEAD_PAGE_SIZE));
+  // Whether a person's row may be hiding valuations: deleting a person always deletes all of them.
+  const filtered = Boolean(f.tool || f.from || f.to || f.deal || f.belowMin || f.email || !f.includeTest);
+  const view: PersonView[] = people.map((p) => toView(p, versions, when));
   const pageHref = (p: number) => {
     const q = new URLSearchParams();
     for (const [k, v] of Object.entries(search)) if (typeof v === 'string' && v && k !== 'page') q.set(k, v);
@@ -61,7 +65,7 @@ export default async function ToolLeadsPage(props: { searchParams: Promise<Recor
         <AdminPageHeader
           eyebrow="Leads"
           title="Tool Leads"
-          description="One lead per email. Each valuation a person runs is a project under them, named by its company; emailed versions and save and return runs are versions of a project. Inputs and results are stored exactly as the visitor was shown them."
+          description="One lead per email. Each valuation a person runs is a project under them, named by its company; emailed versions and save and return runs are versions of a project. Inputs and results are stored exactly as the visitor was shown them. Open a lead with its arrow to see its valuations. Deleting a lead removes every valuation under its email."
         />
         {missingTable && (
           <MigrationNotice migration="077_tool_leads.sql" table="tool_leads" effect="Visitors still see their results, but nothing is saved or emailed until it is applied." />
@@ -131,32 +135,7 @@ export default async function ToolLeadsPage(props: { searchParams: Promise<Recor
           </Link>
         </form>
 
-        <div style={{ ...adminCard, padding: 0, overflowX: 'auto' }}>
-          <table style={adminTable}>
-            <thead style={adminThead}>
-              <tr>
-                <th style={adminTh}>Lead / project</th>
-                <th style={adminTh}>Contact</th>
-                <th style={adminTh}>Tool and deal size</th>
-                <th style={{ ...adminTh, textAlign: 'right' }}>Base case</th>
-                <th style={adminTh}>Email</th>
-                <th style={adminTh}>Latest</th>
-              </tr>
-            </thead>
-            <tbody>
-              {people.length === 0 && (
-                <tr>
-                  <td colSpan={6} style={{ ...adminTd, color: ADMIN_COLORS.textMuted, textAlign: 'center', padding: 28 }}>
-                    {missingTable ? 'No table yet.' : 'No leads match these filters.'}
-                  </td>
-                </tr>
-              )}
-              {people.map((p) => (
-                <PersonRows key={p.email} person={p} versions={versions} when={when} />
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <ToolLeadsTable people={view} filtered={filtered} emptyText={missingTable ? 'No table yet.' : 'No leads match these filters.'} />
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, fontSize: 13, color: ADMIN_COLORS.textMuted }}>
           <span>
             {total} {total === 1 ? 'lead' : 'leads'} (one per email), {projects} {projects === 1 ? 'valuation' : 'valuations'}
@@ -177,54 +156,31 @@ export default async function ToolLeadsPage(props: { searchParams: Promise<Recor
   );
 }
 
-/** A person's row, then one row per project beneath it. */
-function PersonRows({ person: p, versions, when }: { person: Person; versions: Record<string, number>; when: (iso: string) => string }) {
-  return (
-    <>
-      <tr style={{ background: '#F7F9FC' }}>
-        <td style={adminTd}>
-          <div style={{ fontWeight: 700, color: ADMIN_COLORS.textHeading }}>{p.name}</div>
-          <div style={{ fontSize: 12, color: ADMIN_COLORS.textMuted }}>
-            {p.projects.length} {p.projects.length === 1 ? 'project' : 'projects'}
-            {p.bookingClicks > 0 ? `, booking clicks: ${p.bookingClicks}` : ''}
-          </div>
-          {p.isTest && <span style={adminBadge('warning')}>Test</span>}
-          {p.belowMinimum && <span style={{ ...adminBadge('neutral'), marginLeft: 4 }}>Below minimum</span>}
-        </td>
-        <td style={{ ...adminTd, fontSize: 13 }}>
-          <div>{p.email}</div>
-          <div style={{ color: ADMIN_COLORS.textMuted }}>
-            {p.phone || 'No phone'}
-            {p.contactCountry ? `, ${p.contactCountry}` : ''}
-          </div>
-        </td>
-        <td style={adminTd} colSpan={3} />
-        <td style={{ ...adminTd, fontSize: 13, whiteSpace: 'nowrap' }}>{when(p.latestAt)}</td>
-      </tr>
-      {p.projects.map((x) => {
-        const es = emailStatusLabel(x.email_status);
-        const v = versions[x.id] ?? 0;
-        return (
-          <tr key={x.id}>
-            <td style={{ ...adminTd, paddingLeft: 28 }}>
-              <Link href={`/admin/tool-leads/${x.id}`} style={{ fontWeight: 600, color: ADMIN_COLORS.primary, textDecoration: 'none' }}>
-                {x.projectName}
-              </Link>
-              <div style={{ fontSize: 12, color: ADMIN_COLORS.textMuted }}>{v ? `${v + 1} versions` : '1 version'}</div>
-            </td>
-            <td style={{ ...adminTd, fontSize: 12, color: ADMIN_COLORS.textMuted }}>{x.country ?? ''}</td>
-            <td style={{ ...adminTd, fontSize: 13 }}>
-              {TOOLS.find((t) => t.slug === x.tool_slug)?.name ?? x.tool_slug}
-              <div style={{ fontSize: 12, color: ADMIN_COLORS.textMuted }}>{dealSizeLabel(x.deal_size_band, x.country)}</div>
-            </td>
-            <td style={{ ...adminTd, fontSize: 13, textAlign: 'right', whiteSpace: 'nowrap' }}>{money(x.equity_mid, x.currency)}</td>
-            <td style={adminTd}>
-              <span style={adminBadge(es.tone)}>{es.label}</span>
-            </td>
-            <td style={{ ...adminTd, fontSize: 13, whiteSpace: 'nowrap' }}>{when(x.created_at)}</td>
-          </tr>
-        );
-      })}
-    </>
-  );
+/** A person and their valuations as plain values for the client table, newest valuation first. */
+function toView(p: Person, versions: Record<string, number>, when: (iso: string) => string): PersonView {
+  return {
+    email: p.email,
+    name: p.name,
+    contactLine: `${p.phone || 'No phone'}${p.contactCountry ? `, ${p.contactCountry}` : ''}`,
+    bookingClicks: p.bookingClicks,
+    belowMinimum: p.belowMinimum,
+    isTest: p.isTest,
+    latestLabel: when(p.latestAt),
+    valuations: p.projects.map((x) => {
+      const es = emailStatusLabel(x.email_status);
+      const v = versions[x.id] ?? 0;
+      return {
+        id: x.id,
+        projectName: x.projectName,
+        versionsLabel: v ? `${v + 1} versions` : '1 version',
+        country: x.country ?? '',
+        toolName: TOOLS.find((t) => t.slug === x.tool_slug)?.name ?? x.tool_slug,
+        dealLabel: dealSizeLabel(x.deal_size_band, x.country),
+        amount: money(x.equity_mid, x.currency),
+        emailLabel: es.label,
+        emailTone: es.tone,
+        createdLabel: when(x.created_at),
+      };
+    }),
+  };
 }
