@@ -10,6 +10,8 @@
 
 import { z } from 'zod';
 
+import { DEFAULT_PRIORITY_SERVICES, GROWTH_SERVICES, isGrowthService } from './model';
+
 export const SEND_TIMEZONE = 'Asia/Riyadh';
 
 /** 0 Sunday to 6 Saturday, as the database stores them. */
@@ -47,6 +49,8 @@ export type GrowthSettings = {
   ai_alert_threshold_pct: number;
   ai_alert_email: string;
   retention_months: number;
+  /** Site service slugs to prioritise in outreach (migration 086). */
+  priority_services: string[];
 };
 
 export const DEFAULT_SETTINGS: GrowthSettings = {
@@ -61,6 +65,7 @@ export const DEFAULT_SETTINGS: GrowthSettings = {
   ai_alert_threshold_pct: 80,
   ai_alert_email: 'ahmad.din@pacemakersglobal.com',
   retention_months: 12,
+  priority_services: [...DEFAULT_PRIORITY_SERVICES],
 };
 
 const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -95,6 +100,10 @@ export const settingsSchema = z
     ai_alert_threshold_pct: z.number().int().min(SETTINGS_LIMITS.thresholdPct.min).max(SETTINGS_LIMITS.thresholdPct.max),
     ai_alert_email: z.string().trim().toLowerCase().email('Enter a valid email address'),
     retention_months: z.number().int().min(SETTINGS_LIMITS.retentionMonths.min).max(SETTINGS_LIMITS.retentionMonths.max),
+    priority_services: z
+      .array(z.string().refine(isGrowthService, 'Not one of the site services'))
+      .max(GROWTH_SERVICES.length)
+      .refine((a) => new Set(a).size === a.length, 'A service is listed twice'),
   })
   .refine((s) => s.send_start < s.send_end, { message: 'The sending window must end after it starts', path: ['send_end'] })
   .refine((s) => s.max_follow_ups <= s.follow_up_days.length, { message: 'Maximum follow-ups cannot exceed the number of follow-up days', path: ['max_follow_ups'] });

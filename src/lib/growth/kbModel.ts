@@ -30,8 +30,12 @@ export type KbKindConfig = {
   fields: KbField[];
   /** Fixed kinds hold only their starter items: no new ones can be added. */
   fixed?: boolean;
-  /** The kind links to a public site service (services) or a case study record. */
-  link?: 'site_service' | 'case_study';
+  /**
+   * site_page: a service, linked to its own site page by its key (no mapping step).
+   * related_services: an offer, linked to any of the nine services.
+   * case_study: a case study, linked to its existing record.
+   */
+  link?: 'site_page' | 'related_services' | 'case_study';
 };
 
 export const KB_KINDS_LIST = [
@@ -57,9 +61,9 @@ export const KB_KINDS: readonly KbKindConfig[] = [
     label: 'Services',
     singular: 'Service',
     titleLabel: 'Service',
-    purpose: 'The six Growth services, each mapped to its related public site service.',
+    purpose: "The site's nine services, named as on the site and each linked to its own page.",
     fixed: true,
-    link: 'site_service',
+    link: 'site_page',
     fields: [
       { key: 'description', label: 'Description', type: 'textarea', required: true },
       { key: 'ideal_client', label: 'Ideal client', type: 'textarea', required: true },
@@ -73,8 +77,9 @@ export const KB_KINDS: readonly KbKindConfig[] = [
     label: 'Entry offers',
     singular: 'Entry offer',
     titleLabel: 'Offer',
-    purpose: 'The four entry offers, with scope, who each suits and its upsell path.',
+    purpose: 'The four entry offers, with scope, who each suits, its upsell path and the services it leads to.',
     fixed: true,
+    link: 'related_services',
     fields: [
       { key: 'scope', label: 'Scope', type: 'textarea', required: true },
       { key: 'suits', label: 'Who it suits', type: 'textarea', required: true },
@@ -174,9 +179,9 @@ export function isKbKind(value: unknown): value is KbKind {
 
 /** The four entry offers, created as drafts by migration 084. */
 export const KB_OFFER_KEYS = ['model_health_check', 'feasibility_study', 'valuation_report', 'investor_pack'] as const;
-/** The six service keys: the Growth service values. */
+/** The nine service keys: the site service slugs (config/services.ts). */
 export const KB_SERVICE_KEYS = GROWTH_SERVICES.map((s) => s.value);
-/** Public site services a Growth service can map to (config/services.ts). */
+/** The site's services, for an offer's related services and for display (config/services.ts). */
 export const SITE_SERVICE_OPTIONS = SERVICES.map((s) => ({ slug: s.slug, title: s.title }));
 
 export const KB_LIMITS = { title: 200, text: 300, textarea: 5000, listItem: 300, listItems: 40 } as const;
@@ -205,7 +210,7 @@ export function cleanKbContent(kind: KbKind, raw: unknown): KbContent {
   return out;
 }
 
-export type KbDraft = { kind: KbKind; title: string; content: KbContent; site_service_slug: string | null; case_study_id: string | null };
+export type KbDraft = { kind: KbKind; title: string; content: KbContent; site_service_slug: string | null; case_study_id: string | null; related_service_slugs?: string[] };
 
 /**
  * Why an item cannot be approved yet, or an empty list when it can. Approval
@@ -225,7 +230,7 @@ export function approvalProblems(item: KbDraft): string[] {
     const t = content as Record<string, string[]>;
     if (!t.decision_maker_titles?.length && !t.excluded_work?.length) problems.push('Add decision-maker titles or excluded work');
   }
-  if (cfg.link === 'site_service' && !item.site_service_slug) problems.push('Choose the related public site service');
+  if (cfg.link === 'site_page' && !validSiteServiceSlug(item.site_service_slug)) problems.push('This service is not one of the site services');
   if (cfg.link === 'case_study' && !item.case_study_id) problems.push('Choose the case study record');
   return problems;
 }
@@ -234,7 +239,8 @@ export function approvalProblems(item: KbDraft): string[] {
 export function approvedSnapshot(item: KbDraft): KbSnapshot {
   const content = cleanKbContent(item.kind, item.content);
   const cfg = kbKind(item.kind);
-  if (cfg.link === 'site_service') return { ...content, site_service_slug: item.site_service_slug };
+  if (cfg.link === 'site_page') return { ...content, site_service_slug: item.site_service_slug };
+  if (cfg.link === 'related_services') return { ...content, related_service_slugs: cleanRelatedServices(item.related_service_slugs) };
   if (cfg.link === 'case_study') return { ...content, case_study_id: item.case_study_id };
   return content;
 }
@@ -246,6 +252,7 @@ export const kbCreateSchema = z.object({
   content: z.record(z.string(), z.unknown()).default({}),
   site_service_slug: z.string().nullable().optional(),
   case_study_id: z.string().uuid().nullable().optional(),
+  related_service_slugs: z.array(z.string()).max(SERVICES.length).optional(),
 });
 
 export const kbEditSchema = z.object({
@@ -253,10 +260,17 @@ export const kbEditSchema = z.object({
   content: z.record(z.string(), z.unknown()),
   site_service_slug: z.string().nullable().optional(),
   case_study_id: z.string().uuid().nullable().optional(),
+  related_service_slugs: z.array(z.string()).max(SERVICES.length).optional(),
 });
 
 export const kbActionSchema = z.object({ action: z.enum(['approve', 'archive', 'restore']) });
 
 export function validSiteServiceSlug(slug: string | null | undefined): slug is string {
   return Boolean(slug) && SITE_SERVICE_OPTIONS.some((s) => s.slug === slug);
+}
+
+/** An offer's related services: known site services only, each once, in site order. */
+export function cleanRelatedServices(slugs: readonly string[] | null | undefined): string[] {
+  const wanted = new Set(slugs ?? []);
+  return SITE_SERVICE_OPTIONS.map((s) => s.slug).filter((slug) => wanted.has(slug));
 }

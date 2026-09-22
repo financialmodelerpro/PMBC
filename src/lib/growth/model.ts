@@ -2,23 +2,38 @@
  * The Growth Engine's data model (Unit 1.2, 2026-09-22): the value lists,
  * business rules and row shapes behind migration 083.
  *
- * Every list here is mirrored in a CHECK constraint in
- * `supabase/migrations/083_growth_core.sql`, and `npm run verify-growth-data`
- * fails if they drift. Change both together, the SQL by a new migration.
+ * Every list here is mirrored in a CHECK constraint in the Growth migrations
+ * (083, and 086 for services), and `npm run verify-growth-data` fails if they
+ * drift. Change both together, the SQL by a new migration.
  *
  * Pure: no database access, so verifiers and later units import it freely.
  */
 
-/** The six core services the Growth Engine sells. */
-export const GROWTH_SERVICES = [
-  { value: 'financial_modeling', label: 'Financial Modeling' },
-  { value: 'business_valuation', label: 'Business Valuation' },
-  { value: 'ma_modeling', label: 'M&A Modeling' },
-  { value: 'real_estate_modeling', label: 'Real Estate Modeling' },
-  { value: 'feasibility_study', label: 'Feasibility Studies' },
-  { value: 'financial_due_diligence', label: 'Financial Due Diligence' },
-] as const;
-export type GrowthService = (typeof GROWTH_SERVICES)[number]['value'];
+import { SERVICES } from '@/config/services';
+
+/**
+ * The Growth services are the public site's nine services (Unit 1.3b), read
+ * from src/config/services.ts so the two lists cannot drift. The value is the
+ * site slug, and each service's page is /services/<slug>.
+ */
+export const GROWTH_SERVICES: readonly { value: string; label: string; href: string }[] = SERVICES.map((s) => ({
+  value: s.slug,
+  label: s.title,
+  href: `/services/${s.slug}`,
+}));
+/** A site service slug. Checked at runtime against GROWTH_SERVICES; the database holds the same nine. */
+export type GrowthService = string;
+
+export function isGrowthService(value: unknown): value is GrowthService {
+  return typeof value === 'string' && GROWTH_SERVICES.some((s) => s.value === value);
+}
+
+export function growthServiceLabel(value: string): string {
+  return GROWTH_SERVICES.find((s) => s.value === value)?.label ?? value;
+}
+
+/** Priority services for outreach until Ahmad changes them in Settings (migration 086 default). */
+export const DEFAULT_PRIORITY_SERVICES: readonly string[] = ['financial-modeling', 'business-valuation', 'financial-due-diligence', 'mergers-acquisitions', 'refm'];
 
 /** Minimum deal size, SAR. Mirrored in the generated `growth_leads.below_minimum`. */
 export const MINIMUM_DEAL_SIZE_SAR = 50_000_000;

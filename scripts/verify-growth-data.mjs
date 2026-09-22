@@ -59,14 +59,16 @@ const same = (a, b) => JSON.stringify([...a].sort()) === JSON.stringify([...b].s
 
 console.log('1. Model matches the migration, rules and access');
 const sql = fs.readFileSync(path.join(root, 'supabase/migrations/083_growth_core.sql'), 'utf8');
-function checkList(column) {
-  const lists = [...sql.matchAll(new RegExp(`CHECK \\(${column} IN \\(([^)]*)\\)`, 'g'))].map((m) => [...m[1].matchAll(/'([^']+)'/g)].map((x) => x[1]));
+const sql086 = fs.readFileSync(path.join(root, 'supabase/migrations/086_growth_nine_services.sql'), 'utf8');
+function checkList(column, source = sql) {
+  const lists = [...source.matchAll(new RegExp(`CHECK \\(${column} IN \\(([^)]*)\\)`, 'g'))].map((m) => [...m[1].matchAll(/'([^']+)'/g)].map((x) => x[1]));
   return lists;
 }
 const values = (list) => list.map((x) => (typeof x === 'string' ? x : x.value));
-for (const [column, list, count] of [
-  ['likely_service', model.GROWTH_SERVICES, 1],
-  ['recommended_service', model.GROWTH_SERVICES, 1],
+// The service columns were redefined by 086 (the site's nine services); the rest are as 083 made them.
+for (const [column, list, count, source] of [
+  ['likely_service', model.GROWTH_SERVICES, 1, sql086],
+  ['recommended_service', model.GROWTH_SERVICES, 1, sql086],
   ['stage', model.PIPELINE_STAGES, 1],
   ['prospect_band', model.PROSPECT_BANDS, 1],
   ['lead_temperature', model.LEAD_TEMPERATURES, 1],
@@ -75,7 +77,7 @@ for (const [column, list, count] of [
   ['consent_status', model.CONSENT_STATUSES, 1],
   ['actor_type', model.ACTOR_TYPES, 1],
 ]) {
-  const lists = checkList(column);
+  const lists = checkList(column, source);
   check(`${column}: one CHECK list in the migration`, lists.length === count, String(lists.length));
   check(`${column}: model.ts matches the migration`, lists[0] && same(lists[0], values(list)), `${lists[0]} vs ${values(list)}`);
 }
@@ -86,7 +88,12 @@ for (const [column, list, count] of [
   check('company statuses match', statusLists.some((l) => same(l, values(model.COMPANY_STATUSES))));
   check('signal statuses match', statusLists.some((l) => same(l, values(model.SIGNAL_STATUSES))));
 }
-check('six core services', model.GROWTH_SERVICES.length === 6);
+{
+  const { SERVICES } = await jiti.import(path.join(root, 'src/config/services.ts'));
+  check('Growth services are the nine site services, same slugs, names and order', model.GROWTH_SERVICES.length === 9 && JSON.stringify(model.GROWTH_SERVICES.map((g) => [g.value, g.label, g.href])) === JSON.stringify(SERVICES.map((x) => [x.slug, x.title, `/services/${x.slug}`])));
+  check('priority default: the five outreach services, all site services', JSON.stringify([...model.DEFAULT_PRIORITY_SERVICES].sort()) === JSON.stringify(['business-valuation', 'financial-due-diligence', 'financial-modeling', 'mergers-acquisitions', 'refm']) && model.DEFAULT_PRIORITY_SERVICES.every(model.isGrowthService));
+  check('the old six-service values are gone from the model', !['financial_modeling', 'ma_modeling', 'real_estate_modeling', 'feasibility_study'].some(model.isGrowthService));
+}
 check('ten pipeline stages in the order given', values(model.PIPELINE_STAGES).join() === 'prospect,contacted,replied,qualified,meeting_booked,opportunity,proposal,won,lost,nurture');
 check('minimum deal size is SAR 50 million in both places', model.MINIMUM_DEAL_SIZE_SAR === 50_000_000 && sql.includes('deal_size_sar < 50000000'));
 check('default company country is Saudi Arabia in both places', model.DEFAULT_COMPANY_COUNTRY === 'Saudi Arabia' && sql.includes("country TEXT NOT NULL DEFAULT 'Saudi Arabia'"));
@@ -171,11 +178,12 @@ async function writePhase(svc) {
   try {
     // Company, with a domain given the way people paste it.
     const domain = model.normaliseDomain(`https://www.zz-growth-verify-${run}.example/about`);
-    const { data: company, error: cErr } = await svc.from('growth_companies').insert({ is_test: true, name: `${MARKER} Co ${run}`, website_domain: domain, sector: 'Real estate', city: 'Riyadh', likely_service: 'real_estate_modeling' }).select().single();
+    const { data: company, error: cErr } = await svc.from('growth_companies').insert({ is_test: true, name: `${MARKER} Co ${run}`, website_domain: domain, sector: 'Real estate', city: 'Riyadh', likely_service: 'refm' }).select().single();
     check('company created', !cErr && company, cErr?.message);
     if (!company) return;
     created.growth_companies.push(company.id);
     check('company country defaults to Saudi Arabia, status to new', company.country === 'Saudi Arabia' && company.status === 'new');
+    await expectError('an old six-service value is refused', svc.from('growth_companies').insert({ is_test: true, name: `${MARKER} Old service ${run}`, likely_service: 'real_estate_modeling' }), '23514');
     await expectError('duplicate domain refused', svc.from('growth_companies').insert({ is_test: true, name: `${MARKER} Dup ${run}`, website_domain: domain }), '23505');
     await expectError('un-normalised domain refused', svc.from('growth_companies').insert({ is_test: true, name: `${MARKER} Raw ${run}`, website_domain: `WWW.${domain}` }), '23514');
 
@@ -199,7 +207,7 @@ async function writePhase(svc) {
     await expectError('signal naming no company refused', svc.from('growth_signals').insert({ is_test: true, trigger_type: 'other', signal_date: '2026-09-20', summary: `${MARKER} nameless ${run}`, evidence_url: 'https://example.invalid/e' }), '23514');
 
     // Leads above and below the minimum.
-    const lead = (title, deal) => ({ is_test: true, company_id: company.id, contact_id: contact.id, title: `${MARKER} ${title} ${run}`, source: 'outbound', recommended_service: 'real_estate_modeling', deal_size_sar: deal, prospect_score: 72, prospect_band: 'good', lead_score: 40, lead_temperature: 'warm', score_reasons: ['Off-plan registration in Riyadh', 'CFO identified'] });
+    const lead = (title, deal) => ({ is_test: true, company_id: company.id, contact_id: contact.id, title: `${MARKER} ${title} ${run}`, source: 'outbound', recommended_service: 'refm', deal_size_sar: deal, prospect_score: 72, prospect_band: 'good', lead_score: 40, lead_temperature: 'warm', score_reasons: ['Off-plan registration in Riyadh', 'CFO identified'] });
     const { data: big, error: bErr } = await svc.from('growth_leads').insert(lead('Above', 120_000_000)).select().single();
     const { data: small, error: smErr } = await svc.from('growth_leads').insert(lead('Below', 12_500_000)).select().single();
     const { data: unknown, error: uErr } = await svc.from('growth_leads').insert(lead('Unknown', null)).select().single();
