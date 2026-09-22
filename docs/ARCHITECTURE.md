@@ -219,6 +219,7 @@ NextAuth credentials provider, JWT sessions of one hour (`SESSION_MAX_AGE_SECOND
 | `/admin/settings` | Misc site settings (analytics IDs, social URLs, etc.) |
 | `/admin/tools` | Free tools: Live or Hidden per tool (admin only to switch), lead counts, visibility history. See section 7b |
 | `/admin/tool-leads` | Leads from the free tools, one row per email with its valuations behind an arrow (closed by default), with filters (tool, dates, deal size, below minimum, email status, test leads), detail with stored inputs and results, email events, resend and PDF download. **Admins can delete** a lead, a single valuation, or several ticked leads, each behind a confirmation |
+| `/admin/growth` | Growth Engine (Unit 1.1, 2026-09-22): an empty section shell with its own sub-navigation over eleven pages (Home, Signals, Prospects, Outreach, Pipeline, Conversations, Meetings, Partners, Knowledge Base, Analytics, Settings), each stating its purpose and the build phase that delivers it. Pages are listed once in `src/lib/growth/pages.ts`; each page calls `requireGrowthSession` (`src/lib/growth/access.ts`) before rendering, on top of the middleware and admin layout. Open to admins and editors, like Tool Leads |
 
 ### Sidebar (`src/components/admin/CmsAdminNav.tsx`)
 
@@ -230,7 +231,7 @@ Single component handling both desktop and mobile chrome (no separate `AdminSide
 - Off-canvas drawer below 768px viewport with hamburger button + body-scroll lock + click-backdrop-to-close
 - Active state by exact-match OR prefix-match against per-item `matchPaths` (e.g. "Page Builder" stays highlighted while inside `/admin/page-builder/...`, "Inquiries" also matches `/admin/leads`)
 - Active item gets `#1B3A5F` background + **3px gold (`#C69C3E`) left border**
-- Group dividers labeled `Content` / `Collections` / `Leads` / `Email` / `System` (FMP-parity order set in Phase 11). `Collections` holds the PMBC-only Phase 10 tables that have no FMP counterpart.
+- Group dividers labeled `Content` / `Collections` / `Tools` / `Leads` / `Email` / `System` (FMP-parity order set in Phase 11), then `Growth` (Unit 1.1, 2026-09-22) after the existing entries. `Collections` holds the PMBC-only Phase 10 tables that have no FMP counterpart.
 - Footer: external links to `https://www.pacemakersglobal.com` (View Live Site) and `https://www.financialmodelerpro.com` (Visit FMP), both `target="_blank"`. Sign-out lives below those.
 
 ### Admin styling
