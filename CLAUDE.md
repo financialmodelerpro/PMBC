@@ -4,8 +4,13 @@ This file holds only what must be true in every session. Detail, examples and hi
 
 ## Reference files
 
+**Growth Engine work: read [`docs/GROWTH_ENGINE_STATUS.md`](./docs/GROWTH_ENGINE_STATUS.md) first.** It holds what is built, the standing rules, the verifiers, open items and what comes next.
+
+## Reference files
+
 | File | Read it before |
 |------|----------------|
+| [`docs/GROWTH_ENGINE_STATUS.md`](./docs/GROWTH_ENGINE_STATUS.md) | Any Growth Engine work: status, standing rules, verifiers, open items, next unit |
 | [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) | Changing the stack, folder layout, admin roles, auth, admin routes, the sidebar, the page builder, the Growth Engine and its Knowledge Base, or PMBC and FMP cross-links |
 | [`docs/DATABASE.md`](./docs/DATABASE.md) | Writing a migration, changing a table, or rebuilding the database (table index, migration order 001 to 082) |
 | [`docs/CMS.md`](./docs/CMS.md) | Adding or changing a section type, a public page, the navigation, the footer, or service slugs |
