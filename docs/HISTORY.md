@@ -5,7 +5,7 @@ Dated records moved out of `CLAUDE.md` on 2026-09-22, newest first. Session-by-s
 ## Open items
 
 - **Business valuation tool Live since 2026-09-16 while the privacy policy update is still pending with counsel. Must be closed.** (`PRIVACY_TOOLS_DRAFT.md`; the rule was "settle it before switching a tool Live", see the 2026-09-16 section below.)
-- **Replace hardcoded admin password fallback in seed-admin.mjs and the four smoke/verify scripts with an environment variable.** The four are `rotate-admin-password.mjs`, `smoke-admin.mjs`, `smoke-builder.mjs` and `verify-parity8.mjs`. The value is the retired password, dead since 2026-08-02; it was removed on 2026-09-22 from every markdown file except the untouched backup `docs/archive/CLAUDE.md.bak-2026-09-22`, and three saved permission rules carrying password values were removed from `.claude/settings.local.json`. It remains in git history.
+- ~~**Replace hardcoded admin password fallback in seed-admin.mjs and the four smoke/verify scripts with an environment variable.**~~ The four are `rotate-admin-password.mjs`, `smoke-admin.mjs`, `smoke-builder.mjs` and `verify-parity8.mjs`. The value is the retired password, dead since 2026-08-02; it was removed on 2026-09-22 from every markdown file (the backup `docs/archive/CLAUDE.md.bak-2026-09-22` in a follow-up the same day), and three saved permission rules carrying password values were removed from `.claude/settings.local.json`. It remains in git history. **Closed 2026-09-22:** the four scripts require `ADMIN_PASSWORD` with no fallback, and the rotation script holds the retired value only as a SHA-256 digest.
 - The tool open items listed in the handoff at the top of `SESSION_LOG.md`.
 
 ## 2026-09-22: CLAUDE.md split

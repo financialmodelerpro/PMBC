@@ -9,9 +9,9 @@
 // non-secret metadata: a hash prefix, a length, a timestamp.
 //
 // That constraint is why this exists alongside seed-admin.mjs rather than
-// replacing it. seed-admin.mjs hardcodes a known development password in the
-// file, which is fine for a throwaway debug credential and completely wrong for
-// a production one: it would put the live password in git history forever.
+// replacing it. seed-admin.mjs creates the first admin row from ADMIN_PASSWORD
+// and refuses to overwrite a rotated credential; this script sets a new,
+// strength-checked password on an existing row.
 //
 //   node scripts/rotate-admin-password.mjs
 //   npm run rotate-admin-password
@@ -23,6 +23,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { createHash } from 'node:crypto';
 import readline from 'node:readline';
 import { fileURLToPath } from 'node:url';
 import { createClient } from '@supabase/supabase-js';
@@ -34,6 +35,9 @@ const projectRoot = path.resolve(__dirname, '..');
 const DEFAULT_EMAIL = 'meetahmadch@gmail.com';
 const BCRYPT_COST = 12;
 const MIN_LENGTH = 16;
+/** The retired admin password, lowercased: SHA-256 digest and length only. */
+const RETIRED_SHA256 = '8b3ce0c3977ee6e8d53efeb1fb5b4f82bfb85e44b706c4eded197bd78875da67';
+const RETIRED_LENGTH = 10;
 
 /** Minimal .env.local loader, matching seed-admin.mjs so there is one pattern. */
 function loadEnvLocal() {
@@ -103,7 +107,7 @@ function promptHidden(question) {
  * This is a launch blocker being closed, not a formality: the credential it
  * replaces is a documented debug password sitting in public git history.
  */
-function assessStrength(pw) {
+export function assessStrength(pw) {
   const problems = [];
   if (pw.length < MIN_LENGTH) {
     problems.push(`shorter than ${MIN_LENGTH} characters (got ${pw.length})`);
@@ -118,12 +122,23 @@ function assessStrength(pw) {
   if (/(.)\1{3,}/.test(pw)) {
     problems.push('contains a character repeated 4 or more times in a row');
   }
-  // Deliberately compared as lowercase substrings: "Admin@2026!!" is not a
-  // rotation of "Admin@2026".
+  // Compared as lowercase substrings, so a capitalised or suffixed variant of a
+  // predictable string is refused too.
   const lowered = pw.toLowerCase();
-  for (const banned of ['admin@2026', 'password', 'pacemakers', 'pmbc', 'qwerty', '123456']) {
+  for (const banned of ['password', 'pacemakers', 'pmbc', 'qwerty', '123456']) {
     if (lowered.includes(banned)) {
       problems.push(`contains the predictable string "${banned}"`);
+    }
+  }
+  // The retired admin password is held only as a SHA-256 digest, so this file
+  // no longer publishes it. Every window of its length is hashed and compared,
+  // which refuses it as a substring exactly as the plain entry did. The message
+  // names it without quoting the window that matched.
+  for (let i = 0; i + RETIRED_LENGTH <= lowered.length; i++) {
+    const digest = createHash('sha256').update(lowered.slice(i, i + RETIRED_LENGTH)).digest('hex');
+    if (digest === RETIRED_SHA256) {
+      problems.push('contains the retired admin password');
+      break;
     }
   }
   return problems;
@@ -310,7 +325,10 @@ async function main() {
   process.exitCode = allOk ? 0 : 1;
 }
 
-main().catch((err) => {
-  console.error('rotate-admin-password failed:', err.message);
-  process.exitCode = 1;
-});
+// Run only when executed, so a test can import assessStrength without reaching the database.
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  main().catch((err) => {
+    console.error('rotate-admin-password failed:', err.message);
+    process.exitCode = 1;
+  });
+}

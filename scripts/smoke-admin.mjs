@@ -7,12 +7,20 @@ const BASE = process.env.SMOKE_BASE || 'http://localhost:3001';
 // Never against production: see scripts/lib/productionGuard.mjs.
 const { refuseWritesAgainstProduction } = await import('./lib/productionGuard.mjs');
 refuseWritesAgainstProduction(BASE, 'smoke-admin');
+
+// Required, with no fallback: the retired debug password was removed on 2026-09-22.
+// Checked after the production guard, which makes no network call, so a production
+// URL is still refused with exit 2 first.
+const ADMIN_PASSWORD_ENV = process.env.ADMIN_PASSWORD;
+if (!ADMIN_PASSWORD_ENV) {
+  console.error('smoke-admin: ADMIN_PASSWORD is required. Export it (never inline it in the command) and run again.');
+  process.exit(1);
+}
+
 const EMAIL = 'meetahmadch@gmail.com';
 // Read from the environment so rotating the admin credential does not break the
-// verification tooling. The fallback is the documented pre-rotation debug
-// password; once the launch-blocker rotation happens it stops working, and you
-// export ADMIN_PASSWORD before running this instead.
-const PASSWORD = process.env.ADMIN_PASSWORD || 'Admin@2026';
+// verification tooling. Checked above, after the production guard.
+const PASSWORD = ADMIN_PASSWORD_ENV;
 
 const ADMIN_ROUTES = [
   '/admin',

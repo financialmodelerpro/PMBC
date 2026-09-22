@@ -3,9 +3,8 @@
 // verifies the stored hash by comparing it back. Run with `npm run seed-admin`.
 //
 // USE rotate-admin-password.mjs INSTEAD to set a real credential. This script
-// hardcodes its password in the file below, which is correct for a throwaway
-// debug login and completely wrong for a production one: it would commit the
-// live password to git history.
+// reads the password from ADMIN_PASSWORD, which is required: it exits before any
+// database call when the variable is missing or empty.
 //
 // Since the launch-blocker rotation, this script refuses to overwrite an
 // existing row whose hash no longer matches ADMIN_PASSWORD, because doing so
@@ -17,6 +16,13 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createClient } from '@supabase/supabase-js';
 import bcrypt from 'bcryptjs';
+
+// Required, with no fallback: the retired debug password was removed on 2026-09-22.
+const ADMIN_PASSWORD_ENV = process.env.ADMIN_PASSWORD;
+if (!ADMIN_PASSWORD_ENV) {
+  console.error('seed-admin: ADMIN_PASSWORD is required. Export it (never inline it in the command) and run again.');
+  process.exit(1);
+}
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(__dirname, '..');
@@ -48,7 +54,7 @@ function loadEnvLocal() {
 }
 
 const ADMIN_EMAIL = 'meetahmadch@gmail.com';
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'Admin@2026';
+const ADMIN_PASSWORD = ADMIN_PASSWORD_ENV;
 const ADMIN_NAME = 'Ahmad Din';
 
 async function main() {

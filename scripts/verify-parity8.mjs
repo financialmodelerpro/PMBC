@@ -15,9 +15,19 @@ const BASE = process.env.SMOKE_BASE || 'http://localhost:3001';
 // Never against production: see scripts/lib/productionGuard.mjs.
 const { refuseWritesAgainstProduction } = await import('./lib/productionGuard.mjs');
 refuseWritesAgainstProduction(BASE, 'verify-parity8');
+
+// Required, with no fallback: the retired debug password was removed on 2026-09-22.
+// Checked after the production guard, which makes no network call, so a production
+// URL is still refused with exit 2 first.
+const ADMIN_PASSWORD_ENV = process.env.ADMIN_PASSWORD;
+if (!ADMIN_PASSWORD_ENV) {
+  console.error('verify-parity8: ADMIN_PASSWORD is required. Export it (never inline it in the command) and run again.');
+  process.exit(1);
+}
+
 const EMAIL = 'meetahmadch@gmail.com';
-// See the note in smoke-admin.mjs: env first, debug default as a fallback.
-const PASSWORD = process.env.ADMIN_PASSWORD || 'Admin@2026';
+// See the note in smoke-admin.mjs: required, checked above.
+const PASSWORD = ADMIN_PASSWORD_ENV;
 
 const TESTIMONIALS = '/api/admin/testimonials';
 const SITE_PAGES = '/api/admin/site-pages';
