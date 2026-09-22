@@ -1,8 +1,8 @@
 import { ADMIN_COLORS, adminBadge, adminCard, adminTable, adminTd, adminTh, adminThead } from '@/lib/admin/styles';
-import { GROWTH_MIGRATION, growthDataLayerStatus } from '@/lib/growth/db';
+import { growthDataLayerStatus, migrationsFor } from '@/lib/growth/db';
 
 /**
- * Whether the Growth data layer (migration 083) is in place, table by table.
+ * Whether the Growth data layer (migrations 083 onwards) is in place, table by table.
  * Row counts include test rows. Reads counts only, never records.
  */
 export async function DataLayerStatus() {
@@ -20,9 +20,9 @@ export async function DataLayerStatus() {
       </div>
       <p style={{ margin: '8px 0 16px', fontSize: 13, color: ADMIN_COLORS.textBody }}>
         {status.ready
-          ? 'All five Growth tables are in place.'
+          ? `All ${status.tables.length} Growth tables are in place.`
           : status.missing.length
-            ? `Missing: ${status.missing.join(', ')}. Apply ${GROWTH_MIGRATION} in the Supabase SQL editor.`
+            ? `Missing: ${status.missing.join(', ')}. Apply ${migrationsFor(status.missing).join(' then ')} in the Supabase SQL editor.`
             : 'The tables could not be read. See the detail below.'}
       </p>
       <div style={{ overflowX: 'auto' }}>

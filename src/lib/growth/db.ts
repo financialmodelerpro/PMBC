@@ -17,11 +17,22 @@ export function growthDb(): SupabaseClient {
   return createSupabaseServerClient() as unknown as SupabaseClient;
 }
 
-/** The five tables migration 083 creates, in dependency order. */
-export const GROWTH_TABLES = ['growth_companies', 'growth_contacts', 'growth_leads', 'growth_signals', 'growth_activity'] as const;
-export type GrowthTable = (typeof GROWTH_TABLES)[number];
+/** Every Growth table, in dependency order, with the migration that creates it. */
+export const GROWTH_TABLE_MIGRATIONS = {
+  growth_companies: '083_growth_core.sql',
+  growth_contacts: '083_growth_core.sql',
+  growth_leads: '083_growth_core.sql',
+  growth_signals: '083_growth_core.sql',
+  growth_activity: '083_growth_core.sql',
+  growth_kb_items: '084_growth_knowledge_base.sql',
+} as const;
+export type GrowthTable = keyof typeof GROWTH_TABLE_MIGRATIONS;
+export const GROWTH_TABLES = Object.keys(GROWTH_TABLE_MIGRATIONS) as GrowthTable[];
 
-export const GROWTH_MIGRATION = '083_growth_core.sql';
+/** The migrations still to apply for the tables that are missing, in order. */
+export function migrationsFor(missing: GrowthTable[]): string[] {
+  return [...new Set(missing.map((t) => GROWTH_TABLE_MIGRATIONS[t]))].sort();
+}
 
 export type TableStatus = { table: GrowthTable; state: 'ready' | 'missing' | 'error'; rows: number | null; detail: string | null };
 export type DataLayerStatus = { ready: boolean; tables: TableStatus[]; missing: GrowthTable[] };
