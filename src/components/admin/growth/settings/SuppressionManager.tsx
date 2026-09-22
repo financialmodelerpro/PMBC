@@ -18,10 +18,19 @@ export type SuppressionView = {
   isTest: boolean;
 };
 
+class RequestError extends Error {
+  constructor(
+    message: string,
+    readonly code?: string,
+  ) {
+    super(message);
+  }
+}
+
 async function call(url: string, body?: unknown): Promise<Record<string, unknown>> {
   const res = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body ?? {}) });
   const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
-  if (!res.ok && res.status !== 207) throw new Error(typeof data.error === 'string' ? data.error : 'Request failed');
+  if (!res.ok && res.status !== 207) throw new RequestError(typeof data.error === 'string' ? data.error : 'Request failed', typeof data.code === 'string' ? data.code : undefined);
   return data;
 }
 
@@ -35,6 +44,9 @@ export function SuppressionManager({ rows }: { rows: SuppressionView[] }) {
   const [message, setMessage] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
   const [removing, setRemoving] = useState<string | null>(null);
   const [removeReason, setRemoveReason] = useState('');
+  /** Set when the server says the domain is a shared email provider: the admin must confirm. */
+  const [sharedWarning, setSharedWarning] = useState<string | null>(null);
+  const [confirmShared, setConfirmShared] = useState(false);
 
   async function run(key: string, fn: () => Promise<string>) {
     setBusy(key);
@@ -51,9 +63,17 @@ export function SuppressionManager({ rows }: { rows: SuppressionView[] }) {
 
   const add = () =>
     run('add', async () => {
-      const data = await call('/api/admin/growth/suppressions', { kind, value, reason });
+      let data: Record<string, unknown>;
+      try {
+        data = await call('/api/admin/growth/suppressions', { kind, value, reason, confirmSharedDomain: confirmShared });
+      } catch (err) {
+        if (err instanceof RequestError && err.code === 'shared_domain') setSharedWarning(err.message);
+        throw err;
+      }
       setValue('');
       setReason('');
+      setSharedWarning(null);
+      setConfirmShared(false);
       const row = data.row as { value: string } | undefined;
       return `Suppressed ${row?.value ?? value}.`;
     });
@@ -90,7 +110,16 @@ export function SuppressionManager({ rows }: { rows: SuppressionView[] }) {
           </label>
           <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             <span style={adminLabel}>{kind === 'email' ? 'Email' : 'Domain'}</span>
-            <input value={value} onChange={(e) => setValue(e.target.value)} placeholder={kind === 'email' ? 'name@example.com' : 'example.com'} style={adminInput} />
+            <input
+              value={value}
+              onChange={(e) => {
+                setValue(e.target.value);
+                setSharedWarning(null);
+                setConfirmShared(false);
+              }}
+              placeholder={kind === 'email' ? 'name@example.com' : 'example.com'}
+              style={adminInput}
+            />
           </label>
           <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             <span style={adminLabel}>Reason</span>
@@ -100,6 +129,15 @@ export function SuppressionManager({ rows }: { rows: SuppressionView[] }) {
             {busy === 'add' ? 'Adding' : 'Suppress'}
           </SaveButton>
         </div>
+        {sharedWarning && (
+          <div role="alert" style={{ marginTop: 12, padding: '10px 12px', borderRadius: 8, background: ADMIN_COLORS.warningBg, color: ADMIN_COLORS.warning, fontSize: 13 }}>
+            <strong>Shared email provider.</strong> {sharedWarning}
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8 }}>
+              <input type="checkbox" checked={confirmShared} onChange={(e) => setConfirmShared(e.target.checked)} />
+              I understand this blocks everyone at this domain.
+            </label>
+          </div>
+        )}
         <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginTop: 16, paddingTop: 16, borderTop: `1px solid ${ADMIN_COLORS.borderSoft}` }}>
           <button type="button" onClick={importNow} disabled={Boolean(busy)} style={adminButtonGhost}>
             {busy === 'import' ? 'Importing' : 'Import existing opt-outs'}

@@ -11,10 +11,11 @@
 
 export type IntegrationKey = 'claude' | 'microsoft_graph' | 'brevo';
 
-type IntegrationDef = { key: IntegrationKey; label: string; purpose: string; built: boolean; env: string[]; arrivesIn?: string };
+type IntegrationDef = { key: IntegrationKey; label: string; purpose: string; built: boolean; env: string[]; arrivesIn?: string; mockWithout?: boolean };
 
 export const INTEGRATIONS: readonly IntegrationDef[] = [
-  { key: 'claude', label: 'Claude API', purpose: 'Research, drafting and scoring by AI agents', built: false, env: ['ANTHROPIC_API_KEY'], arrivesIn: 'Unit 1.5' },
+  // Built in Unit 1.5: without the key the AI layer runs in mock mode, so it shows Mock mode rather than Not set up.
+  { key: 'claude', label: 'Claude API', purpose: 'Research, drafting and scoring by AI agents', built: true, env: ['ANTHROPIC_API_KEY'], mockWithout: true },
   {
     key: 'microsoft_graph',
     label: 'Microsoft Graph (email and Bookings)',
@@ -26,13 +27,14 @@ export const INTEGRATIONS: readonly IntegrationDef[] = [
   { key: 'brevo', label: 'Brevo', purpose: 'Transactional email from the site and the free tools', built: true, env: ['BREVO_API_KEY', 'EMAIL_FROM_DEFAULT'] },
 ];
 
-export type IntegrationStatus = { key: IntegrationKey; label: string; purpose: string; state: 'configured' | 'not_set_up'; detail: string };
+export type IntegrationStatus = { key: IntegrationKey; label: string; purpose: string; state: 'configured' | 'mock' | 'not_set_up'; detail: string };
 
 /** `env` is injectable so the verifier can prove the rules without touching real values. */
 export function integrationStatus(env: Record<string, string | undefined> = process.env): IntegrationStatus[] {
   return INTEGRATIONS.map((i) => {
     const missing = i.env.filter((name) => !env[name]?.trim());
     if (!i.built) return { key: i.key, label: i.label, purpose: i.purpose, state: 'not_set_up', detail: `Not built yet${i.arrivesIn ? `, arrives in ${i.arrivesIn}` : ''}.` };
+    if (missing.length && i.mockWithout) return { key: i.key, label: i.label, purpose: i.purpose, state: 'mock', detail: `Mock mode: ${missing.join(', ')} is not set, so AI features answer with labelled sample output at no cost. Set it and the real API is used with no code change.` };
     if (missing.length) return { key: i.key, label: i.label, purpose: i.purpose, state: 'not_set_up', detail: `Missing: ${missing.join(', ')}.` };
     return { key: i.key, label: i.label, purpose: i.purpose, state: 'configured', detail: `Set: ${i.env.join(', ')}.` };
   });

@@ -51,7 +51,7 @@ chosen instead, and why. **Read the file before re-running one.** The list below
 is an index, not a substitute.
 
 Three flags matter when rebuilding:
-- **DDL** migrations (031, 032, 033, 072, 076, 077, 082, 083, 084, 085, 086) use `ALTER TABLE`, which supabase-js cannot
+- **DDL** migrations (031, 032, 033, 072, 076, 077, 082, 083, 084, 085, 086, 087) use `ALTER TABLE`, which supabase-js cannot
   execute. Paste them into the Supabase SQL editor by hand. Everything that reads
   those columns degrades safely if they are absent.
 - **Destructive on re-run** (034, 048, 049) delete and reinsert, so re-applying
@@ -131,19 +131,20 @@ Three flags matter when rebuilding:
 084  growth_knowledge_base   **DDL, HAND-RUN.** growth_kb_items (working and approved copy, activity logged by trigger) and ten empty starter drafts; growth_activity gains clock_timestamp() created_at, a seq identity and kb_item_id. Applied 2026-09-22
 085  growth_settings         **DDL, HAND-RUN.** growth_settings (one row, typed limits checked by the database, every change logged with old and new values) and growth_suppressions (never deleted, removal needs a reason, logged). Applied 2026-09-22
 086  growth_nine_services    **DDL, HAND-RUN.** Growth services become the site's nine (companies, leads, Knowledge Base; five drafts converted, Feasibility Studies archived, four added, all logged), offers gain related_service_slugs, settings gain priority_services. Applied 2026-09-22
+087  growth_ai_usage         **DDL, HAND-RUN.** growth_ai_usage (every AI call, logged with actor ai; mock calls free by constraint) and growth_ai_alerts (one budget alert per Riyadh month by unique key); growth_settings may hold one test row, id 2. Applied 2026-09-22
 ```
 
 **Every migration from 076 on states when it is safe to apply** in a `SAFE TO APPLY:` line in its header: before or after which deploy, and what the site does in the gap. 075 is why: it was applied before the routes it linked to were deployed, and previews share the production database, so the live footer linked to a 404.
 
 After running migrations, manually insert one admin_users row via SQL with a bcrypt hash for the password.
 
-**DDL migrations must be run by hand.** 031, 032, 033, 072, 076, 077, 082, 083, 084, 085 and 086 use `ALTER TABLE` or `CREATE TABLE`, which supabase-js cannot execute. The Supabase CLI is not installed and `.env.local` carries no direct Postgres connection string, so the seed-script pattern used for 029 does not work for them. Paste them into the Supabase SQL editor. Every consumer of those columns degrades safely if the migration has not run: the page list treats a missing `is_system` as "system" so nothing is deletable, `writeAudit` retries without the diff columns rather than failing the mutation, and `/api/admin/site-pages` replays a write with `can_toggle` stripped when Postgres rejects the column (so Pages & Nav keeps working, minus pinning).
+**DDL migrations must be run by hand.** 031, 032, 033, 072, 076, 077, 082, 083, 084, 085, 086 and 087 use `ALTER TABLE` or `CREATE TABLE`, which supabase-js cannot execute. The Supabase CLI is not installed and `.env.local` carries no direct Postgres connection string, so the seed-script pattern used for 029 does not work for them. Paste them into the Supabase SQL editor. Every consumer of those columns degrades safely if the migration has not run: the page list treats a missing `is_system` as "system" so nothing is deletable, `writeAudit` retries without the diff columns rather than failing the mutation, and `/api/admin/site-pages` replays a write with `can_toggle` stripped when Postgres rejects the column (so Pages & Nav keeps working, minus pinning).
 
 ### Rebuilding this database
 
-Run every migration in order, and remember that **031, 032, 033, 072, 076, 077, 082, 083, 084, 085 and 086 are DDL and
+Run every migration in order, and remember that **031, 032, 033, 072, 076, 077, 082, 083, 084, 085, 086 and 087 are DDL and
 need the Supabase SQL editor**: supabase-js cannot execute `ALTER TABLE` and this
-repository has no direct Postgres connection string. All eleven are applied and
+repository has no direct Postgres connection string. All twelve are applied and
 verified live on the current database. Everything that reads those columns
 degrades safely when they are absent, which is what let Pages & Nav keep working
 before 033 was run.

@@ -18,7 +18,10 @@
 //      proves the anon key cannot read either table; removes every test row.
 //
 // The database is production. Test rows carry is_test = true and a marker;
-// every delete is filtered on is_test = true. The settings row is real: the
+// every delete is filtered on is_test = true. Settings changes are made only to
+// the isolated test row (id 2, is_test, migration 087), created for the run and
+// removed after it; the real row (id 1) is compared field for field before and
+// after, including updated_at, and must not change at all. Previously the
 // run restores it exactly and its log rows are marked test. The valuation
 // tool's tables are only read. Approved by Ahmad for the Growth tables on
 // 2026-09-22.
@@ -132,7 +135,7 @@ check('suppression values normalised', sup.normaliseSuppressionValue('email', ' 
   const all = integ.integrationStatus({ BREVO_API_KEY: SECRET, EMAIL_FROM_DEFAULT: SECRET, ANTHROPIC_API_KEY: SECRET, MS_GRAPH_TENANT_ID: SECRET, MS_GRAPH_CLIENT_ID: SECRET, MS_GRAPH_CLIENT_SECRET: SECRET });
   const by = (k, list) => list.find((i) => i.key === k);
   check('Brevo configured when its variables are set', by('brevo', all).state === 'configured');
-  check('Claude and Graph show Not set up until built', by('claude', all).state === 'not_set_up' && by('microsoft_graph', all).state === 'not_set_up');
+  check('Claude configured once its key is set; Graph Not set up until built', by('claude', all).state === 'configured' && by('microsoft_graph', all).state === 'not_set_up');
   check('integration status never contains a value', !JSON.stringify(all).includes(SECRET));
   const none = integ.integrationStatus({});
   check('Brevo not set up without its variables', by('brevo', none).state === 'not_set_up' && by('brevo', none).detail.includes('BREVO_API_KEY'));
@@ -183,9 +186,17 @@ async function writePhase(svc) {
   const run = randomUUID().slice(0, 8);
   const runStart = new Date(Date.now() - 1000).toISOString();
   const created = { contacts: [], companies: [], leads: [] };
-  const original = await settingsLib.getGrowthSettings();
-  const { data: originalMeta } = await svc.from('growth_settings').select('updated_by, updated_by_name, last_change_is_test').eq('id', 1).single();
-  check('settings read from the database', original.source === 'database', original.error);
+  const TEST_ROW = settingsLib.TEST_SETTINGS_ROW;
+  const { data: realBefore } = await svc.from('growth_settings').select('*').eq('id', 1).single();
+  await svc.from('growth_settings').delete().eq('id', TEST_ROW).eq('is_test', true);
+  const { error: rowErr } = await svc.from('growth_settings').insert({ id: TEST_ROW, is_test: true });
+  check('an isolated test settings row can be created', !rowErr, rowErr?.message);
+  const { error: fakeReal } = await svc.from('growth_settings').insert({ id: 3, is_test: true });
+  check('no third settings row is possible', Boolean(fakeReal));
+  const { error: testAsReal } = await svc.from('growth_settings').update({ is_test: true }).eq('id', 1);
+  check('the real row cannot be marked test', testAsReal?.code === '23514');
+  const original = await settingsLib.getGrowthSettings(TEST_ROW);
+  check('test settings read from the database', original.source === 'database', original.error);
   if (original.source !== 'database') return;
 
   async function cleanup() {
@@ -207,15 +218,15 @@ async function writePhase(svc) {
 
     // Settings: a logged test change, then restored exactly.
     const changed = { ...original.settings, daily_cold_email_cap: original.settings.daily_cold_email_cap === 11 ? 12 : 11, retention_months: original.settings.retention_months === 6 ? 7 : 6, ai_alert_threshold_pct: original.settings.ai_alert_threshold_pct === 75 ? 76 : 75, priority_services: original.settings.priority_services.includes('cfo-advisory') ? original.settings.priority_services.filter((x) => x !== 'cfo-advisory') : [...original.settings.priority_services, 'cfo-advisory'] };
-    const w1 = await settingsLib.updateGrowthSettings(changed, actor, { isTest: true });
+    const w1 = await settingsLib.updateGrowthSettings(changed, actor, { rowId: TEST_ROW });
     check('settings change saved', w1.ok, w1.error);
     const { data: log1 } = await svc.from('growth_activity').select('action, is_test, actor_id, metadata').eq('action', 'settings.changed').gte('created_at', runStart).order('created_at').order('seq');
     const entry = (log1 ?? [])[0];
     const c = entry?.metadata?.changes ?? {};
     check('settings change logged as a test row, with who', entry && entry.is_test === true && entry.actor_id === actor.id && entry.metadata.actor_name === actor.name);
     check('log holds old and new for each changed field, and only those', c.daily_cold_email_cap?.old === original.settings.daily_cold_email_cap && c.daily_cold_email_cap?.new === changed.daily_cold_email_cap && c.retention_months?.new === changed.retention_months && c.ai_alert_threshold_pct?.new === changed.ai_alert_threshold_pct && JSON.stringify(c.priority_services?.new) === JSON.stringify(changed.priority_services) && Object.keys(c).length === 4, JSON.stringify(c));
-    const w2 = await settingsLib.updateGrowthSettings(original.settings, actor, { isTest: true });
-    const back = await settingsLib.getGrowthSettings();
+    const w2 = await settingsLib.updateGrowthSettings(original.settings, actor, { rowId: TEST_ROW });
+    const back = await settingsLib.getGrowthSettings(TEST_ROW);
     check('settings restored exactly', w2.ok && JSON.stringify(back.settings) === JSON.stringify(original.settings));
 
     // The database refuses invalid values, whatever the app sends.
@@ -233,10 +244,10 @@ async function writePhase(svc) {
       'an unknown priority service': { priority_services: ['financial-modeling', 'feasibility_study'] },
     };
     for (const [label, patch] of Object.entries(invalid)) {
-      const { error } = await svc.from('growth_settings').update({ ...patch, last_change_is_test: true }).eq('id', 1);
+      const { error } = await svc.from('growth_settings').update(patch).eq('id', TEST_ROW);
       check(`database refuses ${label}`, error?.code === '23514', error ? error.code : 'accepted');
     }
-    const after = await settingsLib.getGrowthSettings();
+    const after = await settingsLib.getGrowthSettings(TEST_ROW);
     check('refused values changed nothing', JSON.stringify(after.settings) === JSON.stringify(original.settings));
 
     // Suppression against the live tables.
@@ -336,20 +347,20 @@ async function writePhase(svc) {
         check(`anon cannot read ${t}`, Boolean(error) || (Array.isArray(data) && data.length === 0));
       }
       const { error: upd } = await anon.from('growth_settings').update({ daily_cold_email_cap: 499 }).eq('id', 1);
-      const still = await settingsLib.getGrowthSettings();
-      check('anon cannot change the settings', still.settings.daily_cold_email_cap === original.settings.daily_cold_email_cap, upd?.message);
+      const { data: realStill } = await svc.from('growth_settings').select('daily_cold_email_cap').eq('id', 1).single();
+      check('anon cannot change the settings', realStill?.daily_cold_email_cap === realBefore?.daily_cold_email_cap, upd?.message);
     } else check('anon key available', false);
   } finally {
     await cleanup();
-    // Put back who last changed the real row: only these fields change, so nothing is logged.
-    if (originalMeta) await svc.from('growth_settings').update(originalMeta).eq('id', 1);
-    const { data: metaAfter } = await svc.from('growth_settings').select('updated_by, updated_by_name, last_change_is_test').eq('id', 1).single();
-    check('the real row keeps its original last editor', JSON.stringify(metaAfter) === JSON.stringify(originalMeta));
+    const { error: delRow } = await svc.from('growth_settings').delete().eq('id', TEST_ROW).eq('is_test', true);
+    check('the test settings row is removed', !delRow, delRow?.message);
+    const { data: realAfter } = await svc.from('growth_settings').select('*').eq('id', 1).single();
+    check('the real settings row is untouched, field for field', JSON.stringify(realAfter) === JSON.stringify(realBefore), 'the real row changed');
     const leftovers = await Promise.all(['growth_companies', 'growth_contacts', 'growth_leads', 'growth_suppressions'].map((t) => svc.from(t).select('id', { count: 'exact' }).eq('is_test', true)));
     const acts = await svc.from('growth_activity').select('id', { count: 'exact' }).eq('is_test', true);
     check('no test rows remain in any Growth table', leftovers.every((l) => (l.count ?? 0) === 0) && (acts.count ?? 0) === 0, `${leftovers.map((l) => l.count).join(',')} activity ${acts.count}`);
-    const final = await settingsLib.getGrowthSettings();
-    check('settings end exactly as they began', JSON.stringify(final.settings) === JSON.stringify(original.settings));
+    const { count: rows } = await svc.from('growth_settings').select('id', { count: 'exact' });
+    check('only the real settings row remains', rows === 1, String(rows));
     const real = await svc.from('growth_suppressions').select('id, source', { count: 'exact' }).eq('is_test', false);
     console.log(`  Real suppression entries now: ${real.count ?? 0}.`);
   }

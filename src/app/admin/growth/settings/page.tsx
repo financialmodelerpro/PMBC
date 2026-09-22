@@ -1,11 +1,14 @@
 import type { Metadata } from 'next';
 
 import { AdminPageHeader } from '@/components/admin/AdminPageHeader';
+import { AiTestCall } from '@/components/admin/growth/settings/AiTestCall';
 import { SettingsForm } from '@/components/admin/growth/settings/SettingsForm';
 import { SettingsTabs } from '@/components/admin/growth/settings/SettingsTabs';
 import { MigrationNotice } from '@/components/admin/tools/MigrationNotice';
 import { ADMIN_COLORS, adminBadge, adminCard, adminTable, adminTd, adminTh, adminThead } from '@/lib/admin/styles';
 import { requireGrowthSession } from '@/lib/growth/access';
+import { isMockMode } from '@/lib/growth/ai/provider';
+import { monthSpend, recentAiCalls } from '@/lib/growth/ai/run';
 import { integrationStatus } from '@/lib/growth/integrations';
 import { growthPage } from '@/lib/growth/pages';
 import { retentionPreview } from '@/lib/growth/retention';
@@ -23,6 +26,8 @@ export default async function GrowthSettingsPage() {
   const ready = read.source === 'database';
   const preview = ready ? await retentionPreview(read.settings.retention_months) : null;
   const integrations = integrationStatus();
+  const [spend, calls] = await Promise.all([monthSpend(), recentAiCalls(10)]);
+  const mock = isMockMode();
 
   return (
     <>
@@ -38,7 +43,57 @@ export default async function GrowthSettingsPage() {
         </p>
       )}
 
-      {ready ? <SettingsForm settings={read.settings} spentThisMonthUsd={0} /> : null}
+      {ready ? <SettingsForm settings={read.settings} spentThisMonthUsd={spend.error ? null : spend.spentUsd} spendMonth={spend.month} /> : null}
+
+      <section style={{ ...adminCard, padding: 0, marginBottom: 16 }} aria-labelledby="ai-layer">
+        <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <h2 id="ai-layer" style={{ margin: 0, fontSize: 15, fontWeight: 700, color: ADMIN_COLORS.textHeading }}>
+              AI calls
+            </h2>
+            <span style={adminBadge(mock ? 'warning' : 'success')}>{mock ? 'Mock mode' : 'Claude API'}</span>
+          </div>
+          <p style={{ margin: 0, fontSize: 12, color: ADMIN_COLORS.textMuted }}>
+            {mock
+              ? 'No Anthropic API key is set, so every AI feature answers with labelled sample output at no cost. Once the key is set, the real Claude API is used with no code change.'
+              : 'Calls go to the Claude API and count against the monthly budget.'}{' '}
+            Every call is checked against the budget, recorded here and logged in the audit log under AI calls.
+          </p>
+          <AiTestCall />
+        </div>
+        {calls.length > 0 && (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={adminTable}>
+              <thead style={adminThead}>
+                <tr>
+                  <th style={adminTh}>When</th>
+                  <th style={adminTh}>Agent</th>
+                  <th style={adminTh}>Outcome</th>
+                  <th style={{ ...adminTh, textAlign: 'right' }}>Cost (USD)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {calls.map((c) => (
+                  <tr key={c.id}>
+                    <td style={{ ...adminTd, fontSize: 12, whiteSpace: 'nowrap' }}>{day(c.created_at)}</td>
+                    <td style={{ ...adminTd, fontSize: 13 }}>
+                      {c.agent}
+                      <div style={{ fontSize: 11, color: ADMIN_COLORS.textMuted }}>{c.model}</div>
+                    </td>
+                    <td style={{ ...adminTd, fontSize: 12 }}>
+                      <span style={adminBadge(c.status === 'succeeded' ? 'success' : c.status === 'refused' ? 'warning' : 'danger')}>{c.status}</span>
+                      {c.is_mock && <span style={{ ...adminBadge('warning'), marginLeft: 4 }}>Mock</span>}
+                      {c.is_test && <span style={{ ...adminBadge('neutral'), marginLeft: 4 }}>Test</span>}
+                      {c.reason && <div style={{ fontSize: 11, color: ADMIN_COLORS.textMuted, marginTop: 4 }}>{c.reason}</div>}
+                    </td>
+                    <td style={{ ...adminTd, fontSize: 12, textAlign: 'right' }}>{Number(c.cost_usd).toFixed(6)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
 
       {preview && (
         <section style={{ ...adminCard, padding: 0, marginBottom: 16 }} aria-labelledby="retention-preview">
@@ -103,7 +158,7 @@ export default async function GrowthSettingsPage() {
                     <div style={{ fontSize: 12, color: ADMIN_COLORS.textMuted }}>{i.purpose}</div>
                   </td>
                   <td style={adminTd}>
-                    <span style={adminBadge(i.state === 'configured' ? 'success' : 'neutral')}>{i.state === 'configured' ? 'Configured' : 'Not set up'}</span>
+                    <span style={adminBadge(i.state === 'configured' ? 'success' : i.state === 'mock' ? 'warning' : 'neutral')}>{i.state === 'configured' ? 'Configured' : i.state === 'mock' ? 'Mock mode' : 'Not set up'}</span>
                   </td>
                   <td style={{ ...adminTd, fontSize: 12, color: ADMIN_COLORS.textBody }}>{i.detail}</td>
                 </tr>

@@ -61,7 +61,7 @@ function toInput(f: Form) {
  * with the same rules the database enforces; each change is logged with its old
  * and new value.
  */
-export function SettingsForm({ settings, spentThisMonthUsd }: { settings: GrowthSettings; spentThisMonthUsd: number }) {
+export function SettingsForm({ settings, spentThisMonthUsd, spendMonth }: { settings: GrowthSettings; spentThisMonthUsd: number | null; spendMonth: string }) {
   const router = useRouter();
   const [saved, setSaved] = useState<Form>(() => toForm(settings));
   const [form, setForm] = useState<Form>(() => toForm(settings));
@@ -160,8 +160,9 @@ export function SettingsForm({ settings, spentThisMonthUsd }: { settings: Growth
             {label('Alert recipient', <input type="email" value={form.ai_alert_email} onChange={set('ai_alert_email')} style={adminInput} />)}
           </div>
           <p style={{ margin: '14px 0 0', fontSize: 13, color: ADMIN_COLORS.textBody }}>
-            Spent this month: <strong>USD {spentThisMonthUsd.toFixed(2)}</strong>
-            {budget && Number.isFinite(budget) ? ` of USD ${budget.toFixed(2)}` : ''}. Spend is recorded from Unit 1.5.
+            Spent this month ({spendMonth}, Riyadh time):{' '}
+            {spentThisMonthUsd === null ? <strong>not available until migration 087 is applied</strong> : <strong>USD {spentThisMonthUsd.toFixed(2)}</strong>}
+            {spentThisMonthUsd !== null && budget && Number.isFinite(budget) ? ` of USD ${budget.toFixed(2)}` : ''}. Mock calls cost nothing.
           </p>
         </>,
       )}

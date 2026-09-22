@@ -12,6 +12,8 @@ const schema = z.object({
   kind: z.enum(['email', 'domain']),
   value: z.string().trim().min(3).max(320),
   reason: z.string().trim().min(1, 'Give a reason').max(500),
+  /** Needed to suppress a shared email provider such as gmail.com as a whole domain. */
+  confirmSharedDomain: z.boolean().optional(),
 });
 
 /** Adds an email or domain to the suppression list by hand. */
@@ -28,7 +30,7 @@ export async function POST(req: Request) {
   if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Validation failed' }, { status: 422 });
 
   const result = await addSuppression(parsed.data, { id: gate.user.id, name: gate.user.name || gate.user.email });
-  if (!result.ok) return NextResponse.json({ error: result.error }, { status: result.status });
+  if (!result.ok) return NextResponse.json({ error: result.error, code: result.code }, { status: result.status });
 
   await writeAudit(createSupabaseServerClient(), {
     adminId: gate.user.id,
