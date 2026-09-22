@@ -6,7 +6,7 @@ This file holds only what must be true in every session. Detail, examples and hi
 
 | File | Read it before |
 |------|----------------|
-| [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) | Changing the stack, folder layout, admin roles, auth, admin routes, the sidebar, the page builder, or PMBC and FMP cross-links |
+| [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) | Changing the stack, folder layout, admin roles, auth, admin routes, the sidebar, the page builder, the Growth Engine and its Knowledge Base, or PMBC and FMP cross-links |
 | [`docs/DATABASE.md`](./docs/DATABASE.md) | Writing a migration, changing a table, or rebuilding the database (table index, migration order 001 to 082) |
 | [`docs/CMS.md`](./docs/CMS.md) | Adding or changing a section type, a public page, the navigation, the footer, or service slugs |
 | [`docs/EMAIL.md`](./docs/EMAIL.md) | Changing the Brevo wrapper, email templates, the email shell, or the Brevo webhook |
@@ -69,7 +69,7 @@ Single Next.js App Router application (^15), one domain, no subdomain routing: t
 ## 5. Database and migrations
 
 - Migrations live in `supabase/migrations/`, three-digit prefix, one logical change each. **Never edit a migration after it has been applied.** Read a migration's header before re-running it.
-- **DDL migrations (031, 032, 033, 072, 076, 077, 082, 083) must be pasted into the Supabase SQL editor by hand**: supabase-js cannot run DDL and there is no direct Postgres connection string. Everything else is DML applied by its `npm run` script, most with `--dry-run`.
+- **DDL migrations (031, 032, 033, 072, 076, 077, 082, 083, 084) must be pasted into the Supabase SQL editor by hand**: supabase-js cannot run DDL and there is no direct Postgres connection string. Everything else is DML applied by its `npm run` script, most with `--dry-run`.
 - **034, 048 and 049 are destructive on re-run** (they delete and reinsert).
 - **Every migration from 076 on states a `SAFE TO APPLY:` line** in its header: before or after which deploy, and what the site does in the gap. Previews share the production database, so applying early can publish links to routes not yet deployed (075 did exactly that).
 - **Code that reads new columns or tables degrades safely when the migration has not run.** Keep that true for every new one.
