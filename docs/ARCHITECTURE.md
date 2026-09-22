@@ -285,3 +285,18 @@ PMBC and FMP are fully separate codebases and Supabase projects. They do not sha
 ### Articles
 
 Articles are PMBC's own since Phase 10: the `articles` table, `/admin/articles`, and public `/insights` and `/insights/[slug]`. Cross-posting from FMP is possible but not wired. (Replaced on 2026-09-22 a note that articles would live on FMP.)
+
+## Environment defaults
+
+The non-secret values the project runs with, moved from the original CLAUDE.md environment block on 2026-09-22. Every other variable holds a secret or an optional setting; its name and purpose are in CLAUDE.md section 11, and its value lives only on Vercel and in `.env.local`, never in the repository.
+
+| Variable | Value |
+|----------|-------|
+| `NEXTAUTH_URL` | `https://pacemakersglobal.com` |
+| `NEXT_PUBLIC_SITE_URL` | `https://pacemakersglobal.com` |
+| `EMAIL_FROM_DEFAULT` | `info@pacemakersglobal.com` |
+| `EMAIL_FROM_NAME` | `PaceMakers Business Consultants` |
+| `EMAIL_TO_ADMIN` | `advisory@pacemakersglobal.com` |
+| `FMP_API_URL` | `https://app.financialmodelerpro.com` |
+
+`EMAIL_FROM_CONTACT` and `NEXT_PUBLIC_GA_ID` are optional and ship blank. `HCAPTCHA_SECRET_KEY` and `NEXT_PUBLIC_HCAPTCHA_SITE_KEY` are deliberately unset (the forms use a honeypot and a timing floor).

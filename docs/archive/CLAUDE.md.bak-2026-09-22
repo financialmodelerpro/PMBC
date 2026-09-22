@@ -86,7 +86,7 @@ something is the way it is before changing it.
 
 **Admin login:** `meetahmadch@gmail.com`. **The password was rotated on 2026-08-02 and is deliberately not recorded here or anywhere else in this repository.** Writing it down is what made the previous one worthless. Ahmad holds it; if it is lost, `npm run rotate-admin-password` sets a new one using the service-role key in `.env.local`, so there is no lockout risk.
 
-The retired `Admin@2026` remains in this file's git history and in older `SESSION_LOG.md` entries. That history is left intact on purpose: rewriting it would not un-publish the string, and the password no longer opens anything. It is verified dead, not merely replaced (see the rotation entry in `SESSION_LOG.md`).
+The retired [retired admin password] remains in this file's git history and in older `SESSION_LOG.md` entries. That history is left intact on purpose: rewriting it would not un-publish the string, and the password no longer opens anything. It is verified dead, not merely replaced (see the rotation entry in `SESSION_LOG.md`).
 
 **Rotate with `npm run rotate-admin-password`, not `npm run seed-admin`.** The rotation script reads the new password from a hidden prompt (no echo, entered twice to catch typos), never writes it to the repo, the terminal or any log, enforces a strength floor, hashes at bcrypt cost 12, then verifies both the stored hash and a real end-to-end NextAuth login. `seed-admin.mjs` hardcodes its password in the file, which is fine for creating a throwaway debug login and wrong for a production one; since the rotation it also refuses to overwrite a row whose hash no longer matches, so a stray run cannot silently downgrade the live credential back to the debug value (override with `ADMIN_SEED_FORCE=1`).
 

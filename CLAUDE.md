@@ -121,7 +121,9 @@ Institutional, not modern-startup: no gradient backgrounds, no animated icons, n
 
 ## 11. Environment variables
 
-Names only: values never go in the repository, a commit, a log or a chat reply. `.env.local` is loaded by the seed scripts.
+Names only: values never go in the repository, a commit, a log or a chat reply. `.env.local` is loaded by the seed scripts. The non-secret defaults are in ARCHITECTURE.md, "Environment defaults".
+
+**Never pass a password, key or token as a literal in a shell command. Read it from an environment variable or prompt for it interactively.**
 
 `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_ANON_KEY`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXTAUTH_SECRET`, `NEXTAUTH_URL`, `NEXT_PUBLIC_SITE_URL`, `BREVO_API_KEY`, `EMAIL_FROM_DEFAULT`, `EMAIL_FROM_NAME`, `EMAIL_TO_ADMIN`, `EMAIL_FROM_CONTACT` (optional, the From on the acknowledgement), `FMP_API_URL`, `FMP_API_KEY` (server only; FMP fails closed, and PMBC then serves its stored copy), `HCAPTCHA_SECRET_KEY` and `NEXT_PUBLIC_HCAPTCHA_SITE_KEY` (not required; setting both re-enables hCaptcha), `TOOL_LEAD_IP_SALT` (IP hashing, falls back to `NEXTAUTH_SECRET`), `BREVO_WEBHOOK_TOKEN` (unset, the webhook answers 503), `CRON_SECRET` (unset, the reminder cron answers 503), `NEXT_PUBLIC_GA_ID` (optional).
 
