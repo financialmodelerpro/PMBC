@@ -69,7 +69,7 @@ Single Next.js App Router application (^15), one domain, no subdomain routing: t
 ## 5. Database and migrations
 
 - Migrations live in `supabase/migrations/`, three-digit prefix, one logical change each. **Never edit a migration after it has been applied.** Read a migration's header before re-running it.
-- **DDL migrations (031, 032, 033, 072, 076, 077, 082, 083, 084) must be pasted into the Supabase SQL editor by hand**: supabase-js cannot run DDL and there is no direct Postgres connection string. Everything else is DML applied by its `npm run` script, most with `--dry-run`.
+- **DDL migrations (031, 032, 033, 072, 076, 077, 082, 083, 084, 085) must be pasted into the Supabase SQL editor by hand**: supabase-js cannot run DDL and there is no direct Postgres connection string. Everything else is DML applied by its `npm run` script, most with `--dry-run`.
 - **034, 048 and 049 are destructive on re-run** (they delete and reinsert).
 - **Every migration from 076 on states a `SAFE TO APPLY:` line** in its header: before or after which deploy, and what the site does in the gap. Previews share the production database, so applying early can publish links to routes not yet deployed (075 did exactly that).
 - **Code that reads new columns or tables degrades safely when the migration has not run.** Keep that true for every new one.
@@ -108,6 +108,7 @@ Free tools partly reverse the original "credibility document, not a lead engine"
 - **A nullable result field must be listed in `NULL_MEANS_ABSENT`** (`serialize.ts`). Stored results are never recomputed; bump `INPUT_SCHEMA_VERSION` when a stored input changes meaning, and branch on it in `resolveExtras`, never by guessing from shape.
 - **Email status writes are conditional, never read-then-write** (`setEmailStatusIf`).
 - **A booking short link only opens `/book`** and is never accepted where the access token is. Booking always goes to `/book`, never to Calendly directly.
+- **Growth Engine: suppression always wins.** Every send calls `checkSuppression` (`src/lib/growth/suppression.ts`) first and sends only when it returns not suppressed; it fails closed. Send limits, the AI budget and retention are read through `getGrowthSettings` (`src/lib/growth/settings.ts`), never hardcoded, and nothing sends or spends when the row cannot be read or the budget is not set.
 - **Reports:** no colours or page chrome in a tool's own report file (use the shared theme); every absolute link in a PDF or tool email is built on `SITE_HREF`; replace all four logo copies when Header Settings changes the logo.
 
 ## 10. Design system
