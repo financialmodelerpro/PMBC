@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 
 import { SaveButton } from '@/components/admin/SaveButton';
 import { ADMIN_COLORS, adminCard, adminFieldHint, adminInput, adminLabel } from '@/lib/admin/styles';
+import { GROWTH_SERVICES } from '@/lib/growth/model';
 import { SETTINGS_LIMITS, WEEKDAYS, parseDayList, settingsSchema, type GrowthSettings } from '@/lib/growth/settingsModel';
 
 type Form = {
@@ -18,6 +19,7 @@ type Form = {
   ai_alert_threshold_pct: string;
   ai_alert_email: string;
   retention_months: string;
+  priority_services: string[];
 };
 
 function toForm(s: GrowthSettings): Form {
@@ -32,6 +34,7 @@ function toForm(s: GrowthSettings): Form {
     ai_alert_threshold_pct: String(s.ai_alert_threshold_pct),
     ai_alert_email: s.ai_alert_email,
     retention_months: String(s.retention_months),
+    priority_services: [...s.priority_services],
   };
 }
 
@@ -49,6 +52,7 @@ function toInput(f: Form) {
     ai_alert_threshold_pct: num(f.ai_alert_threshold_pct),
     ai_alert_email: f.ai_alert_email,
     retention_months: num(f.retention_months),
+    priority_services: GROWTH_SERVICES.map((s) => s.value).filter((v) => f.priority_services.includes(v)),
   };
 }
 
@@ -129,6 +133,21 @@ export function SettingsForm({ settings, spentThisMonthUsd }: { settings: Growth
                 );
               })}
             </div>
+          </div>
+          <div style={{ marginTop: 16 }}>
+            <span style={adminLabel}>Priority services for outreach</span>
+            <div role="group" aria-label="Priority services" style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+              {GROWTH_SERVICES.map((svc) => {
+                const on = form.priority_services.includes(svc.value);
+                return (
+                  <label key={svc.value} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, padding: '6px 10px', border: `1px solid ${on ? ADMIN_COLORS.primary : ADMIN_COLORS.border}`, borderRadius: 999, background: on ? '#EEF3F9' : '#FFFFFF' }}>
+                    <input type="checkbox" checked={on} onChange={() => setForm((f) => ({ ...f, priority_services: on ? f.priority_services.filter((x) => x !== svc.value) : [...f.priority_services, svc.value] }))} />
+                    {svc.label}
+                  </label>
+                );
+              })}
+            </div>
+            <span style={{ ...adminFieldHint, display: 'block', marginTop: 6 }}>The site&apos;s nine services. Outreach and scoring favour the ones ticked.</span>
           </div>
         </>,
       )}

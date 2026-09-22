@@ -52,7 +52,7 @@ export default async function KbItemPage(props: { params: Promise<{ id: string }
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 420px), 1fr))', gap: 20, alignItems: 'start' }}>
         <KbEditor
-          item={{ id: item.id, kind: item.kind, title: item.title, content: item.content, site_service_slug: item.site_service_slug, case_study_id: item.case_study_id, status: item.status }}
+          item={{ id: item.id, kind: item.kind, title: item.title, content: item.content, site_service_slug: item.site_service_slug, case_study_id: item.case_study_id, related_service_slugs: item.related_service_slugs, status: item.status }}
           caseStudies={caseStudies}
         />
 
@@ -72,7 +72,12 @@ export default async function KbItemPage(props: { params: Promise<{ id: string }
                 <p style={{ margin: 0, fontWeight: 600, fontSize: 13 }}>{item.approved_title}</p>
                 {typeof approved.site_service_slug === 'string' && (
                   <p style={{ margin: '6px 0 0', fontSize: 12, color: ADMIN_COLORS.textBody }}>
-                    Public site service: {SITE_SERVICE_OPTIONS.find((s) => s.slug === approved.site_service_slug)?.title ?? approved.site_service_slug}
+                    Site page: /services/{approved.site_service_slug}
+                  </p>
+                )}
+                {Array.isArray(approved.related_service_slugs) && approved.related_service_slugs.length > 0 && (
+                  <p style={{ margin: '6px 0 0', fontSize: 12, color: ADMIN_COLORS.textBody }}>
+                    Related services: {approved.related_service_slugs.map((slug) => SITE_SERVICE_OPTIONS.find((s) => s.slug === slug)?.title ?? slug).join(', ')}
                   </p>
                 )}
                 {typeof approved.case_study_id === 'string' && (

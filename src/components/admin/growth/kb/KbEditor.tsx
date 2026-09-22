@@ -16,6 +16,7 @@ export type KbEditorItem = {
   content: KbContent;
   site_service_slug: string | null;
   case_study_id: string | null;
+  related_service_slugs: string[];
   status: KbStatus;
 };
 
@@ -49,23 +50,24 @@ export function KbEditor({ item, caseStudies }: { item: KbEditorItem; caseStudie
   const cfg = kbKind(item.kind);
   const [title, setTitle] = useState(item.title);
   const [form, setForm] = useState<Record<string, string>>(() => toForm(item.kind, item.content));
-  const [siteService, setSiteService] = useState(item.site_service_slug ?? '');
+  const siteService = item.site_service_slug ?? '';
   const [caseStudy, setCaseStudy] = useState(item.case_study_id ?? '');
-  const [saved, setSaved] = useState({ title: item.title, form: toForm(item.kind, item.content), siteService: item.site_service_slug ?? '', caseStudy: item.case_study_id ?? '' });
+  const [related, setRelated] = useState<string[]>(item.related_service_slugs);
+  const [saved, setSaved] = useState({ title: item.title, form: toForm(item.kind, item.content), siteService: item.site_service_slug ?? '', caseStudy: item.case_study_id ?? '', related: item.related_service_slugs });
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
 
   const archived = item.status === 'archived';
-  const dirty = title !== saved.title || siteService !== saved.siteService || caseStudy !== saved.caseStudy || JSON.stringify(form) !== JSON.stringify(saved.form);
+  const dirty = title !== saved.title || caseStudy !== saved.caseStudy || JSON.stringify(related) !== JSON.stringify(saved.related) || JSON.stringify(form) !== JSON.stringify(saved.form);
   const payload = () => ({
     title,
     content: fromForm(item.kind, form),
-    site_service_slug: cfg.link === 'site_service' ? siteService || null : null,
     case_study_id: cfg.link === 'case_study' ? caseStudy || null : null,
+    related_service_slugs: cfg.link === 'related_services' ? SITE_SERVICE_OPTIONS.map((o) => o.slug).filter((slug) => related.includes(slug)) : [],
   });
   const problems = useMemo(
-    () => approvalProblems({ kind: item.kind, title, content: fromForm(item.kind, form), site_service_slug: siteService || null, case_study_id: caseStudy || null }),
-    [item.kind, title, form, siteService, caseStudy],
+    () => approvalProblems({ kind: item.kind, title, content: fromForm(item.kind, form), site_service_slug: siteService || null, case_study_id: caseStudy || null, related_service_slugs: related }),
+    [item.kind, title, form, siteService, caseStudy, related],
   );
 
   async function save(): Promise<boolean> {
@@ -83,7 +85,7 @@ export function KbEditor({ item, caseStudies }: { item: KbEditorItem; caseStudie
         router.push(`/admin/growth/knowledge-base/${data.item.id}`);
         return true;
       }
-      setSaved({ title, form, siteService, caseStudy });
+      setSaved({ title, form, siteService, caseStudy, related });
       setMessage({ tone: 'ok', text: item.status === 'approved' ? 'Saved. AI agents keep the approved copy until you approve again.' : 'Saved as a draft.' });
       router.refresh();
       return true;
@@ -115,20 +117,36 @@ export function KbEditor({ item, caseStudies }: { item: KbEditorItem; caseStudie
       )}
       <fieldset disabled={archived || saving} style={{ border: 0, padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 18, minWidth: 0 }}>
         {field(cfg.titleLabel, <input value={title} maxLength={KB_LIMITS.title} onChange={(e) => setTitle(e.target.value)} style={adminInput} />, undefined, true)}
-        {cfg.link === 'site_service' &&
-          field(
-            'Related public site service',
-            <select value={siteService} onChange={(e) => setSiteService(e.target.value)} style={adminInput}>
-              <option value="">Choose a service</option>
-              {SITE_SERVICE_OPTIONS.map((s) => (
-                <option key={s.slug} value={s.slug}>
-                  {s.title}
-                </option>
-              ))}
-            </select>,
-            'The public site keeps its own list of nine services. This maps the Growth service to the closest one.',
-            true,
-          )}
+        {cfg.link === 'site_page' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <span style={adminLabel}>Site page</span>
+            {siteService ? (
+              <a href={`/services/${siteService}`} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, color: ADMIN_COLORS.primary }}>
+                /services/{siteService}
+              </a>
+            ) : (
+              <span style={{ fontSize: 13, color: ADMIN_COLORS.danger }}>No site page: this is not one of the site services.</span>
+            )}
+            <span style={adminFieldHint}>Each Growth service is one of the site&apos;s nine services, named as on the site and linked to its own page.</span>
+          </div>
+        )}
+        {cfg.link === 'related_services' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <span style={adminLabel}>Related services</span>
+            <div role="group" aria-label="Related services" style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {SITE_SERVICE_OPTIONS.map((o) => {
+                const on = related.includes(o.slug);
+                return (
+                  <label key={o.slug} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, padding: '6px 10px', border: `1px solid ${on ? ADMIN_COLORS.primary : ADMIN_COLORS.border}`, borderRadius: 999, background: on ? '#EEF3F9' : '#FFFFFF' }}>
+                    <input type="checkbox" checked={on} onChange={() => setRelated((r) => (on ? r.filter((x) => x !== o.slug) : [...r, o.slug]))} />
+                    {o.title}
+                  </label>
+                );
+              })}
+            </div>
+            <span style={adminFieldHint}>The services this offer leads into. Agents read them with the approved offer.</span>
+          </div>
+        )}
         {cfg.link === 'case_study' &&
           field(
             'Case study record',

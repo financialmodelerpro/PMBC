@@ -19,8 +19,9 @@ import {
 } from '@/lib/admin/styles';
 import { requireGrowthSession } from '@/lib/growth/access';
 import { hasUnapprovedEdits, kbReadiness, listKbItems, type KbItem } from '@/lib/growth/kb';
-import { KB_KINDS, KB_STATUSES, approvalProblems, isKbKind, type KbStatus } from '@/lib/growth/kbModel';
+import { KB_KINDS, KB_SERVICE_KEYS, KB_STATUSES, approvalProblems, isKbKind, type KbStatus } from '@/lib/growth/kbModel';
 import { growthPage } from '@/lib/growth/pages';
+import { getGrowthSettings } from '@/lib/growth/settings';
 
 export const metadata: Metadata = { title: 'Knowledge Base | Growth | PMBC Admin', robots: { index: false, follow: false } };
 export const dynamic = 'force-dynamic';
@@ -40,7 +41,11 @@ export default async function GrowthKnowledgeBasePage(props: { searchParams: Pro
   const kind = typeof search.kind === 'string' && isKbKind(search.kind) ? search.kind : null;
   const status = typeof search.status === 'string' && (KB_STATUSES as readonly string[]).includes(search.status) ? (search.status as KbStatus) : null;
 
-  const { items, missingTable, error } = await listKbItems();
+  const [{ items, missingTable, error }, settingsRead] = await Promise.all([listKbItems(), getGrowthSettings()]);
+  const priority = new Set(settingsRead.settings.priority_services);
+  // Before migration 086 the services are the old six, not the site's nine.
+  const liveServiceKeys = items.filter((i) => i.kind === 'service' && i.status !== 'archived').map((i) => i.item_key ?? '');
+  const servicesAligned = liveServiceKeys.length === KB_SERVICE_KEYS.length && KB_SERVICE_KEYS.every((k) => liveServiceKeys.includes(k));
   const readiness = kbReadiness(items);
   const shown = items.filter((i) => (!kind || i.kind === kind) && (!status || i.status === status));
   const kinds = KB_KINDS.filter((k) => !kind || k.kind === kind);
@@ -52,6 +57,9 @@ export default async function GrowthKnowledgeBasePage(props: { searchParams: Pro
         <MigrationNotice migration="084_growth_knowledge_base.sql" table="growth_kb_items" effect="Until then there is nothing to edit, and AI agents receive no knowledge." />
       )}
       {error && <p style={{ color: ADMIN_COLORS.danger, fontSize: 13 }}>Could not load the Knowledge Base: {error}</p>}
+      {!missingTable && !error && !servicesAligned && (
+        <MigrationNotice migration="086_growth_nine_services.sql" table="nine site services" effect="Until then the services here are the old list, not the site's nine." />
+      )}
 
       {!missingTable && !error && (
         <>
@@ -138,7 +146,7 @@ export default async function GrowthKnowledgeBasePage(props: { searchParams: Pro
                         </tr>
                       )}
                       {rows.map((i) => (
-                        <Row key={i.id} item={i} />
+                        <Row key={i.id} item={i} priority={i.kind === 'service' && i.status !== 'archived' && priority.has(i.item_key ?? '')} />
                       ))}
                     </tbody>
                   </table>
@@ -152,7 +160,7 @@ export default async function GrowthKnowledgeBasePage(props: { searchParams: Pro
   );
 }
 
-function Row({ item: i }: { item: KbItem }) {
+function Row({ item: i, priority }: { item: KbItem; priority: boolean }) {
   const edits = i.status === 'approved' && hasUnapprovedEdits(i);
   const problems = approvalProblems({ kind: i.kind, title: i.title, content: i.content, site_service_slug: i.site_service_slug, case_study_id: i.case_study_id });
   const actions = i.status === 'archived' ? (['restore'] as const) : i.status === 'approved' && !edits ? (['archive'] as const) : (['approve', 'archive'] as const);
@@ -162,6 +170,14 @@ function Row({ item: i }: { item: KbItem }) {
         <Link href={`/admin/growth/knowledge-base/${i.id}`} style={{ fontWeight: 600, color: ADMIN_COLORS.primary, textDecoration: 'none' }}>
           {i.title}
         </Link>
+        {priority && <span style={{ ...adminBadge('success'), marginLeft: 6 }}>Priority</span>}
+        {i.kind === 'service' && i.site_service_slug && i.status !== 'archived' && (
+          <div style={{ fontSize: 12 }}>
+            <a href={`/services/${i.site_service_slug}`} target="_blank" rel="noopener noreferrer" style={{ color: ADMIN_COLORS.textMuted }}>
+              /services/{i.site_service_slug}
+            </a>
+          </div>
+        )}
       </td>
       <td style={{ ...adminTd, whiteSpace: 'nowrap' }}>
         <span style={adminBadge(STATUS_TONE[i.status])}>{STATUS_LABEL[i.status]}</span>
