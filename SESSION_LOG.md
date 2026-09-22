@@ -4,6 +4,25 @@ Chronological build history for the PMBC website. Split out of `CLAUDE.md` to ke
 
 ---
 
+## 2026-09-22: CRON_SECRET set, Tool Leads delete and collapsible rows
+
+**CRON_SECRET.** Generated locally (32 random bytes, hex), never written to the repository, set by
+the owner on Vercel Production and redeployed. Checked with GET only: `/api/cron/tool-reminders`
+answers 401 without the secret where it answered 503, and the production deployment is `aa14746`.
+The daily 06:00 UTC schedule is in `vercel.json`; the Vercel API available here does not list
+registered cron jobs, so the owner confirms it under Settings, Cron Jobs. Item 1 of the handoff
+below is closed.
+
+**Tool Leads** (`feat/tool-leads-delete`). Each email is one row with its valuations behind an
+arrow, closed by default, showing the number of valuations and the latest date. Admins can delete a
+lead (every valuation under the email), a single valuation, or several ticked leads, each behind a
+confirmation; editors see no delete controls and the route refuses them. Events cascade with the
+lead. Deleting one valuation while others remain moves the person's reminder, unsubscribe and
+booked events to the newest remaining valuation first, so the delete cannot resend a reminder or
+restart them after an unsubscribe. One audit row per valuation removed. `verify-tool-followup` 48
+(section 5 is the deletion plan, break-tested by reversing the carry order). Nothing was deleted
+from production: the owner deletes the test entries.
+
 ## Handoff, 2026-09-21 (read this first)
 
 **State at close.** Production matches `main` (the documentation merge of 2026-09-21; `/api/health`

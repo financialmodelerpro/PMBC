@@ -36,6 +36,7 @@ const resume = await jiti.import(path.join(root, 'src/lib/tools/leads/resumeLink
 const templates = await jiti.import(path.join(root, 'src/lib/tools/email/templates.ts'));
 const leads = await jiti.import(path.join(root, 'src/lib/tools/leads/valuation.ts'));
 const state = await jiti.import(path.join(root, 'src/components/tools/valuation/state.ts'));
+const deletion = await jiti.import(path.join(root, 'src/lib/tools/leads/deleteLeads.ts'));
 const contact = await jiti.import(path.join(root, 'src/lib/tools/contactCountries.ts'));
 const countries = await jiti.import(path.join(root, 'src/lib/public/countries.ts'));
 
@@ -129,6 +130,32 @@ console.log('4. Save and return');
   check('results email carries the edit and rerun link, marked personal', email.body.includes('Edit and rerun your valuation') && email.body.includes('resume=abcdefghijkmnpqr') && email.body.includes('do not forward'));
   const plain = templates.buildResultsEmail({ template: templates.DEFAULT_TEMPLATES[templates.RESULTS_TEMPLATE_KEY], name: 'A', email: 'a@example.com', company: null, result, bookingHref: 'https://www.pacemakersglobal.com/b/abcdefghijkme' });
   check('without a resume link the results email is as before', !plain.body.includes('Edit and rerun'));
+}
+
+console.log('5. Deleting leads');
+{
+  const rows = [
+    { id: 'j1', email: 'jane@acme.com', created_at: '2026-09-19T10:00:00Z' },
+    { id: 'j2', email: 'Jane@Acme.com', created_at: '2026-09-21T10:00:00Z' },
+    { id: 'j3', email: 'jane@acme.com', created_at: '2026-09-20T10:00:00Z' },
+    { id: 'o1', email: 'omar@gulf.com', created_at: '2026-09-18T10:00:00Z' },
+  ];
+  const sorted = (a) => [...a].sort().join(',');
+  const whole = deletion.planLeadDeletion(rows, { emails: ['JANE@acme.com'] });
+  check('a person: every valuation under the email, matched case-insensitively', sorted(whole.deleteIds) === 'j1,j2,j3', sorted(whole.deleteIds));
+  check('a person: nothing kept, so nothing carried', whole.carry.length === 0);
+  const newest = deletion.planLeadDeletion(rows, { ids: ['j2'] });
+  check('one valuation: only that valuation', sorted(newest.deleteIds) === 'j2');
+  check('one valuation: person events move to the newest remaining valuation', newest.carry.length === 1 && newest.carry[0].toId === 'j3' && sorted(newest.carry[0].fromIds) === 'j2', JSON.stringify(newest.carry));
+  const two = deletion.planLeadDeletion(rows, { ids: ['j2', 'j3'] });
+  check('two of three: both carried to the one left', two.carry.length === 1 && two.carry[0].toId === 'j1' && sorted(two.carry[0].fromIds) === 'j2,j3');
+  const only = deletion.planLeadDeletion(rows, { ids: ['o1'] });
+  check('the only valuation: deleted, nothing carried', sorted(only.deleteIds) === 'o1' && only.carry.length === 0);
+  const bulk = deletion.planLeadDeletion(rows, { emails: ['jane@acme.com', 'omar@gulf.com'] });
+  check('several people at once', bulk.deleteIds.length === 4 && bulk.carry.length === 0);
+  const stale = deletion.planLeadDeletion(rows, { ids: ['gone'], emails: ['nobody@example.com'] });
+  check('ids and emails that match nothing delete nothing', stale.deleteIds.length === 0 && stale.carry.length === 0);
+  check('carried events are the person events', sorted(deletion.PERSON_EVENTS) === sorted([reminders.REMINDER_EVENT, reminders.UNSUBSCRIBED_EVENT, reminders.BOOKED_EVENT]));
 }
 
 const base = process.env.VERIFY_BASE;
