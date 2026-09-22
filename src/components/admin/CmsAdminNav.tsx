@@ -122,7 +122,7 @@ const NAV: NavEntry[] = [
   { kind: 'item', label: 'Change Password', href: '/admin/change-password', icon: KeyRound },
   { kind: 'item', label: 'Audit Log', href: '/admin/audit', icon: History, role: 'admin' },
   { kind: 'divider', label: 'Growth' },
-  { kind: 'item', label: 'Growth', href: '/admin/growth', icon: TrendingUp },
+  { kind: 'item', label: 'Growth', href: '/admin/growth', icon: TrendingUp, role: 'admin' },
 ];
 
 const EXTERNAL_LINKS: Array<{ label: string; href: string }> = [

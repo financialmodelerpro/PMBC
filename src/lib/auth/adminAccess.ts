@@ -16,6 +16,9 @@ import type { AdminRole } from './requireAdmin';
  * can be audited should not be able to read or reshape the audit. User
  * management is on the list for the obvious reason.
  *
+ * **The Growth Engine is here** (since Unit 1.2, 2026-09-22): it holds prospects,
+ * contacts and outreach, which is commercial data rather than site content.
+ *
  * **Pages and Nav is deliberately not here.** It reorders and hides navigation
  * items, which is content work, and hiding is the operation editors are trusted
  * with everywhere else.
@@ -26,6 +29,7 @@ export const ADMIN_ONLY_PREFIXES: readonly string[] = [
   '/admin/footer-links',
   '/admin/users',
   '/admin/audit',
+  '/admin/growth',
 ];
 
 /** True when `pathname` is a screen only an `admin` may open. */
