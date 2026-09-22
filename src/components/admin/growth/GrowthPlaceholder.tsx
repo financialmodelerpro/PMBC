@@ -10,13 +10,15 @@ import { growthPage, type GrowthPageKey } from '@/lib/growth/pages';
  * build phase delivers it. No data is read and nothing is invented.
  *
  * Checks the session itself before rendering (see `requireGrowthSession`).
+ * `children`, when given, render between the header and the empty state.
  */
-export async function GrowthPlaceholder({ pageKey }: { pageKey: GrowthPageKey }) {
+export async function GrowthPlaceholder({ pageKey, children }: { pageKey: GrowthPageKey; children?: React.ReactNode }) {
   await requireGrowthSession();
   const page = growthPage(pageKey);
   return (
     <>
       <AdminPageHeader eyebrow="Growth Engine" title={page.title} description={page.purpose} />
+      {children}
       <div style={{ ...adminCard, textAlign: 'center', padding: '48px 24px', color: ADMIN_COLORS.textMuted }}>
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>
           <Hourglass size={28} color={ADMIN_COLORS.textMicro} aria-hidden />
