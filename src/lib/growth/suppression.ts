@@ -38,6 +38,31 @@ export type Suppression = {
   removed_reason: string | null;
 };
 
+/**
+ * Free and shared email providers. Suppressing one of these as a domain would
+ * block everyone who uses it, so it needs an explicit confirmation (Unit 1.5).
+ */
+export const SHARED_EMAIL_DOMAINS: ReadonlySet<string> = new Set([
+  'gmail.com', 'googlemail.com', 'outlook.com', 'outlook.sa', 'hotmail.com', 'hotmail.co.uk', 'live.com', 'msn.com',
+  'yahoo.com', 'yahoo.co.uk', 'ymail.com', 'rocketmail.com', 'icloud.com', 'me.com', 'mac.com', 'aol.com',
+  'proton.me', 'protonmail.com', 'pm.me', 'gmx.com', 'gmx.net', 'mail.com', 'zoho.com', 'zohomail.com',
+  'yandex.com', 'yandex.ru', 'qq.com', '163.com', '126.com', 'mail.ru', 'fastmail.com', 'tutanota.com', 'hey.com',
+]);
+
+/** Public suffixes a domain entry must never be: suppressing one would block whole countries or sectors. */
+export const PUBLIC_SUFFIXES: ReadonlySet<string> = new Set([
+  'com.sa', 'net.sa', 'org.sa', 'edu.sa', 'gov.sa', 'med.sa', 'co.ae', 'com.qa', 'com.kw', 'com.bh', 'com.om',
+  'com.pk', 'co.uk', 'org.uk', 'ac.uk', 'com.au', 'co.in', 'com.eg', 'com.jo', 'com.tr',
+]);
+
+export function isSharedEmailDomain(domain: string): boolean {
+  return SHARED_EMAIL_DOMAINS.has(domain.toLowerCase());
+}
+
+export function isPublicSuffix(domain: string): boolean {
+  return PUBLIC_SUFFIXES.has(domain.toLowerCase());
+}
+
 const EMAIL = /^[^@\s]+@[^@\s]+$/;
 const DOMAIN = /^[a-z0-9-]+(\.[a-z0-9-]+)+$/;
 
@@ -146,15 +171,21 @@ export async function listSuppressions(opts: { includeRemoved?: boolean; include
   }
 }
 
-export type SuppressionWrite = { ok: true; row: Suppression } | { ok: false; status: number; error: string };
+export type SuppressionWrite = { ok: true; row: Suppression } | { ok: false; status: number; error: string; code?: 'shared_domain' | 'public_suffix' };
 
 export async function addSuppression(
-  input: { kind: SuppressionKind; value: string; reason: string; source?: SuppressionSource; sourceRef?: string | null },
+  input: { kind: SuppressionKind; value: string; reason: string; source?: SuppressionSource; sourceRef?: string | null; confirmSharedDomain?: boolean },
   actor: Actor | null,
   opts: { isTest?: boolean } = {},
 ): Promise<SuppressionWrite> {
   const value = normaliseSuppressionValue(input.kind, input.value);
   if (!value) return { ok: false, status: 422, error: input.kind === 'email' ? 'Enter a valid email address' : 'Enter a valid domain, for example example.com' };
+  if (input.kind === 'domain' && isPublicSuffix(value)) {
+    return { ok: false, status: 422, code: 'public_suffix', error: `${value} is a public suffix, not an organisation's domain. Suppress the organisation's own domain instead.` };
+  }
+  if (input.kind === 'domain' && isSharedEmailDomain(value) && !input.confirmSharedDomain) {
+    return { ok: false, status: 409, code: 'shared_domain', error: `${value} is a shared email provider. Suppressing it blocks everyone who uses ${value}. Suppress the individual email address instead, or confirm to block the whole domain.` };
+  }
   const reason = input.reason.trim();
   if (!reason) return { ok: false, status: 422, error: 'Give a reason' };
   const { data, error } = await growthDb()
