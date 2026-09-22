@@ -51,7 +51,7 @@ chosen instead, and why. **Read the file before re-running one.** The list below
 is an index, not a substitute.
 
 Three flags matter when rebuilding:
-- **DDL** migrations (031, 032, 033, 072, 076, 077, 082, 083) use `ALTER TABLE`, which supabase-js cannot
+- **DDL** migrations (031, 032, 033, 072, 076, 077, 082, 083, 084) use `ALTER TABLE`, which supabase-js cannot
   execute. Paste them into the Supabase SQL editor by hand. Everything that reads
   those columns degrades safely if they are absent.
 - **Destructive on re-run** (034, 048, 049) delete and reinsert, so re-applying
@@ -128,19 +128,20 @@ Three flags matter when rebuilding:
 081  tools_nav_item            DML, safe any time. A hidden "Tools" row in Pages & Nav after Financial Modeler Pro, only if no /tools row exists
 082  tool_lead_phone           **DDL, HAND-RUN.** phone and contact_country on tool_leads, plus an index on lower(email). Applied 2026-09-21. Missing columns: leads save without them
 083  growth_core               **DDL, HAND-RUN.** Growth Engine: growth_companies, growth_contacts, growth_leads, growth_signals, growth_activity. RLS on, anon and authenticated revoked, is_test on every table. Applied 2026-09-22
+084  growth_knowledge_base   **DDL, HAND-RUN.** growth_kb_items (working and approved copy, activity logged by trigger) and ten empty starter drafts; growth_activity gains clock_timestamp() created_at, a seq identity and kb_item_id. Applied 2026-09-22
 ```
 
 **Every migration from 076 on states when it is safe to apply** in a `SAFE TO APPLY:` line in its header: before or after which deploy, and what the site does in the gap. 075 is why: it was applied before the routes it linked to were deployed, and previews share the production database, so the live footer linked to a 404.
 
 After running migrations, manually insert one admin_users row via SQL with a bcrypt hash for the password.
 
-**DDL migrations must be run by hand.** 031, 032, 033, 072, 076, 077, 082 and 083 use `ALTER TABLE` or `CREATE TABLE`, which supabase-js cannot execute. The Supabase CLI is not installed and `.env.local` carries no direct Postgres connection string, so the seed-script pattern used for 029 does not work for them. Paste them into the Supabase SQL editor. Every consumer of those columns degrades safely if the migration has not run: the page list treats a missing `is_system` as "system" so nothing is deletable, `writeAudit` retries without the diff columns rather than failing the mutation, and `/api/admin/site-pages` replays a write with `can_toggle` stripped when Postgres rejects the column (so Pages & Nav keeps working, minus pinning).
+**DDL migrations must be run by hand.** 031, 032, 033, 072, 076, 077, 082, 083 and 084 use `ALTER TABLE` or `CREATE TABLE`, which supabase-js cannot execute. The Supabase CLI is not installed and `.env.local` carries no direct Postgres connection string, so the seed-script pattern used for 029 does not work for them. Paste them into the Supabase SQL editor. Every consumer of those columns degrades safely if the migration has not run: the page list treats a missing `is_system` as "system" so nothing is deletable, `writeAudit` retries without the diff columns rather than failing the mutation, and `/api/admin/site-pages` replays a write with `can_toggle` stripped when Postgres rejects the column (so Pages & Nav keeps working, minus pinning).
 
 ### Rebuilding this database
 
-Run every migration in order, and remember that **031, 032, 033, 072, 076, 077, 082 and 083 are DDL and
+Run every migration in order, and remember that **031, 032, 033, 072, 076, 077, 082, 083 and 084 are DDL and
 need the Supabase SQL editor**: supabase-js cannot execute `ALTER TABLE` and this
-repository has no direct Postgres connection string. All eight are applied and
+repository has no direct Postgres connection string. All nine are applied and
 verified live on the current database. Everything that reads those columns
 degrades safely when they are absent, which is what let Pages & Nav keep working
 before 033 was run.

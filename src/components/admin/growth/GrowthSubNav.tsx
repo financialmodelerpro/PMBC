@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import type { CSSProperties } from 'react';
+import { useEffect, useRef, type CSSProperties } from 'react';
 
 import { ADMIN_COLORS } from '@/lib/admin/styles';
 import { GROWTH_BASE_PATH, GROWTH_PAGES } from '@/lib/growth/pages';
@@ -28,12 +28,20 @@ const tab: CSSProperties = {
 
 /**
  * The Growth section's own navigation, one pill per page in `GROWTH_PAGES`
- * order. Scrolls sideways on a narrow screen rather than wrapping into rows.
+ * order. Scrolls sideways on a narrow screen rather than wrapping into rows,
+ * bringing the current page's pill into view.
  */
 export function GrowthSubNav() {
   const pathname = usePathname() ?? '';
+  const navRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const nav = navRef.current;
+    const active = nav?.querySelector<HTMLElement>('[aria-current="page"]');
+    // Only when it overflows, so a wide screen never scrolls the page.
+    if (nav && active && nav.scrollWidth > nav.clientWidth) active.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  }, [pathname]);
   return (
-    <nav aria-label="Growth sections" style={{ overflowX: 'auto', marginBottom: 24, paddingBottom: 4 }}>
+    <nav ref={navRef} aria-label="Growth sections" style={{ overflowX: 'auto', marginBottom: 24, paddingBottom: 4 }}>
       <ul style={{ display: 'flex', gap: 8, listStyle: 'none', margin: 0, padding: 0 }}>
         {GROWTH_PAGES.map((page) => {
           const active = isActive(pathname, page.href);
