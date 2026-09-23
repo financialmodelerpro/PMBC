@@ -324,6 +324,7 @@ export async function updateLead(id: string, patch: Partial<LeadInput>, actor: A
   if (!before) return { ok: false, status: 404, error: 'Lead not found' };
   const next: Record<string, unknown> = { ...patch };
   const stageChanged = patch.stage && patch.stage !== before.stage;
+  if (stageChanged && patch.stage === 'lost' && !(patch.lost_reason ?? before.lost_reason)?.trim()) return { ok: false, status: 422, error: 'Give the reason the lead was lost' };
   if (stageChanged) next.stage_changed_at = new Date().toISOString();
   const { data, error } = await growthDb().from('growth_leads').update(next).eq('id', id).select('*').single();
   if (error || !data) return dbError(error ?? {}, 'lead');

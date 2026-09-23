@@ -195,10 +195,19 @@ export function MeetingsSettingsForm({ values, pending }: { values: EngineSettin
   const [url, setUrl] = useState(values.bookings_url);
   const { busy, notice, save } = useSave('meetings');
   return (
-    <Card id="meeting-settings" title="Meetings" intro="The Microsoft Bookings page offered to qualified leads by the website chat and in no-show rebooking emails. Empty uses the site's /book page." pending={pending}>
-      <Field label="Microsoft Bookings link">
-        <input value={url} onChange={(e) => setUrl(e.target.value)} style={adminInput} placeholder="https://outlook.office365.com/book/..." />
+    <Card
+      id="meeting-settings"
+      title="Booking link"
+      intro="Every booking offer uses the site's own /book page (pacemakersglobal.com/book) unless a direct Bookings link is entered here. That covers the website chat, no-show rebooking emails, meeting recaps and outreach drafts. Leave it empty to keep /book."
+      pending={pending}
+    >
+      <Field
+        label="Direct Microsoft Bookings link (optional)"
+        hint="Enter one only if you want people to skip the /book page and go straight to your Bookings calendar, for example if /book stops showing your booking calendar or you want a separate calendar for Growth leads. Empty means /book."
+      >
+        <input value={url} onChange={(e) => setUrl(e.target.value)} style={adminInput} placeholder="Empty: the site's /book page is used" />
       </Field>
+      <p style={{ margin: '8px 0 0', fontSize: 12, color: ADMIN_COLORS.textMuted }}>Now in use: {url.trim() || 'https://www.pacemakersglobal.com/book'}</p>
       <div style={{ marginTop: 12 }}>
         <PrimaryButton disabled={busy !== null} onClick={() => save({ bookings_url: url.trim() })}>
           Save meeting settings

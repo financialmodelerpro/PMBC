@@ -27,6 +27,7 @@ import { logActivity } from './activity';
 import { isMockMode } from './ai/provider';
 import { runAi } from './ai/run';
 import { extractJsonObject, knowledgeText } from './agents/json';
+import { growthBookingUrl } from './booking';
 import type { WriteResult } from './api';
 import { growthDb, tableExists } from './db';
 import { getEngineSettings, usable } from './engineSettings';
@@ -104,11 +105,8 @@ export async function publicChatAvailable(): Promise<boolean> {
 
 const newToken = () => randomBytes(24).toString('base64url');
 
-async function bookingUrl(): Promise<string> {
-  const engine = await getEngineSettings();
-  const url = engine.missing.includes('bookings_url') ? '' : engine.values.bookings_url;
-  return url || `${SITE_HREF}/book`;
-}
+/** The one booking rule (booking.ts): the site's /book page unless a direct link is set. */
+const bookingUrl = growthBookingUrl;
 
 export async function openingFor(path: string, trackToken: string | null): Promise<string> {
   const link = trackToken ? await linkByToken(trackToken) : null;
@@ -322,7 +320,7 @@ export async function handleChat(req: ChatRequest, ctx: ChatContext): Promise<Wr
   if (screen.kind !== 'ok') {
     const reply = FIXED_REPLIES[screen.kind];
     await addMessage(c, 'assistant', reply, { flag: screen.kind });
-    if (screen.kind === 'injection') {
+    if (screen.kind === 'injection' || screen.kind === 'clients') {
       await growthDb().from('growth_conversations').update(bump).eq('id', c.id);
       return { ok: true, value: { ...base, token: c.access_token, reply } };
     }
