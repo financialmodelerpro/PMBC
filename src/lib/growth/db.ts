@@ -37,6 +37,8 @@ export const GROWTH_TABLE_MIGRATIONS = {
   growth_link_clicks: '089_growth_outreach.sql',
   growth_opportunities: '089_growth_outreach.sql',
   growth_tasks: '089_growth_outreach.sql',
+  growth_conversations: '090_growth_website_chat.sql',
+  growth_chat_messages: '090_growth_website_chat.sql',
 } as const;
 export type GrowthTable = keyof typeof GROWTH_TABLE_MIGRATIONS;
 export const GROWTH_TABLES = Object.keys(GROWTH_TABLE_MIGRATIONS) as GrowthTable[];
