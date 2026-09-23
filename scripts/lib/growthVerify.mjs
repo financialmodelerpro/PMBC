@@ -105,6 +105,51 @@ export function publicChanges(allowed = []) {
     .filter((f) => !allowed.includes(f));
 }
 
+/**
+ * The public site guard (2026-09-23). With the website chat switched off,
+ * no public page may carry chat markup, the widget script, or any call to a
+ * Growth endpoint. GET requests only, against VERIFY_BASE (default the live
+ * site): every page in the sitemap plus a few that are not in it, and every
+ * script those pages load, since a network call would live in a script.
+ * Returns the offending findings; an empty list passes.
+ */
+export const PUBLIC_GUARD_MARKERS = ['/api/growth', 'growth/widget', '__pmbcChat', 'pmbc-chat', 'Ask PaceMakers a question', 'PaceMakers assistant', 'ChatWidget'];
+
+export async function publicSiteGuard(base = process.env.VERIFY_BASE || 'https://www.pacemakersglobal.com') {
+  const origin = base.replace(/\/+$/, '');
+  const get = async (url) => {
+    const res = await fetch(url, { method: 'GET', redirect: 'follow', headers: { 'user-agent': 'pmbc-public-guard' } });
+    return { status: res.status, text: await res.text() };
+  };
+  const sitemap = await get(`${origin}/sitemap.xml`);
+  const paths = new Set(['/', '/book', '/privacy', '/terms', '/confidentiality']);
+  for (const m of sitemap.text.matchAll(/<loc>([^<]+)<\/loc>/g)) {
+    try {
+      paths.add(new URL(m[1]).pathname || '/');
+    } catch {
+      // not a URL: skip it
+    }
+  }
+  const findings = [];
+  const scripts = new Set();
+  for (const p of paths) {
+    const page = await get(`${origin}${p}`);
+    if (page.status >= 400) continue;
+    for (const mk of PUBLIC_GUARD_MARKERS) if (page.text.includes(mk)) findings.push(`${p}: page contains "${mk}"`);
+    for (const s of page.text.matchAll(/<script[^>]*\ssrc="([^"]+)"/g)) scripts.add(s[1]);
+    for (const s of page.text.matchAll(/"(\/_next\/static\/[^"]+\.js)"/g)) scripts.add(s[1]);
+  }
+  for (const src of scripts) {
+    const url = src.startsWith('http') ? src : `${origin}${src}`;
+    if (!url.startsWith(origin)) continue;
+    const js = await get(url);
+    for (const mk of PUBLIC_GUARD_MARKERS) if (js.text.includes(mk)) findings.push(`${src}: script contains "${mk}"`);
+  }
+  const chat = await get(`${origin}/api/growth/chat?path=/`);
+  if (chat.status !== 404) findings.push(`/api/growth/chat answered ${chat.status}, expected 404 while the chat is off`);
+  return { findings, pages: paths.size, scripts: scripts.size };
+}
+
 export function serviceClient() {
   const url = process.env.SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;

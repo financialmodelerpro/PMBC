@@ -106,7 +106,9 @@ async function live(svc) {
     const ok = await review.decideReview(b, 'approve', null, actor);
     const { data: testAfter } = await svc.from('growth_settings').select('scoring_weights').eq('id', settings.TEST_SETTINGS_ROW).single();
     const { data: realAfter } = await svc.from('growth_settings').select('scoring_weights').eq('id', 1).single();
-    check('approving a test review applies its weights to the test row only', ok.ok && JSON.stringify(testAfter.scoring_weights) === JSON.stringify(suggested) && JSON.stringify(realAfter.scoring_weights) === JSON.stringify(realBefore.scoring_weights));
+    // The database returns JSONB with its keys sorted, so compare key by key.
+    const same = (a, b) => Object.keys(a).length === Object.keys(b).length && Object.keys(a).every((k) => a[k] === b[k]);
+    check('approving a test review applies its weights to the test row only', ok.ok && same(testAfter.scoring_weights, suggested) && same(realAfter.scoring_weights, realBefore.scoring_weights), ok.ok ? JSON.stringify(testAfter.scoring_weights) : ok.error);
   } finally {
     if (ids.length) await svc.from('growth_scoring_reviews').delete().eq('is_test', true).in('id', ids);
     await svc.from('growth_activity').delete().eq('is_test', true).gte('created_at', started);

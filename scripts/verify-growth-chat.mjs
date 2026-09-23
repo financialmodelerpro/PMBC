@@ -22,7 +22,7 @@
 
 import { execSync } from 'node:child_process';
 
-import { PHASE1_BASE, WRITE, adminOnlyGates, check, dashed, finish, load, markPending, migrationChecks, publicChanges, read, root, serviceClient, tableReady, walk } from './lib/growthVerify.mjs';
+import { PHASE1_BASE, WRITE, adminOnlyGates, publicSiteGuard, check, dashed, finish, load, markPending, migrationChecks, publicChanges, read, root, serviceClient, tableReady, walk } from './lib/growthVerify.mjs';
 
 const cm = await load('src/lib/growth/chatModel.ts');
 const ws = await load('src/lib/growth/widgetScript.ts');
@@ -103,8 +103,18 @@ console.log('4. Migration 090 and gates (offline)');
   check('no em or en dash in any Growth file or the layout', d.length === 0, d.join(', '));
 }
 
-console.log('5. Live database, test rows');
 const svc = serviceClient();
+console.log('5. Public site guard (GET only, the live site or VERIFY_BASE)');
+{
+  const { data: setting } = svc ? await svc.from('growth_settings').select('chat_widget_enabled').eq('id', 1).maybeSingle() : { data: null };
+  if (setting?.chat_widget_enabled) console.log('  The chat is switched on: the guard applies only while it is off.');
+  else {
+    const g = await publicSiteGuard();
+    check(`with the chat off, no chat markup, script or Growth call on ${g.pages} public pages and ${g.scripts} scripts`, g.findings.length === 0 && g.pages >= 10, g.findings.slice(0, 10).join('; '));
+  }
+}
+
+console.log('6. Live database, test rows');
 if (!svc) console.log('  SKIP  no SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
 else if (!(await tableReady(svc, 'growth_conversations'))) markPending('live preview conversations, consent and routing', '090_growth_website_chat.sql');
 else if (!WRITE) console.log('  Write phase skipped (pass --write-test-rows to run it).');
