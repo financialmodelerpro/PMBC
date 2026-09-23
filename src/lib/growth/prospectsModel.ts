@@ -92,6 +92,8 @@ export const leadFields = {
   next_action: optText(500),
   next_action_due: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
   lost_reason: optText(500),
+  /** Migration 089. */
+  meeting_requested: z.boolean().optional(),
 };
 
 export const leadCreateSchema = z.object(leadFields);
