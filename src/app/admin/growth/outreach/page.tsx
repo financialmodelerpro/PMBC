@@ -22,8 +22,9 @@ export const dynamic = 'force-dynamic';
 
 const h2 = { margin: 0, fontSize: 15, fontWeight: 700, color: ADMIN_COLORS.textHeading } as const;
 
-export default async function GrowthOutreachPage() {
+export default async function GrowthOutreachPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   await requireGrowthSession();
+  const includeTest = (await searchParams).test === '1';
   const page = growthPage('outreach');
   const ready = await outreachReady();
   if (!ready) {
@@ -35,10 +36,10 @@ export default async function GrowthOutreachPage() {
     );
   }
   const [candidates, drafts, waiting, sent, settings, engine] = await Promise.all([
-    outreachCandidates(),
-    listMessages(['draft']),
-    listMessages(['approved', 'scheduled', 'failed']),
-    listMessages(['sent'], { limit: 40 }),
+    outreachCandidates({ includeTest }),
+    listMessages(['draft'], { includeTest }),
+    listMessages(['approved', 'scheduled', 'failed'], { includeTest }),
+    listMessages(['sent'], { limit: 40, includeTest }),
     getGrowthSettings(),
     getEngineSettings(),
   ]);
@@ -51,7 +52,7 @@ export default async function GrowthOutreachPage() {
       <section style={{ ...adminCard, marginBottom: 16 }}>
         <OutreachJobs graphLive={graphLive} paused={engine.values.outreach_sending_paused} />
         <p style={{ margin: '10px 0 0', fontSize: 12, color: ADMIN_COLORS.textMuted }}>
-          Sends {describeDays(s.send_days)}, {s.send_start} to {s.send_end} Riyadh time, at most {s.daily_cold_email_cap} cold emails a day. Follow-ups on days {s.follow_up_days.join(', ')} after the first email, at most {s.max_follow_ups}. Every email carries an opt-out link; suppressed addresses are never sent to.{' '}
+          <Link href={includeTest ? '/admin/growth/outreach' : '/admin/growth/outreach?test=1'}>{includeTest ? 'Hide test and sample rows' : 'Include test and sample rows'}</Link>. Sends {describeDays(s.send_days)}, {s.send_start} to {s.send_end} Riyadh time, at most {s.daily_cold_email_cap} cold emails a day. Follow-ups on days {s.follow_up_days.join(', ')} after the first email, at most {s.max_follow_ups}. Every email carries an opt-out link; suppressed addresses are never sent to.{' '}
           {isMockMode() && (
             <>
               <MockBadge /> Drafts come from the mock AI until the Anthropic key is set.

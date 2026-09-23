@@ -64,13 +64,14 @@ export async function suppressedEmails(emails: string[]): Promise<Set<string>> {
   return out;
 }
 
-async function lookupsFor(rows: string[][], mapping: ImportMapping): Promise<Lookups> {
+async function lookupsFor(rows: string[][], mapping: ImportMapping, includeTest = false): Promise<Lookups> {
   const col = (k: keyof ImportMapping) => mapping[k];
   const body = rows.slice(1, IMPORT_LIMITS.rows + 1);
   const val = (r: string[], i: number | undefined) => (i === undefined ? '' : (r[i] ?? '').trim());
   const emails = [...new Set(body.map((r) => val(r, col('contact_email')).toLowerCase()).filter((e) => e.includes('@')))];
   const [companies, contacts, suppressed] = await Promise.all([
-    growthDb().from('growth_companies').select('id, name, website_domain').eq('is_test', false).limit(20000),
+    // A real import matches real companies only; a test import also sees test ones.
+    (includeTest ? growthDb().from('growth_companies').select('id, name, website_domain') : growthDb().from('growth_companies').select('id, name, website_domain').eq('is_test', false)).limit(20000),
     chunked(emails, 200, async (chunk) => {
       const { data } = await growthDb().from('growth_contacts').select('id, full_name, company_id, email').in('email', chunk);
       return (data ?? []) as { id: string; full_name: string; company_id: string | null; email: string }[];
@@ -90,13 +91,13 @@ async function lookupsFor(rows: string[][], mapping: ImportMapping): Promise<Loo
 
 export type ImportPreview = { headers: string[]; plan: PlannedRow[]; summary: ReturnType<typeof summarisePlan>; truncated: boolean };
 
-export async function previewImport(csv: string, mapping: ImportMapping): Promise<WriteResult<ImportPreview>> {
+export async function previewImport(csv: string, mapping: ImportMapping, opts: { isTest?: boolean } = {}): Promise<WriteResult<ImportPreview>> {
   const rows = parseCsv(csv);
   if (rows.length < 2) return { ok: false, status: 422, error: 'The file needs a header row and at least one data row' };
   if (mapping.company_name === undefined) return { ok: false, status: 422, error: 'Map the company name column' };
   let lookups: Lookups;
   try {
-    lookups = await lookupsFor(rows, mapping);
+    lookups = await lookupsFor(rows, mapping, Boolean(opts.isTest));
   } catch (err) {
     return { ok: false, status: 503, error: `Could not check duplicates and suppression, so nothing can be imported: ${err instanceof Error ? err.message : 'read failed'}` };
   }
@@ -108,7 +109,7 @@ export type ImportResult = ImportPreview & { importId: string; created: { compan
 
 export async function runImport(csv: string, mapping: ImportMapping, filename: string | null, actor: Actor, opts: { isTest?: boolean } = {}): Promise<WriteResult<ImportResult>> {
   if (!(await tableExists('growth_imports'))) return { ok: false, status: 503, error: 'Importing needs 088_growth_prospecting.sql applied first. Preview and dry run work now.' };
-  const preview = await previewImport(csv, mapping);
+  const preview = await previewImport(csv, mapping, opts);
   if (!preview.ok) return preview;
   const { plan } = preview.value;
   const isTest = Boolean(opts.isTest);

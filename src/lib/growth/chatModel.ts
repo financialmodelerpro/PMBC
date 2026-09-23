@@ -31,7 +31,12 @@ export const QUALIFICATION_FIELDS = [
 export type QualificationKey = (typeof QUALIFICATION_FIELDS)[number]['key'];
 export type Qualification = Partial<Record<QualificationKey, string | number | null>>;
 
-export type ScreenResult = { kind: 'ok' } | { kind: 'injection' | 'pricing' | 'legal' | 'complaint' | 'sensitive'; reason: string };
+export type ScreenResult = { kind: 'ok' } | { kind: 'injection' | 'clients' | 'pricing' | 'legal' | 'complaint' | 'sensitive'; reason: string };
+
+/** Asking who the firm's clients are: answered with a fixed reply, never by the model. */
+const CLIENTS = /\b(who are|name|list|tell me) (some of |any of )?your clients\b|\bclient (list|names)\b|\bwhich (companies|clients|firms|developers|banks) (have you|did you) (worked|work) (with|for)\b|\bwho (have you|did you) work(ed)? (with|for)\b/i;
+/** A reply that names clients or past engagements by name is replaced. */
+const NAMES_CLIENT = /\b([Oo]ur clients (include|are)|[Ww]e (have )?(worked|work) (with|for) [A-Z][a-z]+|[Cc]lients such as|for example,? [A-Z][a-z]+ (Group|Holding|Company|Co\b))/;
 
 const INJECTION = /\b(ignore|disregard|forget|override)\b[^.]{0,40}\b(instructions?|rules?|prompts?|directions?|guidelines)\b|\b(system prompt|your instructions|your rules|developer mode|jailbreak|act as (an?|the) |you are now|pretend (to be|you are)|reveal (your|the) (prompt|instructions)|print (your|the) (prompt|instructions)|what are your instructions)/i;
 const PRICING = /\b(your|the|pacemakers'?s?) (fees?|prices?|pricing|rates?|charges?)\b|\bhow much (do|does|would|will|is|are) (you|it|this|that|pacemakers|an? \w+)\b|\bwhat (do|would) you charge\b|\b(quote|quotation|pricing|rate card|retainer|discount)\b|\bfee (proposal|estimate|range)\b/i;
@@ -42,6 +47,7 @@ const SENSITIVE = /\b(confidential|insider|inside information|non-public|bribe|k
 /** What a visitor wrote, before any AI sees it. */
 export function screenVisitorMessage(text: string): ScreenResult {
   if (INJECTION.test(text)) return { kind: 'injection', reason: 'Tried to change the assistant instructions' };
+  if (CLIENTS.test(text)) return { kind: 'clients', reason: 'Asked who the clients are' };
   if (SENSITIVE.test(text)) return { kind: 'sensitive', reason: 'Raised a sensitive matter' };
   if (LEGAL.test(text)) return { kind: 'legal', reason: 'Asked a legal question' };
   if (COMPLAINT.test(text)) return { kind: 'complaint', reason: 'Raised a complaint' };
@@ -51,6 +57,7 @@ export function screenVisitorMessage(text: string): ScreenResult {
 
 export const FIXED_REPLIES = {
   injection: 'I can only help with questions about how PaceMakers works and whether we can help with your situation. What are you working on?',
+  clients: 'PaceMakers keeps its client relationships confidential, so I cannot name clients. I can describe the kind of work involved, or Ahmad Din can talk you through comparable engagements on a call.',
   pricing: 'Fees depend on the scope of each engagement, so Ahmad Din discusses them personally. I have passed your question to him. If you share your name and email below, he will reply directly.',
   legal: 'That is a question for Ahmad Din directly rather than for this assistant. I have passed it to him. If you share your name and email below, he will be in touch.',
   complaint: 'I am sorry to hear that. I have passed this to Ahmad Din, who will want to deal with it personally. If you share your name and email below, he will reply directly.',
@@ -80,6 +87,7 @@ export function guardReply(text: string): { text: string; flag: string | null; e
   if (!t) return { text: FIXED_REPLIES.unknown, flag: 'guard', escalate: null };
   if (MONEY.test(t)) return { text: FIXED_REPLIES.pricing, flag: 'pricing', escalate: 'pricing' };
   if (GUARANTEE.test(t)) return { text: FIXED_REPLIES.unknown, flag: 'guarantee', escalate: null };
+  if (NAMES_CLIENT.test(t)) return { text: FIXED_REPLIES.clients, flag: 'clients', escalate: null };
   if (LEAK.test(t)) return { text: FIXED_REPLIES.injection, flag: 'guard', escalate: null };
   const cleaned = t.replace(EMAIL, '').replace(PHONE, '').replace(DASH, ', ').replace(/\s{3,}/g, '\n\n').slice(0, CHAT_LIMITS.reply);
   return { text: cleaned, flag: null, escalate: null };

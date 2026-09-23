@@ -29,6 +29,7 @@ import { growthDb, tableExists } from './db';
 import { getEngineSettings, pendingMigration } from './engineSettings';
 import { graphMailConfigured, graphRepliesInConversation, graphSendMail } from './graph';
 import { extractJsonObject, knowledgeText, stripEmails } from './agents/json';
+import { BOOKING_PLACEHOLDER, fillBookingLink, growthBookingUrl } from './booking';
 import { getApprovedKnowledge, type Actor } from './kb';
 import { createLinks, stopForContact } from './links';
 import { GROWTH_SERVICES, isGrowthService, type GrowthContact, type GrowthLead, type GrowthSignal } from './model';
@@ -162,8 +163,9 @@ function firstName(full: string | null | undefined): string {
 }
 
 /** Fills the placeholders the draft can know; the rest stay for Ahmad to fill before approval. */
-export function fillKnown(text: string, v: { firstName: string; company: string }): string {
+export function fillKnown(text: string, v: { firstName: string; company: string; bookingUrl?: string }): string {
   let t = text;
+  if (v.bookingUrl) t = fillBookingLink(t, v.bookingUrl);
   if (v.firstName) t = t.replace(/\[(First name|Name|first name)\]/g, v.firstName);
   if (v.company) t = t.replace(/\[(Company|Company name)\]/g, v.company);
   return t.replace(/\[Sender\]/g, 'Ahmad Din');
@@ -180,8 +182,9 @@ async function draftContext(leadId: string, channel: MessageChannel): Promise<Wr
   const contact = c as GrowthContact | null;
   if (!contact) return { ok: false, status: 422, error: 'The lead contact no longer exists' };
   if (['opted_out', 'do_not_contact'].includes(contact.consent_status)) return { ok: false, status: 409, code: 'suppressed', error: `${contact.full_name} has opted out or is marked do not contact` };
-  if (channel === 'email') {
-    if (!contact.email) return { ok: false, status: 422, error: 'The contact has no email address. Use LinkedIn, or add the email.' };
+  if (channel === 'email' && !contact.email) return { ok: false, status: 422, error: 'The contact has no email address. Use LinkedIn, or add the email.' };
+  // A suppressed person is never contacted, on any channel.
+  if (contact.email) {
     const s = await checkSuppression(contact.email);
     if (s.suppressed) return { ok: false, status: 409, code: 'suppressed', error: `${contact.email} is suppressed: ${s.reasons.map((r) => r.reason).join('; ')}` };
   }
@@ -200,6 +203,7 @@ async function writeDraft(ctx: DraftContext, opts: { channel: MessageChannel; ki
     'The message must refer to the trigger below by what the source says, and must not add facts that are not in it.',
     `Include the placeholder ${LINK_PLACEHOLDER} exactly once where a link to the relevant page belongs; it becomes a tracked link.`,
     'Never give prices, fees, guarantees or client names. Never claim results. Sign off as Ahmad Din.',
+    `If you offer a call, write the placeholder ${BOOKING_PLACEHOLDER} where the booking link belongs; never write a booking address yourself.`,
     opts.channel === 'linkedin' ? 'This is a LinkedIn message: at most 600 characters, no subject.' : 'This is an email: a subject line under 70 characters and a body of 70 to 140 words.',
     opts.kind === 'follow_up' ? 'This is a polite follow-up to the earlier message below: shorter, adds one useful point, no pressure.' : '',
     '',
@@ -231,7 +235,7 @@ async function writeDraft(ctx: DraftContext, opts: { channel: MessageChannel; ki
   if (!ai.ok) return { ok: false, status: ai.reason === 'provider_error' ? 502 : 409, code: ai.reason, error: ai.message };
   const parsed = extractJsonObject(ai.text) as { subject?: unknown; body?: unknown } | null;
   if (!parsed || typeof parsed.body !== 'string' || !parsed.body.trim()) return { ok: false, status: 502, code: 'unreadable', error: 'The draft could not be read. Try again.' };
-  const fill = { firstName: firstName(ctx.contact.full_name), company: ctx.company?.name ?? '' };
+  const fill = { firstName: firstName(ctx.contact.full_name), company: ctx.company?.name ?? '', bookingUrl: await growthBookingUrl() };
   let body = fillKnown(stripEmails(parsed.body.trim()), fill).replace(DASHES, ',');
   if (!body.includes(LINK_PLACEHOLDER)) body = `${body}\n\n${LINK_PLACEHOLDER}`;
   const subject = opts.channel === 'email' ? fillKnown(stripEmails(String(parsed.subject ?? '').trim()), fill).replace(DASHES, ',').slice(0, 200) : null;
