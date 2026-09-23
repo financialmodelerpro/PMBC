@@ -119,7 +119,8 @@ console.log('3. Research Agent and signal feed (offline)');
   const feedOut = await mock.mockProvider.call({ model: 'mock', messages: [{ role: 'user', content: 'x' }], maxTokens: 6000, purpose: 'signal_feed', agent: 'signal-feed' });
   const today = new Date(Date.now() + 3 * 3_600_000).toISOString().slice(0, 10);
   const screened = feedMod.screenCandidates(json.extractJsonObject(feedOut.text), { sourceUrls: feedOut.sourceUrls, mock: true, today });
-  check('the mock feed keeps the sourced sample and discards the one without a link', screened.valid.length === 1 && screened.discarded.length === 1 && screened.discarded[0].why === 'no evidence link');
+  // The sample reports the sourced story twice (the in-run repeat is caught by dedupeWithinRun, see verify-growth-keywords).
+  check('the mock feed keeps the sourced sample and discards the one without a link', screened.valid.length === 2 && feedMod.dedupeWithinRun(screened.valid).unique.length === 1 && screened.discarded.length === 1 && screened.discarded[0].why === 'no evidence link');
   const realScreen = feedMod.screenCandidates(json.extractJsonObject(feedOut.text), { sourceUrls: feedOut.sourceUrls, mock: false, today });
   check('in real mode a reserved evidence link is discarded', realScreen.valid.length === 0);
   const notReturned = feedMod.screenCandidates({ signals: [{ company_name: 'A', trigger_type: 'new_project', signal_date: today, summary: 'A real sounding summary', evidence_url: 'https://argaam.com/z' }] }, { sourceUrls: [], mock: false, today });

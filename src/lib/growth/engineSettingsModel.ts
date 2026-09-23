@@ -132,7 +132,9 @@ export const engineGroupSchemas = {
     signal_keywords: z
       .array(keyword)
       .max(ENGINE_LIMITS.keywords)
-      .transform((a) => [...new Set(a.map((k) => k.replace(/\s+/g, ' ')))]),
+      .transform((a) => [...new Set(a.map((k) => k.replace(/\s+/g, ' ')))])
+      // The keyword library (094) replaced this list; it stays for the feed's fallback before 094.
+      .optional(),
     signal_feed_paused: z.boolean(),
     signal_feed_max_per_run: z.number().int().min(ENGINE_LIMITS.feedMax.min).max(ENGINE_LIMITS.feedMax.max),
   }),

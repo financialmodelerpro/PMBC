@@ -28,9 +28,13 @@ export type InboxSignal = GrowthSignal & {
   triaged_at?: string | null;
   triaged_by_name?: string | null;
   feed_run_id?: string | null;
+  matched_keyword_id?: string | null;
+  matched_keyword?: string | null;
 };
 
-const SIGNAL_088_COLUMNS = ['origin', 'evidence_key', 'duplicate_of', 'triaged_at', 'triaged_by_name', 'feed_run_id'] as const;
+/** Columns later migrations add (088, and 094 for the matched keyword); a write drops them until they exist. */
+const SIGNAL_088_COLUMNS = ['origin', 'evidence_key', 'duplicate_of', 'triaged_at', 'triaged_by_name', 'feed_run_id', 'matched_keyword_id', 'matched_keyword'] as const;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export const triggerLabel = (t: string) => TRIGGER_TYPES.find((x) => x.value === t)?.label ?? t;
 
@@ -104,6 +108,8 @@ export type CreateSignalOpts = {
   isTest?: boolean;
   actorType?: ActorType;
   actorId?: string | null;
+  /** The library keyword the feed matched (migration 094). */
+  matchedKeyword?: { id: string | null; keyword: string } | null;
 };
 
 export async function createSignal(input: SignalCreateInput, actor: Actor | null, opts: CreateSignalOpts = {}): Promise<WriteResult<InboxSignal & { duplicateWhy: string | null }>> {
@@ -131,6 +137,10 @@ export async function createSignal(input: SignalCreateInput, actor: Actor | null
     duplicate_of: dup?.id ?? null,
     feed_run_id: opts.feedRunId ?? null,
   };
+  if (opts.matchedKeyword) {
+    row.matched_keyword = opts.matchedKeyword.keyword;
+    row.matched_keyword_id = opts.matchedKeyword.id && UUID.test(opts.matchedKeyword.id) ? opts.matchedKeyword.id : null;
+  }
   const { data, error } = await insertTolerant<InboxSignal>('growth_signals', row, SIGNAL_088_COLUMNS);
   if (error || !data) {
     if (error && isMissingSchema(error)) return { ok: false, status: 503, error: 'The signals table is missing. Apply 083_growth_core.sql.' };
@@ -201,6 +211,10 @@ export async function triageSignal(id: string, t: SignalTriage, actor: Actor): P
   } else if (t.action === 'dismiss') {
     patch = { status: 'dismissed', dismissed_reason: t.reason, ...triaged };
     summary = `Signal dismissed: ${t.reason}`;
+  } else if (t.action === 'retype') {
+    if (t.trigger_type === signal.trigger_type) return { ok: false, status: 409, error: 'The signal already has that trigger type' };
+    patch = { trigger_type: t.trigger_type };
+    summary = `Trigger changed from ${triggerLabel(signal.trigger_type)} to ${triggerLabel(t.trigger_type)}`;
   } else if (t.action === 'reopen') {
     patch = { status: 'new', dismissed_reason: null, ...triaged };
     summary = 'Signal reopened for triage';
@@ -211,7 +225,7 @@ export async function triageSignal(id: string, t: SignalTriage, actor: Actor): P
 
   const { data, error } = await updateTolerant<InboxSignal>('growth_signals', id, patch, SIGNAL_088_COLUMNS);
   if (error || !data) return { ok: false, status: error?.code === '23514' ? 422 : 500, error: error?.code === '23514' ? 'The database refused that change' : error?.message ?? 'Save failed' };
-  await logActivity({ actorType: 'admin', actorId: actor.id, action: `signal.${t.action}`, summary, companyId, leadId, signalId: id, isTest: signal.is_test, metadata: { from: signal.status, to: data.status } });
+  await logActivity({ actorType: 'admin', actorId: actor.id, action: `signal.${t.action}`, summary, companyId, leadId, signalId: id, isTest: signal.is_test, metadata: t.action === 'retype' ? { from: signal.trigger_type, to: data.trigger_type } : { from: signal.status, to: data.status } });
   const touched = new Set([signal.company_id, companyId].filter((x): x is string => Boolean(x)));
   for (const c of touched) await rescoreCompany(c, { actor });
   return { ok: true, value: data };

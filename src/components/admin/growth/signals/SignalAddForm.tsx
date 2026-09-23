@@ -3,6 +3,7 @@
 import { useState } from 'react';
 
 import { adminCard, adminInput, adminTextarea, ADMIN_COLORS } from '@/lib/admin/styles';
+import { suggestKeyword, type MatchableKeyword } from '@/lib/growth/keywordLibrary';
 import { TRIGGER_TYPES } from '@/lib/growth/model';
 
 import { sendJson } from '../ui/client';
@@ -10,11 +11,16 @@ import { Field, GhostButton, NoticeLine, PrimaryButton, grid, useAction } from '
 
 const today = () => new Date(Date.now() + 3 * 3_600_000).toISOString().slice(0, 10);
 
-/** Adds a signal by hand. The evidence link is required; the server flags a likely duplicate. */
-export function SignalAddForm({ companies }: { companies: { id: string; name: string }[] }) {
+/**
+ * Adds a signal by hand. The evidence link is required; the server flags a
+ * likely duplicate. A summary that fits a keyword in the library suggests its
+ * trigger type, which stays a suggestion until chosen.
+ */
+export function SignalAddForm({ companies, keywords = [] }: { companies: { id: string; name: string }[]; keywords?: MatchableKeyword[] }) {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ trigger_type: 'new_project', signal_date: today(), company_id: '', company_name: '', summary: '', evidence_url: '', source_name: '' });
   const { busy, notice, run } = useAction();
+  const match = form.summary.trim().length >= 10 ? suggestKeyword(`${form.company_name} ${form.summary}`, keywords) : null;
   const set = (k: keyof typeof form) => (e: { target: { value: string } }) => setForm({ ...form, [k]: e.target.value });
 
   const submit = () =>
@@ -78,6 +84,12 @@ export function SignalAddForm({ companies }: { companies: { id: string; name: st
         <Field label="Summary" style={{ gridColumn: '1 / -1' }}>
           <textarea value={form.summary} onChange={set('summary')} style={{ ...adminTextarea, minHeight: 72 }} placeholder="What happened, in a sentence or two" />
         </Field>
+        {match && match.trigger !== form.trigger_type && (
+          <p style={{ gridColumn: '1 / -1', margin: 0, fontSize: 12, color: ADMIN_COLORS.textMuted }} data-suggested-trigger={match.trigger}>
+            Fits the keyword &quot;{match.keyword}&quot;, which suggests {TRIGGER_TYPES.find((t) => t.value === match.trigger)?.label}.{' '}
+            <GhostButton onClick={() => setForm({ ...form, trigger_type: match.trigger })}>Use it</GhostButton>
+          </p>
+        )}
         <Field label="Source name" hint="Optional, e.g. Argaam or Saudi Gazette">
           <input value={form.source_name} onChange={set('source_name')} style={adminInput} />
         </Field>
