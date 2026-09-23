@@ -166,7 +166,8 @@ console.log('5. Migration 088 and static gates (offline)');
   const files = [...walk('src/lib/growth'), ...walk('src/app/admin/growth'), ...walk('src/app/api/admin/growth'), ...walk('src/components/admin/growth'), 'src/app/api/cron/growth-daily/route.ts', 'scripts/verify-growth-prospecting.mjs', 'scripts/lib/growthVerify.mjs'];
   const d = dashed(files);
   check('no em or en dash in any Growth file', d.length === 0, d.join(', '));
-  const pub = publicChanges();
+  // The layout gains the chat mount in Phase 4; verify-growth-chat proves it renders nothing while off.
+  const pub = publicChanges(['src/app/(public)/layout.tsx']);
   check('the public site is untouched since Phase 1', pub.length === 0, pub.join(', '));
   check('every Growth AI call goes through runAi', walk('src/lib/growth').filter((f) => /provider\.call\(|selectProvider\(/.test(read(f))).every((f) => f === 'src/lib/growth/ai/run.ts' || f === 'src/lib/growth/ai/provider.ts'));
 }

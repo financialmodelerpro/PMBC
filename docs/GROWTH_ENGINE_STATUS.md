@@ -2,7 +2,7 @@
 
 **Read this first in any Growth Engine session.** Last updated 2026-09-23, during the Phase 2 to 7 build. Production runs `main`; `/api/health` reports the live sha. Also read `docs/GROWTH_BUILD_LOG.md` (one line per unit) and `docs/PENDING_MIGRATIONS.md` (every migration and whether it is applied).
 
-**Resume point:** Phases 2 and 3 are complete and merged (088 and 089 applied). Next is Phase 4 (Website AI, built disabled), starting with migration 090 and Unit 4.1.
+**Resume point:** Phases 2, 3 and 4 are complete and merged (088, 089 and 090 applied). Next is Phase 5 (Meetings), starting with migration 091 and Unit 5.1.
 
 The Growth Engine is an in-house lead generation and CRM system inside the admin at `/admin/growth`. It is admin-only. Detail on each part is in `docs/ARCHITECTURE.md` (the Growth rows) and `docs/DATABASE.md` (migrations 083 to 087); this file is the summary and the rules.
 
@@ -42,6 +42,14 @@ Also in Phase 2: `runAi` now takes `webSearch` (priced at USD 0.01 a search) and
 | 3.4 | Pipeline at `/admin/growth/pipeline`: board and table by stage with filters; lead page `/admin/growth/pipeline/[id]` with stage moves (lost asks why), meeting-request flag, opportunities (service, fee band, expected close, won or lost with reason), tasks with due dates, all messages and the full timeline. `pipeline.ts`. |
 | 3.5 | Lead Score (`scoring/lead.ts`, `leadScore.ts`): ICP fit 25, clear need 20, scale 15, timeline 15, authority 10, engagement 10, meeting intent 5 (weights in Settings, sum 100 checked); Hot 71+, Warm 41 to 70, Cold 40 and under; a meeting request is always Hot; under SAR 50 million caps at Cold and wins over a meeting request; stored once the lead engages (reply, click, chat, meeting, meeting request). |
 
+## Built (Phase 4, Website AI, built disabled, 2026-09-23)
+
+| Unit | What it delivered |
+|---|---|
+| 4.1 | Chat backend (`chat.ts`, `chatModel.ts`): the `website-chat` agent answers only from the approved Knowledge Base and fills qualification progressively (service, sector, project type, size, purpose, timeline, decision role, pain point). Before any AI call, prompt injection gets a fixed refusal (no AI call) and pricing, legal, complaints and sensitive matters escalate to Ahmad with a fixed reply and an alert. Every reply passes a guard (no fees or discounts as amounts, no guarantees, no emails or phone numbers, no instruction leaks, no dashes). Limits: conversations per IP a day, messages per conversation, messages a minute; the AI budget applies. Routing: Hot gets the booking link and an instant alert, Warm the nurture opt-in, Cold is logged. Consent before storing any contact detail, wording and time recorded (database constraint); without consent, emails and numbers typed in are redacted. Consent creates or links the contact, company and a website lead; a visitor from an outreach email is recognised by the tracked-link cookie. |
+| 4.2 | The widget is a plain script (`widgetScript.ts`, served by `/api/growth/widget`) because a React component in the layout would be bundled into every page. `ChatWidgetMount` (server component, no client code) is the one public change: it renders nothing unless `chat_widget_enabled` is on (default off) and `ANTHROPIC_API_KEY` is set, then adds one deferred script tag. Verified on a local production build: while off, no public page references it and `/api/growth/chat` answers 404. Visitors never see mock replies. |
+| 4.3 | Conversations at `/admin/growth/conversations`: status, an admin preview (test rows, mock allowed, no alerts), the list by route, and each transcript with qualification, consent wording and links. Valuation tool leads at `/admin/growth/conversations/valuation`: read only on the tool; a lead with follow-up consent and not suppressed can be linked (one Growth lead per tool lead, source `tool`). |
+
 ## Migrations 083 to 087 (all applied 2026-09-22)
 
 All are DDL, hand-run in the Supabase SQL editor, safe to re-run, and carry a `SAFE TO APPLY` line.
@@ -54,7 +62,7 @@ All are DDL, hand-run in the Supabase SQL editor, safe to re-run, and carry a `S
 | 086 `growth_nine_services` | The nine site services on companies, leads and the Knowledge Base; five drafts converted, Feasibility Studies archived, four added; offer `related_service_slugs`; settings `priority_services`. |
 | 087 `growth_ai_usage` | growth_ai_usage (every AI call, logged with actor `ai`, mock calls free by constraint), growth_ai_alerts (one per Riyadh month), and a single test settings row, id 2, for verifiers. |
 
-Every Growth table has RLS on with no policies and every privilege revoked from `anon` and `authenticated`. **088 (Phase 2) and 089 (Phase 3) are applied.** The next migration is **090**; follow the same pattern and extend `GROWTH_TABLE_MIGRATIONS` in `src/lib/growth/db.ts`. `docs/PENDING_MIGRATIONS.md` is the list of record.
+Every Growth table has RLS on with no policies and every privilege revoked from `anon` and `authenticated`. **088, 089 and 090 are applied.** The next migration is **091**; follow the same pattern and extend `GROWTH_TABLE_MIGRATIONS` in `src/lib/growth/db.ts`. `docs/PENDING_MIGRATIONS.md` is the list of record.
 
 ## Standing rules
 
@@ -82,6 +90,7 @@ Each runs offline and read-only by default; `-- --write-test-rows` adds the live
 | `npm run verify-growth-kb` | Knowledge Base kinds and rules, the nine services and offer links, and (live) create, approve, edit while approved (agents keep the approved copy), archive and restore, the log with who and when, activity order, anon refused. |
 | `npm run verify-growth-settings` | Defaults and limits in app and database, suppression rules including a later opt-out caught live, retention preview read-only, audit filters, integration status never showing values; the real settings row checked untouched field for field. |
 | `npm run verify-growth-ai` | Prices, Riyadh months, budget and mock rules, and (live) a mock call labelled and free and in the audit log, every refusal and failure recorded, the budget alert once a month and retried after a failed send, shared domains needing confirmation. |
+| `npm run verify-growth-chat` | Phase 4: screening, reply guard, redaction, qualification, routing, openings, the widget script, the zero-footprint mount and the layout diff, migration 090; (live) the real setting off and the public chat unavailable, preview conversations: injection without an AI call, pricing escalation, redaction, consent with wording, contact and lead, database refusal of details without consent, tool tables unchanged. 80 checks, all passing 2026-09-23. |
 | `npm run verify-growth-outreach` | Phase 3: window and cap in Riyadh time, follow-up timing, placeholders, email body with tracked and opt-out links, safe redirects, the Lead Score rules, migration 089, gates; (live) approve, schedule, mock send, suppression refusal, database refusal of a mock draft sent for real, click, reply, opt-out, opportunity and tasks. 86 checks, all passing 2026-09-23. |
 | `npm run verify-growth-prospecting` | Phase 2: score rules and bands, the SAR 50 million rule, evidence and duplicate rules, the research source check, the feed screen, CSV plan, migration 088, admin-only gates, no dashes, public site untouched; (live) signals, duplicates, triage, stored scores, overrides, a refused research run, a dry run and an import. 97 checks, all passing 2026-09-23. |
 
@@ -94,6 +103,7 @@ Also run `npm run typecheck`, `npm run build`, the other verifiers (`verify-prod
 - **Add signal keywords** in Growth Settings, tab "Signals, scoring, website and AI". The morning feed does nothing without them.
 - **Approve the targeting rules** (decision-maker titles, excluded work): the Prospect Score reads them.
 - **Approve messaging and disallowed content** in the Knowledge Base: the outreach writer refuses to draft without them.
+- **Website chat** (when ready): approve Knowledge Base items for services, disallowed content, qualification and escalation; set the AI budget and the Anthropic key; try it in Conversations; then switch it on in Settings, tab "Signals, scoring, website and AI".
 - **Microsoft Graph for sending** (when ready): an Entra app registration with Mail.Send and Mail.Read application permissions (ideally limited to your mailbox by an application access policy), then set `MS_GRAPH_TENANT_ID`, `MS_GRAPH_CLIENT_ID`, `MS_GRAPH_CLIENT_SECRET` and `MS_GRAPH_SENDER` on Vercel (Production). Until then outreach is mock: nothing is delivered.
 - **Add the Anthropic API key** later: set `ANTHROPIC_API_KEY` on Vercel (Production) and redeploy. The real Claude API takes over with no code change.
 
@@ -109,4 +119,4 @@ Also run `npm run typecheck`, `npm run build`, the other verifiers (`verify-prod
 
 ## Next up
 
-Phase 4 (Website AI, built disabled): migration 090, then 4.1 chat backend (Knowledge Base answers, qualification, consent, routing, guards, rate limits), 4.2 the widget mounted behind the chat_widget_enabled setting (off by default, nothing added to a page while off), 4.3 Conversations screen and valuation tool lead links. Then Phases 5 to 7 per the brief.
+Phase 5 (Meetings): migration 091, then 5.1 Bookings sync (mock until credentials) with matching to leads and alerts, 5.2 meeting briefs, 5.3 notes, outcome, recap and no-show drafts. Then Phases 6 and 7 per the brief.

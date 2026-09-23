@@ -148,3 +148,45 @@ export function AgentModelsForm({ values, pending }: { values: EngineSettings; p
     </Card>
   );
 }
+
+export function ChatSettingsForm({ values, pending, mock }: { values: EngineSettings; pending: string | null; mock: boolean }) {
+  const [v, setV] = useState({ enabled: values.chat_widget_enabled, max: String(values.chat_max_messages), perIp: String(values.chat_max_conversations_per_ip_per_day), consent: values.chat_consent_text, alert: values.lead_alert_email });
+  const [confirm, setConfirm] = useState(false);
+  const { busy, notice, save } = useSave('chat');
+  const turningOn = v.enabled && !values.chat_widget_enabled;
+  return (
+    <Card id="chat-settings" title="Website chat" intro="Off by default. While off, nothing at all is added to the public website. Switching it on adds the chat to every public page, but only once the Anthropic key is set: visitors never see mock replies." pending={pending}>
+      <div style={grid}>
+        <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13, fontWeight: 700 }}>
+          <input type="checkbox" checked={v.enabled} onChange={(e) => setV({ ...v, enabled: e.target.checked })} /> Show the chat on the website
+        </label>
+        <Field label="Most messages per conversation">
+          <input value={v.max} onChange={(e) => setV({ ...v, max: e.target.value })} style={adminInput} inputMode="numeric" />
+        </Field>
+        <Field label="Most new conversations per visitor a day">
+          <input value={v.perIp} onChange={(e) => setV({ ...v, perIp: e.target.value })} style={adminInput} inputMode="numeric" />
+        </Field>
+        <Field label="Alerts for Hot leads and escalations go to">
+          <input value={v.alert} onChange={(e) => setV({ ...v, alert: e.target.value })} style={adminInput} />
+        </Field>
+        <Field label="Consent wording" hint="Shown beside the consent box and recorded with every consent" style={{ gridColumn: '1 / -1' }}>
+          <textarea value={v.consent} onChange={(e) => setV({ ...v, consent: e.target.value })} style={{ ...adminTextarea, minHeight: 72 }} />
+        </Field>
+      </div>
+      {turningOn && (
+        <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13, marginTop: 10, color: ADMIN_COLORS.warning }}>
+          <input type="checkbox" checked={confirm} onChange={(e) => setConfirm(e.target.checked)} /> I understand the chat will appear on every public page{mock ? ' as soon as the Anthropic key is set' : ' within a minute'}.
+        </label>
+      )}
+      <div style={{ marginTop: 12 }}>
+        <PrimaryButton
+          disabled={busy !== null || (turningOn && !confirm)}
+          onClick={() => save({ chat_widget_enabled: v.enabled, chat_max_messages: Number(v.max), chat_max_conversations_per_ip_per_day: Number(v.perIp), chat_consent_text: v.consent, lead_alert_email: v.alert }, v.enabled ? 'Saved. The chat is switched on.' : 'Saved. The chat is off.')}
+        >
+          Save chat settings
+        </PrimaryButton>
+      </div>
+      <NoticeLine notice={notice} />
+    </Card>
+  );
+}
