@@ -82,6 +82,7 @@
     "verify-growth-prospecting": "node scripts/verify-growth-prospecting.mjs",
     "verify-growth-outreach": "node scripts/verify-growth-outreach.mjs",
     "verify-growth-chat": "node scripts/verify-growth-chat.mjs",
+    "verify-growth-meetings": "node scripts/verify-growth-meetings.mjs",
     "verify-growth-settings": "node scripts/verify-growth-settings.mjs",
     "verify-growth-ai": "node scripts/verify-growth-ai.mjs"
   },
