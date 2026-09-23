@@ -152,4 +152,32 @@ Also run `npm run typecheck`, `npm run build`, the other verifiers (`verify-prod
 
 ## Next up
 
-The Phase 2 to 7 brief is built. What remains is Ahmad's: apply 093, approve the Knowledge Base, set the AI budget, and add the keys and settings listed under Open items, in roughly this order: budget and Knowledge Base (research, drafts, briefs and chat start working in mock mode), Anthropic key (real AI), Microsoft Graph (real sending and reply detection), Bookings, then nurture, then the website chat switch. Each can be tried in its admin screen before it touches anyone.
+The Phase 2 to 7 brief is built. What remains is Ahmad's: apply 093, approve the Knowledge Base, set the AI budget, and add the keys and settings listed under Open items, in roughly this order: budget and Knowledge Base (research, drafts, briefs and chat start working in mock mode), Anthropic key (real AI), Microsoft Graph (real sending and reply detection), Bookings, then nurture, then the website chat switch. Each can be tried in its admin screen before it touches anyone.## End of session, 2026-09-23 (start here tomorrow)
+
+**State.** `main` = `origin/main` = production (`74360c5`, confirmed by `/api/health`). Working tree clean apart from `AGENTS.md`, which predates this work and is not Growth's. The only unmerged branch is `fmp-cms-archive` (older, unrelated). No stashes. Every Growth migration, 083 to 093, is applied.
+
+**End-to-end mock test** (`npm run e2e-growth-mock -- --write-test-rows`): all 12 steps pass, 112 checks, on the live system with test rows that clean themselves up. Five bugs found and fixed:
+1. A lead could be marked Lost without a reason (now refused).
+2. A suppressed contact could still get a LinkedIn draft (suppression now blocks every channel).
+3. A second test import could not see the first import's test companies, so duplicates were not caught (test imports now see test rows).
+4. The website chat had no fixed answer to "who are your clients" and its guard missed a named client (fixed reply, no AI call; guard catches it).
+5. The test run's own cleanup left rows behind (order fixed; unlinked rows swept).
+Also added: an "include test and sample rows" view on Outreach.
+
+**Booking link rule** (`src/lib/growth/booking.ts`): the site's /book page is the permanent default. The direct Bookings link setting is empty by default and empty means /book; a direct link, if entered, overrides /book everywhere: website chat, no-show emails, meeting recaps and outreach drafts. Drafts write `[Booking link]`, filled when the draft is made. `npm run verify-growth-booking` enforces it.
+
+**Samples left for review:** three made-up companies named "SAMPLE: ..." (Al Waha Real Estate Development, Gulf Horizon Logistics, Najd Hospitality Group), each with a contact, signal, lead, mock research brief, score and mock outreach draft. They are test rows, so they show with the test view (`?test=1`) on Prospects, Signals, Outreach and Pipeline. No other test rows exist. Remove them with:
+
+```
+npm run e2e-growth-mock -- --remove-samples
+```
+
+**Waiting on Ahmad:**
+- Knowledge Base approvals (0 of 14 approved; messaging, disallowed, qualification, escalation and targeting items not yet written). Until then research, drafting, chat, meeting briefs and recaps refuse to run for real records.
+- Screen review of the samples: /admin/growth/prospects?test=1, /admin/growth/signals?status=all&test=1, /admin/growth/outreach?test=1, /admin/growth/pipeline?test=1, /admin/growth/conversations, /admin/growth/settings/engine.
+- Sample removal after the review (command above).
+- The Anthropic key (`ANTHROPIC_API_KEY` on Vercel, Production). The AI budget is already USD 50.
+
+**Cannot be tested until real keys are added:** real Claude output, including web search for research and the signal feed; how a real model handles client names, legal and pricing questions (the fixed replies and guards are tested); full qualification through the chat (the mock deliberately stores none; the scoring and routing rules are tested directly); Microsoft Graph sending and reply detection; the Microsoft Bookings sync; Brevo nurture sends and events. The admin screens are tested at code level only, as Chrome cannot sign in to the production admin.
+
+
