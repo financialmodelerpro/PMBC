@@ -77,7 +77,7 @@ export const JSON_SAMPLES: Record<string, Sample> = {
   }),
   outreach_follow_up: () => ({
     subject: 'Re: Your registered project in north Riyadh',
-    body: 'Dear [First name],\n\nFollowing up on my note about [Project]. If an updated model is on your list for the next quarter, I would be glad to walk you through how we structure them.\n\nKind regards,\nAhmad Din',
+    body: 'Dear [First name],\n\nFollowing up on my note about [Project]. If an updated model is on your list for the next quarter, I would be glad to walk you through how we structure them. You can choose a time here: [Booking link]\n\nKind regards,\nAhmad Din',
   }),
   chat_reply: (req) => {
     const said = lastUser(req).slice(0, 80);
@@ -100,7 +100,7 @@ export const JSON_SAMPLES: Record<string, Sample> = {
   }),
   meeting_recap: () => ({
     subject: 'Thank you for your time today',
-    body: 'Dear [First name],\n\nThank you for the conversation today (sample recap from the mock provider). As agreed, the next step is [next step].\n\nKind regards,\nAhmad Din',
+    body: 'Dear [First name],\n\nThank you for the conversation today (sample recap from the mock provider). As agreed, the next step is [next step]. If a follow-up call would help, choose a time here: [Booking link]\n\nKind regards,\nAhmad Din',
   }),
   no_show: () => ({
     subject: 'Finding another time',

@@ -26,6 +26,7 @@ import { sendEmail } from '@/lib/email/send';
 import { logActivity } from './activity';
 import { runAi } from './ai/run';
 import { extractJsonObject, knowledgeText, stripEmails } from './agents/json';
+import { growthBookingUrl } from './booking';
 import type { WriteResult } from './api';
 import { growthDb, tableExists } from './db';
 import { getEngineSettings } from './engineSettings';
@@ -329,12 +330,11 @@ export async function draftMeetingEmail(meetingId: string, kind: 'recap' | 'no_s
   if (!m.contact_id) return { ok: false, status: 422, error: 'The meeting has no contact to write to' };
   const { data: pending } = await growthDb().from('growth_messages').select('id').eq('meeting_id', m.id).eq('kind', kind).in('status', ['draft', 'approved', 'scheduled']).limit(1);
   if (pending?.length) return { ok: false, status: 409, error: 'A draft is already waiting for this meeting' };
-  const engine = await getEngineSettings();
-  const booking = (!engine.missing.includes('bookings_url') && engine.values.bookings_url) || `${SITE_HREF}/book`;
+  const booking = await growthBookingUrl();
   const kb = await getApprovedKnowledge({ includeTest: m.is_test });
   const system = [
     kind === 'recap'
-      ? 'Write a short recap email from Ahmad Din after a call: thank them, restate what was discussed and the agreed next step, using only the notes given. No prices, no guarantees, no client names.'
+      ? 'Write a short recap email from Ahmad Din after a call: thank them, restate what was discussed and the agreed next step, using only the notes given. If a further call is useful, offer it with the placeholder [Booking link]. No prices, no guarantees, no client names.'
       : `Write a short, gracious email from Ahmad Din to someone who missed a booked call, offering to find another time with the placeholder [Booking link]. No pressure.`,
     'Approved messaging:',
     knowledgeText(kb.messaging),
@@ -348,7 +348,7 @@ export async function draftMeetingEmail(meetingId: string, kind: 'recap' | 'no_s
   if (typeof parsed.body !== 'string' || !parsed.body.trim()) return { ok: false, status: 502, error: 'The draft could not be read. Try again.' };
   const company = m.company_id ? await getCompany(m.company_id) : null;
   const first = (m.attendee_name ?? '').split(/\s+/)[0] ?? '';
-  const fill = (t: string) => fillKnown(stripEmails(t), { firstName: first, company: company?.name ?? '' }).split('[Booking link]').join(booking).replace(new RegExp(`[${String.fromCharCode(0x2014)}${String.fromCharCode(0x2013)}]`, 'g'), ',');
+  const fill = (t: string) => fillKnown(stripEmails(t), { firstName: first, company: company?.name ?? '', bookingUrl: booking }).replace(new RegExp(`[${String.fromCharCode(0x2014)}${String.fromCharCode(0x2013)}]`, 'g'), ',');
   const { data, error } = await growthDb()
     .from('growth_messages')
     .insert({ is_test: m.is_test, lead_id: m.lead_id, company_id: m.company_id, contact_id: m.contact_id, meeting_id: m.id, channel: 'email', kind, sequence_step: 0, subject: fill(String(parsed.subject ?? (kind === 'recap' ? 'Thank you for your time' : 'Finding another time'))).slice(0, 200), body: fill(parsed.body).slice(0, 6000), is_mock_ai: ai.mock, ai_usage_id: ai.usageId, status: 'draft' })

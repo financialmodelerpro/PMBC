@@ -86,6 +86,8 @@
     "verify-growth-nurture": "node scripts/verify-growth-nurture.mjs",
     "verify-growth-intelligence": "node scripts/verify-growth-intelligence.mjs",
     "verify-growth-public-guard": "node scripts/verify-growth-public-guard.mjs",
+    "verify-growth-booking": "node scripts/verify-growth-booking.mjs",
+    "e2e-growth-mock": "node scripts/e2e-growth-mock.mjs",
     "verify-growth-settings": "node scripts/verify-growth-settings.mjs",
     "verify-growth-ai": "node scripts/verify-growth-ai.mjs"
   },
