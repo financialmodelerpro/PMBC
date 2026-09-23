@@ -301,6 +301,7 @@ export type LeadInput = {
   next_action?: string | null;
   next_action_due?: string | null;
   lost_reason?: string | null;
+  meeting_requested?: boolean;
 };
 
 export async function getLead(id: string): Promise<GrowthLead | null> {
@@ -336,7 +337,12 @@ export async function updateLead(id: string, patch: Partial<LeadInput>, actor: A
     await logActivity({ ...who, action: 'lead.updated', summary: `"${after.title}": changed ${changed.join(', ')}`, companyId: after.company_id, leadId: id, isTest: after.is_test, metadata: { changes: Object.fromEntries(changed.map((k) => [k, { old: (before as Record<string, unknown>)[k] ?? null, new: next[k] ?? null }])) } });
   }
   if (after.company_id && (changed.includes('deal_size_sar') || stageChanged)) await rescoreCompany(after.company_id, { actor });
-  return { ok: true, value: after };
+  if (stageChanged || changed.length) {
+    // Loaded here, not at the top: leadScore reads the targeting rules from this module.
+    const { rescoreLead } = await import('./leadScore');
+    await rescoreLead(id);
+  }
+  return { ok: true, value: (await getLead(id)) ?? after };
 }
 
 // ---------------------------------------------------------------------------
