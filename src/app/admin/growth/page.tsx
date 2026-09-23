@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 
 import { AdminPageHeader } from '@/components/admin/AdminPageHeader';
+import { DailyBrief } from '@/components/admin/growth/DailyBrief';
 import { DataLayerStatus } from '@/components/admin/growth/DataLayerStatus';
 import { ADMIN_COLORS, adminBadge, adminCard } from '@/lib/admin/styles';
 import { requireGrowthSession } from '@/lib/growth/access';
@@ -37,6 +38,7 @@ export default async function GrowthHomePage() {
   return (
     <>
       <AdminPageHeader eyebrow="Growth Engine" title={page.title} description={page.purpose} />
+      <DailyBrief />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))', gap: 12, marginBottom: 16 }}>
         <Tile label="New signals" value={c.newSignals} href="/admin/growth/signals" note={c.duplicateSignals ? `${c.duplicateSignals} possible duplicates` : 'Waiting for triage'} />
         <Tile label="Prospects" value={c.companies} href="/admin/growth/prospects" />
