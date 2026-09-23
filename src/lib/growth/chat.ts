@@ -250,6 +250,10 @@ async function applyConsent(c: Conversation, consent: NonNullable<ChatRequest['c
   patch.company_id = companyId;
   patch.lead_id = leadId;
   const { data } = await growthDb().from('growth_conversations').update(patch).eq('id', c.id).select('*').single();
+  if (consent.nurture && contactId) {
+    // Opted in to insights: subscribe to the nurture sequence (migration 092; a no-op before it).
+    await growthDb().from('growth_contacts').update({ nurture_status: 'subscribed', nurture_changed_at: now, nurture_step: 0, nurture_next_at: now }).eq('id', contactId).eq('consent_status', 'opted_in');
+  }
   await logActivity({ actorType: 'system', actorId: CHAT_AGENT, action: 'chat.consent', summary: `Consent given in the website chat${consent.nurture ? ', with nurture opt-in' : ''}`, contactId, companyId, leadId, isTest: c.is_test, metadata: { conversation_id: c.id, consent_text: consentText } });
   if (leadId) {
     const { rescoreLead } = await import('./leadScore');

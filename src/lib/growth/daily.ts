@@ -9,6 +9,8 @@
 
 import { runSignalFeed } from './feed';
 import { briefUpcoming, syncBookings } from './meetings';
+import { runSequence, syncToBrevo } from './nurture';
+import { remindCheckins } from './partners';
 import { checkReplies, draftDueFollowUps, sendDue } from './outreach';
 
 export type JobResult = { job: string; ok: boolean; detail: string };
@@ -49,5 +51,8 @@ export async function runGrowthDaily(now: Date = new Date()): Promise<JobResult[
       },
     },
     { name: 'meeting-briefs', run: () => briefUpcoming(now) },
+    { name: 'nurture-sync', run: async () => (await syncToBrevo()).message },
+    { name: 'nurture-sequence', run: async () => (await runSequence(now)).message },
+    { name: 'partner-checkins', run: () => remindCheckins(now) },
   ]);
 }

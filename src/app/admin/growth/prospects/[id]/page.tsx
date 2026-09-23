@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
 import { AdminPageHeader } from '@/components/admin/AdminPageHeader';
+import { NurtureToggle } from '@/components/admin/growth/nurture/NurtureControls';
 import { ResearchPanel } from '@/components/admin/growth/prospects/ResearchPanel';
 import { ScoreControls } from '@/components/admin/growth/prospects/ScorePanel';
 import { ContactButton, EditCompanyButton, LeadButton } from '@/components/admin/growth/prospects/Toggle';
@@ -150,8 +151,10 @@ export default async function ProspectPage({ params }: { params: Promise<{ id: s
               {x.is_decision_maker && <span style={adminBadge('success')}>Decision-maker</span>}
               <span style={adminBadge(x.consent_status === 'opted_out' || x.consent_status === 'do_not_contact' ? 'danger' : 'neutral')}>{CONSENT_STATUSES.find((k) => k.value === x.consent_status)?.label}</span>
               {suppression.get(x.id) && <span style={adminBadge('danger')}>Suppressed: never contactable</span>}
+              {(x as { nurture_status?: string }).nurture_status === 'subscribed' && <span style={adminBadge('success')}>Nurture</span>}
             </div>
             <div style={{ fontSize: 12, color: ADMIN_COLORS.textBody }}>{[x.email, x.phone].filter(Boolean).join(' / ')}</div>
+            {'nurture_status' in x && !suppression.get(x.id) && <NurtureToggle contactId={x.id} status={String((x as { nurture_status?: string }).nurture_status)} optedIn={x.consent_status === 'opted_in'} />}
             <ContactButton
               companyId={c.id}
               contactId={x.id}
