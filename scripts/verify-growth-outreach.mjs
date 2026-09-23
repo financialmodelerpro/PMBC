@@ -109,7 +109,8 @@ console.log('4. Migration 089 and static gates (offline)');
   const files = [...walk('src/lib/growth'), ...walk('src/app/admin/growth'), ...walk('src/app/api/admin/growth'), ...walk('src/app/api/growth'), ...walk('src/components/admin/growth'), 'supabase/migrations/089_growth_outreach.sql', 'scripts/verify-growth-outreach.mjs'];
   const d = dashed(files);
   check('no em or en dash in any Growth file', d.length === 0, d.join(', '));
-  const pub = publicChanges();
+  // The layout gains the chat mount in Phase 4; verify-growth-chat proves it renders nothing while off.
+  const pub = publicChanges(['src/app/(public)/layout.tsx']);
   check('the public site is untouched since Phase 1', pub.length === 0, pub.join(', '));
 }
 
