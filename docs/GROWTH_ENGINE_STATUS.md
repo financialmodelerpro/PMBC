@@ -1,6 +1,8 @@
 # PMBC AI Growth Engine: status and handover
 
-**Read this first in any Growth Engine session.** Last updated 2026-09-22, at the end of Phase 1. Production runs `main` at the commit that added this file; `/api/health` reports the live sha.
+**Read this first in any Growth Engine session.** Last updated 2026-09-23, during the Phase 2 to 7 build. Production runs `main`; `/api/health` reports the live sha. Also read `docs/GROWTH_BUILD_LOG.md` (one line per unit) and `docs/PENDING_MIGRATIONS.md` (every migration and whether it is applied).
+
+**Resume point:** Phase 2 is complete and merged. Next is Phase 3 (Outreach and Pipeline), starting with migration 089 and Unit 3.1.
 
 The Growth Engine is an in-house lead generation and CRM system inside the admin at `/admin/growth`. It is admin-only. Detail on each part is in `docs/ARCHITECTURE.md` (the Growth rows) and `docs/DATABASE.md` (migrations 083 to 087); this file is the summary and the rules.
 
@@ -17,6 +19,19 @@ The Growth Engine is an in-house lead generation and CRM system inside the admin
 
 Live data today: one settings row with the defaults and **no AI budget set**; fourteen Knowledge Base items (nine service drafts, the archived Feasibility Studies service, four offer drafts), all unapproved and empty; no companies, contacts, leads, signals, suppressions or AI calls yet.
 
+## Built (Phase 2, Prospecting, 2026-09-23)
+
+| Unit | What it delivered |
+|---|---|
+| 2.1 | Signal Inbox at `/admin/growth/signals`: add a signal by hand (trigger, date, summary, a required real evidence link), triage into convert (company created or chosen, plus a lead), attach (company and optional lead) or dismiss with a reason; reopen; duplicates flagged (same evidence link, or same company and trigger within 14 days), never blocked; filters by status, trigger, origin, date, text, duplicates. `signals.ts`, `signalsModel.ts`. |
+| 2.2 | Prospects at `/admin/growth/prospects` and a company page: profile, contacts (suppressed ones flagged as never contactable), leads, signals, research briefs, score with reasons and factor table, and the full timeline oldest first. Manual create and edit of companies, contacts and leads; every change logged. `prospects.ts`, `prospectsModel.ts`, `activity.ts`. |
+| 2.3 | Prospect Score (`scoring/prospect.ts`, pure): geography 10, sector 15 (real estate highest), project signal 20, funding or transaction signal 20, scale 15, decision-maker 10, recency 10; bands Priority 80+, Good 60 to 79, Watch 40 to 59, Low under 40; a known size under SAR 50 million is Low regardless; unknown size scores zero; two or three reasons. Override with a required reason; rescoring on every change; weights in Settings (database checks they sum to 100). Targeting titles and excluded work come from the approved Knowledge Base. |
+| 2.4 | Research Agent (`agents/research.ts`): web search (Sonnet 5 by default), every fact must cite a URL the search actually returned or it is dropped and listed; emails removed; likely service limited to the nine, entry offer to approved offers. Briefs kept as history; Ahmad accepts chosen fields (description, sector, city, service, scale, decision-makers as contacts, triggers as signals). Mock briefs are labelled and can never be accepted (database constraint). |
+| 2.5 | Pilot CSV import at `/admin/growth/prospects/import`: upload, map columns (guessed from headers), preview with validation, duplicate detection in the file and against the database, bulk suppression check (fails closed), dry run, then import as source Pilot; past outreach becomes a dated activity; suppressed emails imported as do not contact. |
+| 2.6 | Daily signal feed (`feed.ts`) inside the one Growth cron `/api/cron/growth-daily` (09:00 Riyadh): keywords from Settings, evidence link required and checked against the search, stale or undated dropped, duplicates skipped, at most N per run, pausable, runnable by hand; mock mode is a labelled preview that saves nothing, and the scheduled run does not run in mock mode. Growth Home shows new signals, prospects by band, open leads and recent activity. |
+
+Also in Phase 2: `runAi` now takes `webSearch` (priced at USD 0.01 a search) and returns the source URLs; the default model is **Claude Sonnet 5**, and each agent's model can be changed in Settings (`ai/agents.ts`). Engine settings (all phases) live in `engineSettingsModel.ts` / `engineSettings.ts` and are edited on the Settings tab "Signals, scoring, website and AI". Writes that carry columns from a later migration retry without them (`tolerant.ts`).
+
 ## Migrations 083 to 087 (all applied 2026-09-22)
 
 All are DDL, hand-run in the Supabase SQL editor, safe to re-run, and carry a `SAFE TO APPLY` line.
@@ -29,7 +44,7 @@ All are DDL, hand-run in the Supabase SQL editor, safe to re-run, and carry a `S
 | 086 `growth_nine_services` | The nine site services on companies, leads and the Knowledge Base; five drafts converted, Feasibility Studies archived, four added; offer `related_service_slugs`; settings `priority_services`. |
 | 087 `growth_ai_usage` | growth_ai_usage (every AI call, logged with actor `ai`, mock calls free by constraint), growth_ai_alerts (one per Riyadh month), and a single test settings row, id 2, for verifiers. |
 
-Every Growth table has RLS on with no policies and every privilege revoked from `anon` and `authenticated`. The next migration is **088**; follow the same pattern and extend `GROWTH_TABLE_MIGRATIONS` in `src/lib/growth/db.ts`.
+Every Growth table has RLS on with no policies and every privilege revoked from `anon` and `authenticated`. **088 (Phase 2) is applied.** The next migration is **089**; follow the same pattern and extend `GROWTH_TABLE_MIGRATIONS` in `src/lib/growth/db.ts`. `docs/PENDING_MIGRATIONS.md` is the list of record.
 
 ## Standing rules
 
@@ -43,6 +58,9 @@ Every Growth table has RLS on with no policies and every privilege revoked from 
 8. **Auto-merge when every check passes**, then confirm the production deploy through `/api/health`, then start the next unit given.
 9. **Stop only for migrations** Ahmad must apply by hand (wait for "applied"), a failed check, or a decision that is his.
 10. **No em or en dashes** anywhere: code, comments, commits, migrations, docs, UI text, replies. The dash gate in `CLAUDE.md` must return zero.
+11. **The public website does not change** (Phase 2 to 7 brief). Growth admin work stays under `/admin/growth`; public-facing pieces are built disabled by a setting that defaults to off and add nothing to a page while off. `publicChanges()` in `scripts/lib/growthVerify.mjs` fails a verifier on any public file changed since 93c3e98.
+12. **Never stop for a migration** (Phase 2 to 7 brief): write it, list it in `docs/PENDING_MIGRATIONS.md`, keep building; verifier checks that need it report PENDING.
+13. **Mock output is never saved as real data**: mock briefs cannot be accepted, the mock feed saves no signals, and later phases keep the mock flag on anything they store.
 
 ## Verifiers
 
@@ -54,6 +72,7 @@ Each runs offline and read-only by default; `-- --write-test-rows` adds the live
 | `npm run verify-growth-kb` | Knowledge Base kinds and rules, the nine services and offer links, and (live) create, approve, edit while approved (agents keep the approved copy), archive and restore, the log with who and when, activity order, anon refused. |
 | `npm run verify-growth-settings` | Defaults and limits in app and database, suppression rules including a later opt-out caught live, retention preview read-only, audit filters, integration status never showing values; the real settings row checked untouched field for field. |
 | `npm run verify-growth-ai` | Prices, Riyadh months, budget and mock rules, and (live) a mock call labelled and free and in the audit log, every refusal and failure recorded, the budget alert once a month and retried after a failed send, shared domains needing confirmation. |
+| `npm run verify-growth-prospecting` | Phase 2: score rules and bands, the SAR 50 million rule, evidence and duplicate rules, the research source check, the feed screen, CSV plan, migration 088, admin-only gates, no dashes, public site untouched; (live) signals, duplicates, triage, stored scores, overrides, a refused research run, a dry run and an import. 97 checks, all passing 2026-09-23. |
 
 Also run `npm run typecheck`, `npm run build`, the other verifiers (`verify-production-guard`, `verify-tools-visibility`, `verify-tool-followup`, `verify-brevo-webhook`, `verify-booking-links`) and the dash gate before merging.
 
@@ -61,7 +80,8 @@ Also run `npm run typecheck`, `npm run build`, the other verifiers (`verify-prod
 
 - **Set the monthly AI budget** in Growth Settings. Until then every AI call is refused, mock or real.
 - **Approve Knowledge Base items**, at least the services, messaging, disallowed content and targeting rules. Agents will refuse to run until the kinds they need have approved items. Map nothing: services already link to their site pages.
-- **Add signal keywords** once Phase 2 builds that setting.
+- **Add signal keywords** in Growth Settings, tab "Signals, scoring, website and AI". The morning feed does nothing without them.
+- **Approve the targeting rules** (decision-maker titles, excluded work): the Prospect Score reads them.
 - **Add the Anthropic API key** later: set `ANTHROPIC_API_KEY` on Vercel (Production) and redeploy. The real Claude API takes over with no code change.
 
 ## Known risks carried forward
@@ -76,4 +96,4 @@ Also run `npm run typecheck`, `npm run build`, the other verifiers (`verify-prod
 
 ## Next up
 
-**Phase 2 (Prospecting), Units 2.1 to 2.6.** The brief will be provided in the next session. Agents built there call `runAi` with a `purpose` the mock already answers (`signal_research`, `prospect_brief`, `outreach_draft`, `qualification`, `meeting_brief`), name the Knowledge Base kinds they need in `requireKnowledgeKinds`, return a real evidence link for every signal, and read targeting rules and priority services rather than hardcoding them.
+Phase 3 (Outreach and Pipeline): migration 089, then Units 3.1 (Outreach Studio), 3.2 (sending through Microsoft Graph, mock until credentials), 3.3 (follow-ups and reply detection), 3.4 (Pipeline), 3.5 (Lead Score). Then Phases 4 to 7 per the brief.
