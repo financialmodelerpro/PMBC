@@ -18,6 +18,16 @@ export const AUDIT_TYPES = [
   { value: 'signal', label: 'Signals' },
   { value: 'contact', label: 'Contacts' },
   { value: 'company', label: 'Companies' },
+  { value: 'research', label: 'Research briefs' },
+  { value: 'feed', label: 'Signal feed' },
+  { value: 'import', label: 'Imports' },
+  { value: 'outreach', label: 'Outreach' },
+  { value: 'pipeline', label: 'Pipeline' },
+  { value: 'chat', label: 'Website chat' },
+  { value: 'meeting', label: 'Meetings' },
+  { value: 'nurture', label: 'Nurture' },
+  { value: 'partner', label: 'Partners and referrals' },
+  { value: 'scoring', label: 'Scoring review' },
 ] as const;
 
 export const AUDIT_ACTORS = [

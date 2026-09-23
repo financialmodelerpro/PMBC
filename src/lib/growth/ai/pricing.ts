@@ -7,7 +7,15 @@
  * prices; a model missing from it is refused rather than billed at a guess.
  */
 
-export const DEFAULT_MODEL = 'claude-opus-5';
+/**
+ * Claude Sonnet 5 from Phase 2 (2026-09-23): research, drafting and chat sit
+ * well within its reach at well under the Opus price. Any agent can be moved
+ * to another priced model in Growth Settings.
+ */
+export const DEFAULT_MODEL = 'claude-sonnet-5';
+
+/** Server-side web search: USD 10 per 1,000 searches, on top of tokens. */
+export const WEB_SEARCH_USD_PER_REQUEST = 0.01;
 
 export const MODEL_PRICES: Readonly<Record<string, { inputPerMTok: number; outputPerMTok: number }>> = {
   'claude-opus-5': { inputPerMTok: 5, outputPerMTok: 25 },
@@ -16,7 +24,7 @@ export const MODEL_PRICES: Readonly<Record<string, { inputPerMTok: number; outpu
   'claude-haiku-4-5': { inputPerMTok: 1, outputPerMTok: 5 },
 };
 
-export type TokenUsage = { inputTokens: number; outputTokens: number; cacheWriteTokens?: number; cacheReadTokens?: number };
+export type TokenUsage = { inputTokens: number; outputTokens: number; cacheWriteTokens?: number; cacheReadTokens?: number; webSearchRequests?: number };
 
 /** Cost of one call in USD, to six decimal places. Null for a model with no known price. */
 export function costUsd(model: string, usage: TokenUsage): number | null {
@@ -24,7 +32,8 @@ export function costUsd(model: string, usage: TokenUsage): number | null {
   if (!p) return null;
   const input = usage.inputTokens * p.inputPerMTok + (usage.cacheWriteTokens ?? 0) * p.inputPerMTok * 1.25 + (usage.cacheReadTokens ?? 0) * p.inputPerMTok * 0.1;
   const output = usage.outputTokens * p.outputPerMTok;
-  return Math.round(((input + output) / 1_000_000) * 1e6) / 1e6;
+  const searches = (usage.webSearchRequests ?? 0) * WEB_SEARCH_USD_PER_REQUEST;
+  return Math.round(((input + output) / 1_000_000 + searches) * 1e6) / 1e6;
 }
 
 /** Riyadh keeps UTC+3 all year: no daylight saving. */

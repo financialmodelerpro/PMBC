@@ -61,7 +61,7 @@ check('Opus 5: 1M input plus 1M output costs USD 30', pricing.costUsd('claude-op
 check('cache writes at 1.25x and reads at 0.1x the input rate', pricing.costUsd('claude-opus-5', { inputTokens: 0, outputTokens: 0, cacheWriteTokens: 1_000_000, cacheReadTokens: 1_000_000 }) === 6.75);
 check('Sonnet 5 and Haiku 4.5 priced', pricing.costUsd('claude-sonnet-5', { inputTokens: 1_000_000, outputTokens: 0 }) === 2 && pricing.costUsd('claude-haiku-4-5', { inputTokens: 0, outputTokens: 1_000_000 }) === 5);
 check('an unknown model has no price', pricing.costUsd('claude-unknown', { inputTokens: 1, outputTokens: 1 }) === null);
-check('default model is Claude Opus 5', pricing.DEFAULT_MODEL === 'claude-opus-5');
+check('default model is Claude Sonnet 5 (from Phase 2)', pricing.DEFAULT_MODEL === 'claude-sonnet-5');
 {
   const before = pricing.riyadhMonth(new Date('2026-09-30T20:59:59Z'));
   const after = pricing.riyadhMonth(new Date('2026-09-30T21:00:00Z'));
@@ -92,7 +92,8 @@ check('mock mode exactly when no key is set', provider.isMockMode({}) && provide
 check('gmail.com, outlook.com, hotmail.com and yahoo.com are shared domains', ['gmail.com', 'outlook.com', 'hotmail.com', 'yahoo.com'].every(sup.isSharedEmailDomain) && !sup.isSharedEmailDomain('acme.com'));
 check('com.sa is a public suffix, acme.com.sa is not', sup.isPublicSuffix('com.sa') && !sup.isPublicSuffix('acme.com.sa'));
 {
-  const sql = fs.readFileSync(path.join(root, 'supabase/migrations/087_growth_ai_usage.sql'), 'utf8');
+  // Line endings normalised: a Windows checkout has CRLF.
+  const sql = fs.readFileSync(path.join(root, 'supabase/migrations/087_growth_ai_usage.sql'), 'utf8').replace(/\r\n/g, '\n');
   check('087: SAFE TO APPLY, RLS and revoke', /^-- SAFE TO APPLY:/m.test(sql) && sql.includes('ALTER TABLE growth_ai_usage ENABLE ROW LEVEL SECURITY;') && sql.includes('ALTER TABLE growth_ai_alerts ENABLE ROW LEVEL SECURITY;') && sql.includes('REVOKE ALL ON TABLE growth_ai_usage, growth_ai_alerts FROM anon, authenticated;'));
   check('087: mock calls are free by constraint', sql.includes('CHECK (NOT is_mock OR cost_usd = 0)'));
   check('087: one alert per month by unique key', sql.includes('ON growth_ai_alerts (month, is_test)'));

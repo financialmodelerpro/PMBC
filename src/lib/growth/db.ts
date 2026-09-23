@@ -29,9 +29,22 @@ export const GROWTH_TABLE_MIGRATIONS = {
   growth_suppressions: '085_growth_settings.sql',
   growth_ai_usage: '087_growth_ai_usage.sql',
   growth_ai_alerts: '087_growth_ai_usage.sql',
+  growth_feed_runs: '088_growth_prospecting.sql',
+  growth_imports: '088_growth_prospecting.sql',
+  growth_research_briefs: '088_growth_prospecting.sql',
 } as const;
 export type GrowthTable = keyof typeof GROWTH_TABLE_MIGRATIONS;
 export const GROWTH_TABLES = Object.keys(GROWTH_TABLE_MIGRATIONS) as GrowthTable[];
+
+/** Whether one Growth table exists. False on any read failure, so a screen shows its migration notice. */
+export async function tableExists(table: GrowthTable): Promise<boolean> {
+  try {
+    const { error } = await growthDb().from(table).select('id').limit(1);
+    return !error;
+  } catch {
+    return false;
+  }
+}
 
 /** The migrations still to apply for the tables that are missing, in order. */
 export function migrationsFor(missing: GrowthTable[]): string[] {

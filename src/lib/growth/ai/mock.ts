@@ -8,6 +8,7 @@
  * made-up companies and never state a PaceMakers fact.
  */
 
+import { JSON_SAMPLES, sampleUrls } from './mockSamples';
 import type { AiProvider, ProviderRequest, ProviderResponse } from './provider';
 
 export const MOCK_LABEL = '[MOCK AI OUTPUT: sample text, not written by Claude]';
@@ -59,7 +60,8 @@ export const mockProvider: AiProvider = {
   name: 'mock',
   isMock: true,
   async call(req: ProviderRequest): Promise<ProviderResponse> {
-    const sample = SAMPLES[req.purpose] ?? `A sample answer for "${req.purpose}" from the mock provider.`;
+    const json = JSON_SAMPLES[req.purpose]?.(req);
+    const sample = json !== undefined ? JSON.stringify(json, null, 2) : SAMPLES[req.purpose] ?? `A sample answer for "${req.purpose}" from the mock provider.`;
     const text = `${MOCK_LABEL}\n\n${sample}`;
     const prompt = [req.system ?? '', ...req.messages.map((m) => m.content)].join('\n');
     return {
@@ -70,6 +72,8 @@ export const mockProvider: AiProvider = {
       cacheWriteTokens: 0,
       cacheReadTokens: 0,
       refused: false,
+      webSearchRequests: 0,
+      sourceUrls: json !== undefined ? sampleUrls(json) : [],
     };
   },
 };
