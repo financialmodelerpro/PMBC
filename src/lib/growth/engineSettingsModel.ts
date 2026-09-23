@@ -68,6 +68,8 @@ export const ENGINE_LIMITS = {
   chatMessages: { min: 4, max: 100 },
   chatPerIp: { min: 1, max: 100 },
   checkinDays: { min: 7, max: 730 },
+  chatDelay: { min: 5, max: 300 },
+  chatScroll: { min: 10, max: 100 },
   consentText: 1000,
 } as const;
 
@@ -83,6 +85,9 @@ export type EngineSettings = {
   chat_max_messages: number;
   chat_max_conversations_per_ip_per_day: number;
   chat_consent_text: string;
+  chat_auto_open: boolean;
+  chat_auto_open_delay_seconds: number;
+  chat_auto_open_scroll_percent: number;
   lead_alert_email: string;
   bookings_url: string;
   nurture_enabled: boolean;
@@ -104,6 +109,9 @@ export const ENGINE_SETTING_COLUMNS: Record<EngineSettingKey, { migration: strin
   chat_max_messages: { migration: '090_growth_website_chat.sql', default: 30 },
   chat_max_conversations_per_ip_per_day: { migration: '090_growth_website_chat.sql', default: 5 },
   chat_consent_text: { migration: '090_growth_website_chat.sql', default: DEFAULT_CHAT_CONSENT_TEXT },
+  chat_auto_open: { migration: '095_growth_chat_opening.sql', default: true },
+  chat_auto_open_delay_seconds: { migration: '095_growth_chat_opening.sql', default: 20 },
+  chat_auto_open_scroll_percent: { migration: '095_growth_chat_opening.sql', default: 50 },
   lead_alert_email: { migration: '090_growth_website_chat.sql', default: 'ahmad.din@pacemakersglobal.com' },
   bookings_url: { migration: '091_growth_meetings.sql', default: '' },
   nurture_enabled: { migration: '092_growth_nurture_partners.sql', default: false },
@@ -149,6 +157,12 @@ export const engineGroupSchemas = {
     chat_max_conversations_per_ip_per_day: z.number().int().min(ENGINE_LIMITS.chatPerIp.min).max(ENGINE_LIMITS.chatPerIp.max),
     chat_consent_text: z.string().trim().min(20).max(ENGINE_LIMITS.consentText),
     lead_alert_email: z.string().trim().toLowerCase().email('Enter a valid email address'),
+  }),
+  /** How the chat opens by itself (migration 095): once a session, after the delay or the scroll point, whichever comes first. */
+  chat_open: z.object({
+    chat_auto_open: z.boolean(),
+    chat_auto_open_delay_seconds: z.number().int().min(ENGINE_LIMITS.chatDelay.min).max(ENGINE_LIMITS.chatDelay.max),
+    chat_auto_open_scroll_percent: z.number().int().min(ENGINE_LIMITS.chatScroll.min).max(ENGINE_LIMITS.chatScroll.max),
   }),
   meetings: z.object({
     bookings_url: z

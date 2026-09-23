@@ -31,6 +31,17 @@ export const QUALIFICATION_FIELDS = [
 export type QualificationKey = (typeof QUALIFICATION_FIELDS)[number]['key'];
 export type Qualification = Partial<Record<QualificationKey, string | number | null>>;
 
+/**
+ * The three answers that matter most, asked first in whatever order the
+ * conversation allows. With these three a lead is complete enough to score
+ * and route; the rest are asked only if the conversation carries on.
+ */
+export const CORE_QUALIFICATION = ['service', 'size_sar', 'timeline'] as const satisfies readonly QualificationKey[];
+const has = (q: Qualification, k: QualificationKey) => q[k] !== null && q[k] !== undefined && q[k] !== '';
+/** The core answers still missing, in the order they are listed. */
+export const missingCore = (q: Qualification): QualificationKey[] => CORE_QUALIFICATION.filter((k) => !has(q, k));
+export const coreComplete = (q: Qualification): boolean => missingCore(q).length === 0;
+
 export type ScreenResult = { kind: 'ok' } | { kind: 'injection' | 'clients' | 'pricing' | 'legal' | 'complaint' | 'sensitive'; reason: string };
 
 /** Asking who the firm's clients are: answered with a fixed reply, never by the model. */
@@ -131,16 +142,19 @@ export type Route = 'none' | 'hot' | 'warm' | 'cold' | 'escalated';
 
 /**
  * Where a conversation goes. Escalated wins. Otherwise nothing is decided
- * until the visitor has answered at least three questions or asked to meet;
+ * until the visitor has given the three core answers (service, size and
+ * timeline), asked to meet, or answered at least four questions of any kind;
  * then Hot, Warm or Cold follow the temperature.
  */
-export function routeFor(input: { escalated: boolean; temperature: 'hot' | 'warm' | 'cold' | null; answered: number; wantsMeeting: boolean }): Route {
+export function routeFor(input: { escalated: boolean; temperature: 'hot' | 'warm' | 'cold' | null; answered: number; wantsMeeting: boolean; coreComplete?: boolean }): Route {
   if (input.escalated) return 'escalated';
-  if (!input.wantsMeeting && input.answered < 3) return 'none';
+  if (!input.wantsMeeting && !input.coreComplete && input.answered < 4) return 'none';
   return input.temperature ?? 'none';
 }
 
-const OPENINGS: { match: RegExp; line: string }[] = [
+/** The opening line per page, first match wins. Every public page has one; a page not listed gets the general line. */
+export const OPENINGS: { match: RegExp; line: string }[] = [
+  { match: /^\/$/, line: 'What are you working on at the moment: a transaction, a valuation, or a project that needs financing?' },
   { match: /^\/services\/refm/, line: 'Are you working on a real estate project that needs a development model or a lender review?' },
   { match: /^\/services\/business-valuation/, line: 'Is a valuation coming up, for a transaction, a shareholder matter or planning?' },
   { match: /^\/services\/financial-due-diligence/, line: 'Are you buying or selling, and at what stage is the deal?' },
@@ -150,12 +164,23 @@ const OPENINGS: { match: RegExp; line: string }[] = [
   { match: /^\/services\/investment-memorandums/, line: 'Are you preparing to approach investors or lenders?' },
   { match: /^\/services\/cfo-advisory/, line: 'What is the finance question on your desk at the moment?' },
   { match: /^\/services/, line: 'Which of these situations is closest to yours?' },
-  { match: /^\/tools/, line: 'Would you like help reading your valuation result, or talking through the next step?' },
+  { match: /^\/tools\/business-valuation/, line: 'Would you like help reading your valuation result, or talking through the next step?' },
+  { match: /^\/tools/, line: 'Would you like help with one of these tools, or with the decision behind it?' },
   { match: /^\/(case-studies|insights)/, line: 'Is there a situation of your own that is similar?' },
+  { match: /^\/about/, line: 'Would you like to know how Ahmad Din would approach a situation like yours?' },
+  { match: /^\/team/, line: 'Would it help to know who would work on your mandate and how the work is reviewed?' },
+  { match: /^\/network/, line: 'Are you looking for support in a particular market, or an introduction?' },
+  { match: /^\/sectors/, line: 'Which sector is your project or business in?' },
+  { match: /^\/contact/, line: 'If you tell me briefly what you need, Ahmad Din will have the context before he replies. What is it about?' },
+  { match: /^\/book/, line: 'Before you choose a time, is there anything about the project you would like Ahmad Din to know?' },
+  { match: /^\/(fmp|financial-modeler-pro)/, line: 'Are you looking for a model built for your project, or for the Financial Modeler Pro platform itself?' },
+  { match: /^\/(privacy|terms|confidentiality)/, line: 'Is there a question about how PaceMakers handles information that I can help with?' },
 ];
 
+export const GENERAL_OPENING = 'How can PaceMakers help? Tell me a little about what you are working on.';
+
 export function openingLine(path: string, recognised: boolean): string {
-  const base = OPENINGS.find((o) => o.match.test(path))?.line ?? 'How can PaceMakers help? Tell me a little about what you are working on.';
+  const base = OPENINGS.find((o) => o.match.test(path))?.line ?? GENERAL_OPENING;
   return recognised ? `Thank you for following the link from Ahmad's email. ${base}` : base;
 }
 

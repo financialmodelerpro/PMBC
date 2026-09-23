@@ -102,7 +102,25 @@ export function publicChanges(allowed = []) {
     .split(/\r?\n/)
     .map((s) => s.trim())
     .filter(Boolean)
-    .filter((f) => !allowed.includes(f));
+    .filter((f) => !allowed.includes(f))
+    .filter((f) => !(REVALIDATE_ONLY.includes(f) && onlyRevalidateAdded(f)));
+}
+
+/**
+ * Pages given `revalidate = 60` so the site-wide chat reaches them
+ * (2026-09-23): allowed only while that line and its comment are the whole
+ * change.
+ */
+export const REVALIDATE_ONLY = ['src/app/(public)/privacy/page.tsx', 'src/app/(public)/terms/page.tsx', 'src/app/(public)/confidentiality/page.tsx'];
+function onlyRevalidateAdded(file) {
+  let diff = '';
+  try {
+    diff = execSync(`git diff ${PHASE1_BASE} -- "${file}"`, { cwd: root, encoding: 'utf8' });
+  } catch {
+    return false;
+  }
+  const changed = diff.split(/\r?\n/).filter((l) => /^[+-](?![+-])/.test(l));
+  return changed.length > 0 && changed.every((l) => l.startsWith('+') && (l === '+' || l === '+export const revalidate = 60;' || l.startsWith('+// Revalidated each minute')));
 }
 
 /**
@@ -170,6 +188,12 @@ export function migrationChecks(file, tables) {
     check(`${file}: privileges revoked on ${t}`, new RegExp(`REVOKE ALL ON TABLE [^;]*\\b${t}\\b[^;]*FROM anon, authenticated;`).test(sql));
   }
   check(`${file}: idempotent (IF NOT EXISTS)`, !/CREATE TABLE (?!IF NOT EXISTS)/.test(sql));
+  // A mangled edit once left a quote open in 094; catch that before Ahmad pastes it.
+  const code = sql.replace(/--[^\n]*/g, '');
+  const bare = code.replace(/'(?:[^']|'')*'/g, "''");
+  check(`${file}: quotes balanced`, (code.match(/'/g) ?? []).length % 2 === 0);
+  check(`${file}: brackets balanced`, (bare.match(/\(/g) ?? []).length === (bare.match(/\)/g) ?? []).length);
+  check(`${file}: one BEGIN and one COMMIT`, (code.match(/^BEGIN;/gm) ?? []).length === 1 && (code.match(/^COMMIT;/gm) ?? []).length === 1);
   check(`${file}: no dashes`, !DASHES.test(sql));
   return sql;
 }

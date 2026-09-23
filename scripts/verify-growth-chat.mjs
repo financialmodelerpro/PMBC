@@ -49,7 +49,7 @@ check('contact details typed without consent are redacted', cm.redactContactDeta
 console.log('2. Qualification, routing and openings (offline)');
 const q1 = cm.mergeQualification({ sector: 'Hospitality' }, { sector: null, size_sar: 'SAR 250,000,000', timeline: 'Q1', service: 'refm' });
 check('answers fill gaps and a null never erases one', q1.sector === 'Hospitality' && q1.size_sar === 250000000 && q1.timeline === 'Q1' && q1.service === 'refm');
-check('three answers before routing', cm.routeFor({ escalated: false, temperature: 'hot', answered: 2, wantsMeeting: false }) === 'none' && cm.routeFor({ escalated: false, temperature: 'warm', answered: 3, wantsMeeting: false }) === 'warm');
+check('routes on the three core answers, or four of any kind', cm.routeFor({ escalated: false, temperature: 'hot', answered: 3, wantsMeeting: false }) === 'none' && cm.routeFor({ escalated: false, temperature: 'warm', answered: 3, wantsMeeting: false, coreComplete: true }) === 'warm' && cm.routeFor({ escalated: false, temperature: 'cold', answered: 4, wantsMeeting: false }) === 'cold');
 check('a meeting request routes at once', cm.routeFor({ escalated: false, temperature: 'hot', answered: 0, wantsMeeting: true }) === 'hot');
 check('escalation wins', cm.routeFor({ escalated: true, temperature: 'hot', answered: 8, wantsMeeting: true }) === 'escalated');
 check('decision roles recognised', cm.isDecisionRole('Group CFO') && cm.isDecisionRole('Managing Director') && !cm.isDecisionRole('Analyst'));
@@ -72,12 +72,14 @@ console.log('3. Widget and mount: nothing on the public site while off (offline)
   check('the widget talks to /api/growth/chat by default', script.includes("'/api/growth/chat'"));
   const mount = read('src/components/growth/ChatWidgetMount.tsx');
   check('the mount is a server component with no client code', !mount.includes("'use client'") && !/from '\.\/ChatWidget'/.test(mount));
-  check('the mount renders nothing unless the chat is available', mount.includes('if (!(await isOn())) return null;') && mount.includes('return <script src="/api/growth/widget" defer />;'));
+  check('the mount renders nothing unless the chat is shown', mount.includes('if (!on || !opening) return null;') && mount.includes('<script src="/api/growth/widget" defer data-auto-open=') && mount.includes('on = await chatWidgetShown();'));
   check('any failure means off', /catch \{\s*\n\s*on = false;/.test(mount));
   const avail = read('src/lib/growth/chat.ts');
   check('available only when switched on and a real key is set', avail.includes('if (!engine.values.chat_widget_enabled || isMockMode()) return false;'));
   const route = read('src/app/api/growth/chat/route.ts');
-  check('the public chat API refuses while off, on GET and POST', (route.match(/if \(!\(await publicChatAvailable\(\)\)\) return NextResponse\.json\(\{ error: 'Not available' \}, \{ status: 404/g) ?? []).length === 2);
+  const post = route.slice(route.indexOf('export async function POST'));
+  check('the public chat API refuses while off, on GET and POST', /if \(!\(await chatWidgetShown\(\)\)\) return NextResponse\.json\(\{ error: 'Not available' \}, \{ status: 404/.test(route) && /if \(!\(await publicChatAvailable\(\)\)\) return NextResponse\.json\(\{ error: 'Not available' \}, \{ status: 404/.test(post));
+  check('the local display override is ignored on Vercel and never lets a message through', avail.includes('if (process.env.VERCEL) return null;') && !post.includes('chatWidgetShown'));
   check('no React widget component is left for a layout to bundle', !walk('src/components/growth').some((f) => read(f).includes("'use client'")));
   const diff = execSync(`git diff ${PHASE1_BASE} -- "src/app/(public)/layout.tsx"`, { cwd: root, encoding: 'utf8' });
   const added = diff.split('\n').filter((l) => l.startsWith('+') && !l.startsWith('+++')).map((l) => l.slice(1).trim());

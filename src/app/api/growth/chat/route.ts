@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-import { handleChat, openingFor, publicChatAvailable } from '@/lib/growth/chat';
+import { chatWidgetShown, handleChat, openingFor, publicChatAvailable } from '@/lib/growth/chat';
 import { chatRequestSchema } from '@/lib/growth/chatModel';
 import { TRACK_COOKIE } from '@/lib/growth/links';
 import { clientIp, hashIp } from '@/lib/tools/leads/request';
@@ -24,7 +24,8 @@ function cookie(req: Request, name: string): string | null {
 
 /** The opening line for a page, and whether the visitor came from an outreach email. */
 export async function GET(req: Request) {
-  if (!(await publicChatAvailable())) return NextResponse.json({ error: 'Not available' }, { status: 404, headers: noStore });
+  // The opening line follows the widget (so a local placement check can read it); messages below still need the chat switched on.
+  if (!(await chatWidgetShown())) return NextResponse.json({ error: 'Not available' }, { status: 404, headers: noStore });
   const path = new URL(req.url).searchParams.get('path') ?? '/';
   const safe = /^\/[^\s]{0,300}$/.test(path) ? path : '/';
   return NextResponse.json({ opening: await openingFor(safe, cookie(req, TRACK_COOKIE)) }, { headers: noStore });
