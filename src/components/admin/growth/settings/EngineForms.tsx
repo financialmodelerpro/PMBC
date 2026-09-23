@@ -190,3 +190,21 @@ export function ChatSettingsForm({ values, pending, mock }: { values: EngineSett
     </Card>
   );
 }
+
+export function MeetingsSettingsForm({ values, pending }: { values: EngineSettings; pending: string | null }) {
+  const [url, setUrl] = useState(values.bookings_url);
+  const { busy, notice, save } = useSave('meetings');
+  return (
+    <Card id="meeting-settings" title="Meetings" intro="The Microsoft Bookings page offered to qualified leads by the website chat and in no-show rebooking emails. Empty uses the site's /book page." pending={pending}>
+      <Field label="Microsoft Bookings link">
+        <input value={url} onChange={(e) => setUrl(e.target.value)} style={adminInput} placeholder="https://outlook.office365.com/book/..." />
+      </Field>
+      <div style={{ marginTop: 12 }}>
+        <PrimaryButton disabled={busy !== null} onClick={() => save({ bookings_url: url.trim() })}>
+          Save meeting settings
+        </PrimaryButton>
+      </div>
+      <NoticeLine notice={notice} />
+    </Card>
+  );
+}

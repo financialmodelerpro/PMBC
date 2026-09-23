@@ -8,6 +8,7 @@
  */
 
 import { runSignalFeed } from './feed';
+import { briefUpcoming, syncBookings } from './meetings';
 import { checkReplies, draftDueFollowUps, sendDue } from './outreach';
 
 export type JobResult = { job: string; ok: boolean; detail: string };
@@ -40,5 +41,13 @@ export async function runGrowthDaily(now: Date = new Date()): Promise<JobResult[
     { name: 'reply-check', run: () => checkReplies() },
     { name: 'follow-up-drafts', run: () => draftDueFollowUps(now) },
     { name: 'scheduled-sends', run: () => sendDue(now) },
+    {
+      name: 'bookings-sync',
+      run: async () => {
+        const r = await syncBookings({ now });
+        return r.ok ? r.value.message : r.error;
+      },
+    },
+    { name: 'meeting-briefs', run: () => briefUpcoming(now) },
   ]);
 }
