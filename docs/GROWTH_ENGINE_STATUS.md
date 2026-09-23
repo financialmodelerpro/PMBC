@@ -2,7 +2,7 @@
 
 **Read this first in any Growth Engine session.** Last updated 2026-09-23, during the Phase 2 to 7 build. Production runs `main`; `/api/health` reports the live sha. Also read `docs/GROWTH_BUILD_LOG.md` (one line per unit) and `docs/PENDING_MIGRATIONS.md` (every migration and whether it is applied).
 
-**Resume point:** Phases 2 to 6 are complete and merged (088 to 092 applied). Next is Phase 7 (Intelligence), starting with migration 093 and Unit 7.1.
+**Resume point:** Phases 2 to 7 are complete and merged. Migrations 088 to 092 are applied; **093 is pending**. When Ahmad says "093 applied", run `npm run verify-growth-intelligence -- --write-test-rows` to clear its pending live checks. Everything runs in mock mode until the keys listed under Open items are set.
 
 The Growth Engine is an in-house lead generation and CRM system inside the admin at `/admin/growth`. It is admin-only. Detail on each part is in `docs/ARCHITECTURE.md` (the Growth rows) and `docs/DATABASE.md` (migrations 083 to 087); this file is the summary and the rules.
 
@@ -66,6 +66,14 @@ Also in Phase 2: `runAi` now takes `webSearch` (priced at USD 0.01 a search) and
 | 6.2 | The educational sequence (steps approved before use, each a set number of days after the last) and lead magnets (approved, sent on request to opted-in contacts), at `/admin/growth/outreach/nurture`; suppression checked and an opt-out link in every email. Brevo events at `/api/growth/brevo-events` (token `GROWTH_BREVO_WEBHOOK_TOKEN`, separate from the tools webhook) are applied once each: opens and clicks date the message and rescore the lead; unsubscribes, complaints and hard bounces suppress the address and stop nurture. |
 | 6.3 | Partners at `/admin/growth/partners`: partners and past clients by type, check-in cadence (own or the Settings default), check-ins that set the next date, a daily reminder email listing check-ins due, introductions with direction and outcome (an introduction can open a lead with the partner as referral source; won or lost carries to the lead), and a referral partner and source on every lead. |
 
+## Built (Phase 7, Intelligence, 2026-09-23)
+
+| Unit | What it delivered |
+|---|---|
+| 7.1 | Daily Brief at the top of Growth Home (`brief.ts`): Hot leads left quiet, calls today and tomorrow (brief ready or not), replies waiting, escalated chats, drafts to approve, overdue next actions and tasks, stale deals at Opportunity or Proposal, new signals and partner check-ins; each with a recommended next action and the reason. Built by rules from the CRM, not AI: free and traceable. |
+| 7.2 | Analytics at `/admin/growth/analytics` (`analytics.ts`): prospects added, messages sent (mock sends excluded), reply rate, chats, qualification rate, meetings, proposals, wins; the funnel by source, sector, trigger, contact title, service, entry offer and city; AI cost and cost per qualified lead. A lead counts at a stage if it is there now or passed through it. |
+| 7.3 | Scoring review at `/admin/growth/analytics/scoring` (`scoring/review.ts`, `scoringReview.ts`): compares Prospect and Lead Scores with real outcomes (meeting or better against lost or silent), reports conversion by band, and suggests new weights (at least five of each outcome, moves damped and bounded, always 100), saved pending for Ahmad to approve or reject with a note; approval changes the weights through the logged settings row. |
+
 ## Migrations 083 to 087 (all applied 2026-09-22)
 
 All are DDL, hand-run in the Supabase SQL editor, safe to re-run, and carry a `SAFE TO APPLY` line.
@@ -78,7 +86,7 @@ All are DDL, hand-run in the Supabase SQL editor, safe to re-run, and carry a `S
 | 086 `growth_nine_services` | The nine site services on companies, leads and the Knowledge Base; five drafts converted, Feasibility Studies archived, four added; offer `related_service_slugs`; settings `priority_services`. |
 | 087 `growth_ai_usage` | growth_ai_usage (every AI call, logged with actor `ai`, mock calls free by constraint), growth_ai_alerts (one per Riyadh month), and a single test settings row, id 2, for verifiers. |
 
-Every Growth table has RLS on with no policies and every privilege revoked from `anon` and `authenticated`. **088 to 092 are applied.** The next migration is **093**; follow the same pattern and extend `GROWTH_TABLE_MIGRATIONS` in `src/lib/growth/db.ts`. `docs/PENDING_MIGRATIONS.md` is the list of record.
+Every Growth table has RLS on with no policies and every privilege revoked from `anon` and `authenticated`. **088 to 092 are applied; 093 is pending.** The next new migration would be **094**; follow the same pattern and extend `GROWTH_TABLE_MIGRATIONS` in `src/lib/growth/db.ts`. `docs/PENDING_MIGRATIONS.md` is the list of record.
 
 ## Standing rules
 
@@ -106,6 +114,7 @@ Each runs offline and read-only by default; `-- --write-test-rows` adds the live
 | `npm run verify-growth-kb` | Knowledge Base kinds and rules, the nine services and offer links, and (live) create, approve, edit while approved (agents keep the approved copy), archive and restore, the log with who and when, activity order, anon refused. |
 | `npm run verify-growth-settings` | Defaults and limits in app and database, suppression rules including a later opt-out caught live, retention preview read-only, audit filters, integration status never showing values; the real settings row checked untouched field for field. |
 | `npm run verify-growth-ai` | Prices, Riyadh months, budget and mock rules, and (live) a mock call labelled and free and in the audit log, every refusal and failure recorded, the budget alert once a month and retried after a failed send, shared domains needing confirmation. |
+| `npm run verify-growth-intelligence` | Phase 7: review arithmetic (minimum outcomes, direction, bounds, sum 100), title and sector groups, no AI in the brief or analytics, weights change only on approval, migration 093, gates; (read only) the brief and analytics build; (live, after 093) save, reject with a note, approve applying weights to the test row only. 31 checks passing 2026-09-23, 1 pending 093. |
 | `npm run verify-growth-nurture` | Phase 6: nurture needs its own list id, Growth events recognised by header, webhook token, suppression and opt-out in every send, migration 092, gates; (live) opt-in required (code and database), approval with placeholders refused, off or mock sends nothing, events once each, open dated, unsubscribe suppresses and opts out, partner cadence, check-in, introduction opening a referred lead, a won introduction winning it. 47 checks, all passing 2026-09-23. |
 | `npm run verify-growth-meetings` | Phase 5: Bookings variables and the mock preview that saves nothing, outcome to stage mapping, mock samples, migration 091, gates; (live) a call added by hand moves the lead and counts as engagement, a new attendee becomes a contact and lead, briefs and drafts refuse without approvals or budget, outcomes need a held call (code and database), a proposal request moves the lead. 37 checks, all passing 2026-09-23. |
 | `npm run verify-growth-chat` | Phase 4: screening, reply guard, redaction, qualification, routing, openings, the widget script, the zero-footprint mount and the layout diff, migration 090; (live) the real setting off and the public chat unavailable, preview conversations: injection without an AI call, pricing escalation, redaction, consent with wording, contact and lead, database refusal of details without consent, tool tables unchanged. 80 checks, all passing 2026-09-23. |
@@ -139,4 +148,4 @@ Also run `npm run typecheck`, `npm run build`, the other verifiers (`verify-prod
 
 ## Next up
 
-Phase 7 (Intelligence): migration 093, then 7.1 Daily Brief, 7.2 Analytics with AI cost and cost per qualified lead, 7.3 the scoring review tool.
+The Phase 2 to 7 brief is built. What remains is Ahmad's: apply 093, approve the Knowledge Base, set the AI budget, and add the keys and settings listed under Open items, in roughly this order: budget and Knowledge Base (research, drafts, briefs and chat start working in mock mode), Anthropic key (real AI), Microsoft Graph (real sending and reply detection), Bookings, then nurture, then the website chat switch. Each can be tried in its admin screen before it touches anyone.
