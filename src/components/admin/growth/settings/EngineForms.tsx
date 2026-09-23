@@ -241,3 +241,36 @@ export function NurtureSettingsForm({ values, pending, configured }: { values: E
     </Card>
   );
 }
+
+export function ChatOpeningForm({ values, pending }: { values: EngineSettings; pending: string | null }) {
+  const [auto, setAuto] = useState(values.chat_auto_open);
+  const [delay, setDelay] = useState(String(values.chat_auto_open_delay_seconds));
+  const [scroll, setScroll] = useState(String(values.chat_auto_open_scroll_percent));
+  const { busy, notice, save } = useSave('chat_open');
+  return (
+    <Card
+      id="chat-opening"
+      title="Website chat: opening by itself"
+      intro="When the chat is on, it can open by itself once per visit, after the delay or when the visitor scrolls past the point below, whichever comes first. It never opens by itself twice in a visit, or again once the visitor has closed it. On phones it shows a small note above the button instead of the full chat, dismissed with one tap."
+      pending={pending}
+    >
+      <div style={grid}>
+        <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13 }}>
+          <input type="checkbox" checked={auto} onChange={(e) => setAuto(e.target.checked)} /> Open by itself
+        </label>
+        <Field label="Delay (seconds)" hint="5 to 300">
+          <input value={delay} onChange={(e) => setDelay(e.target.value)} style={adminInput} inputMode="numeric" disabled={!auto} />
+        </Field>
+        <Field label="Scroll point (% of the page)" hint="10 to 100">
+          <input value={scroll} onChange={(e) => setScroll(e.target.value)} style={adminInput} inputMode="numeric" disabled={!auto} />
+        </Field>
+      </div>
+      <div style={{ marginTop: 12 }}>
+        <PrimaryButton disabled={busy !== null} onClick={() => save({ chat_auto_open: auto, chat_auto_open_delay_seconds: Number(delay), chat_auto_open_scroll_percent: Number(scroll) }, 'Saved. Pages pick it up within a minute.')}>
+          Save opening settings
+        </PrimaryButton>
+      </div>
+      <NoticeLine notice={notice} />
+    </Card>
+  );
+}

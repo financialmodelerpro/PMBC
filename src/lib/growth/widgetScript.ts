@@ -1,5 +1,6 @@
 /**
- * The website chat widget as a plain script (Unit 4.2, 2026-09-23).
+ * The website chat widget as a plain script (Unit 4.2, 2026-09-23; opening
+ * behaviour 2026-09-23).
  *
  * Why a plain script: a React component imported by the public layout is
  * bundled into the layout's shared chunk and loaded on every page, even when
@@ -11,7 +12,18 @@
  * (never innerHTML), keeps its styles inline, and talks to one endpoint:
  * /api/growth/chat on the public site, or the admin preview endpoint when the
  * script tag says so. It reads the page path from the address bar.
+ *
+ * Opening by itself (settings from migration 095, carried on the script tag):
+ * once per browser session, after `data-delay` seconds or when the visitor
+ * scrolls past `data-scroll` per cent of the page, whichever comes first.
+ * Never twice in a session (sessionStorage), and never again once the visitor
+ * has closed it (localStorage). On a phone it never opens the full panel by
+ * itself: it shows a small note above the button with the opening line, which
+ * one tap dismisses. The phone panel has a large close button, and Escape
+ * closes it anywhere. When storage is blocked, it does not open by itself.
  */
+
+export const WIDGET_STORAGE = { autoOpened: 'pmbc-chat-auto-opened', closed: 'pmbc-chat-closed' } as const;
 
 export function widgetScript(): string {
   return `(() => {
@@ -23,32 +35,58 @@ export function widgetScript(): string {
   const preview = Boolean(mount);
   const NAVY = '#1B3A5F', INK = '#0F1B2D', CREAM = '#FAF7F2', MUTED = '#6B7280';
   const path = () => (me.dataset.path || location.pathname || '/').slice(0, 300);
+  const autoOpen = me.dataset.autoOpen === '1';
+  const delaySeconds = Math.min(300, Math.max(5, Number(me.dataset.delay) || 20));
+  const scrollPercent = Math.min(100, Math.max(10, Number(me.dataset.scroll) || 50));
+  const KEY_AUTO = '${WIDGET_STORAGE.autoOpened}', KEY_CLOSED = '${WIDGET_STORAGE.closed}';
+  const store = (kind) => { try { return kind === 'session' ? window.sessionStorage : window.localStorage; } catch (err) { return null; } };
+  const flag = (kind, key) => { try { const s = store(kind); return s ? s.getItem(key) === '1' : null; } catch (err) { return null; } };
+  const setFlag = (kind, key) => { try { const s = store(kind); if (s) s.setItem(key, '1'); } catch (err) { /* blocked storage: nothing to remember */ } };
+  const phone = () => { try { return window.matchMedia('(max-width: 640px)').matches; } catch (err) { return window.innerWidth <= 640; } };
   let token = null, busy = false, opened = false, state = { askConsent: false, offerNurture: false, bookingUrl: null, consentText: '', closed: false, mock: false };
 
   const el = (tag, style, text) => { const n = document.createElement(tag); if (style) Object.assign(n.style, style); if (text !== undefined) n.textContent = text; return n; };
-  const inputStyle = { width: '100%', boxSizing: 'border-box', border: '1px solid #D1D5DB', borderRadius: '6px', padding: '8px 10px', fontSize: '14px', fontFamily: 'inherit', color: INK, background: '#fff' };
+  const inputStyle = { width: '100%', boxSizing: 'border-box', border: '1px solid #D1D5DB', borderRadius: '6px', padding: '8px 10px', fontSize: '16px', fontFamily: 'inherit', color: INK, background: '#fff' };
   const btnStyle = { background: NAVY, color: '#fff', border: '0', borderRadius: '6px', padding: '8px 14px', fontSize: '14px', cursor: 'pointer', fontFamily: 'inherit' };
+  const small = phone();
 
-  const launcher = el('button', { position: 'fixed', right: '16px', bottom: '16px', zIndex: '60', background: NAVY, color: '#fff', border: '0', borderRadius: '999px', padding: '12px 18px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', boxShadow: '0 8px 24px rgba(15,27,45,0.2)', fontFamily: 'Inter, Arial, sans-serif' }, 'Ask a question');
+  const launcher = el('button', { position: 'fixed', right: small ? '12px' : '16px', bottom: small ? '12px' : '16px', zIndex: '60', background: NAVY, color: '#fff', border: '0', borderRadius: '999px', padding: small ? '10px 16px' : '12px 18px', minHeight: '44px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', boxShadow: '0 8px 24px rgba(15,27,45,0.2)', fontFamily: 'Inter, Arial, sans-serif' }, small ? 'Ask' : 'Ask a question');
   launcher.type = 'button';
+  launcher.dataset.pmbcChat = 'launcher';
   launcher.setAttribute('aria-label', 'Ask PaceMakers a question');
 
   const panel = el('section', preview
     ? { width: '100%', maxWidth: '420px', height: '560px', display: 'flex', flexDirection: 'column', border: '1px solid #E5E7EB', borderRadius: '10px', background: '#fff', fontFamily: 'Inter, Arial, sans-serif', color: INK }
-    : { position: 'fixed', right: '16px', bottom: '16px', zIndex: '60', width: 'min(380px, calc(100vw - 32px))', height: 'min(560px, calc(100vh - 32px))', display: 'none', flexDirection: 'column', border: '1px solid #E5E7EB', borderRadius: '10px', background: '#fff', boxShadow: '0 12px 32px rgba(15,27,45,0.18)', fontFamily: 'Inter, Arial, sans-serif', color: INK });
+    : small
+      ? { position: 'fixed', left: '8px', right: '8px', bottom: '8px', zIndex: '60', height: 'min(70vh, 520px)', display: 'none', flexDirection: 'column', border: '1px solid #E5E7EB', borderRadius: '10px', background: '#fff', boxShadow: '0 12px 32px rgba(15,27,45,0.18)', fontFamily: 'Inter, Arial, sans-serif', color: INK }
+      : { position: 'fixed', right: '16px', bottom: '16px', zIndex: '60', width: 'min(380px, calc(100vw - 32px))', height: 'min(560px, calc(100vh - 32px))', display: 'none', flexDirection: 'column', border: '1px solid #E5E7EB', borderRadius: '10px', background: '#fff', boxShadow: '0 12px 32px rgba(15,27,45,0.18)', fontFamily: 'Inter, Arial, sans-serif', color: INK });
+  panel.dataset.pmbcChat = 'panel';
   panel.setAttribute('aria-label', 'PaceMakers assistant');
-  const head = el('header', { background: NAVY, color: '#fff', padding: '12px 14px', borderRadius: '10px 10px 0 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' });
+  const head = el('header', { background: NAVY, color: '#fff', padding: '8px 8px 8px 14px', borderRadius: '10px 10px 0 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' });
   const titles = el('div');
   titles.appendChild(el('div', { fontWeight: '600', fontSize: '14px' }, 'PaceMakers'));
   const sub = el('div', { fontSize: '12px', opacity: '0.85' }, 'An assistant. Ahmad Din reads every conversation.');
   titles.appendChild(sub);
   head.appendChild(titles);
+
+  let timer = null, teaser = null;
+  const stopAuto = () => {
+    if (timer) { clearTimeout(timer); timer = null; }
+    window.removeEventListener('scroll', onScroll);
+  };
+  const close = () => {
+    panel.style.display = 'none'; launcher.style.display = 'block';
+    if (teaser) { teaser.remove(); teaser = null; }
+    // Closed once, never opened by itself again.
+    setFlag('local', KEY_CLOSED); setFlag('session', KEY_AUTO); stopAuto();
+  };
   if (!preview) {
-    const close = el('button', { background: 'transparent', color: '#fff', border: '0', fontSize: '20px', cursor: 'pointer', lineHeight: '1' }, 'x');
-    close.type = 'button';
-    close.setAttribute('aria-label', 'Close the assistant');
-    close.onclick = () => { panel.style.display = 'none'; launcher.style.display = 'block'; };
-    head.appendChild(close);
+    const x = el('button', { background: 'transparent', color: '#fff', border: '0', fontSize: '22px', cursor: 'pointer', lineHeight: '1', width: '44px', height: '44px', borderRadius: '6px' }, '×');
+    x.type = 'button';
+    x.dataset.pmbcChat = 'close';
+    x.setAttribute('aria-label', 'Close the assistant');
+    x.onclick = close;
+    head.appendChild(x);
   }
   const list = el('div', { flex: '1', overflowY: 'auto', padding: '14px', background: CREAM, display: 'flex', flexDirection: 'column', gap: '10px' });
   list.setAttribute('aria-live', 'polite');
@@ -67,6 +105,7 @@ export function widgetScript(): string {
   const scroll = () => { list.scrollTop = list.scrollHeight; };
   const bubble = (role, text) => {
     const b = el('div', { alignSelf: role === 'visitor' ? 'flex-end' : 'flex-start', maxWidth: '85%', background: role === 'visitor' ? NAVY : '#fff', color: role === 'visitor' ? '#fff' : INK, border: role === 'visitor' ? '0' : '1px solid #E8EEF5', borderRadius: '10px', padding: '8px 12px', fontSize: '14px', lineHeight: '1.5', whiteSpace: 'pre-wrap' }, text);
+    if (role === 'assistant') b.dataset.pmbcChat = 'assistant';
     list.appendChild(b); scroll();
   };
   const note = (text, colour) => { const n = el('div', { fontSize: '13px', color: colour || MUTED }, text); list.appendChild(n); scroll(); return n; };
@@ -139,20 +178,77 @@ export function widgetScript(): string {
   form.onsubmit = (e) => { e.preventDefault(); const msg = box.value.trim(); if (!msg || busy) return; bubble('visitor', msg); box.value = ''; post({ message: msg }); };
   leave.onclick = () => { showConsent(); render(); };
 
-  const open = async () => {
+  let openingPromise = null;
+  const opening = () => {
+    if (!openingPromise) {
+      openingPromise = fetch(endpoint + '?path=' + encodeURIComponent(path()), { credentials: 'same-origin' })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => (d && d.opening) || null)
+        .catch(() => null);
+    }
+    return openingPromise;
+  };
+
+  const open = async (how) => {
     panel.style.display = 'flex'; launcher.style.display = 'none';
+    if (teaser) { teaser.remove(); teaser = null; }
+    if (how !== 'auto') { setFlag('session', KEY_AUTO); stopAuto(); }
     if (opened) return;
     opened = true;
-    try {
-      const r = await fetch(endpoint + '?path=' + encodeURIComponent(path()), { credentials: 'same-origin' });
-      const d = r.ok ? await r.json() : null;
-      if (d && d.opening) bubble('assistant', d.opening);
-    } catch (err) { /* the visitor can still type */ }
-    box.focus();
+    const line = await opening();
+    if (line) bubble('assistant', line);
+    // Focusing would pop the keyboard up on a phone, or pull focus from what the visitor was doing.
+    if (how !== 'auto' && !small) box.focus();
   };
-  launcher.onclick = open;
+  launcher.onclick = () => open('click');
 
-  if (preview) { mount.appendChild(panel); open(); }
-  else { document.body.append(launcher, panel); }
+  // A small note above the button on a phone: it covers little, and one tap dismisses it.
+  const showTeaser = async () => {
+    const line = await opening();
+    if (!line || opened || teaser) return;
+    teaser = el('div', { position: 'fixed', right: '12px', bottom: '64px', zIndex: '60', width: 'min(300px, calc(100vw - 24px))', boxSizing: 'border-box', background: '#fff', color: INK, border: '1px solid #E5E7EB', borderRadius: '10px', boxShadow: '0 8px 24px rgba(15,27,45,0.18)', padding: '10px 4px 10px 12px', display: 'flex', gap: '4px', alignItems: 'flex-start', fontFamily: 'Inter, Arial, sans-serif' });
+    teaser.dataset.pmbcChat = 'teaser';
+    const text = el('button', { flex: '1', textAlign: 'left', background: 'transparent', border: '0', padding: '0', fontSize: '14px', lineHeight: '1.4', color: INK, cursor: 'pointer', fontFamily: 'inherit' }, line);
+    text.type = 'button';
+    text.setAttribute('aria-label', 'Open the assistant: ' + line);
+    text.onclick = () => open('click');
+    const x = el('button', { background: 'transparent', border: '0', color: MUTED, fontSize: '20px', lineHeight: '1', width: '44px', height: '44px', flex: '0 0 44px', cursor: 'pointer' }, '×');
+    x.type = 'button';
+    x.dataset.pmbcChat = 'teaser-close';
+    x.setAttribute('aria-label', 'Dismiss');
+    x.onclick = close;
+    teaser.append(text, x);
+    document.body.appendChild(teaser);
+  };
+
+  let fired = false;
+  const fire = () => {
+    if (fired) return;
+    fired = true;
+    stopAuto();
+    if (opened || panel.style.display === 'flex') return;
+    setFlag('session', KEY_AUTO);
+    if (phone()) showTeaser(); else open('auto');
+  };
+  function onScroll() {
+    const doc = document.documentElement;
+    const room = doc.scrollHeight - window.innerHeight;
+    if (room > 0 && window.scrollY / room >= scrollPercent / 100) fire();
+  }
+
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && (panel.style.display === 'flex' || teaser)) close(); });
+
+  if (preview) { mount.appendChild(panel); open('click'); }
+  else {
+    document.body.append(launcher, panel);
+    // On a phone, room at the foot of the page so the button never sits over the last lines or the footer links.
+    if (small) { const pad = parseFloat(getComputedStyle(document.body).paddingBottom) || 0; document.body.style.paddingBottom = (pad + 68) + 'px'; }
+    // Only when storage answers: a blocked store cannot remember the visitor closed it, so it never opens by itself.
+    const alreadyAuto = flag('session', KEY_AUTO), closedBefore = flag('local', KEY_CLOSED);
+    if (autoOpen && alreadyAuto === false && closedBefore === false) {
+      timer = setTimeout(fire, delaySeconds * 1000);
+      window.addEventListener('scroll', onScroll, { passive: true });
+    }
+  }
 })();`;
 }

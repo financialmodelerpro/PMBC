@@ -3,6 +3,9 @@ import type { Metadata } from 'next';
 import { buildPageMetadata } from '@/lib/seo/metadata';
 import { PageHeroFallback } from '@/components/public/PageHeroFallback';
 
+// Revalidated each minute (the text itself is fixed) so the site-wide layout, including the website chat when it is switched on, reaches this page too.
+export const revalidate = 60;
+
 export const metadata: Metadata = buildPageMetadata({
   path: '/terms',
   fallback: {

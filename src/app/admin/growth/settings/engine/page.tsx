@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 
 import { AdminPageHeader } from '@/components/admin/AdminPageHeader';
-import { AgentModelsForm, ChatSettingsForm, MeetingsSettingsForm, NurtureSettingsForm, LeadWeightsForm, ScoringWeightsForm, SignalFeedForm } from '@/components/admin/growth/settings/EngineForms';
+import { AgentModelsForm, ChatOpeningForm, ChatSettingsForm, MeetingsSettingsForm, NurtureSettingsForm, LeadWeightsForm, ScoringWeightsForm, SignalFeedForm } from '@/components/admin/growth/settings/EngineForms';
 import { KeywordLibrary } from '@/components/admin/growth/settings/KeywordLibrary';
 import { SettingsTabs } from '@/components/admin/growth/settings/SettingsTabs';
 import { ADMIN_COLORS } from '@/lib/admin/styles';
@@ -32,6 +32,7 @@ export default async function GrowthEngineSettingsPage() {
       <ScoringWeightsForm values={v} pending={p('scoring_weights')} />
       <LeadWeightsForm values={v} pending={p('outreach_sending_paused', 'lead_scoring_weights')} />
       <ChatSettingsForm values={v} pending={p('chat_widget_enabled', 'chat_max_messages', 'chat_max_conversations_per_ip_per_day', 'chat_consent_text', 'lead_alert_email')} mock={isMockMode()} />
+      <ChatOpeningForm values={v} pending={p('chat_auto_open', 'chat_auto_open_delay_seconds', 'chat_auto_open_scroll_percent')} />
       <MeetingsSettingsForm values={v} pending={p('bookings_url')} />
       <NurtureSettingsForm values={v} pending={p('nurture_enabled', 'partner_checkin_days')} configured={nurtureConfigured()} />
       <AgentModelsForm values={v} pending={p('agent_models')} />
