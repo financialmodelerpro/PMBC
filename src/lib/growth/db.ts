@@ -32,6 +32,11 @@ export const GROWTH_TABLE_MIGRATIONS = {
   growth_feed_runs: '088_growth_prospecting.sql',
   growth_imports: '088_growth_prospecting.sql',
   growth_research_briefs: '088_growth_prospecting.sql',
+  growth_messages: '089_growth_outreach.sql',
+  growth_tracked_links: '089_growth_outreach.sql',
+  growth_link_clicks: '089_growth_outreach.sql',
+  growth_opportunities: '089_growth_outreach.sql',
+  growth_tasks: '089_growth_outreach.sql',
 } as const;
 export type GrowthTable = keyof typeof GROWTH_TABLE_MIGRATIONS;
 export const GROWTH_TABLES = Object.keys(GROWTH_TABLE_MIGRATIONS) as GrowthTable[];

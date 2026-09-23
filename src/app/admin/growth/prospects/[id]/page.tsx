@@ -173,7 +173,9 @@ export default async function ProspectPage({ params }: { params: Promise<{ id: s
         {leads.map((l) => (
           <div key={l.id} style={{ borderTop: `1px solid ${ADMIN_COLORS.border}`, padding: '10px 0', display: 'flex', flexDirection: 'column', gap: 6 }}>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-              <strong>{l.title}</strong>
+              <Link href={`/admin/growth/pipeline/${l.id}`} style={{ fontWeight: 700 }}>
+                {l.title}
+              </Link>
               <span style={adminBadge('neutral')}>{stageLabel(l.stage)}</span>
               {l.lead_temperature && <span style={adminBadge(temperatureTone(l.lead_temperature))}>{temperatureLabel(l.lead_temperature)} {l.lead_score ?? ''}</span>}
               {l.below_minimum && <span style={adminBadge('danger')}>Below SAR 50 million</span>}

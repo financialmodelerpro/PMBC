@@ -16,13 +16,14 @@ type IntegrationDef = { key: IntegrationKey; label: string; purpose: string; bui
 export const INTEGRATIONS: readonly IntegrationDef[] = [
   // Built in Unit 1.5: without the key the AI layer runs in mock mode, so it shows Mock mode rather than Not set up.
   { key: 'claude', label: 'Claude API', purpose: 'Research, drafting and scoring by AI agents', built: true, env: ['ANTHROPIC_API_KEY'], mockWithout: true },
+  // Built in Unit 3.2: without all four variables outreach runs in mock mode (nothing delivered, labelled).
   {
     key: 'microsoft_graph',
-    label: 'Microsoft Graph (email and Bookings)',
-    purpose: 'Sending outreach from the firm mailbox and reading Bookings',
-    built: false,
-    env: ['MS_GRAPH_TENANT_ID', 'MS_GRAPH_CLIENT_ID', 'MS_GRAPH_CLIENT_SECRET'],
-    arrivesIn: 'Phase 3 (Outreach)',
+    label: 'Microsoft Graph (email)',
+    purpose: 'Sending outreach from the firm mailbox and detecting replies',
+    built: true,
+    env: ['MS_GRAPH_TENANT_ID', 'MS_GRAPH_CLIENT_ID', 'MS_GRAPH_CLIENT_SECRET', 'MS_GRAPH_SENDER'],
+    mockWithout: true,
   },
   { key: 'brevo', label: 'Brevo', purpose: 'Transactional email from the site and the free tools', built: true, env: ['BREVO_API_KEY', 'EMAIL_FROM_DEFAULT'] },
 ];
@@ -34,7 +35,7 @@ export function integrationStatus(env: Record<string, string | undefined> = proc
   return INTEGRATIONS.map((i) => {
     const missing = i.env.filter((name) => !env[name]?.trim());
     if (!i.built) return { key: i.key, label: i.label, purpose: i.purpose, state: 'not_set_up', detail: `Not built yet${i.arrivesIn ? `, arrives in ${i.arrivesIn}` : ''}.` };
-    if (missing.length && i.mockWithout) return { key: i.key, label: i.label, purpose: i.purpose, state: 'mock', detail: `Mock mode: ${missing.join(', ')} is not set, so AI features answer with labelled sample output at no cost. Set it and the real API is used with no code change.` };
+    if (missing.length && i.mockWithout) return { key: i.key, label: i.label, purpose: i.purpose, state: 'mock', detail: i.key === 'claude' ? `Mock mode: ${missing.join(', ')} is not set, so AI features answer with labelled sample output at no cost. Set it and the real API is used with no code change.` : `Mock mode: ${missing.join(', ')} not set, so nothing is delivered and every send is recorded as mock. Set them and the real service is used with no code change.` };
     if (missing.length) return { key: i.key, label: i.label, purpose: i.purpose, state: 'not_set_up', detail: `Missing: ${missing.join(', ')}.` };
     return { key: i.key, label: i.label, purpose: i.purpose, state: 'configured', detail: `Set: ${i.env.join(', ')}.` };
   });

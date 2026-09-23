@@ -80,6 +80,7 @@
     "verify-growth-data": "node scripts/verify-growth-data.mjs",
     "verify-growth-kb": "node scripts/verify-growth-kb.mjs",
     "verify-growth-prospecting": "node scripts/verify-growth-prospecting.mjs",
+    "verify-growth-outreach": "node scripts/verify-growth-outreach.mjs",
     "verify-growth-settings": "node scripts/verify-growth-settings.mjs",
     "verify-growth-ai": "node scripts/verify-growth-ai.mjs"
   },

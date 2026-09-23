@@ -135,11 +135,11 @@ check('suppression values normalised', sup.normaliseSuppressionValue('email', ' 
   const all = integ.integrationStatus({ BREVO_API_KEY: SECRET, EMAIL_FROM_DEFAULT: SECRET, ANTHROPIC_API_KEY: SECRET, MS_GRAPH_TENANT_ID: SECRET, MS_GRAPH_CLIENT_ID: SECRET, MS_GRAPH_CLIENT_SECRET: SECRET });
   const by = (k, list) => list.find((i) => i.key === k);
   check('Brevo configured when its variables are set', by('brevo', all).state === 'configured');
-  check('Claude configured once its key is set; Graph Not set up until built', by('claude', all).state === 'configured' && by('microsoft_graph', all).state === 'not_set_up');
+  check('Claude configured once its key is set; Graph in mock mode until all four variables are set (Unit 3.2)', by('claude', all).state === 'configured' && by('microsoft_graph', all).state === 'mock' && by('microsoft_graph', integ.integrationStatus({ MS_GRAPH_TENANT_ID: SECRET, MS_GRAPH_CLIENT_ID: SECRET, MS_GRAPH_CLIENT_SECRET: SECRET, MS_GRAPH_SENDER: SECRET })).state === 'configured');
   check('integration status never contains a value', !JSON.stringify(all).includes(SECRET));
   const none = integ.integrationStatus({});
   check('Brevo not set up without its variables', by('brevo', none).state === 'not_set_up' && by('brevo', none).detail.includes('BREVO_API_KEY'));
-  check('three integrations listed', all.length === 3);
+  check('every integration listed', all.length === integ.INTEGRATIONS.length && all.length >= 3);
 }
 check('retention cut-off is N calendar months back', ret.retentionCutoff(12, new Date('2026-09-22T00:00:00Z')).toISOString().startsWith('2025-09-22'));
 {
