@@ -8,6 +8,7 @@
  */
 
 import { runSignalFeed } from './feed';
+import { checkReplies, draftDueFollowUps, sendDue } from './outreach';
 
 export type JobResult = { job: string; ok: boolean; detail: string };
 
@@ -35,5 +36,9 @@ export async function runGrowthDaily(now: Date = new Date()): Promise<JobResult[
         return r.ok ? r.value.message : r.error;
       },
     },
+    // Replies first, so a reply stops its follow-up before one is drafted or sent.
+    { name: 'reply-check', run: () => checkReplies() },
+    { name: 'follow-up-drafts', run: () => draftDueFollowUps(now) },
+    { name: 'scheduled-sends', run: () => sendDue(now) },
   ]);
 }
