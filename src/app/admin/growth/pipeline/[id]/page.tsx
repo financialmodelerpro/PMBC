@@ -6,6 +6,7 @@ import { AdminPageHeader } from '@/components/admin/AdminPageHeader';
 import { MessageCard } from '@/components/admin/growth/outreach/MessageCard';
 import { DraftButtons } from '@/components/admin/growth/outreach/OutreachControls';
 import { MeetingRequestToggle, OpportunityForm, StageMover, TaskAdd, TaskTick } from '@/components/admin/growth/pipeline/PipelineControls';
+import { ReferralSetter } from '@/components/admin/growth/partners/PartnerControls';
 import { LeadButton } from '@/components/admin/growth/prospects/Toggle';
 import { Timeline } from '@/components/admin/growth/Timeline';
 import { ADMIN_COLORS, adminBadge, adminCard } from '@/lib/admin/styles';
@@ -15,6 +16,7 @@ import { bandLabel, bandTone, dateTime, day, sar, serviceLabel, sourceLabel, sta
 import { graphMailConfigured } from '@/lib/growth/graph';
 import { computeLeadScore } from '@/lib/growth/leadScore';
 import { VALUE_BANDS } from '@/lib/growth/outreachModel';
+import { listPartners, partnersReady } from '@/lib/growth/partners';
 import { getLeadBundle } from '@/lib/growth/pipeline';
 
 export const metadata: Metadata = { title: 'Lead | Growth | PMBC Admin', robots: { index: false, follow: false } };
@@ -32,7 +34,8 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
   const { lead: l, company, contact } = b;
   const score = await computeLeadScore(id);
   const graphLive = graphMailConfigured();
-  const ext = l as typeof l & { sequence_status?: string; next_follow_up_at?: string | null; sequence_stopped_reason?: string | null; meeting_requested?: boolean; last_reply_at?: string | null };
+  const partners = (await partnersReady()) ? (await listPartners({ includeTest: l.is_test })).map((x) => ({ id: x.id, name: x.name })) : null;
+  const ext = l as typeof l & { referral_partner_id?: string | null; referral_source?: string | null; sequence_status?: string; next_follow_up_at?: string | null; sequence_stopped_reason?: string | null; meeting_requested?: boolean; last_reply_at?: string | null };
 
   return (
     <>
@@ -86,6 +89,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
           {l.requirement && <p style={{ fontSize: 13, whiteSpace: 'pre-wrap', margin: '0 0 12px' }}>{l.requirement}</p>}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <StageMover leadId={l.id} stage={l.stage} />
+            {partners && <ReferralSetter leadId={l.id} partners={partners} partnerId={ext.referral_partner_id ?? null} source={ext.referral_source ?? null} />}
             {'meeting_requested' in l && <MeetingRequestToggle leadId={l.id} value={Boolean(ext.meeting_requested)} />}
             {company && (
               <LeadButton
