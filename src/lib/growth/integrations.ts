@@ -9,7 +9,7 @@
  * will read.
  */
 
-export type IntegrationKey = 'claude' | 'microsoft_graph' | 'brevo';
+export type IntegrationKey = 'claude' | 'microsoft_graph' | 'microsoft_bookings' | 'brevo' | 'brevo_nurture';
 
 type IntegrationDef = { key: IntegrationKey; label: string; purpose: string; built: boolean; env: string[]; arrivesIn?: string; mockWithout?: boolean };
 
@@ -23,6 +23,15 @@ export const INTEGRATIONS: readonly IntegrationDef[] = [
     purpose: 'Sending outreach from the firm mailbox and detecting replies',
     built: true,
     env: ['MS_GRAPH_TENANT_ID', 'MS_GRAPH_CLIENT_ID', 'MS_GRAPH_CLIENT_SECRET', 'MS_GRAPH_SENDER'],
+    mockWithout: true,
+  },
+  // Built in Unit 5.1: without these, the Bookings sync is a labelled preview and calls are added by hand.
+  {
+    key: 'microsoft_bookings',
+    label: 'Microsoft Bookings',
+    purpose: 'Reading booked calls, moves and cancellations',
+    built: true,
+    env: ['MS_GRAPH_TENANT_ID', 'MS_GRAPH_CLIENT_ID', 'MS_GRAPH_CLIENT_SECRET', 'MS_GRAPH_SENDER', 'MS_BOOKINGS_BUSINESS_ID'],
     mockWithout: true,
   },
   { key: 'brevo', label: 'Brevo', purpose: 'Transactional email from the site and the free tools', built: true, env: ['BREVO_API_KEY', 'EMAIL_FROM_DEFAULT'] },
