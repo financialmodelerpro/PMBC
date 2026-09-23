@@ -68,13 +68,13 @@ When you find an em dash in existing content during other work, fix it as part o
 Single Next.js App Router application (^15), one domain, no subdomain routing: the public site plus an admin CMS. No public registration, payments or third-party integrations beyond Brevo, Supabase and the FMP content feed. TypeScript strict, Tailwind CSS 4, `@supabase/supabase-js` ^2, NextAuth ^4 (JWT), Brevo v3 REST with plain `fetch` and no SDK, sharp, `next/og`, lucide-react, react-hook-form with zod, TipTap, bcryptjs, Zustand only if needed, and `@react-pdf/renderer` ^4 for the free tools' PDFs (kept out of the bundle via `serverExternalPackages`, fonts traced with `outputFileTracingIncludes`). hCaptcha is wired but dormant; the forms use a honeypot and a timing floor.
 
 - **lucide-react 1.x is the current major.** Never "downgrade" to 0.x.
-- **Do not install:** Google Apps Script, pdf-lib (one PDF library is enough), exceljs, Recharts, `@anthropic-ai/sdk`, the YouTube API, `@auth/supabase-adapter`, Stripe or any payment SDK. **No cron jobs** except the one Vercel cron for the free tools' reminders (`vercel.json`).
+- **Do not install:** Google Apps Script, pdf-lib (one PDF library is enough), exceljs, Recharts, `@anthropic-ai/sdk`, the YouTube API, `@auth/supabase-adapter`, Stripe or any payment SDK. **No cron jobs** except the two in `vercel.json`: the free tools' reminders, and the one Growth daily run (`/api/cron/growth-daily`, 09:00 Riyadh, added 2026-09-23 by the Phase 2 to 7 brief); every Growth scheduled job runs inside it.
 - Code lives in `src/app/(public)`, `src/app/admin`, `src/app/api`, `src/components/{layout,public,admin,tools}`, `src/lib`, `src/config` and `src/types`; the full tree is in ARCHITECTURE.md.
 
 ## 5. Database and migrations
 
 - Migrations live in `supabase/migrations/`, three-digit prefix, one logical change each. **Never edit a migration after it has been applied.** Read a migration's header before re-running it.
-- **DDL migrations (031, 032, 033, 072, 076, 077, 082, 083, 084, 085, 086, 087) must be pasted into the Supabase SQL editor by hand**: supabase-js cannot run DDL and there is no direct Postgres connection string. Everything else is DML applied by its `npm run` script, most with `--dry-run`.
+- **DDL migrations (031, 032, 033, 072, 076, 077, 082, and every Growth migration from 083 on; `docs/PENDING_MIGRATIONS.md` lists which are applied) must be pasted into the Supabase SQL editor by hand**: supabase-js cannot run DDL and there is no direct Postgres connection string. Everything else is DML applied by its `npm run` script, most with `--dry-run`.
 - **034, 048 and 049 are destructive on re-run** (they delete and reinsert).
 - **Every migration from 076 on states a `SAFE TO APPLY:` line** in its header: before or after which deploy, and what the site does in the gap. Previews share the production database, so applying early can publish links to routes not yet deployed (075 did exactly that).
 - **Code that reads new columns or tables degrades safely when the migration has not run.** Keep that true for every new one.

@@ -17,9 +17,11 @@ import { sendEmail } from '@/lib/email/send';
 import { isMissingSchema } from '@/lib/tools/db';
 
 import { growthDb } from '../db';
+import { getEngineSettings } from '../engineSettings';
 import { getApprovedKnowledge } from '../kb';
 import type { KbKind } from '../kbModel';
 import { REAL_SETTINGS_ROW, getGrowthSettings } from '../settings';
+import { modelForAgent } from './agents';
 import { DEFAULT_MODEL, budgetDecision, costUsd, crossedThreshold, riyadhMonth } from './pricing';
 import { selectProvider, type AiMessage, type AiProvider } from './provider';
 
@@ -32,8 +34,11 @@ export type AiRequest = {
   purpose: string;
   system?: string;
   messages: AiMessage[];
+  /** A fixed model. Omit it to use the agent's model from Settings (default Claude Sonnet 5). */
   model?: string;
   maxTokens?: number;
+  /** Let the model search the web, at most `maxUses` times; each search is billed. */
+  webSearch?: { maxUses: number };
   related?: { companyId?: string | null; leadId?: string | null; kbItemId?: string | null };
   /**
    * Knowledge Base kinds that must have at least one approved item before the
@@ -46,7 +51,7 @@ export type AiRequest = {
 };
 
 export type AiResult =
-  | { ok: true; text: string; mock: boolean; model: string; inputTokens: number; outputTokens: number; costUsd: number; usageId: string }
+  | { ok: true; text: string; mock: boolean; model: string; inputTokens: number; outputTokens: number; costUsd: number; usageId: string; sourceUrls: string[]; webSearchRequests: number }
   | { ok: false; reason: AiRefusal; message: string; mock: boolean; usageId: string | null };
 
 export type BudgetAlertSender = (alert: { to: string; month: string; spentUsd: number; budgetUsd: number; thresholdPct: number }) => Promise<boolean>;
@@ -163,7 +168,7 @@ export async function maybeSendBudgetAlert(input: {
 export async function runAi(req: AiRequest, opts: RunOptions = {}): Promise<AiResult> {
   const provider = opts.provider ?? (await selectProvider());
   const isTest = Boolean(req.isTest);
-  const model = provider.isMock ? 'mock' : req.model ?? DEFAULT_MODEL;
+  let model = provider.isMock ? 'mock' : req.model ?? DEFAULT_MODEL;
   const base = {
     agent: req.agent,
     provider: provider.name,
@@ -194,6 +199,12 @@ export async function runAi(req: AiRequest, opts: RunOptions = {}): Promise<AiRe
   if (spend.error) return { ok: false, reason: 'not_recorded', message: spend.error, mock: provider.isMock, usageId: null };
   const budget = budgetDecision(settings.settings.ai_monthly_budget_usd, spend.spentUsd);
   if (!budget.ok) return refuse(budget.reason, budget.message);
+  if (!provider.isMock && !req.model) {
+    // The agent's model from Settings (migration 088); the default until that column exists.
+    const engine = await getEngineSettings(opts.settingsRowId ?? REAL_SETTINGS_ROW);
+    model = modelForAgent(req.agent, engine.values.agent_models);
+    base.model = model;
+  }
   if (!provider.isMock && costUsd(model, { inputTokens: 0, outputTokens: 0 }) === null) {
     return refuse('unknown_model', `No price is known for ${model}, so it cannot be budgeted.`);
   }
@@ -202,13 +213,13 @@ export async function runAi(req: AiRequest, opts: RunOptions = {}): Promise<AiRe
   const started = Date.now();
   let response;
   try {
-    response = await provider.call({ model, system: req.system, messages: req.messages, maxTokens: req.maxTokens ?? MAX_TOKENS, purpose: req.purpose, agent: req.agent });
+    response = await provider.call({ model, system: req.system, messages: req.messages, maxTokens: req.maxTokens ?? MAX_TOKENS, purpose: req.purpose, agent: req.agent, webSearch: req.webSearch });
   } catch (err) {
     const message = err instanceof Error ? err.message.slice(0, 300) : 'The provider call failed';
     const usageId = await record({ ...base, status: 'failed', reason: message, duration_ms: Date.now() - started });
     return { ok: false, reason: 'provider_error', message, mock: provider.isMock, usageId };
   }
-  const tokens = { inputTokens: response.inputTokens, outputTokens: response.outputTokens, cacheWriteTokens: response.cacheWriteTokens, cacheReadTokens: response.cacheReadTokens };
+  const tokens = { inputTokens: response.inputTokens, outputTokens: response.outputTokens, cacheWriteTokens: response.cacheWriteTokens, cacheReadTokens: response.cacheReadTokens, webSearchRequests: response.webSearchRequests ?? 0 };
   const cost = provider.isMock ? 0 : costUsd(response.model, tokens) ?? costUsd(model, tokens) ?? 0;
 
   // 4. The record, which also writes the audit log.
@@ -243,5 +254,5 @@ export async function runAi(req: AiRequest, opts: RunOptions = {}): Promise<AiRe
   }
 
   if (response.refused) return { ok: false, reason: 'model_refused', message: 'The model declined the request.', mock: provider.isMock, usageId };
-  return { ok: true, text: response.text, mock: provider.isMock, model: response.model, inputTokens: row.input_tokens ?? 0, outputTokens: response.outputTokens, costUsd: cost, usageId };
+  return { ok: true, text: response.text, mock: provider.isMock, model: response.model, inputTokens: row.input_tokens ?? 0, outputTokens: response.outputTokens, costUsd: cost, usageId, sourceUrls: response.sourceUrls ?? [], webSearchRequests: response.webSearchRequests ?? 0 };
 }

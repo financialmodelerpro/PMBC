@@ -5,6 +5,11 @@
  *
  * With ANTHROPIC_API_KEY unset the mock provider answers; once it is set the
  * Anthropic provider does, with no code change.
+ *
+ * Web search (Unit 2.4): an agent that needs sources asks for `webSearch`. The
+ * provider reports how many searches ran (each is billed) and every URL the
+ * searches and citations returned, so an agent can refuse a "source" the
+ * search never saw.
  */
 
 export type AiMessage = { role: 'user' | 'assistant'; content: string };
@@ -17,6 +22,8 @@ export type ProviderRequest = {
   /** What the call is for; the mock provider shapes its sample answer by it. */
   purpose: string;
   agent: string;
+  /** Let the model search the web, at most `maxUses` times. */
+  webSearch?: { maxUses: number };
 };
 
 export type ProviderResponse = {
@@ -29,6 +36,10 @@ export type ProviderResponse = {
   cacheReadTokens: number;
   /** The model declined the request even after any fallback. */
   refused: boolean;
+  /** Web searches run during the call (billed per search). */
+  webSearchRequests?: number;
+  /** Every URL returned by a web search result or a citation in the answer. */
+  sourceUrls?: string[];
 };
 
 export interface AiProvider {

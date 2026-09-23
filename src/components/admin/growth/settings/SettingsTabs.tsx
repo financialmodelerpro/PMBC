@@ -4,6 +4,7 @@ import { ADMIN_COLORS } from '@/lib/admin/styles';
 
 const TABS = [
   { key: 'settings', label: 'Limits, budget and retention', href: '/admin/growth/settings' },
+  { key: 'engine', label: 'Signals, scoring, website and AI', href: '/admin/growth/settings/engine' },
   { key: 'suppression', label: 'Suppression list', href: '/admin/growth/settings/suppression' },
   { key: 'audit', label: 'Audit log', href: '/admin/growth/settings/audit' },
 ] as const;
