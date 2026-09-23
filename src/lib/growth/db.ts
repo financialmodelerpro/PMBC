@@ -47,6 +47,8 @@ export const GROWTH_TABLE_MIGRATIONS = {
   growth_partner_checkins: '092_growth_nurture_partners.sql',
   growth_introductions: '092_growth_nurture_partners.sql',
   growth_scoring_reviews: '093_growth_intelligence.sql',
+  growth_keyword_groups: '094_growth_signal_keywords.sql',
+  growth_signal_keywords: '094_growth_signal_keywords.sql',
 } as const;
 export type GrowthTable = keyof typeof GROWTH_TABLE_MIGRATIONS;
 export const GROWTH_TABLES = Object.keys(GROWTH_TABLE_MIGRATIONS) as GrowthTable[];

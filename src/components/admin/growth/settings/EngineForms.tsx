@@ -36,28 +36,21 @@ function useSave(group: EngineGroup) {
 }
 
 export function SignalFeedForm({ values, pending }: { values: EngineSettings; pending: string | null }) {
-  const [keywords, setKeywords] = useState(values.signal_keywords.join('\n'));
   const [paused, setPaused] = useState(values.signal_feed_paused);
   const [max, setMax] = useState(String(values.signal_feed_max_per_run));
   const { busy, notice, save } = useSave('signal_feed');
   return (
-    <Card id="feed-settings" title="Daily signal feed" intro="The morning search (Riyadh time) uses these keywords. Every signal it keeps needs a real evidence link; duplicates are skipped; it stops at the AI budget." pending={pending}>
+    <Card id="feed-settings" title="Daily signal feed" intro="The morning search (Riyadh time) uses the keywords switched on in the library below. Every signal it keeps needs a real evidence link; duplicates are skipped; it stops at the AI budget. While paused it saves nothing: a run by hand is a preview." pending={pending}>
       <div style={grid}>
-        <Field label="Keywords" hint="One per line, e.g. off-plan registration Riyadh, sukuk issuance, appoints CFO" style={{ gridColumn: '1 / -1' }}>
-          <textarea value={keywords} onChange={(e) => setKeywords(e.target.value)} style={{ ...adminTextarea, minHeight: 120 }} />
-        </Field>
         <Field label="Most signals kept per run">
           <input value={max} onChange={(e) => setMax(e.target.value)} style={adminInput} inputMode="numeric" />
         </Field>
         <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13 }}>
-          <input type="checkbox" checked={paused} onChange={(e) => setPaused(e.target.checked)} /> Pause the morning run
+          <input type="checkbox" checked={paused} onChange={(e) => setPaused(e.target.checked)} /> Pause the feed
         </label>
       </div>
       <div style={{ marginTop: 12 }}>
-        <PrimaryButton
-          disabled={busy !== null}
-          onClick={() => save({ signal_keywords: keywords.split(/\r?\n/).map((k) => k.trim()).filter(Boolean), signal_feed_paused: paused, signal_feed_max_per_run: Number(max) })}
-        >
+        <PrimaryButton disabled={busy !== null} onClick={() => save({ signal_feed_paused: paused, signal_feed_max_per_run: Number(max) })}>
           Save feed settings
         </PrimaryButton>
       </div>

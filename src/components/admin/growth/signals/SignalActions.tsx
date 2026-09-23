@@ -3,6 +3,7 @@
 import { useState } from 'react';
 
 import { adminInput } from '@/lib/admin/styles';
+import { TRIGGER_TYPES } from '@/lib/growth/model';
 
 import { sendJson } from '../ui/client';
 import { Field, GhostButton, NoticeLine, PrimaryButton, useAction } from '../ui/kit';
@@ -13,14 +14,15 @@ type LeadOption = { id: string; title: string; company_id: string | null };
 /**
  * Triage for one signal: convert into a prospect and lead, attach to an
  * existing company (and optionally a lead), dismiss with a reason, reopen, or
- * clear a duplicate flag.
+ * clear a duplicate flag. The trigger type can be changed at any time: a
+ * keyword match from the feed only suggests it.
  */
 export function SignalActions({
   signal,
   companies,
   leads,
 }: {
-  signal: { id: string; status: string; company_id: string | null; company_name: string | null; duplicate_of?: string | null };
+  signal: { id: string; status: string; trigger_type: string; company_id: string | null; company_name: string | null; duplicate_of?: string | null };
   companies: Option[];
   leads: LeadOption[];
 }) {
@@ -44,6 +46,19 @@ export function SignalActions({
   const row = { display: 'flex', gap: 6, flexWrap: 'wrap' as const };
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 220 }}>
+      <select
+        aria-label="Trigger type"
+        value={signal.trigger_type}
+        disabled={busy !== null}
+        onChange={(e) => act({ action: 'retype', trigger_type: e.target.value }, 'Trigger changed.')}
+        style={{ ...adminInput, fontSize: 12, padding: '4px 8px' }}
+      >
+        {TRIGGER_TYPES.map((t) => (
+          <option key={t.value} value={t.value}>
+            {t.label}
+          </option>
+        ))}
+      </select>
       <div style={row}>
         {signal.status !== 'converted' && <GhostButton onClick={() => setMode(mode === 'convert' ? 'none' : 'convert')}>Convert</GhostButton>}
         {signal.status !== 'converted' && <GhostButton onClick={() => setMode(mode === 'attach' ? 'none' : 'attach')}>Attach</GhostButton>}

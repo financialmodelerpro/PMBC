@@ -11,6 +11,7 @@ import { requireGrowthSession } from '@/lib/growth/access';
 import { growthDb, tableExists } from '@/lib/growth/db';
 import { getEngineSettings } from '@/lib/growth/engineSettings';
 import { recentFeedRuns } from '@/lib/growth/feed';
+import { activeKeywords, getKeywordLibrary } from '@/lib/growth/keywords';
 import { day } from '@/lib/growth/format';
 import { TRIGGER_TYPES } from '@/lib/growth/model';
 import { growthPage } from '@/lib/growth/pages';
@@ -39,7 +40,9 @@ export default async function GrowthSignalsPage({ searchParams }: { searchParams
     tableExists('growth_feed_runs'),
     growthDb().from('growth_leads').select('id, title, company_id').not('stage', 'in', '(won,lost)').order('title').limit(1000),
   ]);
-  const [runs, engine] = await Promise.all([has088 ? recentFeedRuns() : Promise.resolve([]), getEngineSettings()]);
+  const [runs, engine, library] = await Promise.all([has088 ? recentFeedRuns() : Promise.resolve([]), getEngineSettings(), getKeywordLibrary()]);
+  const active = activeKeywords(library);
+  const keywordCount = library.source === 'pending' ? engine.values.signal_keywords.length : active.length;
   const leads = (leadRows.data ?? []) as { id: string; title: string; company_id: string | null }[];
   const qs = (patch: Record<string, string>) => {
     const p = new URLSearchParams();
@@ -57,8 +60,8 @@ export default async function GrowthSignalsPage({ searchParams }: { searchParams
       )}
       {list.error && <p style={{ color: ADMIN_COLORS.danger, fontSize: 13 }}>Could not read the signals: {list.error}</p>}
 
-      <FeedPanel runs={runs} available={has088 && !engine.missing.includes('signal_keywords')} keywords={engine.values.signal_keywords.length} paused={engine.values.signal_feed_paused} />
-      <SignalAddForm companies={companies} />
+      <FeedPanel runs={runs} available={has088 && !engine.missing.includes('signal_keywords')} keywords={keywordCount} paused={engine.values.signal_feed_paused} />
+      <SignalAddForm companies={companies} keywords={library.source === 'pending' ? [] : active.map((k) => ({ id: k.id, keyword: k.keyword, trigger: k.trigger, enabled: true }))} />
 
       <nav aria-label="Signal status" style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
         {STATUS_TABS.map((t) => (
@@ -150,6 +153,7 @@ export default async function GrowthSignalsPage({ searchParams }: { searchParams
                         {s.is_test && <span style={adminBadge('neutral')}>Test</span>}
                       </div>
                       <div style={{ fontSize: 13 }}>{s.summary}</div>
+                      {s.matched_keyword && <div style={{ fontSize: 12, marginTop: 4, color: ADMIN_COLORS.textMuted }}>Keyword: {s.matched_keyword}</div>}
                       <div style={{ fontSize: 12, marginTop: 4 }}>
                         <a href={s.evidence_url} target="_blank" rel="noopener noreferrer nofollow">
                           Evidence{s.source_name ? `: ${s.source_name}` : ''}

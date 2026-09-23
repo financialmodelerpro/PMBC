@@ -20,7 +20,7 @@ export function FeedPanel({ runs, available, keywords, paused }: { runs: Run[]; 
   const { busy, notice, run } = useAction();
   const go = () =>
     run('feed', async () => {
-      const r = await sendJson<{ message: string; decisions: FeedDecision[]; mode: string }>('POST', '/api/admin/growth/feed/run');
+      const r = await sendJson<{ message: string; decisions: FeedDecision[]; mode: string; previewOnly?: boolean }>('POST', '/api/admin/growth/feed/run');
       setDecisions(r.decisions);
       setMock(r.mode === 'mock_preview');
       return r.message;
@@ -33,7 +33,7 @@ export function FeedPanel({ runs, available, keywords, paused }: { runs: Run[]; 
             Daily signal feed
           </h2>
           <p style={{ margin: '4px 0 0', fontSize: 12, color: ADMIN_COLORS.textMuted }}>
-            {available ? `Runs each morning at 09:00 Riyadh time${paused ? ' (paused)' : ''} with ${keywords} keywords. Keeps only signals with a real evidence link, skips duplicates and stops at the AI budget.` : 'Needs 088_growth_prospecting.sql applied first.'}
+            {available ? `Runs each morning at 09:00 Riyadh time${paused ? ' (paused)' : ''} with ${keywords} keywords switched on (Settings). While paused a run by hand is a preview and saves nothing. Keeps only signals with a real evidence link, skips duplicates and stops at the AI budget.` : 'Needs 088_growth_prospecting.sql applied first.'}
           </p>
         </div>
         <PrimaryButton onClick={go} disabled={busy !== null || !available}>
@@ -50,7 +50,7 @@ export function FeedPanel({ runs, available, keywords, paused }: { runs: Run[]; 
           )}
           {decisions.map((d, i) => (
             <li key={`${d.evidence_url}-${i}`} style={{ fontSize: 13 }}>
-              <span style={adminBadge(TONE[d.outcome])}>{d.outcome.replace('_', ' ')}</span> <strong>{d.company_name || 'Unnamed'}</strong>: {d.summary} <span style={{ color: ADMIN_COLORS.textMuted }}>({d.why})</span>
+              <span style={adminBadge(TONE[d.outcome])}>{d.outcome.replace('_', ' ')}</span> <strong>{d.company_name || 'Unnamed'}</strong>: {d.summary} {d.matched_keyword && <span style={{ color: ADMIN_COLORS.textMuted }}>[{d.matched_keyword}] </span>}<span style={{ color: ADMIN_COLORS.textMuted }}>({d.why})</span>
             </li>
           ))}
         </ul>

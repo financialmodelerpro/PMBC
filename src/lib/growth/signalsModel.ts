@@ -144,6 +144,8 @@ export const signalTriageSchema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('attach'), company_id: z.string().uuid(), lead_id: z.string().uuid().nullable().optional() }),
   z.object({ action: z.literal('dismiss'), reason: z.string().trim().min(3, 'Give a reason').max(SIGNAL_LIMITS.reason) }),
   z.object({ action: z.literal('reopen') }),
+  /** A keyword match only suggests the trigger: Ahmad can change it. */
+  z.object({ action: z.literal('retype'), trigger_type: z.enum(TRIGGER_VALUES) }),
   z.object({ action: z.literal('not_duplicate') }),
 ]);
 

@@ -47,26 +47,42 @@ export const JSON_SAMPLES: Record<string, Sample> = {
     reasoning: 'Sample reasoning: residential developer with a registered project above the minimum size.',
     unknowns: ['Current lenders', 'Whether a model already exists'],
   }),
-  signal_feed: () => ({
-    signals: [
-      {
-        company_name: 'Sample Logistics Holding (made up)',
-        trigger_type: 'fundraising_debt',
-        signal_date: new Date().toISOString().slice(0, 10),
-        summary: 'Sample: the company announced a SAR 600 million sukuk to fund new warehouses.',
-        evidence_url: 'https://example.invalid/sample-sukuk',
-        source_name: 'Sample News',
-      },
-      {
-        company_name: 'Sample Hospitality Group (made up)',
-        trigger_type: 'new_project',
-        signal_date: new Date().toISOString().slice(0, 10),
-        summary: 'Sample: a 250-key hotel project announced in AlUla.',
-        evidence_url: '',
-        source_name: 'Sample Wire',
-      },
-    ],
-  }),
+  signal_feed: (req) => {
+    // The feed numbers its keywords in the prompt; the sample names the one it fits, as a real answer would.
+    const line = lastUser(req)
+      .split('\n')
+      .find((l) => /^\d+\. .*sukuk issuance/i.test(l));
+    const sukuk = line ? Number(line.split('.')[0]) : null;
+    return {
+      signals: [
+        {
+          company_name: 'Sample Logistics Holding (made up)',
+          trigger_type: 'fundraising_debt',
+          signal_date: new Date().toISOString().slice(0, 10),
+          summary: 'Sample: the company announced a SAR 600 million sukuk issuance to fund new warehouses.',
+          evidence_url: 'https://example.invalid/sample-sukuk',
+          source_name: 'Sample News',
+          keyword_number: sukuk,
+        },
+        {
+          company_name: 'Sample Logistics Holding (made up)',
+          trigger_type: 'fundraising_debt',
+          signal_date: new Date().toISOString().slice(0, 10),
+          summary: 'Sample: the same sukuk story, found again under another keyword.',
+          evidence_url: 'https://example.invalid/sample-sukuk',
+          source_name: 'Sample News',
+        },
+        {
+          company_name: 'Sample Hospitality Group (made up)',
+          trigger_type: 'new_project',
+          signal_date: new Date().toISOString().slice(0, 10),
+          summary: 'Sample: a 250-key hotel project announced in AlUla.',
+          evidence_url: '',
+          source_name: 'Sample Wire',
+        },
+      ],
+    };
+  },
   outreach_email: () => ({
     subject: 'Your registered project in north Riyadh',
     body: 'Dear [First name],\n\nI saw that [Company] registered [Project] for off-plan sales this month. Lenders and escrow agents usually ask for an updated development model at this stage, and we help developers prepare one that holds up to their review.\n\nIf useful, I would be glad to share how we approached a similar project. Our real estate modelling work is outlined here: [Link]\n\nKind regards,\nAhmad Din',
