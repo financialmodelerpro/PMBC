@@ -208,3 +208,34 @@ export function MeetingsSettingsForm({ values, pending }: { values: EngineSettin
     </Card>
   );
 }
+
+export function NurtureSettingsForm({ values, pending, configured }: { values: EngineSettings; pending: string | null; configured: boolean }) {
+  const [on, setOn] = useState(values.nurture_enabled);
+  const [days, setDays] = useState(String(values.partner_checkin_days));
+  const [confirm, setConfirm] = useState(false);
+  const { busy, notice, save } = useSave('nurture');
+  const turningOn = on && !values.nurture_enabled;
+  return (
+    <Card id="nurture-settings" title="Nurture and partners" intro="Nurture is off by default. On, the daily run syncs opted-in contacts to Brevo and sends approved sequence steps; it only sends once GROWTH_BREVO_LIST_ID is set. The check-in cadence is the default for partners without their own." pending={pending}>
+      <div style={grid}>
+        <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13, fontWeight: 700 }}>
+          <input type="checkbox" checked={on} onChange={(e) => setOn(e.target.checked)} /> Send the nurture sequence
+        </label>
+        <Field label="Default partner check-in (days)">
+          <input value={days} onChange={(e) => setDays(e.target.value)} style={adminInput} inputMode="numeric" />
+        </Field>
+      </div>
+      {turningOn && (
+        <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13, marginTop: 10, color: ADMIN_COLORS.warning }}>
+          <input type="checkbox" checked={confirm} onChange={(e) => setConfirm(e.target.checked)} /> I understand approved steps will be emailed to subscribed contacts{configured ? ' from the next morning run' : ' once GROWTH_BREVO_LIST_ID is set'}.
+        </label>
+      )}
+      <div style={{ marginTop: 12 }}>
+        <PrimaryButton disabled={busy !== null || (turningOn && !confirm)} onClick={() => save({ nurture_enabled: on, partner_checkin_days: Number(days) })}>
+          Save nurture settings
+        </PrimaryButton>
+      </div>
+      <NoticeLine notice={notice} />
+    </Card>
+  );
+}

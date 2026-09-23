@@ -47,7 +47,7 @@ export default async function GrowthOutreachPage() {
 
   return (
     <>
-      <AdminPageHeader eyebrow="Growth Engine" title={page.title} description={page.purpose} />
+      <AdminPageHeader eyebrow="Growth Engine" title={page.title} description={page.purpose} actions={<Link href="/admin/growth/outreach/nurture">Nurture sequence and lead magnets</Link>} />
       <section style={{ ...adminCard, marginBottom: 16 }}>
         <OutreachJobs graphLive={graphLive} paused={engine.values.outreach_sending_paused} />
         <p style={{ margin: '10px 0 0', fontSize: 12, color: ADMIN_COLORS.textMuted }}>

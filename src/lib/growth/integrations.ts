@@ -35,6 +35,8 @@ export const INTEGRATIONS: readonly IntegrationDef[] = [
     mockWithout: true,
   },
   { key: 'brevo', label: 'Brevo', purpose: 'Transactional email from the site and the free tools', built: true, env: ['BREVO_API_KEY', 'EMAIL_FROM_DEFAULT'] },
+  // Built in Unit 6.1: marketing mail needs its own list id as a deliberate switch; without it nurture is a preview.
+  { key: 'brevo_nurture', label: 'Brevo nurture', purpose: 'Syncing opted-in contacts, the nurture sequence, lead magnets and email events', built: true, env: ['BREVO_API_KEY', 'EMAIL_FROM_DEFAULT', 'GROWTH_BREVO_LIST_ID', 'GROWTH_BREVO_WEBHOOK_TOKEN'], mockWithout: true },
 ];
 
 export type IntegrationStatus = { key: IntegrationKey; label: string; purpose: string; state: 'configured' | 'mock' | 'not_set_up'; detail: string };
