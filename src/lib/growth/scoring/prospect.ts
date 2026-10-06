@@ -24,7 +24,7 @@
  */
 
 import { MINIMUM_DEAL_SIZE_SAR, type ProspectBand, type TriggerType } from '../model';
-import { DEFAULT_SCORING_WEIGHTS, SCORING_FACTORS, type ScoringFactor, type ScoringWeights } from '../engineSettingsModel';
+import { DEFAULT_SCORING_WEIGHTS, SCORING_FACTORS, resolveSectorTiers, type ScoringFactor, type ScoringWeights, type SectorTier, type SectorTiers } from '../engineSettingsModel';
 
 export const BAND_THRESHOLDS = { priority: 80, good: 60, watch: 40 } as const;
 
@@ -55,20 +55,24 @@ export function geographyShare(country: string | null | undefined, city?: string
 }
 
 /**
- * Sector share. Real estate is highest; then the sectors the firm has worked
- * in and capital-heavy sectors; then investors; then the rest. Unknown is 0.
+ * Sector tier, read from the sector text; the credit per tier comes from
+ * Settings (`sector_tiers`, migration 096). By default real estate earns
+ * 100 per cent, infrastructure, energy and industrial 75, investment 60,
+ * healthcare, education and services 45, any other known sector 25. Unknown is
+ * not scored.
  */
-export const SECTOR_SHARES: readonly { share: number; label: string; pattern: RegExp }[] = [
-  { share: 1, label: 'real estate', pattern: /real estate|property|properties|developer|development|residential|mixed[- ]use|hospitality|hotel|reit|master[- ]?plan|giga[- ]?project/i },
-  { share: 0.75, label: 'infrastructure, energy or industrial', pattern: /infrastructure|energy|power|utilit|renewable|solar|oil|gas|petro|biofuel|waste|data cent|construction|contractor|industrial|manufactur|mining|logistics|transport|water|desalination/i },
-  { share: 0.6, label: 'investment', pattern: /family office|investment|investor|private equity|fund|holding|asset manage|venture/i },
-  { share: 0.45, label: 'healthcare, education or services', pattern: /health|hospital|clinic|education|school|university|retail|food|agri|tourism|entertainment|telecom|technology|fintech|services/i },
+export const SECTOR_SHARES: readonly { tier: SectorTier; label: string; pattern: RegExp }[] = [
+  { tier: 'real_estate', label: 'real estate', pattern: /real estate|property|properties|developer|development|residential|mixed[- ]use|hospitality|hotel|reit|master[- ]?plan|giga[- ]?project/i },
+  { tier: 'infrastructure', label: 'infrastructure, energy or industrial', pattern: /infrastructure|energy|power|utilit|renewable|solar|oil|gas|petro|biofuel|waste|data cent|construction|contractor|industrial|manufactur|mining|logistics|transport|water|desalination/i },
+  { tier: 'investment', label: 'investment', pattern: /family office|investment|investor|private equity|fund|holding|asset manage|venture/i },
+  { tier: 'services', label: 'healthcare, education or services', pattern: /health|hospital|clinic|education|school|university|retail|food|agri|tourism|entertainment|telecom|technology|fintech|services/i },
 ];
 
-export function sectorShare(sector: string | null | undefined): { share: number; label: string | null } {
-  if (!sector?.trim()) return { share: 0, label: null };
-  for (const s of SECTOR_SHARES) if (s.pattern.test(sector)) return { share: s.share, label: s.label };
-  return { share: 0.25, label: 'other' };
+export function sectorShare(sector: string | null | undefined, tiers?: SectorTiers | null): { share: number; label: string | null; tier: SectorTier | null } {
+  if (!sector?.trim()) return { share: 0, label: null, tier: null };
+  const credit = resolveSectorTiers(tiers).credit;
+  for (const s of SECTOR_SHARES) if (s.pattern.test(sector)) return { share: credit[s.tier] / 100, label: s.label, tier: s.tier };
+  return { share: credit.other / 100, label: 'other', tier: 'other' };
 }
 
 /** Scale share from the largest known size in SAR. Null when unknown. */
@@ -98,6 +102,8 @@ export type ScoreInput = {
   contacts: { is_decision_maker: boolean; role_title: string | null }[];
   signals: { trigger_type: TriggerType; signal_date: string; status: string }[];
   weights?: ScoringWeights | null;
+  /** Sector tiers from Settings; the defaults when absent or malformed. */
+  sectorTiers?: SectorTiers | null;
   targeting?: { decisionMakerTitles: string[]; excludedWork: string[] };
   now?: Date;
 };
@@ -145,7 +151,7 @@ export function scoreProspect(input: ScoreInput): ScoreResult {
   const belowMinimum = sizeSar !== null && sizeSar < MINIMUM_DEAL_SIZE_SAR;
 
   const geo = geographyShare(input.company.country, input.company.city);
-  const sector = sectorShare(input.company.sector);
+  const sector = sectorShare(input.company.sector, input.sectorTiers);
   const project = relevant.find((s) => PROJECT_TRIGGERS.includes(s.trigger_type));
   const funding = relevant.find((s) => FUNDING_TRIGGERS.includes(s.trigger_type));
   const halfFunding = relevant.find((s) => HALF_FUNDING_TRIGGERS.includes(s.trigger_type));

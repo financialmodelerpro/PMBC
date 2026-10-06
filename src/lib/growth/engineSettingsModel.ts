@@ -16,7 +16,7 @@ import { MODEL_PRICES } from './ai/pricing';
 
 export const SCORING_FACTORS = [
   { key: 'geography', label: 'Geography', hint: 'KSA first, then the wider GCC' },
-  { key: 'sector', label: 'Sector', hint: 'Real estate highest' },
+  { key: 'sector', label: 'Sector', hint: 'Credit per sector tier, set under Sector tiers' },
   { key: 'project_signal', label: 'Project signal', hint: 'A new project, registration, award or expansion' },
   { key: 'funding_signal', label: 'Funding or transaction signal', hint: 'Fundraising, debt, acquisition, JV or capital markets' },
   { key: 'scale', label: 'Scale', hint: 'Known project or deal size; unknown is left out of the score' },
@@ -58,6 +58,45 @@ export const DEFAULT_LEAD_WEIGHTS: LeadWeights = {
   meeting_intent: 5,
 };
 
+/**
+ * Sector tiers (migration 096, 2026-10-06). Each tier earns its credit, a
+ * percentage of the sector part of a score; the tiers must step down in this
+ * order. Tiers marked priority qualify for the Lead Score rule "priority
+ * sector, SAR 50 million or more and a timeline within three months is at
+ * least Warm". Real estate is the only priority tier by default.
+ */
+export const SECTOR_TIERS = [
+  { key: 'real_estate', label: 'Real estate', hint: 'Developers, property, hospitality, REITs, master plans' },
+  { key: 'infrastructure', label: 'Infrastructure, energy and industrial', hint: 'Energy, utilities, construction, manufacturing, logistics, water' },
+  { key: 'investment', label: 'Investment', hint: 'Family offices, funds, holding companies' },
+  { key: 'services', label: 'Healthcare, education and services', hint: 'Healthcare, education, retail, technology, tourism' },
+  { key: 'other', label: 'Any other sector', hint: 'A known sector that matches none of the above' },
+] as const;
+export type SectorTier = (typeof SECTOR_TIERS)[number]['key'];
+export type SectorTiers = { credit: Record<SectorTier, number>; priority: SectorTier[] };
+
+export const DEFAULT_SECTOR_TIERS: SectorTiers = {
+  credit: { real_estate: 100, infrastructure: 75, investment: 60, services: 45, other: 25 },
+  priority: ['real_estate'],
+};
+
+const TIER_KEYS = SECTOR_TIERS.map((t) => t.key) as [SectorTier, ...SectorTier[]];
+
+export const sectorTiersSchema = z
+  .object({
+    credit: z.object(Object.fromEntries(TIER_KEYS.map((k) => [k, z.number().int().min(0).max(100)])) as Record<SectorTier, z.ZodNumber>).strict(),
+    priority: z.array(z.enum(TIER_KEYS)).min(1, 'Mark at least one tier as priority').transform((a) => TIER_KEYS.filter((k) => a.includes(k))),
+  })
+  .strict()
+  .refine((t) => TIER_KEYS.every((k, i) => i === 0 || t.credit[k] < t.credit[TIER_KEYS[i - 1]]), 'Each tier must score below the one above it')
+  .transform((t) => t as SectorTiers);
+
+/** The stored tiers when valid, else the defaults: scoring never runs on a malformed value. */
+export function resolveSectorTiers(raw: unknown): SectorTiers {
+  const parsed = sectorTiersSchema.safeParse(raw);
+  return parsed.success ? parsed.data : DEFAULT_SECTOR_TIERS;
+}
+
 export const DEFAULT_CHAT_CONSENT_TEXT =
   'I agree that PaceMakers may store my name and contact details with this conversation and contact me about my enquiry. I can ask for them to be deleted at any time.';
 
@@ -78,6 +117,7 @@ export type EngineSettings = {
   signal_feed_paused: boolean;
   signal_feed_max_per_run: number;
   scoring_weights: ScoringWeights;
+  sector_tiers: SectorTiers;
   agent_models: Record<string, string>;
   outreach_sending_paused: boolean;
   lead_scoring_weights: LeadWeights;
@@ -102,6 +142,7 @@ export const ENGINE_SETTING_COLUMNS: Record<EngineSettingKey, { migration: strin
   signal_feed_paused: { migration: '088_growth_prospecting.sql', default: false },
   signal_feed_max_per_run: { migration: '088_growth_prospecting.sql', default: 10 },
   scoring_weights: { migration: '088_growth_prospecting.sql', default: DEFAULT_SCORING_WEIGHTS },
+  sector_tiers: { migration: '096_growth_sector_tiers.sql', default: DEFAULT_SECTOR_TIERS },
   agent_models: { migration: '088_growth_prospecting.sql', default: {} },
   outreach_sending_paused: { migration: '089_growth_outreach.sql', default: false },
   lead_scoring_weights: { migration: '089_growth_outreach.sql', default: DEFAULT_LEAD_WEIGHTS },
@@ -147,6 +188,7 @@ export const engineGroupSchemas = {
     signal_feed_max_per_run: z.number().int().min(ENGINE_LIMITS.feedMax.min).max(ENGINE_LIMITS.feedMax.max),
   }),
   scoring: z.object({ scoring_weights: scoringWeightsSchema }),
+  sector_tiers: z.object({ sector_tiers: sectorTiersSchema }),
   agent_models: z.object({
     agent_models: z.record(z.string().regex(/^[a-z0-9-]+$/), z.string().refine((m) => m in MODEL_PRICES, 'Not a priced model')),
   }),
@@ -184,6 +226,7 @@ export const ENGINE_GROUPS = Object.keys(engineGroupSchemas) as EngineGroup[];
 export function readEngineValue<K extends EngineSettingKey>(key: K, raw: unknown): EngineSettings[K] {
   const d = ENGINE_SETTING_COLUMNS[key].default as EngineSettings[K];
   if (raw === null || raw === undefined) return d;
+  if (key === 'sector_tiers') return resolveSectorTiers(raw) as EngineSettings[K];
   if (Array.isArray(d)) return (Array.isArray(raw) ? raw.filter((x) => typeof x === 'string') : d) as EngineSettings[K];
   if (typeof d === 'boolean') return (typeof raw === 'boolean' ? raw : d) as EngineSettings[K];
   if (typeof d === 'number') return (typeof raw === 'number' ? raw : Number.isFinite(Number(raw)) ? Number(raw) : d) as EngineSettings[K];

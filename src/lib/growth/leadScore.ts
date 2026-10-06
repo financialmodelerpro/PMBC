@@ -46,6 +46,7 @@ export async function computeLeadScore(leadId: string): Promise<{ lead: GrowthLe
     contact: contact.data as { is_decision_maker: boolean; role_title: string | null } | null,
     engagement: { replied: replies > 0 || Boolean(lead.last_reply_at), clicks: clickTotal, chats, meetings },
     weights: engine.values.lead_scoring_weights,
+    sectorTiers: engine.values.sector_tiers,
     decisionMakerTitles: targeting.decisionMakerTitles,
   });
   return { lead, result };

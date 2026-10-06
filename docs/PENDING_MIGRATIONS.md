@@ -2,7 +2,7 @@
 
 Every Growth migration is DDL and is pasted into the Supabase SQL editor by hand, in order. Each one is idempotent and carries a `SAFE TO APPLY` line in its header. The code builds and runs whether or not a migration is applied: screens that need it show a notice naming it, and anything that would send, spend or show something public refuses until it is there.
 
-Tell the build session "088 applied" (or whichever) and it re-runs the live checks that were pending. **As at 2026-09-23 every Growth migration, 083 to 095, is applied; none is pending.**
+Tell the build session "088 applied" (or whichever) and it re-runs the live checks that were pending. **As at 2026-10-06, 083 to 095 are applied; 096 is pending.**
 
 | # | File | What it does | Status |
 |---|---|---|---|
@@ -19,3 +19,4 @@ Tell the build session "088 applied" (or whichever) and it re-runs the live chec
 | 093 | `093_growth_intelligence.sql` | Phase 7: growth_scoring_reviews, the record of each scoring review and its decision (suggested weights checked to sum to 100, a rejection needs a note). The Daily Brief and Analytics need no migration | Applied 2026-09-23 (live checks passed) |
 | 094 | `094_growth_signal_keywords.sql` | Signal keyword library: growth_keyword_groups and growth_signal_keywords (one keyword per group ignoring case), growth_signals.matched_keyword_id and matched_keyword, and the feed paused on the settings row. The defaults are not seeded here: the code holds them and saves them on the first change. Safe before or after the deploy; before it, the library shows read only and the feed uses the old keyword list, which is empty | Applied 2026-09-23 (a first paste failed on a quote an edit had broken; fixed before it ran, live checks 72 of 72) |
 | 095 | `095_growth_chat_opening.sql` | Website chat opening: `chat_auto_open` (default on), `chat_auto_open_delay_seconds` (20, 5 to 300), `chat_auto_open_scroll_percent` (50, 10 to 100). Nothing visible while the chat is off | Applied 2026-09-23 |
+| 096 | `096_growth_sector_tiers.sql` | Sector tiers: `sector_tiers` JSONB on the settings row, the credit per tier (real estate 100, infrastructure, energy and industrial 75, investment 60, services 45, other 25; each must step down) and which tiers are priority (real estate by default). The default equals what the code uses, so no score moves when it is applied; before it, the Sector tiers form is read only | Pending |
