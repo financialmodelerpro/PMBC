@@ -380,6 +380,7 @@ export async function computeCompanyScore(companyId: string): Promise<ScoreResul
     leads: (leads.data ?? []) as { deal_size_sar: number | string | null }[],
     signals: (signals.data ?? []) as GrowthSignal[],
     weights: engine.values.scoring_weights,
+    sectorTiers: engine.values.sector_tiers,
     targeting,
   });
 }

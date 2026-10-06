@@ -5,7 +5,7 @@ import { useState, type ReactNode } from 'react';
 import { ADMIN_COLORS, adminCard, adminInput, adminTextarea } from '@/lib/admin/styles';
 import { GROWTH_AGENTS } from '@/lib/growth/ai/agents';
 import { DEFAULT_MODEL, MODEL_PRICES } from '@/lib/growth/ai/pricing';
-import { LEAD_FACTORS, SCORING_FACTORS, type EngineGroup, type EngineSettings } from '@/lib/growth/engineSettingsModel';
+import { LEAD_FACTORS, SCORING_FACTORS, SECTOR_TIERS, type EngineGroup, type EngineSettings, type SectorTier } from '@/lib/growth/engineSettingsModel';
 
 import { sendJson } from '../ui/client';
 import { Field, NoticeLine, PrimaryButton, grid, useAction } from '../ui/kit';
@@ -84,6 +84,38 @@ export function ScoringWeightsForm({ values, pending }: { values: EngineSettings
   return (
     <Card id="scoring-settings" title="Prospect Score weights" intro="Seven factors that must add up to 100. Bands: Priority 80 and over, Good 60 to 79, Watch 40 to 59, Low under 40. A known size under SAR 50 million is always Low. Companies rescore when their data changes, or with Rescore now." pending={pending}>
       <WeightsEditor factors={SCORING_FACTORS} initial={values.scoring_weights} busy={busy !== null} label="Save weights" onSave={(w) => save({ scoring_weights: w }, 'Weights saved. Scores update as each company next changes, or with Rescore now.')} />
+      <NoticeLine notice={notice} />
+    </Card>
+  );
+}
+
+export function SectorTiersForm({ values, pending }: { values: EngineSettings; pending: string | null }) {
+  const { busy, notice, save } = useSave('sector_tiers');
+  const [credit, setCredit] = useState<Record<SectorTier, string>>(Object.fromEntries(SECTOR_TIERS.map((t) => [t.key, String(values.sector_tiers.credit[t.key])])) as Record<SectorTier, string>);
+  const [priority, setPriority] = useState<SectorTier[]>(values.sector_tiers.priority);
+  const nums = SECTOR_TIERS.map((t) => Number(credit[t.key]));
+  const stepsDown = nums.every((n, i) => Number.isInteger(n) && n >= 0 && n <= 100 && (i === 0 || n < nums[i - 1]));
+  return (
+    <Card id="sector-tiers" title="Sector tiers" intro="The share of the sector points each tier earns, in both scores, from 0 to 100 per cent; each tier must score below the one above it. Priority tiers qualify for the Lead Score rule: a priority sector, SAR 50 million or more and a timeline within three months is at least Warm, and Hot with a call, quote or proposal asked for." pending={pending}>
+      <div style={grid}>
+        {SECTOR_TIERS.map((t) => (
+          <div key={t.key} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <Field label={`${t.label} (per cent)`} hint={t.hint}>
+              <input value={credit[t.key]} onChange={(e) => setCredit({ ...credit, [t.key]: e.target.value })} style={adminInput} inputMode="numeric" />
+            </Field>
+            <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13 }}>
+              <input type="checkbox" checked={priority.includes(t.key)} onChange={(e) => setPriority(e.target.checked ? [...priority, t.key] : priority.filter((k) => k !== t.key))} /> Priority sector
+            </label>
+          </div>
+        ))}
+      </div>
+      {!stepsDown && <p style={{ margin: '10px 0 0', fontSize: 13, color: ADMIN_COLORS.danger }}>Each tier must be a whole number from 0 to 100, below the one above it.</p>}
+      {priority.length === 0 && <p style={{ margin: '10px 0 0', fontSize: 13, color: ADMIN_COLORS.danger }}>Mark at least one tier as priority.</p>}
+      <div style={{ marginTop: 12 }}>
+        <PrimaryButton disabled={busy !== null || !stepsDown || priority.length === 0} onClick={() => save({ sector_tiers: { credit: Object.fromEntries(SECTOR_TIERS.map((t, i) => [t.key, nums[i]])), priority } }, 'Sector tiers saved. Scores update as each company or lead next changes, or with Rescore now.')}>
+          Save sector tiers
+        </PrimaryButton>
+      </div>
       <NoticeLine notice={notice} />
     </Card>
   );

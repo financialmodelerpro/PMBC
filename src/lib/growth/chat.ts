@@ -31,7 +31,7 @@ import { growthBookingUrl } from './booking';
 import type { WriteResult } from './api';
 import { growthDb, tableExists } from './db';
 import { getEngineSettings, usable } from './engineSettings';
-import { ENGINE_SETTING_COLUMNS } from './engineSettingsModel';
+import { ENGINE_SETTING_COLUMNS, type SectorTiers } from './engineSettingsModel';
 import { getApprovedKnowledge } from './kb';
 import { linkByToken } from './links';
 import { GROWTH_SERVICES, isGrowthService, normaliseEmail } from './model';
@@ -203,13 +203,14 @@ function systemPrompt(kb: Awaited<ReturnType<typeof getApprovedKnowledge>>, page
 }
 
 /** The Lead Score and temperature a conversation's answers give. `askedForQuote`: a pricing question, which counts as intent. */
-export function temperatureOf(q: Qualification, wantsMeeting: boolean, askedForQuote = false) {
+export function temperatureOf(q: Qualification, wantsMeeting: boolean, askedForQuote = false, sectorTiers?: SectorTiers | null) {
   const size = typeof q.size_sar === 'number' ? q.size_sar : null;
   const r = scoreLead({
     lead: { requirement: [q.purpose, q.pain_point, q.project_type].filter(Boolean).join('. ') || null, recommended_service: typeof q.service === 'string' && isGrowthService(q.service) ? q.service : null, deal_size_sar: size, timeline: typeof q.timeline === 'string' ? q.timeline : null, stage: 'prospect', meeting_requested: wantsMeeting, intent: askedForQuote },
     company: { country: null, city: null, sector: typeof q.sector === 'string' ? q.sector : null },
     contact: q.decision_role ? { is_decision_maker: isDecisionRole(q.decision_role), role_title: String(q.decision_role) } : null,
     engagement: { replied: false, clicks: 0, chats: 1, meetings: 0 },
+    sectorTiers,
   });
   return r;
 }
@@ -403,7 +404,7 @@ export async function handleChat(req: ChatRequest, ctx: ChatContext): Promise<Wr
   const escalate = guarded.escalate ?? aiEscalate;
   const qualification = ai.mock ? c.qualification : mergeQualification(c.qualification, parsed.qualification);
   const wantsMeeting = !ai.mock && parsed.wants_meeting === true;
-  const t = temperatureOf(qualification, wantsMeeting, escalate === 'pricing');
+  const t = temperatureOf(qualification, wantsMeeting, escalate === 'pricing', engine.values.sector_tiers);
   const route = routeFor({ escalated: Boolean(escalate) || c.route === 'escalated', temperature: t.temperature, answered: answeredCount(qualification), wantsMeeting, coreComplete: coreComplete(qualification) });
   const replyText = ai.mock ? `[Mock reply, not written by Claude] ${guarded.text.replace(/^\[MOCK AI OUTPUT[^\]]*\]\s*/, '')}` : guarded.text;
   const reply = route === 'hot' && !replyText.includes(booking) ? `${replyText}\n\nYou can choose a time with Ahmad here: ${booking}` : replyText;

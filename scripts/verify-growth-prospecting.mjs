@@ -69,6 +69,16 @@ console.log('1. Prospect Score (offline)');
   check('excluded work is flagged in the reasons', excluded.excludedMatches.includes('statutory audit') && excluded.reasons.some((r) => r.includes('excluded work')));
   const custom = score.scoreProspect({ company: { country: 'Saudi Arabia', city: null, sector: null }, leads: [], contacts: [], signals: [], now, weights: { geography: 100, sector: 0, project_signal: 0, funding_signal: 0, scale: 0, decision_maker: 0, recency: 0 } });
   check('weights from settings are used', custom.score === 100);
+  // Sector tiers (migration 096): credit per tier from Settings, stepping down; real estate highest.
+  const T = eng.DEFAULT_SECTOR_TIERS;
+  check('default tiers: real estate 100, infrastructure 75, investment 60, services 45, other 25; priority real estate only', JSON.stringify(T.credit) === JSON.stringify({ real_estate: 100, infrastructure: 75, investment: 60, services: 45, other: 25 }) && JSON.stringify(T.priority) === JSON.stringify(['real_estate']));
+  check('infrastructure, energy and industrial sit below real estate and above every other sector', ['Energy', 'Industrial manufacturing', 'Construction contractor'].every((x) => score.sectorShare(x).tier === 'infrastructure' && score.sectorShare(x).share < score.sectorShare('Real estate').share && score.sectorShare(x).share > score.sectorShare('Family office').share));
+  check('tiers must step down and keep a priority tier', eng.sectorTiersSchema.safeParse(T).success && !eng.sectorTiersSchema.safeParse({ ...T, credit: { ...T.credit, infrastructure: 100 } }).success && !eng.sectorTiersSchema.safeParse({ ...T, priority: [] }).success && !eng.sectorTiersSchema.safeParse({ ...T, credit: { ...T.credit, other: 101 } }).success);
+  check('a malformed stored value falls back to the defaults', JSON.stringify(eng.resolveSectorTiers({ credit: { real_estate: 'x' } })) === JSON.stringify(T) && JSON.stringify(eng.readEngineValue('sector_tiers', 'junk')) === JSON.stringify(T));
+  const tierBase = { company: { country: 'Saudi Arabia', city: null, sector: 'Energy', scale_sar: null }, leads: [], contacts: [], signals: [], now, weights: { geography: 0, sector: 100, project_signal: 0, funding_signal: 0, scale: 0, decision_maker: 0, recency: 0 } };
+  check('the credit per tier comes from Settings', score.scoreProspect(tierBase).score === 75 && score.scoreProspect({ ...tierBase, sectorTiers: { ...T, credit: { ...T.credit, infrastructure: 50, investment: 40, services: 30, other: 20 } } }).score === 50);
+  const sql096 = migrationChecks('096_growth_sector_tiers.sql', []);
+  check('096 default matches the code, and it checks the tiers step down', ['"real_estate": 100', '"infrastructure": 75', '"investment": 60', '"services": 45', '"other": 25', '"priority": ["real_estate"]'].every((x) => sql096.includes(x)) && sql096.includes("(sector_tiers -> 'credit' ->> 'real_estate')::int > (sector_tiers -> 'credit' ->> 'infrastructure')::int"));
   check('weights must sum to 100', !eng.scoringWeightsSchema.safeParse({ ...w, geography: 11 }).success && eng.scoringWeightsSchema.safeParse(w).success && !eng.scoringWeightsSchema.safeParse({ geography: 100 }).success);
 }
 

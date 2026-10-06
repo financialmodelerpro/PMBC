@@ -18,8 +18,8 @@
  * applied whatever the total, in this order:
  * 1. Hot from the total needs both the size and the timeline known, so a lead
  *    with one or two strong answers cannot read Hot on those alone.
- * 2. A priority sector (real estate, infrastructure, energy or industrial),
- *    SAR 50 million or more and a timeline within three months is at least
+ * 2. A priority sector (the tiers marked priority in Settings, real estate
+ *    only by default), SAR 50 million or more and a timeline within three months is at least
  *    Warm, and Hot with intent: a call, a quote or a proposal asked for.
  * 3. A meeting request is always Hot.
  * 4. A known size under SAR 50 million caps the lead at Cold: that rule wins
@@ -27,7 +27,7 @@
  *    taking work on.
  */
 
-import { DEFAULT_LEAD_WEIGHTS, LEAD_FACTORS, type LeadFactor, type LeadWeights } from '../engineSettingsModel';
+import { DEFAULT_LEAD_WEIGHTS, LEAD_FACTORS, resolveSectorTiers, type LeadFactor, type LeadWeights, type SectorTiers } from '../engineSettingsModel';
 import { MINIMUM_DEAL_SIZE_SAR, type LeadTemperature } from '../model';
 import { withIndefiniteArticle } from '../../public/grammar';
 import { geographyShare, scaleShare, sectorShare, titleMatches } from './prospect';
@@ -72,9 +72,6 @@ export function timelineShare(months: number | null): number {
 /** The sector a service implies, used only when the lead has no sector of its own. */
 export const SERVICE_SECTOR: Record<string, string> = { refm: 'real estate', 'project-finance': 'infrastructure' };
 
-/** A sector the firm prioritises: real estate first, then infrastructure, energy and industrial. */
-export const PRIORITY_SECTOR_SHARE = 0.75;
-
 /** Explicit intent in free text: a call, a quote or a proposal asked for. Narrow on purpose ("capital call" is not a request). */
 export const INTENT_TEXT = /\b(send|share|need|want|request|requesting|ask for|asking for|like|prepare|book|arrange|schedule)\s+(us\s+|me\s+)?(a|an|your)\s+(quick\s+)?(quote|quotation|fee proposal|proposal|fee quote|call)\b/i;
 
@@ -85,6 +82,8 @@ export type LeadScoreInput = {
   contact: { is_decision_maker: boolean; role_title: string | null } | null;
   engagement: { replied: boolean; clicks: number; chats: number; meetings: number };
   weights?: LeadWeights | null;
+  /** Sector tiers from Settings: the credit per tier and which tiers are priority. The defaults when absent. */
+  sectorTiers?: SectorTiers | null;
   decisionMakerTitles?: string[];
 };
 
@@ -119,7 +118,8 @@ export function scoreLead(input: LeadScoreInput): LeadScoreResult {
   // ICP fit: geography is 10 and sector 15 of its 25; each part counts only when known.
   const ownSector = input.company?.sector?.trim() || null;
   const sectorText = ownSector ?? (input.lead.recommended_service ? SERVICE_SECTOR[input.lead.recommended_service] ?? null : null);
-  const sector = sectorShare(sectorText);
+  const tiers = resolveSectorTiers(input.sectorTiers);
+  const sector = sectorShare(sectorText, tiers);
   const geoKnown = Boolean(`${input.company?.country ?? ''}${input.company?.city ?? ''}`.trim());
   const geo = geographyShare(input.company?.country, input.company?.city);
   const icpKnown = (geoKnown ? 0.4 : 0) + (sectorText ? 0.6 : 0);
@@ -160,7 +160,7 @@ export function scoreLead(input: LeadScoreInput): LeadScoreResult {
     score = Math.min(score, TEMPERATURE_THRESHOLDS.hot - 1);
     reasons.push(`Warm, not Hot, until the ${size === null && months === null ? 'size and timeline are' : size === null ? 'size is' : 'timeline is'} known.`);
   }
-  const priority = sector.share >= PRIORITY_SECTOR_SHARE && size !== null && size >= MINIMUM_DEAL_SIZE_SAR && months !== null && months <= 3;
+  const priority = sector.tier !== null && tiers.priority.includes(sector.tier) && size !== null && size >= MINIMUM_DEAL_SIZE_SAR && months !== null && months <= 3;
   if (priority) {
     const why = `${withIndefiniteArticle(sector.label ?? '')} sector, ${sarMillions(size as number)} and a decision within three months`;
     if (intent && temperature !== 'hot') {
