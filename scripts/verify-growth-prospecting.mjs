@@ -15,6 +15,11 @@
 //      the live database with is_test rows only, all removed afterwards.
 //      Before 088 these are reported as PENDING.
 //
+//   3. Sector tiers (096): read only, the real row holds a valid value; with
+//      --write-test-rows, the card's save path on the isolated test row (id 2)
+//      only: stored, read back, logged, bad values refused, restored, and the
+//      real row compared field for field before and after.
+//
 //   npm run verify-growth-prospecting
 //   npm run verify-growth-prospecting -- --write-test-rows
 
@@ -276,6 +281,64 @@ async function live(svc) {
     await cleanup();
     const { count } = await svc.from('growth_companies').select('id', { count: 'exact', head: true }).like('name', 'ZZ-GROWTH-P2-%');
     check('every test row removed', count === 0);
+  }
+}
+
+console.log('7. Sector tiers, live (migration 096)');
+{
+  const svc = serviceClient();
+  if (!svc) markPending('sector tiers live checks', 'no service key');
+  else {
+    // Read only: the real row (id 1) carries a valid value.
+    const { data: real, error: realErr } = await svc.from('growth_settings').select('sector_tiers').eq('id', 1).maybeSingle();
+    if (realErr && /sector_tiers/.test(realErr.message ?? '')) markPending('sector tiers live checks', 'apply 096_growth_sector_tiers.sql');
+    else {
+      check('096 applied: the real settings row has sector_tiers', !realErr && real && real.sector_tiers !== null, realErr?.message);
+      check('the stored tiers are valid, so scoring and the card use them as stored', eng.sectorTiersSchema.safeParse(real?.sector_tiers).success, JSON.stringify(real?.sector_tiers));
+      const engLib = await load('src/lib/growth/engineSettings.ts');
+      const read1 = await engLib.getEngineSettings();
+      check('the card is not shown as pending a migration', engLib.pendingMigration(read1, ['sector_tiers']) === null);
+
+      if (!WRITE) console.log('  Write phase skipped (pass --write-test-rows to run it).');
+      else {
+        // The save path the card uses (group schema, then updateEngineSettings), on the isolated test row only.
+        const settings = await load('src/lib/growth/settings.ts');
+        const TEST = settings.TEST_SETTINGS_ROW;
+        const actor = { id: 'verify-growth-prospecting', name: 'Prospecting verifier' };
+        const started = new Date().toISOString();
+        const { data: realBefore } = await svc.from('growth_settings').select('*').eq('id', 1).single();
+        const { data: testRow } = await svc.from('growth_settings').select('id').eq('id', TEST).maybeSingle();
+        if (!testRow) await svc.from('growth_settings').insert({ id: TEST, is_test: true });
+        try {
+          const T = eng.DEFAULT_SECTOR_TIERS;
+          const fromCard = { sector_tiers: { credit: { real_estate: 100, infrastructure: 70, investment: 55, services: 40, other: 20 }, priority: ['infrastructure', 'real_estate'] } };
+          const parsed = eng.engineGroupSchemas.sector_tiers.safeParse(fromCard);
+          check('what the card sends passes the route schema', parsed.success);
+          const saved = await engLib.updateEngineSettings(parsed.data, actor, { isTest: true, rowId: TEST });
+          const { data: back } = await svc.from('growth_settings').select('sector_tiers').eq('id', TEST).single();
+          check('the save is stored and reads back as sent (priority kept in tier order)', saved.ok && Object.entries(fromCard.sector_tiers.credit).every(([k, v]) => back?.sector_tiers?.credit?.[k] === v) && Object.keys(back?.sector_tiers?.credit ?? {}).length === 5 && JSON.stringify(back?.sector_tiers?.priority) === JSON.stringify(['real_estate', 'infrastructure']), JSON.stringify(back?.sector_tiers));
+          const read2 = await engLib.getEngineSettings(TEST);
+          check('the settings read returns the saved tiers', read2.values.sector_tiers.credit.infrastructure === 70 && read2.values.sector_tiers.priority.includes('infrastructure'));
+          const { data: log } = await svc.from('growth_activity').select('is_test, actor_id, metadata').eq('action', 'settings.changed').gte('created_at', started);
+          const entry = (log ?? []).find((l) => l.metadata?.changes?.sector_tiers);
+          check('the change is logged with old and new values, as a test row', entry && entry.is_test === true && entry.actor_id === actor.id && entry.metadata.changes.sector_tiers.old && entry.metadata.changes.sector_tiers.new);
+          const bad = async (v) => (await svc.from('growth_settings').update({ sector_tiers: v }).eq('id', TEST)).error?.code === '23514';
+          check('the database refuses tiers that do not step down', await bad({ credit: { ...T.credit, infrastructure: 100 }, priority: ['real_estate'] }));
+          check('the database refuses an empty priority list', await bad({ credit: T.credit, priority: [] }));
+          check('the database refuses a credit over 100', await bad({ credit: { ...T.credit, real_estate: 101 }, priority: ['real_estate'] }));
+          const refused = await engLib.updateEngineSettings({ sector_tiers: { credit: { ...T.credit, infrastructure: 100 }, priority: ['real_estate'] } }, actor, { isTest: true, rowId: TEST });
+          check('a refused save answers 422, not a crash', !refused.ok && refused.status === 422);
+          const restored = await engLib.updateEngineSettings({ sector_tiers: T }, actor, { isTest: true, rowId: TEST });
+          check('the test row restores to the defaults', restored.ok && JSON.stringify(restored.values.sector_tiers) === JSON.stringify(T));
+        } finally {
+          await svc.from('growth_activity').delete().eq('is_test', true).eq('action', 'settings.changed').gte('created_at', started);
+          if (!testRow) await svc.from('growth_settings').delete().eq('id', TEST).eq('is_test', true);
+          else await svc.from('growth_settings').update({ sector_tiers: eng.DEFAULT_SECTOR_TIERS }).eq('id', TEST).eq('is_test', true);
+        }
+        const { data: realAfter } = await svc.from('growth_settings').select('*').eq('id', 1).single();
+        check('the real settings row did not change at all, updated_at included', JSON.stringify(realAfter) === JSON.stringify(realBefore));
+      }
+    }
   }
 }
 
