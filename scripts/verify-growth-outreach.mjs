@@ -83,6 +83,26 @@ console.log('3. Lead Score (offline)');
   check('under SAR 50 million caps at Cold, even with a meeting request', small.temperature === 'cold' && small.score <= 40 && small.reasons[0].includes('SAR 50 million'));
   const quiet = lead.scoreLead({ ...base, lead: { ...base.lead, stage: 'contacted' }, engagement: { replied: false, clicks: 0, chats: 0, meetings: 0 } });
   check('no engagement: not scored yet', quiet.engaged === false);
+  // Scored on what is known (2026-10-06): a short chat with the three key answers.
+  const chat3 = (q, extra = {}) => lead.scoreLead({ lead: { requirement: q.req ?? null, recommended_service: 'refm', deal_size_sar: q.size ?? null, timeline: q.timeline ?? null, stage: 'prospect', ...extra }, company: { country: null, city: null, sector: null }, contact: null, engagement: { replied: false, clicks: 0, chats: 1, meetings: 0 } });
+  const ex = chat3({ size: 450_000_000, timeline: 'within three months' });
+  check('REFM, SAR 450 million, within three months is Hot on the three answers', ex.temperature === 'hot' && ex.score >= 71, `${ex.score} ${ex.temperature}`);
+  check('unanswered factors are left out, not scored zero, and listed', ['authority', 'meeting_intent'].every((k) => ex.unknown.includes(k) && !ex.factors.find((f) => f.factor === k).known) && ex.knownWeight === 75 && ex.reasons.some((r) => r.startsWith('Not yet known: authority, meeting intent')));
+  check('the sector is read from the service when the lead has none', ex.factors.find((f) => f.factor === 'icp_fit').note.includes('real estate sector (from the service)'));
+  const mid = chat3({ size: 60_000_000, timeline: '6 months' });
+  check('SAR 60 million over six months is Warm', mid.temperature === 'warm', `${mid.score}`);
+  const noTime = chat3({ size: 500_000_000 });
+  check('SAR 500 million with no timeline is Warm, not Hot, until the timeline is known', noTime.temperature === 'warm' && noTime.reasons[0].includes('until the timeline is known'), `${noTime.score}`);
+  const tiny = chat3({ size: 20_000_000, timeline: 'urgent' });
+  check('SAR 20 million, urgent, stays Cold', tiny.temperature === 'cold' && tiny.score <= 40 && tiny.reasons[0].includes('SAR 50 million'));
+  // Weights that push the total low, so only the priority rule can lift it.
+  const lowW = { icp_fit: 5, clear_need: 5, scale: 5, timeline: 5, authority: 70, engagement: 5, meeting_intent: 5 };
+  const pri = (req) => lead.scoreLead({ lead: { requirement: req, recommended_service: null, deal_size_sar: 60_000_000, timeline: 'within 2 months', stage: 'prospect' }, company: { country: null, city: null, sector: 'Energy' }, contact: { is_decision_maker: false, role_title: 'Analyst' }, engagement: { replied: false, clicks: 1, chats: 0, meetings: 0 }, weights: lowW });
+  const floor = pri(null);
+  check('a priority sector, SAR 50 million or more and three months is at least Warm whatever the total', floor.temperature === 'warm' && floor.reasons[0].startsWith('At least Warm'), `${floor.score} ${floor.reasons[0]}`);
+  const asked = pri('Please send us a proposal for the model');
+  check('and Hot when a call, quote or proposal is asked for', asked.temperature === 'hot' && asked.reasons[0].includes('call, quote or proposal'), `${asked.score}`);
+  check('the intent check is narrow: a capital call is not a request', !lead.INTENT_TEXT.test('the fund has a capital call next month') && lead.INTENT_TEXT.test('can you share a quote') && lead.INTENT_TEXT.test('we would like a call'));
   check('timelines are read from plain words', lead.timelineMonths('decision within 3 months') === 3 && lead.timelineMonths('ASAP') === 0.5 && lead.timelineMonths('next quarter') === 3 && lead.timelineMonths('') === null && lead.timelineMonths('6 weeks') < 2);
   check('lead weights default 25, 20, 15, 15, 10, 10, 5 and must sum to 100', eng.DEFAULT_LEAD_WEIGHTS.icp_fit === 25 && eng.DEFAULT_LEAD_WEIGHTS.meeting_intent === 5 && eng.leadWeightsSchema.safeParse(eng.DEFAULT_LEAD_WEIGHTS).success && !eng.leadWeightsSchema.safeParse({ ...eng.DEFAULT_LEAD_WEIGHTS, icp_fit: 30 }).success);
 }

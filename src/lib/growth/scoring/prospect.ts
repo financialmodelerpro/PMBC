@@ -10,7 +10,13 @@
  *
  * Bands: Priority 80 and over, Good 60 to 79, Watch 40 to 59, Low under 40.
  * Hard rule: a known deal or project size under SAR 50 million is Low
- * whatever the score. An unknown size scores zero on scale.
+ * whatever the score.
+ *
+ * Scored on what is known (recalibrated 2026-10-06): a factor with no answer
+ * (location, sector, size, or no contact on file) is left out rather than
+ * scored zero, and the total is scaled to the weight of the known factors.
+ * The three signal factors are always known: the engine watches for signals,
+ * so having none is an answer. The unknown factors are listed in the reasons.
  *
  * Targeting rules come from the approved Knowledge Base: its decision-maker
  * titles count a contact as a decision-maker, and its excluded work is
@@ -96,7 +102,8 @@ export type ScoreInput = {
   now?: Date;
 };
 
-export type FactorResult = { factor: ScoringFactor; weight: number; share: number; points: number; note: string };
+/** `known` false: no answer yet, so the factor is left out of the total (its share and points are 0). */
+export type FactorResult = { factor: ScoringFactor; weight: number; share: number; points: number; note: string; known: boolean };
 
 export type ScoreResult = {
   score: number;
@@ -106,6 +113,9 @@ export type ScoreResult = {
   /** The known size in SAR, or null when unknown. */
   sizeSar: number | null;
   belowMinimum: boolean;
+  /** The weight of the known factors the score is scaled to. */
+  knownWeight: number;
+  unknown: ScoringFactor[];
   excludedMatches: string[];
 };
 
@@ -143,6 +153,7 @@ export function scoreProspect(input: ScoreInput): ScoreResult {
   const dm = input.contacts.find((c) => c.is_decision_maker || titleMatches(c.role_title, titles));
   const newest = live.length ? Math.min(...live.map((s) => ageDays(s.signal_date))) : null;
 
+  const known: Record<ScoringFactor, boolean> = { geography: geo > 0, sector: Boolean(sector.label), project_signal: true, funding_signal: true, scale: sizeSar !== null, decision_maker: input.contacts.length > 0, recency: true };
   const shares: Record<ScoringFactor, { share: number; note: string }> = {
     geography: { share: geo, note: geo === 1 ? 'based in KSA' : geo >= 0.6 ? 'based in the wider GCC' : geo > 0 ? 'based outside the GCC' : 'location unknown' },
     sector: { share: sector.share, note: sector.label ? `${sector.label} sector` : 'sector unknown' },
@@ -156,9 +167,12 @@ export function scoreProspect(input: ScoreInput): ScoreResult {
   const factors: FactorResult[] = SCORING_FACTORS.map((f) => {
     const w = weights[f.key] ?? 0;
     const s = shares[f.key];
-    return { factor: f.key, weight: w, share: s.share, points: Math.round(w * s.share * 10) / 10, note: s.note };
+    return { factor: f.key, weight: w, share: s.share, points: Math.round(w * s.share * 10) / 10, note: s.note, known: known[f.key] };
   });
-  const score = Math.max(0, Math.min(100, Math.round(factors.reduce((a, f) => a + f.points, 0))));
+  const knownWeight = factors.reduce((a, f) => a + (f.known ? f.weight : 0), 0);
+  const unknown = factors.filter((f) => !f.known && f.weight > 0).map((f) => f.factor);
+  const raw = factors.reduce((a, f) => a + f.points, 0);
+  const score = knownWeight > 0 ? Math.max(0, Math.min(100, Math.round((raw / knownWeight) * 100))) : 0;
   const band = belowMinimum ? 'low' : bandFor(score);
 
   const text = `${input.company.sector ?? ''} ${input.company.description ?? ''} ${input.company.notes ?? ''}`.toLowerCase();
@@ -167,11 +181,12 @@ export function scoreProspect(input: ScoreInput): ScoreResult {
   const reasons: string[] = [];
   if (belowMinimum && sizeSar !== null) reasons.push(`Low regardless of score: the known size, ${sar(sizeSar)}, is under the SAR 50 million minimum.`);
   const strengths = factors.filter((f) => f.share > 0).sort((a, b) => b.points - a.points);
-  const gaps = factors.filter((f) => f.share < 1 && f.weight > 0).sort((a, b) => b.weight * (1 - b.share) - a.weight * (1 - a.share));
+  const gaps = factors.filter((f) => f.known && f.share < 1 && f.weight > 0).sort((a, b) => b.weight * (1 - b.share) - a.weight * (1 - a.share));
   if (strengths.length) reasons.push(`Strongest: ${strengths.slice(0, 2).map((f) => f.note).join(' and ')} (${strengths.slice(0, 2).reduce((a, f) => a + f.points, 0)} of ${strengths.slice(0, 2).reduce((a, f) => a + f.weight, 0)} points).`);
-  if (gaps.length && reasons.length < 3) reasons.push(`Biggest gap: ${gaps[0].note} (${gaps[0].points} of ${gaps[0].weight} points).`);
-  if (excludedMatches.length && reasons.length < 3) reasons.push(`Check the targeting rules: mentions excluded work (${excludedMatches.join(', ')}).`);
+  if (unknown.length) reasons.push(`Not yet known: ${unknown.map((k) => (SCORING_FACTORS.find((f) => f.key === k)?.label ?? k).toLowerCase()).join(', ')}. Scored on the ${knownWeight} of ${factors.reduce((a, f) => a + f.weight, 0)} points that are known.`);
+  if (excludedMatches.length && reasons.length < 4) reasons.push(`Check the targeting rules: mentions excluded work (${excludedMatches.join(', ')}).`);
+  if (gaps.length && reasons.length < 4) reasons.push(`Biggest gap: ${gaps[0].note} (${gaps[0].points} of ${gaps[0].weight} points).`);
   if (reasons.length < 2) reasons.push(`Score ${score} of 100 from the seven factors.`);
 
-  return { score, band, factors, reasons: reasons.slice(0, 3), sizeSar, belowMinimum, excludedMatches };
+  return { score, band, factors, reasons: reasons.slice(0, 4), sizeSar, belowMinimum, knownWeight, unknown, excludedMatches };
 }

@@ -123,11 +123,16 @@ export default async function ProspectPage({ params }: { params: Promise<{ id: s
                   <tr key={f.factor}>
                     <td style={{ ...adminTd, padding: '5px 8px', fontSize: 12 }}>{SCORING_FACTORS.find((x) => x.key === f.factor)?.label}</td>
                     <td style={{ ...adminTd, padding: '5px 8px', fontSize: 12, color: ADMIN_COLORS.textMuted }}>{f.note}</td>
-                    <td style={{ ...adminTd, padding: '5px 8px', fontSize: 12, textAlign: 'right', whiteSpace: 'nowrap' }}>
-                      {f.points} / {f.weight}
+                    <td style={{ ...adminTd, padding: '5px 8px', fontSize: 12, textAlign: 'right', whiteSpace: 'nowrap', color: f.known ? undefined : ADMIN_COLORS.textMuted }}>
+                      {f.known ? `${f.points} / ${f.weight}` : 'not known'}
                     </td>
                   </tr>
                 ))}
+                <tr>
+                  <td colSpan={3} style={{ ...adminTd, padding: '5px 8px', fontSize: 12, color: ADMIN_COLORS.textMuted }}>
+                    Scored on the {live.knownWeight} points that are known, scaled to 100.
+                  </td>
+                </tr>
               </tbody>
             </table>
           )}
