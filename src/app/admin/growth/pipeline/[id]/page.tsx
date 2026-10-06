@@ -134,11 +134,16 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
                     <tr key={f.factor}>
                       <td style={{ padding: '3px 0' }}>{LEAD_FACTORS.find((x) => x.key === f.factor)?.label}</td>
                       <td style={{ padding: '3px 6px', color: ADMIN_COLORS.textMuted }}>{f.note}</td>
-                      <td style={{ padding: '3px 0', textAlign: 'right' }}>
-                        {f.points} / {f.weight}
+                      <td style={{ padding: '3px 0', textAlign: 'right', color: f.known ? undefined : ADMIN_COLORS.textMuted }}>
+                        {f.known ? `${f.points} / ${f.weight}` : 'not known'}
                       </td>
                     </tr>
                   ))}
+                  <tr>
+                    <td colSpan={3} style={{ padding: '6px 0 0', color: ADMIN_COLORS.textMuted }}>
+                      Scored on the {score.result.knownWeight} points that are known, scaled to 100.
+                    </td>
+                  </tr>
                 </tbody>
               </table>
             </>

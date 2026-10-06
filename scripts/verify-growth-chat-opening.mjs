@@ -188,8 +188,9 @@ console.log('3. The three answers that matter most (offline)');
   check('once they are in, the rest only if the conversation carries on', chat.qualificationFocus({ service: 'refm', size_sar: 400000000, timeline: 'Q1' }).includes('only if the conversation carries on naturally'));
   check('the prompt keeps one question at a time, after answering', /Always answer what the visitor asked first, then ask at most one question/.test(fs.readFileSync(path.join(root, 'src/lib/growth/chat.ts'), 'utf8')));
   const cases = [
-    { q: { service: 'refm', size_sar: 450_000_000, timeline: 'within three months' }, want: 'warm' },
-    { q: { service: 'project-finance', size_sar: 2_000_000_000, timeline: 'this quarter' }, want: 'warm' },
+    { q: { service: 'refm', size_sar: 450_000_000, timeline: 'within three months' }, want: 'hot' },
+    { q: { service: 'project-finance', size_sar: 2_000_000_000, timeline: 'this quarter' }, want: 'hot' },
+    { q: { service: 'refm', size_sar: 60_000_000, timeline: '6 months' }, want: 'warm' },
     { q: { service: 'business-valuation', size_sar: 30_000_000, timeline: 'next year' }, want: 'cold' },
   ];
   for (const { q, want } of cases) {

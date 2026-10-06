@@ -19,7 +19,7 @@ export const SCORING_FACTORS = [
   { key: 'sector', label: 'Sector', hint: 'Real estate highest' },
   { key: 'project_signal', label: 'Project signal', hint: 'A new project, registration, award or expansion' },
   { key: 'funding_signal', label: 'Funding or transaction signal', hint: 'Fundraising, debt, acquisition, JV or capital markets' },
-  { key: 'scale', label: 'Scale', hint: 'Known project or deal size; unknown scores zero' },
+  { key: 'scale', label: 'Scale', hint: 'Known project or deal size; unknown is left out of the score' },
   { key: 'decision_maker', label: 'Decision-maker', hint: 'A named decision-maker on file' },
   { key: 'recency', label: 'Recency', hint: 'How fresh the latest signal is' },
 ] as const;
