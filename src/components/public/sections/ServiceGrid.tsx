@@ -5,6 +5,7 @@ import { SectionContainer } from '@/components/public/SectionContainer';
 import type { PmbcVariant } from '@/lib/public/tokens';
 import type { SectionContext } from '@/lib/public/sectionContext';
 import { sectionCopy } from '@/lib/public/sectionCopy';
+import { MultilineText } from '../MultilineText';
 
 /**
  * The nine service cards on `/services`.
@@ -69,7 +70,7 @@ export function ServiceGrid({
           )}
           {intro && (
             <p className="mt-5 text-[17px] leading-[1.7] text-[#52606B] sm:text-[18px]">
-              {intro}
+              <MultilineText text={intro} />
             </p>
           )}
         </div>

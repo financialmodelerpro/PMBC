@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { SectionContainer, SectionIntro } from '../SectionContainer';
 import { Media } from '../Media';
 import { sanitizeRichHtml } from '@/lib/cms/sanitize';
+import { bodyAlignAttrs, readBodyAlign } from '@/lib/public/prose';
 import { readMediaValue } from '@/lib/media';
 import { PORTRAIT_OBJECT_POSITION } from '@/lib/public/portrait';
 import { variantStyles, type PmbcVariant } from '@/lib/public/tokens';
@@ -100,6 +101,7 @@ export function FounderBlock({
   if (!c.name && !c.bio_html && !c.photo_url && !c.section_headline && !c.eyebrow) return null;
   const imageRight = c.layout === 'image_right';
   const v = variantStyles(variant);
+  const bodyAlign = bodyAlignAttrs(readBodyAlign(content?.body_align));
 
   return (
     <SectionContainer variant={variant} styles={styles}>
@@ -193,8 +195,8 @@ export function FounderBlock({
           )}
           {c.bio_html && (
             <div
-              className="pmbc-prose mt-6 max-w-none"
-              style={{ color: v.text, fontSize: 17, lineHeight: 1.7 }}
+              className={['pmbc-prose mt-6 max-w-none', bodyAlign.className].filter(Boolean).join(' ')}
+              style={{ color: v.text, fontSize: 17, lineHeight: 1.7, ...bodyAlign.style }}
               dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(c.bio_html) }}
             />
           )}

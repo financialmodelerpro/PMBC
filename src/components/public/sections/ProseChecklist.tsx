@@ -1,5 +1,6 @@
 import { SectionContainer, SectionIntro } from '../SectionContainer';
 import { sanitizeRichHtml } from '@/lib/cms/sanitize';
+import { bodyAlignAttrs, readBodyAlign } from '@/lib/public/prose';
 import { visibleListItems } from '@/lib/public/itemVisibility';
 import { variantStyles, type PmbcVariant } from '@/lib/public/tokens';
 import type { SectionMediaValue } from '@/lib/cms/sectionMedia';
@@ -60,6 +61,7 @@ export function ProseChecklist({
   if (!html && items.length === 0 && !heading) return null;
 
   const v = variantStyles(variant);
+  const bodyAlign = bodyAlignAttrs(readBodyAlign(c.body_align));
   const dark = variant === 'navy_deep';
 
   return (
@@ -70,8 +72,15 @@ export function ProseChecklist({
         <div>
           {html && (
             <div
-              className={['pmbc-prose', dark ? 'pmbc-prose-invert' : ''].filter(Boolean).join(' ')}
-              style={{ color: dark ? '#E8DDC4' : v.text, fontSize: 17, lineHeight: 1.75 }}
+              className={['pmbc-prose', dark ? 'pmbc-prose-invert' : '', bodyAlign.className]
+                .filter(Boolean)
+                .join(' ')}
+              style={{
+                color: dark ? '#E8DDC4' : v.text,
+                fontSize: 17,
+                lineHeight: 1.75,
+                ...bodyAlign.style,
+              }}
               dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(html) }}
             />
           )}

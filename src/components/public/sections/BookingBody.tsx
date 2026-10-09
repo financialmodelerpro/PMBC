@@ -7,6 +7,7 @@ import { SectionContainer } from '@/components/public/SectionContainer';
 import type { PmbcVariant } from '@/lib/public/tokens';
 import type { SectionContext } from '@/lib/public/sectionContext';
 import { sectionCopy } from '@/lib/public/sectionCopy';
+import { MultilineText } from '../MultilineText';
 
 /**
  * The body of /book: the calendar band, and the direct routes under it.
@@ -155,7 +156,7 @@ export function BookingBody({
             )}
             {emptyBody && (
               <p className="mt-3 text-[15px] leading-relaxed text-[color:var(--pmbc-muted)]">
-                {emptyBody}
+                <MultilineText text={emptyBody} />
               </p>
             )}
           </div>
@@ -174,7 +175,7 @@ export function BookingBody({
         )}
         {alternativesText && (
           <p className="mt-4 text-[15px] leading-relaxed text-[color:var(--pmbc-muted)]">
-            {alternativesText}
+            <MultilineText text={alternativesText} />
           </p>
         )}
 

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { MultilineText } from './MultilineText';
 
 /**
  * The interactive half of the testimonial section.
@@ -74,7 +75,7 @@ export function TestimonialFormFields({
     return (
       <div className="border-l-[3px] border-[color:var(--pmbc-accent)] bg-white p-8">
         <p className="text-[16px] leading-relaxed text-[color:var(--pmbc-text)]">
-          {successMessage}
+          <MultilineText text={successMessage} />
         </p>
       </div>
     );
@@ -168,7 +169,7 @@ export function TestimonialFormFields({
           className="mt-1 h-4 w-4 shrink-0 accent-[#1B3A5F]"
         />
         <span className="text-[14px] leading-relaxed text-[color:var(--pmbc-muted)]">
-          {consentLabel}
+          <MultilineText text={consentLabel} />
         </span>
       </label>
 

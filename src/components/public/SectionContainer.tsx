@@ -7,6 +7,7 @@ import {
   SECTION_PADDING,
   SECTION_PADDING_COMPACT,
 } from '@/lib/public/layout';
+import { MultilineText } from './MultilineText';
 import { SectionMediaLayout } from './SectionMediaLayout';
 import type { SectionMediaValue } from '@/lib/cms/sectionMedia';
 import {
@@ -148,7 +149,7 @@ export function SectionIntro({
           className="mt-5 text-[17px] leading-[1.7] sm:text-[18px]"
           style={{ color: v.textMuted }}
         >
-          {intro}
+          <MultilineText text={intro} />
         </p>
       )}
     </div>

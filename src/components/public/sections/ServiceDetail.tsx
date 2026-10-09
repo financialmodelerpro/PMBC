@@ -2,10 +2,12 @@ import Link from 'next/link';
 import { CheckCircle2, ArrowRight } from 'lucide-react';
 
 import { sanitizeRichHtml } from '@/lib/cms/sanitize';
+import { bodyAlignAttrs, readBodyAlign } from '@/lib/public/prose';
 import { SERVICES } from '@/config/services';
 import { SectionContainer } from '../SectionContainer';
 import { variantStyles, type PmbcVariant } from '@/lib/public/tokens';
 import type { SectionMediaValue } from '@/lib/cms/sectionMedia';
+import { MultilineText } from '../MultilineText';
 
 function s(v: unknown): string {
   return typeof v === 'string' ? v : '';
@@ -75,6 +77,7 @@ export function ServiceDetail({
     : [];
 
   const v = variantStyles(variant);
+  const bodyAlign = bodyAlignAttrs(readBodyAlign(content?.body_align));
 
   return (
     <SectionContainer variant={variant} styles={styles} media={media}>
@@ -115,8 +118,8 @@ export function ServiceDetail({
 
         {c.full_description_html && (
           <div
-            className="pmbc-prose mt-12 max-w-[780px]"
-            style={{ color: v.text, fontSize: 17, lineHeight: 1.75 }}
+            className={['pmbc-prose mt-12 max-w-[780px]', bodyAlign.className].filter(Boolean).join(' ')}
+            style={{ color: v.text, fontSize: 17, lineHeight: 1.75, ...bodyAlign.style }}
             dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(c.full_description_html) }}
           />
         )}
@@ -185,7 +188,7 @@ export function ServiceDetail({
                     className="mt-3 text-[15px] leading-[1.7]"
                     style={{ color: v.text }}
                   >
-                    {c.timeline_text}
+                    <MultilineText text={c.timeline_text} />
                   </p>
                 </div>
               )}
@@ -212,7 +215,7 @@ export function ServiceDetail({
                     className="mt-3 text-[15px] leading-[1.7]"
                     style={{ color: v.text }}
                   >
-                    {c.target_audience_text}
+                    <MultilineText text={c.target_audience_text} />
                   </p>
                 </div>
               )}

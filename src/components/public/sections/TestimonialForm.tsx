@@ -4,6 +4,7 @@ import { sectionCopy } from '@/lib/public/sectionCopy';
 import { TestimonialFormFields } from '@/components/public/TestimonialFormFields';
 import type { SectionContext } from '@/lib/public/sectionContext';
 import { TestimonialFormGate } from '@/components/public/TestimonialFormGate';
+import { MultilineText } from '../MultilineText';
 
 /**
  * The client testimonial form, placeable on any page from the builder.
@@ -72,7 +73,7 @@ export function TestimonialForm({
             </h2>
           )}
           {intro && (
-            <p className="mt-5 text-[17px] leading-[1.7] text-[#52606B]">{intro}</p>
+            <p className="mt-5 text-[17px] leading-[1.7] text-[#52606B]"><MultilineText text={intro} /></p>
           )}
         </div>
       )}

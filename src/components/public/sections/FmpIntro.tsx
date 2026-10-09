@@ -4,6 +4,7 @@ import { ArrowUpRight, CheckCircle2 } from 'lucide-react';
 
 import { SectionContainer } from '../SectionContainer';
 import { sanitizeRichHtml } from '@/lib/cms/sanitize';
+import { bodyAlignAttrs, readBodyAlign } from '@/lib/public/prose';
 import { variantStyles, type PmbcVariant } from '@/lib/public/tokens';
 
 function s(v: unknown): string {
@@ -51,6 +52,7 @@ export function FmpIntro({
   if (!c.heading && !c.description_html && c.feature_points.length === 0) return null;
   const external = /^https?:/i.test(c.cta_href);
   const v = variantStyles(variant);
+  const bodyAlign = bodyAlignAttrs(readBodyAlign(content?.body_align));
   const dark = variant === 'navy_deep';
 
   return (
@@ -107,11 +109,14 @@ export function FmpIntro({
         )}
         {c.description_html && (
           <div
-            className="pmbc-prose pmbc-prose-invert mt-6 max-w-none"
+            className={['pmbc-prose pmbc-prose-invert mt-6 max-w-none', bodyAlign.className]
+              .filter(Boolean)
+              .join(' ')}
             style={{
               color: dark ? '#E8DDC4' : v.text,
               fontSize: 17,
               lineHeight: 1.7,
+              ...bodyAlign.style,
             }}
             dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(c.description_html) }}
           />
