@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { SectionContainer } from '../SectionContainer';
 import { Media } from '../Media';
 import { sanitizeRichHtml } from '@/lib/cms/sanitize';
+import { bodyAlignAttrs, readBodyAlign } from '@/lib/public/prose';
 import { readMediaValue } from '@/lib/media';
 import { variantStyles, type PmbcVariant } from '@/lib/public/tokens';
 
@@ -51,6 +52,7 @@ export function TextImage({
   if (!c.heading && !c.body_html && !c.image_url && !c.eyebrow) return null;
   const imageLeft = c.image_position === 'left';
   const v = variantStyles(variant);
+  const bodyAlign = bodyAlignAttrs(readBodyAlign(content?.body_align));
   const dark = variant === 'navy_deep';
 
   return (
@@ -138,11 +140,12 @@ export function TextImage({
           )}
           {c.body_html && (
             <div
-              className="pmbc-prose mt-6 max-w-none"
+              className={['pmbc-prose mt-6 max-w-none', bodyAlign.className].filter(Boolean).join(' ')}
               style={{
                 color: dark ? '#E8DDC4' : v.text,
                 fontSize: 17,
                 lineHeight: 1.75,
+                ...bodyAlign.style,
               }}
               dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(c.body_html) }}
             />

@@ -11,6 +11,7 @@ import {
   readMediaMaxHeight,
   type SectionMediaValue,
 } from '@/lib/cms/sectionMedia';
+import { MultilineText } from '../MultilineText';
 
 /**
  * Large cards carrying a description, metadata chips, a bullet list and a CTA.
@@ -187,7 +188,7 @@ export function FeatureCards({
                 className="mt-6 text-[15px] leading-[1.7]"
                 style={{ color: v.textMuted }}
               >
-                {card.description}
+                <MultilineText text={card.description} />
               </p>
             )}
 
@@ -335,7 +336,7 @@ function FeatureRow({
 
       {card.description && (
         <p className="mt-6 text-[16px] leading-[1.75]" style={{ color: v.textMuted }}>
-          {card.description}
+          <MultilineText text={card.description} />
         </p>
       )}
 

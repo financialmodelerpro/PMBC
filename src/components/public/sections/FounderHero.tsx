@@ -5,6 +5,7 @@ import { Media } from '../Media';
 import { readMediaValue } from '@/lib/media';
 import { PORTRAIT_OBJECT_POSITION } from '@/lib/public/portrait';
 import { variantStyles, type PmbcVariant } from '@/lib/public/tokens';
+import { MultilineText } from '../MultilineText';
 
 function s(v: unknown): string {
   return typeof v === 'string' ? v : '';
@@ -190,7 +191,7 @@ export function FounderHero({
           )}
           {c.intro && (
             <p className="mt-7 max-w-[620px] text-[17px] leading-[1.75]" style={{ color: bodyColor }}>
-              {c.intro}
+              <MultilineText text={c.intro} />
             </p>
           )}
 

@@ -32,6 +32,7 @@ import {
 import { SERVICES } from '@/config/services';
 
 import type { SectionEditorProps } from './types';
+import { BodyAlignField } from './BodyAlignField';
 
 type Deliverable = { id: string; text: string };
 
@@ -123,6 +124,11 @@ export function ServiceDetailEditor({ content, onChange }: SectionEditorProps) {
           ))}
         </select>
       </Field>
+
+      <BodyAlignField
+        value={content.body_align}
+        onChange={(next) => onChange({ ...content, body_align: next })}
+      />
 
       <div>
         <p style={adminLabel}>Full description</p>

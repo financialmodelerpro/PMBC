@@ -6,6 +6,7 @@ import { RichTextEditor } from '@/components/admin/RichTextEditor';
 import { ADMIN_COLORS, adminButtonGhost, adminFieldHint, adminInput, adminLabel } from '@/lib/admin/styles';
 
 import type { SectionEditorProps } from './types';
+import { BodyAlignField } from './BodyAlignField';
 
 type Item = { title: string; description: string };
 
@@ -51,6 +52,11 @@ export function ProseChecklistEditor({ content, onChange }: SectionEditorProps) 
           style={adminInput}
         />
       </div>
+
+      <BodyAlignField
+        value={content.body_align}
+        onChange={(next) => patch({ body_align: next })}
+      />
 
       <div>
         <p style={adminLabel}>Left column, prose</p>

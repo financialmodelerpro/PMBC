@@ -141,6 +141,7 @@ Three flags matter when rebuilding:
 094  growth_signal_keywords  **DDL, HAND-RUN.** Signal keyword library: growth_keyword_groups, growth_signal_keywords, growth_signals.matched_keyword_id and matched_keyword; pauses the feed. Defaults live in code (src/lib/growth/keywordLibrary.ts) and are saved on the first change. Applied 2026-09-23.
 095  growth_chat_opening     **DDL, HAND-RUN.** Settings chat_auto_open (default true), chat_auto_open_delay_seconds (20, 5 to 300) and chat_auto_open_scroll_percent (50, 10 to 100). Applied 2026-09-23.
 096  growth_sector_tiers     **DDL, HAND-RUN.** Setting sector_tiers (JSONB): credit per sector tier, stepping down, and the priority tiers (real estate by default). Applied 2026-10-06. Later Growth migrations: see docs/PENDING_MIGRATIONS.md
+097  network_skygulf_logo_size  DML, hand-run. Sets logo_size "smaller" on the Sky Gulf partner in the network_partners section; everything else untouched, idempotent. Applied 2026-10-09.
 ```
 
 **Every migration from 076 on states when it is safe to apply** in a `SAFE TO APPLY:` line in its header: before or after which deploy, and what the site does in the gap. 075 is why: it was applied before the routes it linked to were deployed, and previews share the production database, so the live footer linked to a 404.

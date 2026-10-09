@@ -6,9 +6,16 @@ import { Media } from '../Media';
 import { readMediaValue, type MediaValue } from '@/lib/media';
 import { variantStyles, type PmbcVariant } from '@/lib/public/tokens';
 import { visibleListItems } from '@/lib/public/itemVisibility';
+import {
+  PARTNER_LOGO_MAX_HEIGHT,
+  readPartnerLogoSize,
+  type PartnerLogoSize,
+} from '@/lib/public/partnerLogo';
+import { MultilineText } from '../MultilineText';
 
 type Partner = {
   logo_url: string;
+  logo_size: PartnerLogoSize;
   name: string;
   location: string;
   description: string;
@@ -41,6 +48,7 @@ function pickPartners(c: Record<string, unknown>): {
       if (!name && !description) return null;
       return {
         logo_url: s(o.logo_url),
+        logo_size: readPartnerLogoSize(o.logo_size),
         name,
         location: s(o.location),
         description,
@@ -98,19 +106,27 @@ export function NetworkPartners({
                 />
                 <div className="flex items-start justify-between gap-3">
                   {p.logo_url ? (
-                    <div className="relative h-14 w-36 flex-shrink-0">
-                      <Media
-                        src={p.media.url}
-                        alt={p.name || 'Partner logo'}
-                        mediaType={p.media.mediaType}
-                        posterUrl={p.media.posterUrl}
-                        autoplay={p.media.autoplay}
-                        loop={p.media.loop}
-                        controls={p.media.controls}
-                        fill
-                        sizes="144px"
-                        className="object-contain object-left"
-                      />
+                    // The slot keeps its 56px height whatever the size, so the
+                    // role tag and the heading below do not move; the logo is
+                    // capped inside it and centred on the slot's height.
+                    <div className="flex h-14 w-36 flex-shrink-0 items-center">
+                      <div
+                        className="relative w-full"
+                        style={{ height: PARTNER_LOGO_MAX_HEIGHT[p.logo_size] }}
+                      >
+                        <Media
+                          src={p.media.url}
+                          alt={p.name || 'Partner logo'}
+                          mediaType={p.media.mediaType}
+                          posterUrl={p.media.posterUrl}
+                          autoplay={p.media.autoplay}
+                          loop={p.media.loop}
+                          controls={p.media.controls}
+                          fill
+                          sizes="144px"
+                          className="object-scale-down object-left"
+                        />
+                      </div>
                     </div>
                   ) : (
                     <div
@@ -160,7 +176,7 @@ export function NetworkPartners({
                     className="mt-4 text-[15px] leading-[1.7]"
                     style={{ color: dark ? v.textMuted : '#52606B' }}
                   >
-                    {p.description}
+                    <MultilineText text={p.description} />
                   </p>
                 )}
                 {p.link && (

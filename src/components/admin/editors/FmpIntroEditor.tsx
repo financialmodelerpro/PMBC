@@ -31,6 +31,7 @@ import {
 } from '@/lib/admin/styles';
 
 import type { SectionEditorProps } from './types';
+import { BodyAlignField } from './BodyAlignField';
 
 type Point = { id: string; text: string };
 
@@ -144,6 +145,11 @@ export function FmpIntroEditor({ content, onChange }: SectionEditorProps) {
         urlKey="logo_url"
         onChange={writeMedia}
         label="Logo (optional)"
+      />
+
+      <BodyAlignField
+        value={content.body_align}
+        onChange={(next) => writeMedia({ body_align: next })}
       />
 
       <div>

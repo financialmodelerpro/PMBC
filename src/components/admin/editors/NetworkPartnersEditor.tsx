@@ -30,6 +30,7 @@ import {
 } from '@/lib/admin/styles';
 
 import { MediaField } from '@/components/admin/MediaField';
+import { PARTNER_LOGO_SIZE_OPTIONS, readPartnerLogoSize } from '@/lib/public/partnerLogo';
 
 import type { SectionEditorProps } from './types';
 
@@ -290,6 +291,19 @@ function SortablePartner({
                 placeholder="Strategic Partner"
                 style={adminInput}
               />
+            </FieldShell>
+            <FieldShell label="Logo size">
+              <select
+                value={readPartnerLogoSize(partner.logo_size)}
+                onChange={(e) => onUpdate({ logo_size: readPartnerLogoSize(e.target.value) })}
+                style={adminInput}
+              >
+                {PARTNER_LOGO_SIZE_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
             </FieldShell>
           </div>
           <FieldShell label="Description">

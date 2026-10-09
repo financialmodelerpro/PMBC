@@ -8,6 +8,7 @@ import { SectionContainer } from '@/components/public/SectionContainer';
 import type { PmbcVariant } from '@/lib/public/tokens';
 import type { SectionContext } from '@/lib/public/sectionContext';
 import { sectionCopy } from '@/lib/public/sectionCopy';
+import { MultilineText } from '../MultilineText';
 
 /**
  * The body of /contact: the form panel and the direct-contact column beside it.
@@ -106,7 +107,7 @@ export function ContactBody({
             )}
             {responseNote && (
               <p className="mt-3 text-[14px] leading-relaxed text-[color:var(--pmbc-muted)]">
-                {responseNote}
+                <MultilineText text={responseNote} />
               </p>
             )}
 
@@ -128,7 +129,7 @@ export function ContactBody({
                     )}
                     {bookingBody && (
                       <p className="mt-1.5 text-[14px] leading-relaxed text-[color:var(--pmbc-muted)]">
-                        {bookingBody}
+                        <MultilineText text={bookingBody} />
                       </p>
                     )}
                   </div>
@@ -169,7 +170,7 @@ export function ContactBody({
           )}
           {directIntro && (
             <p className="mt-3 text-[14px] leading-relaxed text-[color:var(--pmbc-muted)]">
-              {directIntro}
+              <MultilineText text={directIntro} />
             </p>
           )}
 
@@ -259,7 +260,7 @@ export function ContactBody({
                 )}
                 {founderBody && (
                   <p className="mt-2.5 text-[14px] leading-relaxed text-[color:var(--pmbc-muted)]">
-                    {founderBody}
+                    <MultilineText text={founderBody} />
                   </p>
                 )}
                 {founderCtaLabel && (

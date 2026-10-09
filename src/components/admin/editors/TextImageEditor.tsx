@@ -9,6 +9,7 @@ import {
 } from '@/lib/admin/styles';
 
 import type { SectionEditorProps } from './types';
+import { BodyAlignField } from './BodyAlignField';
 
 function s(v: unknown): string {
   return typeof v === 'string' ? v : '';
@@ -51,6 +52,11 @@ export function TextImageEditor({ content, onChange }: SectionEditorProps) {
           style={adminInput}
         />
       </Field>
+
+      <BodyAlignField
+        value={content.body_align}
+        onChange={(next) => update({ body_align: next })}
+      />
 
       <div>
         <p style={adminLabel}>Body</p>
