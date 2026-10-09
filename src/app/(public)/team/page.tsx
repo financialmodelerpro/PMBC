@@ -4,7 +4,13 @@ import { ArrowUpRight } from 'lucide-react';
 
 import { sanitizeRichHtml } from '@/lib/cms/sanitize';
 import { fetchVisibleTeam, type TeamMemberRow } from '@/lib/cms/collections';
-import { fetchFounderProfile, isFounder, type FounderProfile } from '@/lib/cms/founderProfile';
+import {
+  FOUNDER_PAGE_SLUG,
+  fetchMemberProfiles,
+  isFounder,
+  profileFor,
+  type FounderProfile,
+} from '@/lib/cms/founderProfile';
 import { buildPageMetadata } from '@/lib/seo/metadata';
 import { fetchPage, fetchPageSections } from '@/lib/cms/pages';
 import { FirmPageBody } from '@/components/public/FirmPageBody';
@@ -133,25 +139,39 @@ function FoundingPartnerCard({
             dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(member.bio) }}
           />
         )}
-        {profilePath && (
-          <Link
-            href={profilePath}
-            className="group mt-7 inline-flex items-center gap-1.5 text-[13px] font-semibold text-[color:var(--pmbc-primary)]"
-          >
-            Read the full profile
-            <ArrowUpRight
-              size={15}
-              className="transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
-            />
-          </Link>
-        )}
+        {profilePath && <ProfileLink href={profilePath} className="mt-7" />}
       </div>
     </article>
   );
 }
 
-/** Every other member, in the three-up grid the collection pages share. */
-function MemberCard({ member }: { member: TeamMemberRow }) {
+/** The link through to a member's full profile. Shared by both card treatments. */
+function ProfileLink({ href, className }: { href: string; className: string }) {
+  return (
+    <Link
+      href={href}
+      className={`group inline-flex items-center gap-1.5 text-[13px] font-semibold text-[color:var(--pmbc-primary)] ${className}`}
+    >
+      Read the full profile
+      <ArrowUpRight
+        size={15}
+        className="transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
+      />
+    </Link>
+  );
+}
+
+/**
+ * Every other member, in the three-up grid the collection pages share. A member
+ * with a profile page (see `PROFILE_PAGE_SLUGS`) links through to it.
+ */
+function MemberCard({
+  member,
+  profilePath,
+}: {
+  member: TeamMemberRow;
+  profilePath: string | null;
+}) {
   return (
     <li className="flex h-full flex-col overflow-hidden rounded-[2px] border border-[color:var(--pmbc-border-warm)] bg-white">
       <Portrait member={member} className="h-52 w-full" />
@@ -166,6 +186,7 @@ function MemberCard({ member }: { member: TeamMemberRow }) {
             dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(member.bio) }}
           />
         )}
+        {profilePath && <ProfileLink href={profilePath} className="mt-6 self-start" />}
       </div>
     </li>
   );
@@ -198,12 +219,14 @@ export default async function TeamPage(props: {
   const search = await props.searchParams;
   const isPreview = search.preview === '1';
 
-  const [team, founder, sections] = await Promise.all([
+  const [team, profiles, sections] = await Promise.all([
     fetchVisibleTeam(),
-    fetchFounderProfile(),
+    fetchMemberProfiles(),
     fetchPageSections('team', { onlyVisible: !isPreview }),
   ]);
+  const founder = profiles.find((p) => p.slug === FOUNDER_PAGE_SLUG) ?? null;
   const { lead, rest } = partition(team, founder);
+  const pathFor = (m: TeamMemberRow) => profileFor(m.name, profiles)?.path ?? null;
 
   return (
     <main>
@@ -233,7 +256,7 @@ export default async function TeamPage(props: {
                   className={`grid gap-6 sm:grid-cols-2 lg:grid-cols-3 ${lead ? 'mt-8' : ''}`}
                 >
                   {rest.map((m) => (
-                    <MemberCard key={m.id} member={m} />
+                    <MemberCard key={m.id} member={m} profilePath={pathFor(m)} />
                   ))}
                 </ul>
               )}

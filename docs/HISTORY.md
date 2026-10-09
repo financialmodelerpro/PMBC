@@ -8,6 +8,10 @@ Dated records moved out of `CLAUDE.md` on 2026-09-22, newest first. Session-by-s
 - ~~**Replace hardcoded admin password fallback in seed-admin.mjs and the four smoke/verify scripts with an environment variable.**~~ The four are `rotate-admin-password.mjs`, `smoke-admin.mjs`, `smoke-builder.mjs` and `verify-parity8.mjs`. The value is the retired password, dead since 2026-08-02; it was removed on 2026-09-22 from every markdown file (the backup `docs/archive/CLAUDE.md.bak-2026-09-22` in a follow-up the same day), and three saved permission rules carrying password values were removed from `.claude/settings.local.json`. It remains in git history. **Closed 2026-09-22:** the four scripts require `ADMIN_PASSWORD` with no fallback, and the rotation script holds the retired value only as a SHA-256 digest.
 - The tool open items listed in the handoff at the top of `SESSION_LOG.md`.
 
+## 2026-10-10: Kaleem Farooq added to the team
+
+Kaleem Farooq (Business Development, Saudi Arabia) added as a team card and a full profile at `/about/kaleem-farooq`, from the owner's copy with "PMBC" replaced by "PaceMakers". The profile is a CMS page built from the same section types as the founder's; the card is a `team_members` row at display order 1. Member cards now link to a profile page when one exists (`fetchMemberProfiles` in `src/lib/cms/founderProfile.ts`), so no column was added. Migration 098 (DML, `npm run seed-kaleem-farooq`). No photo or email yet: the monogram renders until a portrait is set in /admin/team and the page builder.
+
 ## 2026-10-09: Paragraph breaks, body alignment, partner logo size
 
 Three public-site fixes, diagnosed and approved before building.
