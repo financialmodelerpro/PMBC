@@ -76,3 +76,52 @@ export function isFounder(memberName: string, founder: FounderProfile | null): b
   if (!founder) return false;
   return memberName.trim().toLowerCase() === founder.name.trim().toLowerCase();
 }
+
+/**
+ * Every team member's full profile page, founder first.
+ *
+ * A profile page is a CMS page with its own route, so it is listed here rather
+ * than discovered: a new one needs a route file, a line in `pageRoutes.ts` and
+ * a line here. The match to a team card is by the name on the page's own
+ * founder_hero section, exactly as for the founder, so no column is needed.
+ */
+export const PROFILE_PAGE_SLUGS = [FOUNDER_PAGE_SLUG, 'about-kaleem-farooq'] as const;
+
+export type MemberProfile = FounderProfile & { slug: string };
+
+/**
+ * Reads the founder_hero name of every profile page in one query.
+ *
+ * A page whose section is missing, hidden or nameless is simply absent from the
+ * result, so its member renders as a card with no profile link. A failed read
+ * returns an empty list for the same reason.
+ */
+export async function fetchMemberProfiles(): Promise<MemberProfile[]> {
+  try {
+    const supabase = createSupabaseServerClient();
+    const { data, error } = await supabase
+      .from('page_sections')
+      .select('page_slug, content, display_order')
+      .in('page_slug', [...PROFILE_PAGE_SLUGS])
+      .eq('section_type', 'founder_hero')
+      .eq('visible', true)
+      .order('display_order', { ascending: true });
+    if (error || !data) return [];
+
+    const profiles: MemberProfile[] = [];
+    for (const slug of PROFILE_PAGE_SLUGS) {
+      const row = data.find((r) => r.page_slug === slug);
+      const content = row?.content as Record<string, unknown> | null | undefined;
+      const name = typeof content?.name === 'string' ? content.name.trim() : '';
+      if (name) profiles.push({ slug, name, path: publicPathForPageSlug(slug) });
+    }
+    return profiles;
+  } catch {
+    return [];
+  }
+}
+
+/** The profile page for a team member, matched on name as `isFounder` does. */
+export function profileFor(memberName: string, profiles: MemberProfile[]): MemberProfile | null {
+  return profiles.find((p) => isFounder(memberName, p)) ?? null;
+}
