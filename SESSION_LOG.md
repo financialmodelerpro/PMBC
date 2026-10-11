@@ -4,6 +4,28 @@ Chronological build history for the PMBC website. Split out of `CLAUDE.md` to ke
 
 ---
 
+## Handoff, 2026-10-11 (read this first)
+
+**State at close.** Production matches `main` at `f9bd2df` (`/api/health` confirmed). Today's work,
+recorded in `docs/HISTORY.md` under 2026-10-11: contact details and one LinkedIn button standard on
+the profile heroes; compact team profiles and Muhammad Shahjahan (migrations 101, 102); the shared
+`ProfilePhoto` frame and the cleaned founder portrait (103); profiles moved to `/team/<name>` with
+301s from `/about/...`, and US spelling site-wide (104); optional hero background images (105).
+
+**Open, for the owner:**
+1. **Migration 105** (hero background defaults) is written and not yet applied; the owner applies it
+   by hand. The site works without it.
+2. **Hero photos.** The owner is uploading hero images to test the background feature; nothing has
+   been seen live with a real photo yet. Recommended 2880 x 1440 px, 2:1, under 500 KB, subject in
+   the middle third (DESIGN.md).
+3. **Kaleem Farooq and Muhammad Shahjahan are unpublished** on /team, on purpose, by the owner. Tick
+   Published in /admin/team when ready; their cards then show the compact layout and framed portrait.
+4. **FMP content cache** still carries one "modelling" (`_fmp_cache.refm`); fix it in FMP.
+
+**Working note.** The owner often pastes migrations (DML too) into the SQL editor and edits the admin
+while a session runs. Keep apply scripts guarded and idempotent, and treat an already-applied change
+as likely the owner's, not an unknown writer.
+
 ## 2026-09-22: CRON_SECRET set, Tool Leads delete and collapsible rows
 
 **CRON_SECRET.** Generated locally (32 random bytes, hex), never written to the repository, set by
