@@ -5,10 +5,43 @@ import { SectionContainer } from '@/components/public/SectionContainer';
 import type { PmbcVariant } from '@/lib/public/tokens';
 import type { SectionContext } from '@/lib/public/sectionContext';
 import { sectionCopy } from '@/lib/public/sectionCopy';
+import { SERVICE_GROUPS, serviceGroupOf, type ServiceGroupKey } from '@/config/services';
 import { MultilineText } from '../MultilineText';
 
 /**
- * The nine service cards on `/services`.
+ * Header and card colours per practice group: primary navy, deep navy, then
+ * gold with navy text. Card fills are a light tint of the group colour over
+ * white (6%, 8% and 10%), borders a stronger one.
+ */
+const GROUP_TONES: Record<
+  ServiceGroupKey,
+  { header: string; headerText: string; headerMeta: string; card: string; cardBorder: string }
+> = {
+  'modeling-valuation': {
+    header: '#1B3A5F',
+    headerText: '#FFFFFF',
+    headerMeta: '#E8DDC4',
+    card: '#F1F3F5',
+    cardBorder: '#D7DDE4',
+  },
+  transactions: {
+    header: '#14304F',
+    headerText: '#FFFFFF',
+    headerMeta: '#E8DDC4',
+    card: '#ECEEF1',
+    cardBorder: '#D2D8E0',
+  },
+  'capital-finance': {
+    header: '#C69C3E',
+    headerText: '#14304F',
+    headerMeta: '#14304F',
+    card: '#F9F5EC',
+    cardBorder: '#EADDBE',
+  },
+};
+
+/**
+ * The nine service cards on `/services`, in three practice groups.
  *
  * This was written into the route file and rendered after every CMS section,
  * whatever order the builder showed. A `cta_block` placed after it in the
@@ -20,7 +53,8 @@ import { MultilineText } from '../MultilineText';
  * context, from the managed `services` collection with the static config as a
  * fallback, because the same nine feed the related-services cards, the contact
  * form's dropdown, the sitemap and the JSON-LD. What this section owns is the
- * copy above them: the eyebrow, the heading and the standfirst.
+ * copy above them: the eyebrow, the heading, the standfirst and the three
+ * group names (`group_1_name` to `group_3_name`, migration 106).
  */
 export function ServiceGrid({
   content,
@@ -42,6 +76,18 @@ export function ServiceGrid({
     'intro',
     'Each engagement is led directly by the partner, modelled to institutional standards, and delivered with the documentation a board, lender, or investor will accept without rework.',
   );
+
+  // Three practice groups, one column each from 1024px and stacked below it.
+  // Membership is by slug in the config; the cards keep the collection's order
+  // within their group. A group with no cards is dropped.
+  const groups = SERVICE_GROUPS.map((g) => ({
+    key: g.key,
+    name: sectionCopy(content, `group_${g.index}_name`, g.name),
+    tone: GROUP_TONES[g.key],
+    cards: cards.filter((c) => serviceGroupOf(c.slug) === g.key),
+  })).filter((g) => g.cards.length > 0);
+  // The header plus the longest group, so every column shares the same rows.
+  const rowSpan = 1 + Math.max(0, ...groups.map((g) => g.cards.length));
 
   // Nothing to show and nothing to say. A heading over an empty grid reads as a
   // page that failed to load rather than one with no services configured.
@@ -76,34 +122,71 @@ export function ServiceGrid({
         </div>
       )}
 
-      {cards.length > 0 && (
-        <ul className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {cards.map((s) => (
-            <li key={s.slug}>
-              <Link
-                href={`/services/${s.slug}`}
-                className="group flex h-full flex-col rounded-[2px] border border-t-2 border-[color:var(--pmbc-border-warm)] bg-white p-9 transition hover:-translate-y-0.5 hover:border-[color:var(--pmbc-primary)] hover:shadow-[0_12px_36px_rgba(15,37,64,0.08)]"
-                style={{ borderTopColor: '#C69C3E' }}
+      {groups.length > 0 && (
+        <div className="mt-12 flex flex-col gap-12 lg:grid lg:grid-cols-3 lg:gap-x-6 lg:gap-y-4">
+          {groups.map((g) => (
+            <section
+              key={g.key}
+              aria-labelledby={g.name ? `service-group-${g.key}` : undefined}
+              className="flex flex-col gap-4 lg:grid lg:grid-rows-subgrid"
+              style={{ gridRow: `span ${rowSpan}` }}
+            >
+              <header
+                className="rounded-[2px] px-6 py-5"
+                style={{ background: g.tone.header, color: g.tone.headerText }}
               >
-                <div className="flex items-center justify-between">
-                  <span className="font-serif text-2xl font-semibold text-[color:var(--pmbc-accent-muted)]">
-                    {s.number}
-                  </span>
-                  <ArrowUpRight
-                    size={16}
-                    className="text-[color:var(--pmbc-muted)] transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-[color:var(--pmbc-primary)]"
-                  />
-                </div>
-                <h3 className="mt-5 font-serif text-[22px] font-semibold leading-tight text-[color:var(--pmbc-text)]">
-                  {s.title}
-                </h3>
-                <p className="mt-3 text-[15px] leading-[1.7] text-[color:var(--pmbc-muted)]">
-                  {s.summary}
+                {g.name && (
+                  <h3
+                    id={`service-group-${g.key}`}
+                    className="font-serif text-[22px] font-semibold leading-tight"
+                  >
+                    {g.name}
+                  </h3>
+                )}
+                <p
+                  className={`${g.name ? 'mt-1.5 ' : ''}text-[11px] font-semibold uppercase`}
+                  style={{ letterSpacing: '0.18em', color: g.tone.headerMeta }}
+                >
+                  {g.cards.length} {g.cards.length === 1 ? 'service' : 'services'}
                 </p>
-              </Link>
-            </li>
+              </header>
+              {/* `contents` from 1024px puts each card in a row of the parent
+                  subgrid, so cards line up across the three columns. role="list"
+                  keeps the list semantics Safari drops with display: contents. */}
+              <ul role="list" className="flex flex-col gap-4 lg:contents">
+                {g.cards.map((s) => (
+                  <li key={s.slug} className="flex">
+                    <Link
+                      href={`/services/${s.slug}`}
+                      className="group flex w-full flex-col rounded-[2px] border border-t-2 p-7 transition hover:-translate-y-0.5 hover:shadow-[0_12px_36px_rgba(15,37,64,0.08)]"
+                      style={{
+                        background: g.tone.card,
+                        borderColor: g.tone.cardBorder,
+                        borderTopColor: g.tone.header,
+                      }}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-serif text-2xl font-semibold text-[color:var(--pmbc-accent-muted)]">
+                          {s.number}
+                        </span>
+                        <ArrowUpRight
+                          size={16}
+                          className="text-[color:var(--pmbc-muted)] transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-[color:var(--pmbc-primary)]"
+                        />
+                      </div>
+                      <h4 className="mt-4 font-serif text-[21px] font-semibold leading-tight text-[color:var(--pmbc-text)]">
+                        {s.title}
+                      </h4>
+                      <p className="mt-3 text-[15px] leading-[1.7] text-[color:var(--pmbc-muted)]">
+                        {s.summary}
+                      </p>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </section>
           ))}
-        </ul>
+        </div>
       )}
     </SectionContainer>
   );

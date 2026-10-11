@@ -3,7 +3,7 @@ import { CheckCircle2, ArrowRight } from 'lucide-react';
 
 import { sanitizeRichHtml } from '@/lib/cms/sanitize';
 import { bodyAlignAttrs, readBodyAlign } from '@/lib/public/prose';
-import { SERVICES } from '@/config/services';
+import { SERVICES, relatedServices } from '@/config/services';
 import { SectionContainer } from '../SectionContainer';
 import { variantStyles, type PmbcVariant } from '@/lib/public/tokens';
 import type { SectionMediaValue } from '@/lib/cms/sectionMedia';
@@ -72,9 +72,7 @@ export function ServiceDetail({
 
   if (!service && !c.full_description_html && c.deliverables.length === 0) return null;
 
-  const related = service
-    ? SERVICES.filter((sv) => sv.slug !== service.slug).slice(0, 3)
-    : [];
+  const related = service ? relatedServices(service.slug) : [];
 
   const v = variantStyles(variant);
   const bodyAlign = bodyAlignAttrs(readBodyAlign(content?.body_align));
