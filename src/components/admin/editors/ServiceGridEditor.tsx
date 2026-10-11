@@ -1,7 +1,7 @@
 'use client';
 
 import { ADMIN_COLORS, adminInput, adminLabel, adminTextarea } from '@/lib/admin/styles';
-import { SERVICES } from '@/config/services';
+import { SERVICES, SERVICE_GROUPS } from '@/config/services';
 
 import type { SectionEditorProps } from './types';
 
@@ -50,10 +50,26 @@ export function ServiceGridEditor({ content, onChange }: SectionEditorProps) {
         />
       </Field>
 
+      {SERVICE_GROUPS.map((g) => {
+        const key = `group_${g.index}_name`;
+        return (
+          <Field key={key} label={`Group ${g.index} name`}>
+            <input
+              type="text"
+              value={typeof content[key] === 'string' ? s(content[key]) : g.name}
+              onChange={(e) => update({ [key]: e.target.value })}
+              style={adminInput}
+            />
+          </Field>
+        );
+      })}
+
       <p style={{ margin: 0, fontSize: 12, color: ADMIN_COLORS.textBody }}>
         The {SERVICES.length} cards below this copy come from the Services collection,
-        not from this section. Clearing all three fields above removes the heading
-        block and leaves the cards on their own.
+        not from this section, in three practice groups. Which group a service
+        sits in is set in code; its order within the group is its display order
+        in the collection. Clearing the eyebrow, heading and standfirst removes
+        the heading block and leaves the cards on their own.
       </p>
     </div>
   );

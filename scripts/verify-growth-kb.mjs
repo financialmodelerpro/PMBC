@@ -75,10 +75,18 @@ const siteNine = SERVICES.map((x) => x.slug);
 check('086 converts five old service drafts', conversions.length === 5 && same(conversions.map((c) => c.old), ['financial_modeling', 'business_valuation', 'financial_due_diligence', 'ma_modeling', 'real_estate_modeling']), JSON.stringify(conversions));
 check('086 adds the four missing site services', added.length === 4 && added.every((a) => a.key === a.slug));
 check('converted and added together are exactly the nine site services', same([...conversions.map((c) => c.key), ...added.map((a) => a.key)], siteNine));
-check('every service is named exactly as on the site', [...conversions, ...added].every((c) => SERVICES.find((x) => x.slug === c.key)?.title === c.title));
+// 086 used the names of its day; a later rename (106: Investment Memoranda) is
+// checked against the name 086 wrote, and against the site through the rename.
+const NAMED_AT_086 = { 'investment-memorandums': 'Investment Memorandums' };
+check('every service is named exactly as on the site', [...conversions, ...added].every((c) => (NAMED_AT_086[c.key] ?? SERVICES.find((x) => x.slug === c.key)?.title) === c.title));
+{
+  const sql106 = fs.readFileSync(path.join(root, 'supabase/migrations/106_service_practice_groups.sql'), 'utf8');
+  const im = SERVICES.find((x) => x.slug === 'investment-memorandums')?.title;
+  check('106 renames the KB draft to the site name', new RegExp(`UPDATE growth_kb_items\\s+SET title = '${im}',[^;]*item_key = 'investment-memorandums'`).test(sql106));
+}
 check('Feasibility Studies service is archived, not deleted', /SET status = 'archived', item_key = NULL/.test(sql086) && sql086.includes("item_key = 'feasibility_study' AND NOT is_test"));
 check('the feasibility offer links to Financial Modeling, Real Estate Financial Modeling and Project Finance', sql086.includes("SET related_service_slugs = ARRAY['financial-modeling', 'refm', 'project-finance']"));
-check('086 CHECK lists are the nine site slugs', [...sql086.matchAll(/'financial-modeling', 'business-valuation', 'financial-due-diligence', 'transaction-advisory',\s*'mergers-acquisitions', 'refm', 'project-finance', 'investment-memorandums', 'cfo-advisory'/g)].length === 5 && JSON.stringify(siteNine) === JSON.stringify(['financial-modeling', 'business-valuation', 'financial-due-diligence', 'transaction-advisory', 'mergers-acquisitions', 'refm', 'project-finance', 'investment-memorandums', 'cfo-advisory']));
+check('086 CHECK lists are the nine site slugs', [...sql086.matchAll(/'financial-modeling', 'business-valuation', 'financial-due-diligence', 'transaction-advisory',\s*'mergers-acquisitions', 'refm', 'project-finance', 'investment-memorandums', 'cfo-advisory'/g)].length === 5 && same(siteNine, ['financial-modeling', 'business-valuation', 'financial-due-diligence', 'transaction-advisory', 'mergers-acquisitions', 'refm', 'project-finance', 'investment-memorandums', 'cfo-advisory']));
 check('086 logs every conversion and the offer link', sql086.includes("'kb.service_aligned'") && sql086.includes("'kb.offer_linked'"));
 check('086 has a SAFE TO APPLY line and adds no content', /^-- SAFE TO APPLY:/m.test(sql086) && !/content\s*=/.test(sql086));
 check('the model services are the nine site services', same(kbm.KB_SERVICE_KEYS, siteNine));
