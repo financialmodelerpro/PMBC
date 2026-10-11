@@ -736,6 +736,7 @@ console.log('Report branding and partner');
   check('partner: photo and LinkedIn from the hero', card?.photoUrl === hero.photo_url && card?.linkedinUrl === hero.cta_primary_href);
   check('partner: profile path is the founder page', card?.profilePath === '/about/ahmad-din', card?.profilePath);
   check('partner: a non-LinkedIn primary link is not offered as LinkedIn', partnerModule.partnerFromHero({ ...hero, cta_primary_href: '/book' })?.linkedinUrl === null);
+  check('partner: the LinkedIn field wins over the primary CTA', partnerModule.partnerFromHero({ ...hero, contact_linkedin: 'https://www.linkedin.com/in/field/', cta_primary_href: '/book' })?.linkedinUrl === 'https://www.linkedin.com/in/field/');
   check('partner: a non-https photo is dropped', partnerModule.partnerFromHero({ ...hero, photo_url: 'javascript:alert(1)' })?.photoUrl === null);
   check('partner: no name means no card', partnerModule.partnerFromHero({ intro: 'x' }) === null);
   check('partner: slug matches founderProfile.ts', founderProfileSrc.includes(`FOUNDER_PAGE_SLUG = '${partnerModule.PARTNER_PAGE_SLUG}'`));

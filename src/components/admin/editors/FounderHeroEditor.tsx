@@ -139,9 +139,10 @@ export function FounderHeroEditor({ content, onChange }: SectionEditorProps) {
         </div>
       </div>
       <p style={adminFieldHint}>
-        Shown as a contact row under the intro. Each item appears only when filled in, so clear a
-        field to remove it. Email opens the mail app, the phone dials on mobile, and LinkedIn must
-        be a full https://linkedin.com link.
+        Email and phone show as a contact row under the intro. LinkedIn shows as the &quot;Connect
+        on LinkedIn&quot; button, always first and in gold, so it needs no CTA below. Each appears
+        only when filled in, so clear a field to remove it. LinkedIn must be a full
+        https://www.linkedin.com/in/... link.
       </p>
 
       <div style={{ display: 'grid', gap: 12, gridTemplateColumns: '1fr 1fr' }}>
@@ -150,7 +151,7 @@ export function FounderHeroEditor({ content, onChange }: SectionEditorProps) {
           <input
             type="text"
             value={s(content.cta_primary_label)}
-            placeholder="Connect on LinkedIn"
+            placeholder="Book a Meeting"
             onChange={(e) => set('cta_primary_label', e.target.value)}
             style={adminInput}
           />
@@ -160,7 +161,7 @@ export function FounderHeroEditor({ content, onChange }: SectionEditorProps) {
           <input
             type="text"
             value={s(content.cta_primary_href)}
-            placeholder="https://www.linkedin.com/in/..."
+            placeholder="/book"
             onChange={(e) => set('cta_primary_href', e.target.value)}
             style={adminInput}
           />
@@ -187,8 +188,9 @@ export function FounderHeroEditor({ content, onChange }: SectionEditorProps) {
         </div>
       </div>
       <p style={adminFieldHint}>
-        A CTA renders only when it has both a label and a link. An http link opens in a new tab
-        and shows an external-link icon.
+        A CTA renders only when it has both a label (the button text) and a link. CTAs follow the
+        LinkedIn button in outline style; with no LinkedIn set, the first CTA takes the gold style.
+        An http link opens in a new tab and shows an external-link icon.
       </p>
     </div>
   );

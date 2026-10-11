@@ -72,7 +72,9 @@ export function reportHighlights(v: unknown): string[] {
 export function partnerFromHero(hero: Record<string, unknown> | null): PartnerCard | null {
   const name = text(hero?.name);
   if (!name) return null;
-  const linkedin = url(hero?.cta_primary_href);
+  // The hero's LinkedIn field since 2026-10-11; before it, the LinkedIn link
+  // was kept in the primary CTA, which a hero not yet moved over still does.
+  const linkedin = url(hero?.contact_linkedin) ?? url(hero?.cta_primary_href);
   return {
     name,
     role: text(hero?.eyebrow) || 'Founding Partner',
