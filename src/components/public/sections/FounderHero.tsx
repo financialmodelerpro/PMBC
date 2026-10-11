@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { Mail, Phone } from 'lucide-react';
 
 import { SectionContainer } from '../SectionContainer';
 import { Media } from '../Media';
@@ -48,6 +49,85 @@ function getInitials(name: string): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
+/**
+ * The contact row's three links, each dropped when its field is empty or does
+ * not look like what it claims to be. Clearing a field in the page builder
+ * removes that item; clearing all three removes the row.
+ */
+type ContactItem = {
+  key: string;
+  href: string;
+  label: string;
+  icon: React.ReactNode;
+  external: boolean;
+};
+
+/**
+ * The hero's contact fields that pass validation, each null when empty or
+ * malformed. Shared with the profile pages' Person JSON-LD, so a field cleared
+ * in the page builder leaves the page and the structured data together.
+ */
+export function heroContacts(content: Record<string, unknown>): {
+  email: string | null;
+  phone: string | null;
+  dial: string | null;
+  linkedin: string | null;
+} {
+  const email = s(content.contact_email).trim();
+  const phone = s(content.contact_phone).trim();
+  const linkedin = s(content.contact_linkedin).trim();
+  const dial = phone.replace(/[^\d+]/g, '');
+  const phoneOk = /^\+?\d{6,15}$/.test(dial);
+  return {
+    email: /^[^\s@<>"]+@[^\s@<>"]+\.[^\s@<>"]+$/.test(email) ? email : null,
+    phone: phoneOk ? phone : null,
+    dial: phoneOk ? dial : null,
+    linkedin: /^https:\/\/([a-z]{2,3}\.)?linkedin\.com\/[^\s<>"]*$/i.test(linkedin) ? linkedin : null,
+  };
+}
+
+function contactItems(content: Record<string, unknown>): ContactItem[] {
+  const { email, phone, dial, linkedin } = heroContacts(content);
+  const items: ContactItem[] = [];
+  if (email) {
+    items.push({
+      key: 'email',
+      href: `mailto:${email}`,
+      label: email,
+      icon: <Mail size={15} aria-hidden />,
+      external: false,
+    });
+  }
+  if (phone && dial) {
+    items.push({
+      key: 'phone',
+      href: `tel:${dial}`,
+      label: phone,
+      icon: <Phone size={15} aria-hidden />,
+      external: false,
+    });
+  }
+  if (linkedin) {
+    items.push({
+      key: 'linkedin',
+      href: linkedin,
+      label: 'LinkedIn',
+      icon: <LinkedInIcon />,
+      external: true,
+    });
+  }
+  return items;
+}
+
+/** lucide-react 1.x carries no brand marks, so the LinkedIn glyph is inline, as in the footer. */
+function LinkedInIcon() {
+  return (
+    <svg aria-hidden width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M20.45 20.45h-3.56v-5.57c0-1.33-.03-3.04-1.85-3.04-1.85 0-2.13 1.45-2.13 2.94v5.67H9.35V9h3.42v1.56h.05a3.74 3.74 0 0 1 3.37-1.85c3.6 0 4.27 2.37 4.27 5.45zM5.34 7.43a2.07 2.07 0 1 1 0-4.13 2.07 2.07 0 0 1 0 4.13zM7.12 20.45H3.56V9h3.56zM22.22 0H1.77C.79 0 0 .77 0 1.72v20.56C0 23.23.79 24 1.77 24h20.45c.98 0 1.78-.77 1.78-1.72V1.72C24 .77 23.2 0 22.22 0z" />
+    </svg>
+  );
+}
+
 function isExternal(href: string): boolean {
   return /^https?:\/\//i.test(href);
 }
@@ -79,7 +159,8 @@ function ExternalIcon() {
  * Distinct from `founder_block`, which is a mid-page card summarising the
  * founder on the home and about pages. This is the page's own hero: it carries
  * the two-line title treatment (role in light navy text, specialism in gold),
- * the credentials line, and the outbound CTAs.
+ * the credentials line, an optional contact row (email, phone, LinkedIn) and
+ * the outbound CTAs.
  *
  * Follows the Phase 9.5 founder pattern for the portrait: gold hairline frame,
  * navy accent corner, monogram fallback when no photo is set, so the page is
@@ -102,6 +183,7 @@ export function FounderHero({
 
   const bodyColor = dark ? '#E8DDC4' : v.textMuted;
   const titleColor = dark ? '#B7CBE0' : '#1B3A5F';
+  const contacts = contactItems(content ?? {});
 
   return (
     // `size="hero"` rather than the default rhythm: this is the block a visitor
@@ -193,6 +275,25 @@ export function FounderHero({
             <p className="mt-7 max-w-[620px] text-[17px] leading-[1.75]" style={{ color: bodyColor }}>
               <MultilineText text={c.intro} />
             </p>
+          )}
+
+          {contacts.length > 0 && (
+            <ul className="mt-7 flex flex-wrap items-center gap-x-7 gap-y-3 text-[15px]">
+              {contacts.map((item) => (
+                <li key={item.key}>
+                  <a
+                    href={item.href}
+                    {...(item.external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+                    className="inline-flex items-center gap-2.5 transition-opacity hover:opacity-80"
+                    style={{ color: dark ? '#E8DDC4' : '#1B3A5F' }}
+                  >
+                    <span style={{ color: '#C69C3E' }}>{item.icon}</span>
+                    {item.label}
+                    {item.external && <ExternalIcon />}
+                  </a>
+                </li>
+              ))}
+            </ul>
           )}
 
           {/* CTAs render only when both a label and an href are set. A founder

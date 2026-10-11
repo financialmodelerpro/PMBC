@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 
 import { fetchPage, fetchPageSections } from '@/lib/cms/pages';
 import { SectionList } from '@/components/public/SectionRenderer';
+import { heroContacts } from '@/components/public/sections/FounderHero';
 import { buildPageMetadata, siteUrl } from '@/lib/seo/metadata';
 
 export const dynamic = 'force-dynamic';
@@ -29,10 +30,13 @@ export async function generateMetadata(): Promise<Metadata> {
 
 /**
  * Person schema for the profile, built from literals for the same reason as the
- * founder's: nothing user-supplied reaches the script tag. Linked to the
- * Organization node the public layout mounts.
+ * founder's. The one exception is the hero's contact row (email, phone,
+ * LinkedIn): those are read from the section so a field cleared in the page
+ * builder leaves the schema too, pass the same validation the hero applies, and
+ * the serialised JSON has `<` escaped so nothing can close the script tag.
+ * Linked to the Organization node the public layout mounts.
  */
-function personJsonLd() {
+function personJsonLd(contacts: ReturnType<typeof heroContacts>) {
   const base = siteUrl();
   return {
     '@context': 'https://schema.org',
@@ -52,6 +56,9 @@ function personJsonLd() {
       'Cost Optimisation',
       'Regulatory, Tax and Governance',
     ],
+    ...(contacts.email ? { email: `mailto:${contacts.email}` } : {}),
+    ...(contacts.dial ? { telephone: contacts.dial } : {}),
+    ...(contacts.linkedin ? { sameAs: [contacts.linkedin] } : {}),
   };
 }
 
@@ -69,12 +76,13 @@ export default async function KaleemFarooqProfilePage(props: {
   const sections = await fetchPageSections(PAGE_SLUG, { onlyVisible: !isPreview });
   if (sections.length === 0) notFound();
 
+  const hero = sections.find((s) => s.section_type === 'founder_hero' && s.visible);
+  const contacts = heroContacts((hero?.content ?? {}) as Record<string, unknown>);
+  const jsonLd = JSON.stringify(personJsonLd(contacts)).replace(/</g, '\\u003c');
+
   return (
     <>
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(personJsonLd()) }}
-      />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd }} />
       <SectionList sections={sections} />
     </>
   );

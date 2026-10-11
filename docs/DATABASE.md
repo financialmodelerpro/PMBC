@@ -143,6 +143,7 @@ Three flags matter when rebuilding:
 096  growth_sector_tiers     **DDL, HAND-RUN.** Setting sector_tiers (JSONB): credit per sector tier, stepping down, and the priority tiers (real estate by default). Applied 2026-10-06. Later Growth migrations: see docs/PENDING_MIGRATIONS.md
 097  network_skygulf_logo_size  DML, hand-run. Sets logo_size "smaller" on the Sky Gulf partner in the network_partners section; everything else untouched, idempotent. Applied 2026-10-09.
 098  team_kaleem_farooq      DML, applied by `npm run seed-kaleem-farooq` (--dry-run supported). Profile page about-kaleem-farooq (six sections) and his team_members card at display_order 1. Guarded inserts only, safe on re-run, never destructive.
+099  kaleem_farooq_contact   DML, applied by `npm run seed-kaleem-contact` (--dry-run supported). Adds contact_email, contact_phone and contact_linkedin to the about-kaleem-farooq founder_hero, only where a key is absent. Safe on re-run, never destructive.
 ```
 
 **Every migration from 076 on states when it is safe to apply** in a `SAFE TO APPLY:` line in its header: before or after which deploy, and what the site does in the gap. 075 is why: it was applied before the routes it linked to were deployed, and previews share the production database, so the live footer linked to a 404.
