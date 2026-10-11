@@ -5,40 +5,17 @@ import { SectionContainer } from '@/components/public/SectionContainer';
 import type { PmbcVariant } from '@/lib/public/tokens';
 import type { SectionContext } from '@/lib/public/sectionContext';
 import { sectionCopy } from '@/lib/public/sectionCopy';
-import { SERVICE_GROUPS, serviceGroupOf, type ServiceGroupKey } from '@/config/services';
+import { SERVICE_GROUPS, serviceGroupOf } from '@/config/services';
 import { MultilineText } from '../MultilineText';
 
 /**
- * Header and card colours per practice group: primary navy, deep navy, then
- * gold with navy text. Card fills are a light tint of the group colour over
- * white (6%, 8% and 10%), borders a stronger one.
+ * One treatment for every group (2026-10-11, the owner's revision of the
+ * first layout, which colour-coded the groups): a primary navy header with
+ * cream text, and white cards with a warm hairline and a navy top rule.
  */
-const GROUP_TONES: Record<
-  ServiceGroupKey,
-  { header: string; headerText: string; headerMeta: string; card: string; cardBorder: string }
-> = {
-  'modeling-valuation': {
-    header: '#1B3A5F',
-    headerText: '#FFFFFF',
-    headerMeta: '#E8DDC4',
-    card: '#F1F3F5',
-    cardBorder: '#D7DDE4',
-  },
-  transactions: {
-    header: '#14304F',
-    headerText: '#FFFFFF',
-    headerMeta: '#E8DDC4',
-    card: '#ECEEF1',
-    cardBorder: '#D2D8E0',
-  },
-  'capital-finance': {
-    header: '#C69C3E',
-    headerText: '#14304F',
-    headerMeta: '#14304F',
-    card: '#F9F5EC',
-    cardBorder: '#EADDBE',
-  },
-};
+const HEADER_BG = '#1B3A5F';
+const HEADER_TEXT = '#FAF7F2';
+const CARD_BORDER = '#E8E2D6';
 
 /**
  * The nine service cards on `/services`, in three practice groups.
@@ -83,11 +60,11 @@ export function ServiceGrid({
   const groups = SERVICE_GROUPS.map((g) => ({
     key: g.key,
     name: sectionCopy(content, `group_${g.index}_name`, g.name),
-    tone: GROUP_TONES[g.key],
     cards: cards.filter((c) => serviceGroupOf(c.slug) === g.key),
   })).filter((g) => g.cards.length > 0);
   // The header plus the longest group, so every column shares the same rows.
-  const rowSpan = 1 + Math.max(0, ...groups.map((g) => g.cards.length));
+  const cardRows = Math.max(0, ...groups.map((g) => g.cards.length));
+  const rowSpan = 1 + cardRows;
 
   // Nothing to show and nothing to say. A heading over an empty grid reads as a
   // page that failed to load rather than one with no services configured.
@@ -123,7 +100,13 @@ export function ServiceGrid({
       )}
 
       {groups.length > 0 && (
-        <div className="mt-12 flex flex-col gap-12 lg:grid lg:grid-cols-3 lg:gap-x-6 lg:gap-y-4">
+        // From 1024px every card row is 1fr, so all nine cards take the height
+        // of the tallest and the three columns line up row for row. The
+        // template is ignored below 1024px, where the groups stack as flex.
+        <div
+          className="mt-12 flex flex-col gap-12 lg:grid lg:grid-cols-3 lg:gap-x-6 lg:gap-y-4"
+          style={{ gridTemplateRows: `auto repeat(${cardRows}, 1fr)` }}
+        >
           {groups.map((g) => (
             <section
               key={g.key}
@@ -133,7 +116,7 @@ export function ServiceGrid({
             >
               <header
                 className="rounded-[2px] px-6 py-5"
-                style={{ background: g.tone.header, color: g.tone.headerText }}
+                style={{ background: HEADER_BG, color: HEADER_TEXT }}
               >
                 {g.name && (
                   <h3
@@ -145,7 +128,7 @@ export function ServiceGrid({
                 )}
                 <p
                   className={`${g.name ? 'mt-1.5 ' : ''}text-[11px] font-semibold uppercase`}
-                  style={{ letterSpacing: '0.18em', color: g.tone.headerMeta }}
+                  style={{ letterSpacing: '0.18em', color: HEADER_TEXT }}
                 >
                   {g.cards.length} {g.cards.length === 1 ? 'service' : 'services'}
                 </p>
@@ -160,9 +143,9 @@ export function ServiceGrid({
                       href={`/services/${s.slug}`}
                       className="group flex w-full flex-col rounded-[2px] border border-t-2 p-7 transition hover:-translate-y-0.5 hover:shadow-[0_12px_36px_rgba(15,37,64,0.08)]"
                       style={{
-                        background: g.tone.card,
-                        borderColor: g.tone.cardBorder,
-                        borderTopColor: g.tone.header,
+                        background: '#FFFFFF',
+                        borderColor: CARD_BORDER,
+                        borderTopColor: HEADER_BG,
                       }}
                     >
                       <div className="flex items-center justify-between">
