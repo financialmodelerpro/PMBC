@@ -54,6 +54,10 @@ export const SECTION_TYPES: SectionTypeMeta[] = [
       cta_secondary_label: '',
       cta_secondary_href: '',
       background_style: 'light',
+      // Optional background photo (HeroBackground). Empty: the plain hero.
+      hero_bg_image: '',
+      hero_bg_overlay: 60,
+      hero_bg_focal: 'center',
     },
   },
   {
@@ -163,6 +167,9 @@ export const SECTION_TYPES: SectionTypeMeta[] = [
       contact_email: '',
       contact_phone: '',
       contact_linkedin: '',
+      hero_bg_image: '',
+      hero_bg_overlay: 60,
+      hero_bg_focal: 'center',
       cta_primary_label: '',
       cta_primary_href: '',
       cta_secondary_label: '',

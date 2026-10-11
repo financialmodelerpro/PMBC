@@ -22,7 +22,7 @@ The live registry is `SECTION_REGISTRY` in `src/components/public/SectionRendere
 
 ### Section types
 
-- `hero`: main page hero with badge, headline, subtitle, CTA
+- `hero`: main page hero with badge, headline, subtitle, CTA. **Both hero types (`hero`, `founder_hero`) take an optional background image** (since 2026-10-11): `hero_bg_image` (Media Library URL, empty = none), `hero_bg_overlay` (navy overlay opacity, 35 to 100, default 60) and `hero_bg_focal` (`center`, `top`, `bottom`), edited through `HeroBackgroundFields` and rendered by `HeroBackground` (`src/components/public/HeroBackground.tsx`). With no image a hero renders exactly as before; migration 105 backfills the defaults. `npm run verify-hero-background`.
 - `stats_block`: large number callouts (100+, SAR 20B+, etc.)
 - `service_cards`: grid of service cards with number, title, description, link
 - `service_detail`: full detail block for a single service (used on /services/[slug]). Carries `show_header`, which is **false on all nine service pages** because the hero above already prints the number, title and summary, and true anywhere else so a detail block dropped onto another page still says which service it describes. It began as a route prop and moved into the row in migration 067, when these pages started rendering through the section registry, which passes nothing beyond the row

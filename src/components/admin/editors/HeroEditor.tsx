@@ -7,6 +7,7 @@ import {
   adminTextarea,
 } from '@/lib/admin/styles';
 import { RichTextarea } from '@/components/admin/RichTextarea';
+import { HeroBackgroundFields } from './HeroBackgroundFields';
 
 import type { SectionEditorProps } from './types';
 
@@ -163,6 +164,8 @@ export function HeroEditor({ content, onChange }: SectionEditorProps) {
           })}
         </div>
       </Field>
+
+      <HeroBackgroundFields content={content} onPatch={update} />
     </div>
   );
 }

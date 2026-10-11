@@ -7,6 +7,7 @@ import { SectionMediaLayout } from '../SectionMediaLayout';
 import type { SectionMediaValue } from '@/lib/cms/sectionMedia';
 import { variantStyles, type PmbcVariant } from '@/lib/public/tokens';
 import { HERO_FRAME } from '@/lib/public/layout';
+import { HeroBackground, readHeroBackground } from '../HeroBackground';
 import {
   parseSectionStyles,
   sectionInnerStyle,
@@ -48,7 +49,7 @@ function pick(c: Record<string, unknown>): HeroContent {
 export function Hero({
   content,
   styles,
-  variant = 'navy_deep',
+  variant: variantProp = 'navy_deep',
   media = null,
 }: {
   content: Record<string, unknown>;
@@ -57,6 +58,10 @@ export function Hero({
   media?: SectionMediaValue | null;
 }) {
   const c = pick(content ?? {});
+  // A background image always sits under a navy overlay, so the hero takes the
+  // navy text colours whatever its variant. Without one, nothing changes.
+  const photo = readHeroBackground(content);
+  const variant: PmbcVariant = photo ? 'navy_deep' : variantProp;
   const dark = variant === 'navy_deep';
   const v = variantStyles(variant);
 
@@ -84,8 +89,11 @@ export function Hero({
       className={`${HERO_FRAME} ${overrides.className}`.trim()}
       style={{ background: bg, color: v.text, ...overrides.style }}
     >
-      {/* Faint diagonal pattern overlay, kept extremely subtle. */}
-      {dark && (
+      {photo && <HeroBackground bg={photo} />}
+
+      {/* Faint diagonal pattern overlay, kept extremely subtle. Not drawn over
+          a photograph, where it would read as a screen artefact. */}
+      {dark && !photo && (
         <div
           aria-hidden
           className="pointer-events-none absolute inset-0 opacity-[0.04]"

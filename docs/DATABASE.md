@@ -149,6 +149,7 @@ Three flags matter when rebuilding:
 102  team_shahjahan_modeling DML, `npm run seed-team-shahjahan` (--dry-run supported). Muhammad Shahjahan's compact card at display_order 2, and "modelling" to "modeling" in Kaleem Farooq's credential lists. Guarded, safe on re-run. Applied 2026-10-11.
 103  founder_photo_clean     DML plus storage, `npm run fix-founder-photo-edge` (--dry-run supported). Uploads a cleaned founder portrait (top 40 px cropped: a baked-in green band and cut corners) and repoints the three fields holding the old URL; the original is kept. Applied 2026-10-11.
 104  team_urls_us_spelling   DML, `npm run seed-team-urls-spelling` (--dry-run supported). Repoints stored links from /about/ahmad-din and /about/kaleem-farooq to /team/<name> (the Founder navbar item, the home founder card), and "modelling" to "modeling" in five sections. Part 1 only after the deploy serving /team/<name>. Applied 2026-10-11.
+105  hero_background_fields  DML, **HAND-RUN** by the owner. Backfills hero_bg_image empty, hero_bg_overlay 60 and hero_bg_focal center on every hero and founder_hero section; existing values win. Sets no image.
 ```
 
 **Every migration from 076 on states when it is safe to apply** in a `SAFE TO APPLY:` line in its header: before or after which deploy, and what the site does in the gap. 075 is why: it was applied before the routes it linked to were deployed, and previews share the production database, so the live footer linked to a 404.

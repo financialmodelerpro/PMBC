@@ -55,6 +55,7 @@
     "seed-team-shahjahan": "node scripts/seed-team-shahjahan.mjs",
     "fix-founder-photo-edge": "node scripts/fix-founder-photo-edge.mjs",
     "seed-team-urls-spelling": "node scripts/seed-team-urls-spelling.mjs",
+    "verify-hero-background": "node scripts/verify-hero-background.mjs",
     "verify-container-widths": "node scripts/verify-container-widths.mjs",
     "seed-logo-trim": "node scripts/seed-logo-trim.mjs",
     "seed-home-content-pass": "node scripts/seed-home-content-pass.mjs",

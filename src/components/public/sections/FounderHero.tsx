@@ -3,6 +3,7 @@ import { Mail, Phone } from 'lucide-react';
 
 import { SectionContainer } from '../SectionContainer';
 import { ProfilePhoto } from '../ProfilePhoto';
+import { HeroBackground, readHeroBackground } from '../HeroBackground';
 import { readMediaValue } from '@/lib/media';
 import { variantStyles, type PmbcVariant } from '@/lib/public/tokens';
 import { MultilineText } from '../MultilineText';
@@ -168,7 +169,7 @@ function ExternalIcon() {
 export function FounderHero({
   content,
   styles,
-  variant = 'navy_deep',
+  variant: variantProp = 'navy_deep',
 }: {
   content: Record<string, unknown>;
   styles: Record<string, unknown>;
@@ -177,6 +178,10 @@ export function FounderHero({
   const c = pick(content ?? {});
   const media = readMediaValue(content ?? {}, 'photo_url');
   if (!c.name && !c.intro && !c.eyebrow) return null;
+  // As in Hero: a background image sits under a navy overlay, so the text takes
+  // the navy colours. Without one, nothing changes.
+  const photo = readHeroBackground(content);
+  const variant: PmbcVariant = photo ? 'navy_deep' : variantProp;
   const v = variantStyles(variant);
   const dark = variant === 'navy_deep';
 
@@ -189,7 +194,12 @@ export function FounderHero({
     // `size="hero"` rather than the default rhythm: this is the block a visitor
     // lands on, so it takes the same 70vh every other page-leading hero does
     // instead of being sized by its portrait.
-    <SectionContainer variant={variant} styles={styles} size="hero">
+    <SectionContainer
+      variant={variant}
+      styles={styles}
+      size="hero"
+      background={photo ? <HeroBackground bg={photo} /> : undefined}
+    >
       <div className="grid items-center gap-12 lg:grid-cols-[minmax(240px,340px)_minmax(0,1fr)] lg:gap-16">
         <div>
           <ProfilePhoto
