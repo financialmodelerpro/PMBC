@@ -25,6 +25,7 @@ import { ToggleSwitch } from '@/components/admin/ToggleSwitch';
 import {
   ADMIN_COLORS,
   adminButtonGhost,
+  adminFieldHint,
   adminInput,
   adminLabel,
   adminTextarea,
@@ -33,6 +34,7 @@ import { SERVICES } from '@/config/services';
 
 import type { SectionEditorProps } from './types';
 import { BodyAlignField } from './BodyAlignField';
+import { HeroBackgroundFields } from './HeroBackgroundFields';
 
 type Deliverable = { id: string; text: string };
 
@@ -124,6 +126,20 @@ export function ServiceDetailEditor({ content, onChange }: SectionEditorProps) {
           ))}
         </select>
       </Field>
+
+      {/* Not a <Field>: that is a <label>, and these are several controls. */}
+      <div>
+        <span style={adminLabel}>Page hero background</span>
+        <p style={{ ...adminFieldHint, marginTop: 0, marginBottom: 8 }}>
+          The hero at the top of this service&apos;s page. Its number, title and summary come
+          from the service itself; only the background is set here, and only on the
+          service&apos;s own page.
+        </p>
+        <HeroBackgroundFields
+          content={content}
+          onPatch={(patch) => onChange({ ...content, ...patch })}
+        />
+      </div>
 
       <BodyAlignField
         value={content.body_align}
