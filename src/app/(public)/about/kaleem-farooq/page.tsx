@@ -51,7 +51,7 @@ function personJsonLd(contacts: ReturnType<typeof heroContacts>) {
       'Business Development',
       'Bid Strategy',
       'Fundraising and Investor Readiness',
-      'Financial Modelling',
+      'Financial Modeling',
       'Treasury and Banking',
       'Cost Optimisation',
       'Regulatory, Tax and Governance',

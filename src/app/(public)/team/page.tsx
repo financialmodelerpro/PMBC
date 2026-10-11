@@ -14,6 +14,7 @@ import {
 import { buildPageMetadata } from '@/lib/seo/metadata';
 import { fetchPage, fetchPageSections } from '@/lib/cms/pages';
 import { FirmPageBody } from '@/components/public/FirmPageBody';
+import { ProfilePhoto } from '@/components/public/ProfilePhoto';
 
 export const dynamic = 'force-dynamic';
 
@@ -38,42 +39,21 @@ export async function generateMetadata(): Promise<Metadata> {
   });
 }
 
-/** Up to two initials, for a member with no portrait uploaded. */
-function initials(name: string): string {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((w) => w[0])
-    .slice(0, 2)
-    .join('')
-    .toUpperCase();
+/**
+ * A member's profile type, from migration 101. Null when the column is absent
+ * (101 not applied) or holds anything else, in which case the card renders as
+ * it did before compact profiles existed.
+ */
+function profileType(member: TeamMemberRow): 'full' | 'compact' | null {
+  const t = (member as { profile_type?: unknown }).profile_type;
+  return t === 'full' || t === 'compact' ? t : null;
 }
 
-/**
- * The navy monogram panel that stands in for a missing portrait.
- *
- * Deliberate rather than unfinished, and the same choice the carousel cards
- * make: there is no stock imagery in this repository, and an invented headshot
- * would be worse than an honest placeholder.
- */
-function Portrait({ member, className }: { member: TeamMemberRow; className: string }) {
-  if (member.photo) {
-    return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img src={member.photo} alt={member.name} className={`${className} object-cover`} />
-    );
-  }
-  return (
-    <div
-      className={`${className} flex items-center justify-center`}
-      style={{ background: '#1B3A5F' }}
-      aria-hidden
-    >
-      <span className="font-serif text-[44px] font-semibold tracking-tight text-[#C69C3E]">
-        {initials(member.name)}
-      </span>
-    </div>
-  );
+/** A list column as trimmed, non-empty strings. Absent or malformed reads as empty. */
+function items(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((v): v is string => typeof v === 'string').map((v) => v.trim()).filter(Boolean)
+    : [];
 }
 
 /** Role, then the qualifications line. Shared by both card treatments. */
@@ -117,15 +97,13 @@ function FoundingPartnerCard({
 }) {
   return (
     <article className="grid items-center gap-10 rounded-[2px] border border-[color:var(--pmbc-border-warm)] bg-white p-8 sm:p-10 lg:grid-cols-[minmax(0,300px)_minmax(0,1fr)] lg:gap-14">
-      <div className="relative mx-auto aspect-[4/5] w-full max-w-[300px]">
-        {/* The same gold frame and navy corner as the home founder card. */}
-        <div aria-hidden className="absolute -inset-2 border border-[#C69C3E]" />
-        <div
-          aria-hidden
-          className="absolute -right-2 -bottom-2 h-8 w-8"
-          style={{ background: '#1B3A5F' }}
+      <div className="mx-auto w-full max-w-[300px]">
+        <ProfilePhoto
+          name={member.name}
+          src={member.photo}
+          accent="navy"
+          sizes="300px"
         />
-        <Portrait member={member} className="relative aspect-[4/5] w-full overflow-hidden" />
       </div>
 
       <div>
@@ -161,9 +139,26 @@ function ProfileLink({ href, className }: { href: string; className: string }) {
   );
 }
 
+/** The small uppercase label over each compact list. */
+function ListLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <p
+      className="mt-6 text-[11px] font-semibold uppercase text-[color:var(--pmbc-accent-muted)]"
+      style={{ letterSpacing: '0.14em' }}
+    >
+      {children}
+    </p>
+  );
+}
+
 /**
- * Every other member, in the three-up grid the collection pages share. A member
- * with a profile page (see `PROFILE_PAGE_SLUGS`) links through to it.
+ * Every other member, in the three-up grid the collection pages share, with the
+ * same framed portrait as the profile pages.
+ *
+ * A full member (see `PROFILE_PAGE_SLUGS`) keeps the short bio and links
+ * through to the profile page. A compact member has no page, so the card
+ * carries the detail itself: the bio, "Selected experience" and "Expertise".
+ * Each list renders only when it has items.
  */
 function MemberCard({
   member,
@@ -172,21 +167,60 @@ function MemberCard({
   member: TeamMemberRow;
   profilePath: string | null;
 }) {
+  const compact = profileType(member) === 'compact';
+  const experience = compact ? items(member.experience_items) : [];
+  const expertise = compact ? items(member.expertise_items) : [];
+
   return (
     <li className="flex h-full flex-col overflow-hidden rounded-[2px] border border-[color:var(--pmbc-border-warm)] bg-white">
-      <Portrait member={member} className="h-52 w-full" />
-      <div className="flex flex-1 flex-col p-7">
+      <div className="px-7 pt-9">
+        <div className="mx-auto w-full max-w-[220px]">
+          <ProfilePhoto name={member.name} src={member.photo} accent="navy" sizes="220px" />
+        </div>
+      </div>
+      <div className="flex flex-1 flex-col p-7 pt-9">
         <h3 className="font-serif text-[21px] font-semibold leading-tight text-[color:var(--pmbc-text)]">
           {member.name}
         </h3>
         <Attribution member={member} tight />
         {member.bio && (
           <div
-            className="pmbc-prose mt-4 flex-1 text-[15px] leading-[1.7] text-[color:var(--pmbc-muted)]"
+            className={`pmbc-prose mt-4 text-[15px] leading-[1.7] text-[color:var(--pmbc-muted)] ${compact ? '' : 'flex-1'}`}
             dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(member.bio) }}
           />
         )}
-        {profilePath && <ProfileLink href={profilePath} className="mt-6 self-start" />}
+        {experience.length > 0 && (
+          <>
+            <ListLabel>Selected experience</ListLabel>
+            <ul className="mt-3 grid gap-2.5">
+              {experience.map((item) => (
+                <li
+                  key={item}
+                  className="flex gap-3 text-[14px] leading-[1.6] text-[color:var(--pmbc-muted)]"
+                >
+                  <span aria-hidden className="mt-[9px] h-1.5 w-1.5 shrink-0 bg-[#C69C3E]" />
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+        {expertise.length > 0 && (
+          <>
+            <ListLabel>Expertise</ListLabel>
+            <ul className="mt-3 flex flex-wrap gap-2">
+              {expertise.map((item) => (
+                <li
+                  key={item}
+                  className="rounded-[2px] border border-[color:var(--pmbc-border-warm)] bg-[color:var(--pmbc-surface-cream)] px-3 py-1.5 text-[12.5px] text-[color:var(--pmbc-text)]"
+                >
+                  {item}
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+        {profilePath && !compact && <ProfileLink href={profilePath} className="mt-6 self-start" />}
       </div>
     </li>
   );

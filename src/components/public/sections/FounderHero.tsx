@@ -2,9 +2,8 @@ import Link from 'next/link';
 import { Mail, Phone } from 'lucide-react';
 
 import { SectionContainer } from '../SectionContainer';
-import { Media } from '../Media';
+import { ProfilePhoto } from '../ProfilePhoto';
 import { readMediaValue } from '@/lib/media';
-import { PORTRAIT_OBJECT_POSITION } from '@/lib/public/portrait';
 import { variantStyles, type PmbcVariant } from '@/lib/public/tokens';
 import { MultilineText } from '../MultilineText';
 
@@ -40,13 +39,6 @@ function pick(c: Record<string, unknown>): FounderHeroContent {
     cta_secondary_label: s(c.cta_secondary_label),
     cta_secondary_href: s(c.cta_secondary_href),
   };
-}
-
-function getInitials(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return 'PM';
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
 /**
@@ -169,9 +161,9 @@ function ExternalIcon() {
  * the credentials line, an optional contact row (email, phone, LinkedIn) and
  * the outbound CTAs.
  *
- * Follows the Phase 9.5 founder pattern for the portrait: gold hairline frame,
- * navy accent corner, monogram fallback when no photo is set, so the page is
- * presentable before the real portrait is uploaded.
+ * The portrait is the shared `ProfilePhoto` frame every team profile uses
+ * (gold hairline, accent corner, square corners, monogram fallback when no
+ * photo is set), so the page is presentable before a portrait is uploaded.
  */
 export function FounderHero({
   content,
@@ -200,44 +192,15 @@ export function FounderHero({
     <SectionContainer variant={variant} styles={styles} size="hero">
       <div className="grid items-center gap-12 lg:grid-cols-[minmax(240px,340px)_minmax(0,1fr)] lg:gap-16">
         <div>
-          <div className="relative aspect-[4/5] w-full">
-            <div aria-hidden className="absolute -inset-2 border border-[#C69C3E]" />
-            <div
-              aria-hidden
-              className="absolute -right-2 -bottom-2 h-8 w-8"
-              style={{ background: dark ? '#C69C3E' : '#1B3A5F' }}
-            />
-            {c.photo_url ? (
-              <div className="relative aspect-[4/5] w-full overflow-hidden bg-neutral-100">
-                <Media
-                  src={media.url}
-                  alt={c.name || 'Founder portrait'}
-                  mediaType={media.mediaType}
-                  posterUrl={media.posterUrl}
-                  autoplay={media.autoplay}
-                  loop={media.loop}
-                  controls={media.controls}
-                  fill
-                  priority
-                  sizes="(min-width: 1024px) 400px, 90vw"
-                  className="object-cover"
-                  style={{ objectPosition: PORTRAIT_OBJECT_POSITION }}
-                />
-              </div>
-            ) : (
-              <div
-                className="flex aspect-[4/5] w-full items-center justify-center"
-                style={{
-                  background: dark ? 'rgba(255,255,255,0.05)' : v.cardBg,
-                  color: dark ? '#C69C3E' : '#1B3A5F',
-                }}
-              >
-                <span className="pmbc-display text-[80px] tracking-tight">
-                  {getInitials(c.name)}
-                </span>
-              </div>
-            )}
-          </div>
+          <ProfilePhoto
+            name={c.name}
+            src={c.photo_url ? media.url : null}
+            alt={c.name || 'Portrait'}
+            accent={dark ? 'gold' : 'navy'}
+            sizes="(min-width: 1024px) 400px, 90vw"
+            priority
+            media={media}
+          />
         </div>
 
         <div>

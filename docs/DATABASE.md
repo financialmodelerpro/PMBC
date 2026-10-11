@@ -145,6 +145,9 @@ Three flags matter when rebuilding:
 098  team_kaleem_farooq      DML, applied by `npm run seed-kaleem-farooq` (--dry-run supported). Profile page about-kaleem-farooq (six sections) and his team_members card at display_order 1. Guarded inserts only, safe on re-run, never destructive.
 099  kaleem_farooq_contact   DML, applied by `npm run seed-kaleem-contact` (--dry-run supported). Adds contact_email, contact_phone and contact_linkedin to the about-kaleem-farooq founder_hero, only where a key is absent. Safe on re-run, never destructive.
 100  profile_linkedin_field  DML, applied by `npm run seed-profile-linkedin-field` (--dry-run supported). On both profile heroes, LinkedIn moves from the primary CTA into contact_linkedin and the secondary CTA moves up. Guarded by the state it fixes, safe on re-run. Applied 2026-10-11.
+101  team_profile_type       **DDL, HAND-RUN.** team_members.profile_type (full or compact, default compact), experience_items and expertise_items (text[]); sets Ahmad Din and Kaleem Farooq to full. Applied 2026-10-11.
+102  team_shahjahan_modeling DML, `npm run seed-team-shahjahan` (--dry-run supported). Muhammad Shahjahan's compact card at display_order 2, and "modelling" to "modeling" in Kaleem Farooq's credential lists. Guarded, safe on re-run. Applied 2026-10-11.
+103  founder_photo_clean     DML plus storage, `npm run fix-founder-photo-edge` (--dry-run supported). Uploads a cleaned founder portrait (top 40 px cropped: a baked-in green band and cut corners) and repoints the three fields holding the old URL; the original is kept. Applied 2026-10-11.
 ```
 
 **Every migration from 076 on states when it is safe to apply** in a `SAFE TO APPLY:` line in its header: before or after which deploy, and what the site does in the gap. 075 is why: it was applied before the routes it linked to were deployed, and previews share the production database, so the live footer linked to a 404.

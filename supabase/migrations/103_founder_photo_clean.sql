@@ -1,0 +1,29 @@
+-- 103_founder_photo_clean.sql
+--
+-- Replaces the founder portrait with a cleaned copy, on the owner's
+-- instruction of 2026-10-11.
+--
+-- The portrait team-photos/1785670772432_ahmad-din-founder.png carries two
+-- defects in the image itself: its top 10 pixel rows are solid green and its
+-- top two corners are transparent for about 30 px below them, which showed
+-- inside the site's frame as a thin green line and rounded corners.
+-- `node scripts/fix-founder-photo-edge.mjs` crops the top 40 rows, checks the
+-- result has no green row and no transparent pixel, uploads it as a new file
+-- (<timestamp>_ahmad-din-founder-clean.png; the original is kept for rollback)
+-- and repoints the three fields that hold the old URL. The new file name is
+-- only known when the script runs, so the script is the executable and this
+-- file records the shape of the change:
+--
+--   UPDATE team_members  SET photo = '<new url>' WHERE photo = '<old url>';
+--   UPDATE page_sections SET content = jsonb_set(content, '{photo_url}', '"<new url>"')
+--   WHERE section_type IN ('founder_hero', 'founder_block')
+--     AND content->>'photo_url' = '<old url>';
+--
+-- Rollback: point the same fields back at the old URL.
+--
+-- DML only, through supabase-js and the storage API. Safe on re-run: once
+-- nothing holds the old URL the script stops before uploading.
+--
+-- SAFE TO APPLY: any time. The new file has the same width and 40 px less
+-- height, and every frame crops to 4:5 with object-fit cover, so only the
+-- green line and the rounded corners disappear.
