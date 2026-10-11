@@ -9,8 +9,9 @@
 //   B. Migration 106 sets the same numbers, orders, title and group names as
 //      the config, so the database and the code cannot disagree once applied.
 //   C. The /services grid renders three groups in order, each header with its
-//      name, "3 services" and its colour, then its three cards in order, on
-//      their group's tint. A cleared group name drops the heading but keeps the
+//      name and "3 services" on primary navy with cream text, then its three
+//      cards in order, all white with one hairline and a navy top rule, every
+//      card row 1fr so the columns line up. A cleared group name drops the heading but keeps the
 //      count; a slug the config does not know joins the last group.
 //   D. Every detail page's related services are its two group siblings and
 //      then the next group's first service, never itself, and the detail
@@ -125,11 +126,13 @@ EXPECTED.forEach(([key, name, list], gi) => {
   const hrefs = [...sec.matchAll(/href="\/services\/([a-z-]+)"/g)].map((m) => m[1]);
   check(`C: group ${gi + 1} cards in order`, JSON.stringify(hrefs) === JSON.stringify(list.map(([s]) => s)), JSON.stringify(hrefs));
 });
-const headerBg = sections.map((s) => (s.match(/<header[^>]*background:([^;"]+)/) ?? [])[1]);
-check('C: header colours navy, deep navy, gold', JSON.stringify(headerBg) === JSON.stringify(['#1B3A5F', '#14304F', '#C69C3E']), JSON.stringify(headerBg));
-check('C: gold header text is navy', /<header[^>]*background:#C69C3E;color:#14304F/.test(sections[2] ?? ''));
-const tints = sections.map((s) => (s.match(/<a [^>]*background:([^;"]+)/) ?? [])[1]);
-check('C: cards take three distinct light tints', new Set(tints).size === 3 && tints.every((t) => /^#[EF][0-9A-F]{5}$/.test(t ?? '')), JSON.stringify(tints));
+const headers = sections.map((s) => (s.match(/<header[^>]*style="([^"]+)"/) ?? [])[1]);
+check('C: every header navy with cream text', headers.length === 3 && headers.every((h) => h === 'background:#1B3A5F;color:#FAF7F2'), JSON.stringify(headers));
+check('C: header counts in cream', sections.every((s) => /<p[^>]*style="letter-spacing:0.18em;color:#FAF7F2">3/.test(s)));
+const cardStyles = [...html.matchAll(/<a [^>]*href="\/services\/[^"]+"[^>]*style="([^"]+)"/g)].map((m) => m[1]);
+check('C: all nine cards white, one hairline, navy top rule', cardStyles.length === 9 && cardStyles.every((c) => c === 'background:#FFFFFF;border-color:#E8E2D6;border-top-color:#1B3A5F'), JSON.stringify([...new Set(cardStyles)]));
+check('C: no group colour left (gold, deep navy, tints)', !/#C69C3E|#14304F|#F1F3F5|#ECEEF1|#F9F5EC/.test(html));
+check('C: every card row is 1fr', html.includes('grid-template-rows:auto repeat(3, 1fr)'));
 check('C: numbers 01 to 09 in page order', JSON.stringify([...html.matchAll(/text-2xl[^>]*>(\d\d)</g)].map((m) => m[1])) === JSON.stringify(SERVICES.map((_, i) => num(i))));
 check('C: three columns from lg, stacked below', html.includes('flex flex-col gap-12 lg:grid lg:grid-cols-3'));
 check('C: group names editable', grid({ group_2_name: 'Deals' }).includes('>Deals</h3>'));

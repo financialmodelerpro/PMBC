@@ -126,6 +126,26 @@ check('migration 105: same defaults, both types, existing values win', mig.inclu
 check('migration 105 sets no image', !/hero_bg_image',\s*'[^']/.test(mig));
 check('storage domain allowed for next/image', src('next.config.ts').includes("hostname: '*.supabase.co'"));
 
+// E. Service pages. Their hero is PageHeroFallback, drawn from the service
+// config, so the image is set on the page's service_detail block instead.
+{
+  const { PageHeroFallback } = await jiti.import(path.join(root, 'src/components/public/PageHeroFallback.tsx'));
+  const fb = (background) =>
+    renderToStaticMarkup(React.createElement(PageHeroFallback, { eyebrow: 'Service 01', headline: 'Financial Modeling', tagline: 'Models.', background }));
+  const plain = fb(undefined);
+  check('service hero: no image keeps the pattern, no img', plain.includes('repeating-linear-gradient') && !plain.includes('<img'));
+  check('service hero: null background renders the same', fb(null) === plain);
+  const withImg = fb(bgModule.readHeroBackground({ hero_bg_image: IMG, hero_bg_overlay: 75, hero_bg_focal: 'top' }));
+  check('service hero: image drawn decoratively, pattern dropped', withImg.includes('alt=""') && withImg.includes(IMG.split('/').pop()) && !withImg.includes('repeating-linear-gradient'));
+  check('service hero: overlay and focal applied', withImg.includes('0.75') && /object-position:\s*(50% 0%|center top|top)/.test(withImg));
+  check('service hero: copy unchanged by the image', withImg.includes('Service 01') && withImg.includes('Financial Modeling') && withImg.includes('Models.'));
+  const route = src('src/app/(public)/services/[slug]/page.tsx');
+  check('service route: reads the background from its service_detail block', /background=\{readHeroBackground\(\s*sections\.find\(\(s\) => s\.section_type === 'service_detail'\)/.test(route));
+  const sdEditor = src('src/components/admin/editors/ServiceDetailEditor.tsx');
+  check('service_detail editor: carries the background fields', sdEditor.includes('<HeroBackgroundFields') && sdEditor.includes('Page hero background'));
+  check('service_detail renderer: ignores the keys (no image in the body)', !renderToStaticMarkup(React.createElement((await jiti.import(path.join(root, 'src/components/public/sections/ServiceDetail.tsx'))).ServiceDetail, { content: { service_slug: 'refm', hero_bg_image: IMG }, variant: 'white' })).includes(IMG.split('/').pop()));
+}
+
 const total = passed + failures.length;
 for (const f of failures) console.log('  FAIL  ' + f);
 console.log(`\nverify-hero-background: ${passed} of ${total} checks passed.`);

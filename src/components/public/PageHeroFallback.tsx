@@ -1,6 +1,7 @@
 import { ChevronDown } from 'lucide-react';
 
 import { HERO_FRAME } from '@/lib/public/layout';
+import { HeroBackground, type HeroBackgroundValue } from './HeroBackground';
 
 /**
  * Default hero shown on a bespoke firm page when the CMS page has no `hero`
@@ -14,10 +15,17 @@ export function PageHeroFallback({
   eyebrow,
   headline,
   tagline,
+  background,
 }: {
   eyebrow: string;
   headline: string;
   tagline?: string;
+  /**
+   * Optional background image, as on the CMS `hero`. The service pages pass
+   * the one set on their `service_detail` section, since their hero copy comes
+   * from the service config and they have no hero section to hold it.
+   */
+  background?: HeroBackgroundValue | null;
 }) {
   return (
     <section
@@ -28,14 +36,18 @@ export function PageHeroFallback({
         color: '#FFFFFF',
       }}
     >
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 opacity-[0.04]"
-        style={{
-          backgroundImage:
-            'repeating-linear-gradient(45deg, #C69C3E 0, #C69C3E 1px, transparent 1px, transparent 14px)',
-        }}
-      />
+      {background && <HeroBackground bg={background} />}
+      {/* Not drawn over a photograph, where it would read as a screen artefact. */}
+      {!background && (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 opacity-[0.04]"
+          style={{
+            backgroundImage:
+              'repeating-linear-gradient(45deg, #C69C3E 0, #C69C3E 1px, transparent 1px, transparent 14px)',
+          }}
+        />
+      )}
       <div className="relative mx-auto w-full max-w-[1100px] text-center">
         <div
           aria-hidden

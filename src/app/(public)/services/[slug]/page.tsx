@@ -9,6 +9,7 @@ import { SERVICES } from '@/config/services';
 import { ServiceDetail } from '@/components/public/sections/ServiceDetail';
 import { SectionList } from '@/components/public/SectionRenderer';
 import { PageHeroFallback } from '@/components/public/PageHeroFallback';
+import { readHeroBackground } from '@/components/public/HeroBackground';
 import { PAGE_GUTTER, SECTION_PADDING } from '@/lib/public/layout';
 import { withIndefiniteArticle } from '@/lib/public/grammar';
 import { buildPageMetadata, siteUrl } from '@/lib/seo/metadata';
@@ -90,6 +91,14 @@ export default async function ServiceDetailPage(props: {
         eyebrow={`Service ${service.number}`}
         headline={service.title}
         tagline={service.summary}
+        // The hero copy comes from the service config, so there is no hero
+        // section to hold a background image; it is set on this page's
+        // service_detail block instead (Page hero background in the builder).
+        background={readHeroBackground(
+          sections.find((s) => s.section_type === 'service_detail')?.content as
+            | Record<string, unknown>
+            | undefined,
+        )}
       />
       {legacyFields ? (
         <ServiceDetail
