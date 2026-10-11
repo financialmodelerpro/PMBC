@@ -149,7 +149,7 @@ export const SECTION_TYPES: SectionTypeMeta[] = [
     type: 'founder_hero',
     label: 'Founder hero',
     description:
-      'Page-leading founder identity: portrait, name, two-line title, credentials, CTAs.',
+      'Page-leading founder identity: portrait, name, two-line title, credentials, contact row, CTAs.',
     implemented: true,
     defaultContent: {
       eyebrow: 'Founder',
@@ -160,6 +160,9 @@ export const SECTION_TYPES: SectionTypeMeta[] = [
       intro: '',
       report_highlights: '',
       photo_url: '',
+      contact_email: '',
+      contact_phone: '',
+      contact_linkedin: '',
       cta_primary_label: '',
       cta_primary_href: '',
       cta_secondary_label: '',

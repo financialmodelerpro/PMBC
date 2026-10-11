@@ -108,6 +108,44 @@ export function FounderHeroEditor({ content, onChange }: SectionEditorProps) {
 
       <div style={{ display: 'grid', gap: 12, gridTemplateColumns: '1fr 1fr' }}>
         <div>
+          <label style={adminLabel}>Contact email</label>
+          <input
+            type="email"
+            value={s(content.contact_email)}
+            placeholder="name@pacemakersglobal.com"
+            onChange={(e) => set('contact_email', e.target.value)}
+            style={adminInput}
+          />
+        </div>
+        <div>
+          <label style={adminLabel}>Contact phone</label>
+          <input
+            type="tel"
+            value={s(content.contact_phone)}
+            placeholder="+966 50 000 0000"
+            onChange={(e) => set('contact_phone', e.target.value)}
+            style={adminInput}
+          />
+        </div>
+        <div style={{ gridColumn: '1 / -1' }}>
+          <label style={adminLabel}>LinkedIn profile</label>
+          <input
+            type="url"
+            value={s(content.contact_linkedin)}
+            placeholder="https://www.linkedin.com/in/..."
+            onChange={(e) => set('contact_linkedin', e.target.value)}
+            style={adminInput}
+          />
+        </div>
+      </div>
+      <p style={adminFieldHint}>
+        Shown as a contact row under the intro. Each item appears only when filled in, so clear a
+        field to remove it. Email opens the mail app, the phone dials on mobile, and LinkedIn must
+        be a full https://linkedin.com link.
+      </p>
+
+      <div style={{ display: 'grid', gap: 12, gridTemplateColumns: '1fr 1fr' }}>
+        <div>
           <label style={adminLabel}>Primary CTA label</label>
           <input
             type="text"
