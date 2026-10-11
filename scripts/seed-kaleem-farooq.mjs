@@ -73,7 +73,7 @@ const SECTIONS = [
       display: 'numbered',
       items: [
         'Technology and IT services: commercial strategy, bid pricing and finance leadership for a Riyadh-based technology services firm',
-        'SaaS and AI start-ups: financial modelling, subscription pricing and investor readiness for venture-backed companies',
+        'SaaS and AI start-ups: financial modeling, subscription pricing and investor readiness for venture-backed companies',
         'Fintech and investor-backed growth: finance leadership through a Series A fundraise and a period of 4x revenue growth',
         'Construction and government projects: financial reporting, billing and cost control on large Ministry of Interior projects',
         'Retail technology, staff augmentation, trading and holding groups: finance operations, treasury and governance',
@@ -124,7 +124,7 @@ const SECTIONS = [
       items: [
         'Business development and bid strategy',
         'Fundraising and investor readiness',
-        'Financial modelling and pricing',
+        'Financial modeling and pricing',
         'Treasury and banking relationships',
         'Cost optimisation and procurement',
         'Regulatory, tax and governance (MISA, ZATCA)',

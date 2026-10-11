@@ -23,7 +23,8 @@ export function FounderHeroEditor({ content, onChange }: SectionEditorProps) {
           onChange={(patch) => onChange({ ...content, ...patch })}
         />
         <p style={adminFieldHint}>
-          Leave empty to show the gold-framed monogram fallback. Portrait crops to a 4:5 frame.
+          Leave empty to show the initials. Portrait crops to a 4:5 frame. Export it with square
+          corners and no border, coloured line or edge: the site draws the frame.
         </p>
       </div>
 

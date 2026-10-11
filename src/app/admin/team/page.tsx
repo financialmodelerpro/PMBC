@@ -14,7 +14,7 @@ import { adminPageMain } from '@/lib/admin/styles';
  * Two column names read differently here than in the database, because the card
  * is what an operator is filling in:
  *   credentials -> Qualifications   the letters after the name
- *   bio         -> Experience       the short paragraph of background
+ *   bio         -> Short bio        the short paragraph of background
  *
  * `linkedin_url` and `email` are deliberately absent. Both columns still exist
  * on `team_members` (migration 023) and an applied migration is never edited, but
@@ -34,11 +34,41 @@ const FIELDS: FieldDef[] = [
   },
   {
     key: 'bio',
-    label: 'Experience',
+    label: 'Short bio',
     type: 'richtext',
-    hint: 'A short paragraph of background. The founding partner keeps this brief, since the card links through to the full profile.',
+    hint: 'A short paragraph of background. Keep it brief for a full profile, since the card links through to the profile page.',
   },
-  { key: 'photo', label: 'Photo', type: 'media', bucket: 'team-photos' },
+  {
+    key: 'profile_type',
+    label: 'Profile type',
+    type: 'select',
+    options: [
+      { value: 'compact', label: 'Compact: details on the card' },
+      { value: 'full', label: 'Full: links to a profile page' },
+    ],
+    hint: 'Compact shows the bio, Selected experience and Expertise on the card. Full keeps the card short and links to the member’s profile page; a profile page has to be built first, and until it exists the card shows no link.',
+  },
+  {
+    key: 'experience_items',
+    label: 'Selected experience',
+    type: 'stringList',
+    placeholder: 'Co-led advisory on an acquisition in the fertilizer sector',
+    hint: 'Compact profiles only. One line per item, up to twelve; four reads best.',
+  },
+  {
+    key: 'expertise_items',
+    label: 'Expertise',
+    type: 'stringList',
+    placeholder: 'Business Valuation',
+    hint: 'Compact profiles only. One short item each, shown as small tags.',
+  },
+  {
+    key: 'photo',
+    label: 'Photo',
+    type: 'media',
+    bucket: 'team-photos',
+    hint: 'A portrait photo, ideally 4:5. Export it with square corners and no border, coloured line or edge: the site draws the frame, and anything baked into the image shows inside it. Leave empty to show the initials.',
+  },
   {
     key: 'display_order',
     label: 'Display order',
@@ -79,7 +109,14 @@ export default function AdminTeamPage() {
           fields={FIELDS}
           listColumns={COLUMNS}
           enableReorder
-          newDefaults={{ name: '', visible: true, display_order: 0 }}
+          newDefaults={{
+            name: '',
+            visible: true,
+            display_order: 0,
+            profile_type: 'compact',
+            experience_items: [],
+            expertise_items: [],
+          }}
           itemLabel={(r) => (r.name as string) || 'Team member'}
           statusTone={(r) => (r.visible ? 'success' : 'neutral')}
           emptyHint="No team members yet. Add the first profile to put /team back in the navbar and footer."

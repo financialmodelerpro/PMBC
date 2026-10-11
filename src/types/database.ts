@@ -490,6 +490,9 @@ export type Database = {
           email: string | null
           display_order: number
           visible: boolean
+          profile_type: string
+          experience_items: string[]
+          expertise_items: string[]
           created_at: string | null
           updated_at: string | null
         }
@@ -504,6 +507,9 @@ export type Database = {
           email?: string | null
           display_order?: number
           visible?: boolean
+          profile_type?: string
+          experience_items?: string[]
+          expertise_items?: string[]
           created_at?: string | null
           updated_at?: string | null
         }
@@ -518,6 +524,9 @@ export type Database = {
           email?: string | null
           display_order?: number
           visible?: boolean
+          profile_type?: string
+          experience_items?: string[]
+          expertise_items?: string[]
           created_at?: string | null
           updated_at?: string | null
         }
