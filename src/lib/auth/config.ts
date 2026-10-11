@@ -4,7 +4,9 @@ import bcrypt from 'bcryptjs';
 
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 
-const SESSION_MAX_AGE_SECONDS = 60 * 60; // 1 hour
+// One hour of inactivity: AdminSessionKeeper renews the cookie every few
+// minutes while someone is working, so the hour counts from last use.
+const SESSION_MAX_AGE_SECONDS = 60 * 60;
 
 export const authOptions: NextAuthOptions = {
   session: {

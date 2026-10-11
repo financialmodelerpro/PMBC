@@ -7,6 +7,7 @@ import { isAdminRole } from '@/lib/auth/requireAdmin';
 import { roleMayOpen } from '@/lib/auth/adminAccess';
 import { CmsAdminNav } from '@/components/admin/CmsAdminNav';
 import { AdminRoleProvider } from '@/components/admin/AdminRoleProvider';
+import { AdminSessionKeeper } from '@/components/admin/AdminSessionKeeper';
 
 export const dynamic = 'force-dynamic';
 
@@ -71,6 +72,7 @@ export default async function AdminLayout({
       >
         <AdminRoleProvider role={role}>{children}</AdminRoleProvider>
       </main>
+      <AdminSessionKeeper />
     </div>
   );
 }
