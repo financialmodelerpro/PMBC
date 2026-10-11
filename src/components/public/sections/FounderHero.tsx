@@ -86,8 +86,9 @@ export function heroContacts(content: Record<string, unknown>): {
   };
 }
 
+/** Email and phone. LinkedIn is not in the row: it is the hero's lead button. */
 function contactItems(content: Record<string, unknown>): ContactItem[] {
-  const { email, phone, dial, linkedin } = heroContacts(content);
+  const { email, phone, dial } = heroContacts(content);
   const items: ContactItem[] = [];
   if (email) {
     items.push({
@@ -107,25 +108,31 @@ function contactItems(content: Record<string, unknown>): ContactItem[] {
       external: false,
     });
   }
-  if (linkedin) {
-    items.push({
-      key: 'linkedin',
-      href: linkedin,
-      label: 'LinkedIn',
-      icon: <LinkedInIcon />,
-      external: true,
-    });
-  }
   return items;
 }
 
-/** lucide-react 1.x carries no brand marks, so the LinkedIn glyph is inline, as in the footer. */
-function LinkedInIcon() {
-  return (
-    <svg aria-hidden width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-      <path d="M20.45 20.45h-3.56v-5.57c0-1.33-.03-3.04-1.85-3.04-1.85 0-2.13 1.45-2.13 2.94v5.67H9.35V9h3.42v1.56h.05a3.74 3.74 0 0 1 3.37-1.85c3.6 0 4.27 2.37 4.27 5.45zM5.34 7.43a2.07 2.07 0 1 1 0-4.13 2.07 2.07 0 0 1 0 4.13zM7.12 20.45H3.56V9h3.56zM22.22 0H1.77C.79 0 0 .77 0 1.72v20.56C0 23.23.79 24 1.77 24h20.45c.98 0 1.78-.77 1.78-1.72V1.72C24 .77 23.2 0 22.22 0z" />
-    </svg>
-  );
+/**
+ * The hero's buttons, in one standard order for every profile: "Connect on
+ * LinkedIn" first, drawn from the LinkedIn field, then the two CTAs. A CTA
+ * pointing at that same LinkedIn profile is dropped rather than shown twice,
+ * which covers a hero still carrying LinkedIn in its primary CTA. Only the
+ * first button takes the gold style.
+ */
+type HeroButton = { key: string; href: string; label: string };
+
+function heroButtons(c: FounderHeroContent, content: Record<string, unknown>): HeroButton[] {
+  const { linkedin } = heroContacts(content);
+  const same = (href: string) =>
+    !!linkedin && href.replace(/\/+$/, '').toLowerCase() === linkedin.replace(/\/+$/, '').toLowerCase();
+  const buttons: HeroButton[] = [];
+  if (linkedin) buttons.push({ key: 'linkedin', href: linkedin, label: 'Connect on LinkedIn' });
+  for (const [key, label, href] of [
+    ['primary', c.cta_primary_label, c.cta_primary_href],
+    ['secondary', c.cta_secondary_label, c.cta_secondary_href],
+  ] as const) {
+    if (label && href && !same(href)) buttons.push({ key, href, label });
+  }
+  return buttons;
 }
 
 function isExternal(href: string): boolean {
@@ -184,6 +191,7 @@ export function FounderHero({
   const bodyColor = dark ? '#E8DDC4' : v.textMuted;
   const titleColor = dark ? '#B7CBE0' : '#1B3A5F';
   const contacts = contactItems(content ?? {});
+  const buttons = heroButtons(c, content ?? {});
 
   return (
     // `size="hero"` rather than the default rhythm: this is the block a visitor
@@ -296,27 +304,14 @@ export function FounderHero({
             </ul>
           )}
 
-          {/* CTAs render only when both a label and an href are set. A founder
+          {/* A CTA renders only when both a label and an href are set. A
               profile is a credibility document, so a button that goes nowhere
               is worse than no button. */}
-          {((c.cta_primary_label && c.cta_primary_href) ||
-            (c.cta_secondary_label && c.cta_secondary_href)) && (
+          {buttons.length > 0 && (
             <div className="mt-9 flex flex-wrap items-center gap-4">
-              {c.cta_primary_label && c.cta_primary_href && (
-                <CtaLink
-                  href={c.cta_primary_href}
-                  label={c.cta_primary_label}
-                  primary
-                  dark={dark}
-                />
-              )}
-              {c.cta_secondary_label && c.cta_secondary_href && (
-                <CtaLink
-                  href={c.cta_secondary_href}
-                  label={c.cta_secondary_label}
-                  dark={dark}
-                />
-              )}
+              {buttons.map((b, i) => (
+                <CtaLink key={b.key} href={b.href} label={b.label} primary={i === 0} dark={dark} />
+              ))}
             </div>
           )}
         </div>
