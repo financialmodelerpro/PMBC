@@ -51,6 +51,7 @@
     "seed-team-page": "node scripts/seed-team-page.mjs",
     "seed-kaleem-farooq": "node scripts/seed-kaleem-farooq.mjs",
     "seed-kaleem-contact": "node scripts/seed-kaleem-contact.mjs",
+    "seed-profile-linkedin-field": "node scripts/seed-profile-linkedin-field.mjs",
     "verify-container-widths": "node scripts/verify-container-widths.mjs",
     "seed-logo-trim": "node scripts/seed-logo-trim.mjs",
     "seed-home-content-pass": "node scripts/seed-home-content-pass.mjs",
