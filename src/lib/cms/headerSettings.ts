@@ -70,7 +70,7 @@ export const DEFAULT_HEADER_CONFIG: HeaderConfig = {
     // /about was merged into the home page. The slot points at the founder
     // profile under its own label rather than keeping "About" on a personal
     // page, which would be a small bait and switch.
-    { label: 'Founder', href: '/about/ahmad-din' },
+    { label: 'Founder', href: '/team/ahmad-din' },
     { label: 'Contact', href: '/contact' },
   ],
   cta_label: 'Start a Conversation',

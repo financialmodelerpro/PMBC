@@ -64,7 +64,7 @@ export const SECTION_PADDING_COMPACT = 'py-12 sm:py-16 lg:py-20';
  * normal section's: for a hero whose content fits, padding is invisible
  * (`items-center` centres it in the 70vh box), so the only thing a larger value
  * does is push the few heroes with more content past the height every other one
- * settles at. At 1440x900 that was /fmp at 727px and /about/ahmad-din at 756px
+ * settles at. At 1440x900 that was /fmp at 727px and /about/ahmad-din (now /team/ahmad-din) at 756px
  * against home's 630px.
  */
 export const HERO_MIN_HEIGHT = 'min-h-[70vh]';

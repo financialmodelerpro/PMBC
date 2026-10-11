@@ -13,7 +13,7 @@ const FALLBACK_HERO = {
   eyebrow: 'Insights',
   headline: 'Perspectives on the work',
   tagline:
-    'Notes on valuation, transactions, and corporate finance from the people doing the modelling.',
+    'Notes on valuation, transactions, and corporate finance from the people doing the modeling.',
 };
 
 export async function generateMetadata(): Promise<Metadata> {

@@ -58,7 +58,7 @@ const PAGES = [
   '/fmp',
   '/contact',
   '/book',
-  '/about/ahmad-din',
+  '/team/ahmad-din',
   // The six routes this list used to omit, which is exactly why their heroes
   // were allowed to drift. /team, /case-studies and /insights each carried a
   // hand-rolled 380px band, /privacy and /terms had no opening band at all, and
@@ -450,7 +450,7 @@ async function main() {
     );
     // The nav rows an operator hid must not be reachable from the footer
     // either, which is the whole point of hiding them.
-    for (const gone of ['/approach', '/about/ahmad-din']) {
+    for (const gone of ['/approach', '/team/ahmad-din']) {
       ok(
         `the footer does not link to ${gone}`,
         !footerData.footerLinks.includes(gone),

@@ -9,7 +9,7 @@ import { buildPageMetadata, siteUrl } from '@/lib/seo/metadata';
 export const dynamic = 'force-dynamic';
 
 const PAGE_SLUG = 'about-kaleem-farooq';
-const PATH = '/about/kaleem-farooq';
+const PATH = '/team/kaleem-farooq';
 
 const FALLBACK_TITLE = 'Kaleem Farooq | Business Development, Saudi Arabia | PaceMakers';
 const FALLBACK_DESCRIPTION =
@@ -63,7 +63,7 @@ function personJsonLd(contacts: ReturnType<typeof heroContacts>) {
 }
 
 /**
- * Kaleem Farooq's full profile. Same shape as /about/ahmad-din: every block is a
+ * Kaleem Farooq's full profile. Same shape as /team/ahmad-din: every block is a
  * page-builder section (seeded by migration 098), and the page 404s until the
  * seed has run rather than serving an empty shell.
  */

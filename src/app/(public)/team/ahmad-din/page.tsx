@@ -8,7 +8,7 @@ import { buildPageMetadata, siteUrl } from '@/lib/seo/metadata';
 export const dynamic = 'force-dynamic';
 
 const PAGE_SLUG = 'about-ahmad-din';
-const PATH = '/about/ahmad-din';
+const PATH = '/team/ahmad-din';
 
 const FALLBACK_TITLE = 'Ahmad Din | Founder | PaceMakers Business Consultants';
 const FALLBACK_DESCRIPTION =

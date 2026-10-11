@@ -7,7 +7,7 @@
  * nested:
  *
  *   service-cfo-advisory  -> /services/cfo-advisory   (9 pages, broken since Phase 7)
- *   about-ahmad-din       -> /about/ahmad-din         (broken since it was added)
+ *   about-ahmad-din       -> /team/ahmad-din          (broken since it was added)
  *   home                  -> /
  *
  * There is no column recording the route, so the exceptions are listed here
@@ -19,8 +19,10 @@
 /** Slugs whose public route is not simply `/${slug}`. */
 const EXPLICIT_ROUTES: Record<string, string> = {
   home: '/',
-  'about-ahmad-din': '/about/ahmad-din',
-  'about-kaleem-farooq': '/about/kaleem-farooq',
+  // The two profile slugs kept their CMS names when the URLs moved under /team
+  // on 2026-10-11; next.config.ts 301s the old /about paths.
+  'about-ahmad-din': '/team/ahmad-din',
+  'about-kaleem-farooq': '/team/kaleem-farooq',
   // The page kept its CMS slug when its URL shortened to /fmp, so the row, its
   // is_system flag and its section history stay intact. Only the route moved.
   'financial-modeler-pro': '/fmp',
