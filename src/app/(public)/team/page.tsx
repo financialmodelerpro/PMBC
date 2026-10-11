@@ -86,7 +86,7 @@ function Attribution({ member, tight }: { member: TeamMemberRow; tight?: boolean
  * founder card uses, because this is the person who wins and leads every
  * mandate. The experience paragraph here is a short one on purpose: the card
  * links through to the full profile rather than repeating it, which is also why
- * this page and /about/ahmad-din do not read as duplicate content.
+ * this page and /team/ahmad-din do not read as duplicate content.
  */
 function FoundingPartnerCard({
   member,
@@ -185,7 +185,9 @@ function MemberCard({
         <Attribution member={member} tight />
         {member.bio && (
           <div
-            className={`pmbc-prose mt-4 text-[15px] leading-[1.7] text-[color:var(--pmbc-muted)] ${compact ? '' : 'flex-1'}`}
+            // Not stretched: a full card's link sits right under its bio rather
+            // than at the foot of a card grown to a compact neighbour's height.
+            className="pmbc-prose mt-4 text-[15px] leading-[1.7] text-[color:var(--pmbc-muted)]"
             dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(member.bio) }}
           />
         )}

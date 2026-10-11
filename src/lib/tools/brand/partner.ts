@@ -3,7 +3,7 @@
  * in the PDF report.
  *
  * Every word comes from ONE place: the `founder_hero` section on the founder
- * profile (/about/ahmad-din), edited in the page builder. Identity, title,
+ * profile (/team/ahmad-din), edited in the page builder. Identity, title,
  * credentials and introduction are the fields that page already shows. The
  * career highlights are a separate field on the same section,
  * `report_highlights` (one per line), which the public profile page does not

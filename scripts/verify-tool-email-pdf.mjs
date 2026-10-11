@@ -734,7 +734,7 @@ console.log('Report branding and partner');
   check('partner: fetch reads only the founder profile hero', (() => { const src = fs.readFileSync(path.join(root, 'src/lib/tools/brand/fetch.ts'), 'utf8'); return !src.includes("'founder_block'") && !src.includes("'home'") && src.includes("partnerFromHero(await sectionContent(FOUNDER_PAGE_SLUG, 'founder_hero'))"); })());
   check('partner: highlights field is editable in the founder hero editor', fs.readFileSync(path.join(root, 'src/components/admin/editors/FounderHeroEditor.tsx'), 'utf8').includes("set('report_highlights'"));
   check('partner: photo and LinkedIn from the hero', card?.photoUrl === hero.photo_url && card?.linkedinUrl === hero.cta_primary_href);
-  check('partner: profile path is the founder page', card?.profilePath === '/about/ahmad-din', card?.profilePath);
+  check('partner: profile path is the founder page', card?.profilePath === '/team/ahmad-din', card?.profilePath);
   check('partner: a non-LinkedIn primary link is not offered as LinkedIn', partnerModule.partnerFromHero({ ...hero, cta_primary_href: '/book' })?.linkedinUrl === null);
   check('partner: the LinkedIn field wins over the primary CTA', partnerModule.partnerFromHero({ ...hero, contact_linkedin: 'https://www.linkedin.com/in/field/', cta_primary_href: '/book' })?.linkedinUrl === 'https://www.linkedin.com/in/field/');
   check('partner: a non-https photo is dropped', partnerModule.partnerFromHero({ ...hero, photo_url: 'javascript:alert(1)' })?.photoUrl === null);

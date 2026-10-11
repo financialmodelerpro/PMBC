@@ -167,7 +167,9 @@ export const OPENINGS: { match: RegExp; line: string }[] = [
   { match: /^\/tools\/business-valuation/, line: 'Would you like help reading your valuation result, or talking through the next step?' },
   { match: /^\/tools/, line: 'Would you like help with one of these tools, or with the decision behind it?' },
   { match: /^\/(case-studies|insights)/, line: 'Is there a situation of your own that is similar?' },
-  { match: /^\/about/, line: 'Would you like to know how Ahmad Din would approach a situation like yours?' },
+  // The founder's profile, before the general /team line. Kaleem Farooq's
+  // profile, also under /team, takes the team line rather than one naming Ahmad.
+  { match: /^\/(team|about)\/ahmad-din/, line: 'Would you like to know how Ahmad Din would approach a situation like yours?' },
   { match: /^\/team/, line: 'Would it help to know who would work on your mandate and how the work is reviewed?' },
   { match: /^\/network/, line: 'Are you looking for support in a particular market, or an introduction?' },
   { match: /^\/sectors/, line: 'Which sector is your project or business in?' },

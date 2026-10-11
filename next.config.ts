@@ -97,6 +97,20 @@ const nextConfig: NextConfig = {
         destination: '/fmp',
         statusCode: 301,
       },
+      {
+        // The team profiles moved from /about/<name> to /team/<name> on
+        // 2026-10-11, so every profile sits under the team page. Same 301
+        // reasoning. These two sources are the one place the old paths have to
+        // stay, and they keep FMP's links to the founder profile working.
+        source: '/about/ahmad-din',
+        destination: '/team/ahmad-din',
+        statusCode: 301,
+      },
+      {
+        source: '/about/kaleem-farooq',
+        destination: '/team/kaleem-farooq',
+        statusCode: 301,
+      },
     ];
   },
 };

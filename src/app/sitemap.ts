@@ -69,9 +69,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // crawlers either. Re-adding this line and the nav item brings it back.
     '/network',
     // `/about` is gone: it was merged into the home page and now 301s there.
-    // The founder profile keeps its nested path.
-    '/about/ahmad-din',
-    '/about/kaleem-farooq',
+    // The profiles moved from /about/<name> to /team/<name> on 2026-10-11.
+
+    '/team/ahmad-din',
+    '/team/kaleem-farooq',
     // /team, /case-studies and /insights sit here when they have content. See
     // collectionIndexRoutes above.
     ...collectionIndexRoutes,

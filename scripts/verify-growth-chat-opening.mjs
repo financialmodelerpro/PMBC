@@ -60,7 +60,7 @@ check('every public page has its own opening line (only the unlinked /approach f
 check('home has its own line', cm.openingLine('/', false) !== general && cm.openingLine('/', false) !== cm.openingLine('/services', false));
 check('each of the nine services has a line of its own', new Set(paths.filter((p) => p.startsWith('/services/')).map((p) => cm.openingLine(p, false))).size >= 8);
 check('the valuation tool and the tools hub differ', cm.openingLine('/tools/business-valuation', false) !== cm.openingLine('/tools', false));
-check('about, contact and book have their own lines', ['/about/ahmad-din', '/contact', '/book'].every((p) => cm.openingLine(p, false) !== general));
+check('about, contact and book have their own lines', ['/team/ahmad-din', '/contact', '/book'].every((p) => cm.openingLine(p, false) !== general));
 check('no opening line has a dash, an exclamation mark or says PMBC', cm.OPENINGS.every((o) => !(DASHES.test(o.line) || /!|PMBC/.test(o.line))) && !DASHES.test(general) && !general.includes('!'));
 
 console.log('2. The widget in a stand-in browser (offline)');

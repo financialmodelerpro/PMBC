@@ -6,7 +6,7 @@
  * Site tokens throughout: Source Serif 4 headings, Inter body, warm borders on
  * white cards over the cream page, the square-cornered navy button, and gold
  * used for accents rather than fills. Inputs that accept numbers are blue, the
- * modelling convention for a value the user controls, inside this tool only.
+ * modeling convention for a value the user controls, inside this tool only.
  */
 
 import { useId, useState, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes } from 'react';

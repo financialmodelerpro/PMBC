@@ -3,7 +3,7 @@
  *
  * WHY THIS EXISTS
  * /team lists the founding partner first and links his card through to the full
- * profile at /about/ahmad-din rather than repeating the bio that already lives
+ * profile at /team/ahmad-din rather than repeating the bio that already lives
  * there. Something has to decide which of the team rows is that person.
  *
  * The three ways of deciding, and why this one:

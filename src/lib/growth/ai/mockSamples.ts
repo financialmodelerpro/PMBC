@@ -85,7 +85,7 @@ export const JSON_SAMPLES: Record<string, Sample> = {
   },
   outreach_email: () => ({
     subject: 'Your registered project in north Riyadh',
-    body: 'Dear [First name],\n\nI saw that [Company] registered [Project] for off-plan sales this month. Lenders and escrow agents usually ask for an updated development model at this stage, and we help developers prepare one that holds up to their review.\n\nIf useful, I would be glad to share how we approached a similar project. Our real estate modelling work is outlined here: [Link]\n\nKind regards,\nAhmad Din',
+    body: 'Dear [First name],\n\nI saw that [Company] registered [Project] for off-plan sales this month. Lenders and escrow agents usually ask for an updated development model at this stage, and we help developers prepare one that holds up to their review.\n\nIf useful, I would be glad to share how we approached a similar project. Our real estate modeling work is outlined here: [Link]\n\nKind regards,\nAhmad Din',
   }),
   outreach_linkedin: () => ({
     subject: '',
