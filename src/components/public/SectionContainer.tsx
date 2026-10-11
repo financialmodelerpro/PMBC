@@ -39,6 +39,7 @@ export function SectionContainer({
   className = '',
   styles,
   media = null,
+  background,
 }: {
   variant?: PmbcVariant;
   size?: 'default' | 'compact' | 'hero';
@@ -51,6 +52,11 @@ export function SectionContainer({
    * Null, which is the default, renders `children` with no wrapper at all.
    */
   media?: SectionMediaValue | null;
+  /**
+   * A layer drawn behind the content, filling the section: the hero background
+   * image. Omitted, the markup is exactly what it was before this existed.
+   */
+  background?: React.ReactNode;
 }) {
   const v = variantStyles(variant);
   const frame =
@@ -76,8 +82,10 @@ export function SectionContainer({
         ...sectionOuterStyle(overrides),
       }}
     >
+      {background}
       <div
-        className={PAGE_INNER}
+        // Positioned only when there is a background layer to paint above.
+        className={background ? `relative ${PAGE_INNER}` : PAGE_INNER}
         style={sectionInnerStyle(overrides)}
       >
         <SectionMediaLayout media={media} variant={variant}>

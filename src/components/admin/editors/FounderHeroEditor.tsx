@@ -3,6 +3,7 @@
 import { MediaField } from '@/components/admin/MediaField';
 import { adminFieldHint, adminInput, adminLabel, adminTextarea } from '@/lib/admin/styles';
 
+import { HeroBackgroundFields } from './HeroBackgroundFields';
 import type { SectionEditorProps } from './types';
 
 function s(v: unknown): string {
@@ -27,6 +28,8 @@ export function FounderHeroEditor({ content, onChange }: SectionEditorProps) {
           corners and no border, coloured line or edge: the site draws the frame.
         </p>
       </div>
+
+      <HeroBackgroundFields content={content} onPatch={(patch) => onChange({ ...content, ...patch })} />
 
       <div>
         <label style={adminLabel}>Eyebrow</label>
