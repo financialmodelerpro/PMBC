@@ -1,7 +1,7 @@
 'use client';
 
-import { RichTextEditor } from '@/components/admin/RichTextEditor';
-import { MediaField } from '@/components/admin/MediaField';
+import Link from 'next/link';
+
 import {
   ADMIN_COLORS,
   adminInput,
@@ -55,14 +55,6 @@ export function FounderEditor({ content, onChange }: SectionEditorProps) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-      <MediaField
-        content={content}
-        urlKey="photo_url"
-        onChange={(patch) => update(patch)}
-        label="Founder photo"
-        bucket="team-photos"
-        hint="Drag and drop, upload, or choose from the library"
-      />
 
       {/* Empty is the right default, not an oversight. The name is printed
           beside the portrait, so alt text that repeats it makes a screen reader
@@ -78,41 +70,12 @@ export function FounderEditor({ content, onChange }: SectionEditorProps) {
         />
       </Field>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-        <Field label="Name">
-          <input
-            type="text"
-            value={name}
-            onChange={(e) => update({ name: e.target.value })}
-            placeholder="Ahmad Din"
-            style={adminInput}
-          />
-        </Field>
-        <Field label="Credentials line">
-          <input
-            type="text"
-            value={credentials_line}
-            onChange={(e) => update({ credentials_line: e.target.value })}
-            placeholder="Founder · CFA · MBA"
-            style={adminInput}
-          />
-        </Field>
-      </div>
 
       <BodyAlignField
         value={content.body_align}
         onChange={(next) => update({ body_align: next })}
       />
 
-      <div>
-        <p style={adminLabel}>Bio</p>
-        <RichTextEditor
-          value={bio_html}
-          onChange={(html) => update({ bio_html: html })}
-          ariaLabel="Founder bio editor"
-          minHeight={200}
-        />
-      </div>
 
       {/* Says whose record the proof points are. They are career figures rather
           than firm figures, and the home page carries both, so the counterpart
@@ -127,82 +90,14 @@ export function FounderEditor({ content, onChange }: SectionEditorProps) {
         />
       </Field>
 
-      {/* Proof points under the bio, mirroring FMP's home founder card. The
-          renderer shows at most five; this is a summary, and the full list
-          lives on the founder profile page. */}
-      <Field label={`Proof points (${credentials.length}, first 5 shown)`}>
-        <div style={{ display: 'grid', gap: 6 }}>
-          {credentials.map((item, i) => (
-            <div key={i} style={{ display: 'flex', gap: 6 }}>
-              <input
-                type="text"
-                value={item}
-                onChange={(e) => {
-                  const next = [...credentials];
-                  next[i] = e.target.value;
-                  update({ credentials: next });
-                }}
-                placeholder="12+ years in corporate finance and advisory"
-                style={adminInput}
-              />
-              <button
-                type="button"
-                aria-label={`Remove proof point ${i + 1}`}
-                onClick={() =>
-                  update({ credentials: credentials.filter((_, j) => j !== i) })
-                }
-                style={{
-                  width: 28,
-                  height: 28,
-                  flexShrink: 0,
-                  borderRadius: 6,
-                  border: `1px solid ${ADMIN_COLORS.border}`,
-                  background: '#fff',
-                  color: ADMIN_COLORS.textMuted,
-                  cursor: 'pointer',
-                  fontFamily: 'inherit',
-                }}
-              >
-                x
-              </button>
-            </div>
-          ))}
-          <button
-            type="button"
-            onClick={() => update({ credentials: [...credentials, ''] })}
-            style={{
-              justifySelf: 'start',
-              padding: '6px 14px',
-              borderRadius: 7,
-              fontSize: 12,
-              fontWeight: 600,
-              border: `1px solid ${ADMIN_COLORS.borderInput}`,
-              background: '#FFFFFF',
-              color: ADMIN_COLORS.primaryDeep,
-              cursor: 'pointer',
-              fontFamily: 'inherit',
-            }}
-          >
-            Add proof point
-          </button>
-        </div>
-      </Field>
 
-      <Fieldset legend="Primary CTA (optional)">
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+      <Fieldset legend="Primary CTA (optional, links to his profile)">
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 12 }}>
           <Field label="Label">
             <input
               type="text"
               value={cta_primary_label}
               onChange={(e) => update({ cta_primary_label: e.target.value })}
-              style={adminInput}
-            />
-          </Field>
-          <Field label="Link">
-            <input
-              type="text"
-              value={cta_primary_href}
-              onChange={(e) => update({ cta_primary_href: e.target.value })}
               style={adminInput}
             />
           </Field>
