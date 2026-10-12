@@ -11,6 +11,12 @@ import {
   profileFor,
   type FounderProfile,
 } from '@/lib/cms/founderProfile';
+import {
+  fetchCardHighlights,
+  memberCredentialsLine,
+  memberProfileSlug,
+} from '@/lib/cms/teamProfiles';
+import { publicPathForPageSlug } from '@/lib/cms/pageRoutes';
 import { buildPageMetadata } from '@/lib/seo/metadata';
 import { fetchPage, fetchPageSections } from '@/lib/cms/pages';
 import { FirmPageBody } from '@/components/public/FirmPageBody';
@@ -39,13 +45,8 @@ export async function generateMetadata(): Promise<Metadata> {
   });
 }
 
-/** How many "Selected experience" lines a member card shows; the rest are on the profile page. */
-const CARD_HIGHLIGHTS = 3;
-
-/** A text column as a trimmed string. Absent (migration 108 not applied) or malformed reads as empty. */
-function text(value: unknown): string {
-  return typeof value === 'string' ? value.trim() : '';
-}
+/** How many highlights a card shows before migration 109, from the member's own list. */
+const LEGACY_CARD_HIGHLIGHTS = 3;
 
 /** A list column as trimmed, non-empty strings. Absent or malformed reads as empty. */
 function items(value: unknown): string[] {
@@ -54,8 +55,9 @@ function items(value: unknown): string[] {
     : [];
 }
 
-/** Role, then the qualifications line, on the founding partner's card. */
+/** Role, then the credentials line, on the founding partner's card. */
 function Attribution({ member }: { member: TeamMemberRow }) {
+  const line = memberCredentialsLine(member);
   return (
     <>
       {member.role && (
@@ -63,12 +65,12 @@ function Attribution({ member }: { member: TeamMemberRow }) {
           {member.role}
         </p>
       )}
-      {member.credentials && (
+      {line && (
         <p
           className="mt-3 text-[12px] font-semibold uppercase text-[color:var(--pmbc-muted)]"
           style={{ letterSpacing: '0.14em' }}
         >
-          {member.credentials}
+          {line}
         </p>
       )}
     </>
@@ -139,9 +141,10 @@ function ProfileLink({ href, className }: { href: string; className: string }) {
  * Every other member, in the three-up grid the collection pages share. One
  * small standard card for all of them, so the row reads as a set: a small
  * framed portrait beside the name, role and one credentials line
- * (qualification | years of experience | location), up to three "Selected
- * experience" lines as key highlights, and the link through to the profile
- * page pinned to the foot.
+ * (qualification | years of experience | location), up to three key
+ * highlights, and the link through to the profile page pinned to the foot.
+ * The highlights are the first items of the profile list marked "Show on team
+ * card", so they are written once, on the profile.
  *
  * The bio and "Expertise" are deliberately not on the card: they belong to the
  * profile page, which carries everything. Each part of the line and the list
@@ -150,19 +153,15 @@ function ProfileLink({ href, className }: { href: string; className: string }) {
 function MemberCard({
   member,
   profilePath,
+  highlights,
 }: {
   member: TeamMemberRow;
   profilePath: string | null;
+  highlights: string[];
 }) {
-  // One credentials line, the same treatment as the founding partner's
-  // "ACCA | FMVA | 12+ Years Experience": qualification, years, location.
-  const years = text(member.experience_years);
-  const facts = [
-    text(member.credentials),
-    years && !/experience/i.test(years) ? `${years} Experience` : years,
-    text(member.location),
-  ].filter(Boolean);
-  const highlights = items(member.experience_items).slice(0, CARD_HIGHLIGHTS);
+  // The same line, and the same treatment, as the founding partner's
+  // "ACCA | FMVA | 12+ Years Experience".
+  const line = memberCredentialsLine(member);
 
   return (
     <li className="flex h-full flex-col rounded-[2px] border border-[color:var(--pmbc-border-warm)] bg-white p-7">
@@ -179,12 +178,12 @@ function MemberCard({
               {member.role}
             </p>
           )}
-          {facts.length > 0 && (
+          {line && (
             <p
               className="mt-2 text-[11px] font-semibold uppercase leading-[1.6] text-[color:var(--pmbc-muted)]"
               style={{ letterSpacing: '0.14em' }}
             >
-              {facts.join(' | ')}
+              {line}
             </p>
           )}
         </div>
@@ -220,9 +219,9 @@ function MemberCard({
  */
 function partition(
   team: TeamMemberRow[],
-  founder: FounderProfile | null,
+  isLead: (m: TeamMemberRow) => boolean,
 ): { lead: TeamMemberRow | null; rest: TeamMemberRow[] } {
-  const index = team.findIndex((m) => isFounder(m.name, founder));
+  const index = team.findIndex(isLead);
   if (index === -1) return { lead: null, rest: team };
   return {
     lead: team[index],
@@ -236,14 +235,36 @@ export default async function TeamPage(props: {
   const search = await props.searchParams;
   const isPreview = search.preview === '1';
 
-  const [team, profiles, sections] = await Promise.all([
+  const [team, sections] = await Promise.all([
     fetchVisibleTeam(),
-    fetchMemberProfiles(),
     fetchPageSections('team', { onlyVisible: !isPreview }),
   ]);
-  const founder = profiles.find((p) => p.slug === FOUNDER_PAGE_SLUG) ?? null;
-  const { lead, rest } = partition(team, founder);
-  const pathFor = (m: TeamMemberRow) => profileFor(m.name, profiles)?.path ?? null;
+
+  // Since migration 109 each member names their own profile page
+  // (`profile_slug`), and the card's highlights come from that page. Before it,
+  // fall back to matching profiles by name and to the member's own list.
+  const linked = team.some((m) => memberProfileSlug(m) !== null);
+  let pathFor: (m: TeamMemberRow) => string | null;
+  let highlightsFor: (m: TeamMemberRow) => string[];
+  let isLead: (m: TeamMemberRow) => boolean;
+  if (linked) {
+    const slugs = team.map(memberProfileSlug).filter((s): s is string => s !== null);
+    const highlights = await fetchCardHighlights(slugs);
+    pathFor = (m) => {
+      const slug = memberProfileSlug(m);
+      return slug ? publicPathForPageSlug(slug) : null;
+    };
+    highlightsFor = (m) => highlights.get(memberProfileSlug(m) ?? '') ?? [];
+    isLead = (m) => memberProfileSlug(m) === FOUNDER_PAGE_SLUG;
+  } else {
+    const profiles = await fetchMemberProfiles();
+    const founder: FounderProfile | null =
+      profiles.find((p) => p.slug === FOUNDER_PAGE_SLUG) ?? null;
+    pathFor = (m) => profileFor(m.name, profiles)?.path ?? null;
+    highlightsFor = (m) => items(m.experience_items).slice(0, LEGACY_CARD_HIGHLIGHTS);
+    isLead = (m) => isFounder(m.name, founder);
+  }
+  const { lead, rest } = partition(team, isLead);
 
   return (
     <main>
@@ -267,13 +288,18 @@ export default async function TeamPage(props: {
             </p>
           ) : (
             <>
-              {lead && <FoundingPartnerCard member={lead} profilePath={founder?.path ?? null} />}
+              {lead && <FoundingPartnerCard member={lead} profilePath={pathFor(lead)} />}
               {rest.length > 0 && (
                 <ul
                   className={`grid gap-6 sm:grid-cols-2 lg:grid-cols-3 ${lead ? 'mt-8' : ''}`}
                 >
                   {rest.map((m) => (
-                    <MemberCard key={m.id} member={m} profilePath={pathFor(m)} />
+                    <MemberCard
+                      key={m.id}
+                      member={m}
+                      profilePath={pathFor(m)}
+                      highlights={highlightsFor(m)}
+                    />
                   ))}
                 </ul>
               )}

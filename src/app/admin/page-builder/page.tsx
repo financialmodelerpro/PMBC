@@ -68,7 +68,17 @@ async function loadPages(): Promise<{
       counts.set(r.page_slug, (counts.get(r.page_slug) ?? 0) + 1);
     }
 
-    const rows: PageRow[] = (pagesRes.data ?? []).map((p) => ({
+    // Team profiles are edited in Team & Advisors, on each member's screen, so
+    // they are not listed here. Only pages a member actually links to are
+    // left out: before migration 109 the read fails and every page stays.
+    const { data: linkedRows, error: linkedErr } = await supabase
+      .from('team_members')
+      .select('profile_slug');
+    const teamProfiles = new Set(
+      linkedErr ? [] : (linkedRows ?? []).map((r) => r.profile_slug).filter(Boolean),
+    );
+
+    const rows: PageRow[] = (pagesRes.data ?? []).filter((p) => !teamProfiles.has(p.slug)).map((p) => ({
       id: p.id,
       slug: p.slug,
       title: p.title,
@@ -100,7 +110,7 @@ export default async function PageBuilderListPage() {
         <AdminPageHeader
           eyebrow="Content"
           title="Page Builder"
-          description="Every CMS-managed page. Open the builder to edit sections, reorder, or change visibility. To edit the navigation menu, use Pages and Nav."
+          description="Every CMS-managed page. Open the builder to edit sections, reorder, or change visibility. To edit the navigation menu, use Pages and Nav. Team profiles are edited in Team & Advisors, with each member's details."
         />
 
         {error && (

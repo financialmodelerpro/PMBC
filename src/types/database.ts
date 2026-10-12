@@ -495,6 +495,7 @@ export type Database = {
           expertise_items: string[]
           location: string | null
           experience_years: string | null
+          profile_slug: string | null
           created_at: string | null
           updated_at: string | null
         }
@@ -514,6 +515,7 @@ export type Database = {
           expertise_items?: string[]
           location?: string | null
           experience_years?: string | null
+          profile_slug?: string | null
           created_at?: string | null
           updated_at?: string | null
         }
@@ -533,6 +535,7 @@ export type Database = {
           expertise_items?: string[]
           location?: string | null
           experience_years?: string | null
+          profile_slug?: string | null
           created_at?: string | null
           updated_at?: string | null
         }

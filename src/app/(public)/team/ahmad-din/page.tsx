@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import { fetchPage, fetchPageSections } from '@/lib/cms/pages';
 import { SectionList } from '@/components/public/SectionRenderer';
 import { buildPageMetadata, siteUrl } from '@/lib/seo/metadata';
+import { fetchMemberForProfile, withMemberHero } from '@/lib/cms/teamProfiles';
 
 export const dynamic = 'force-dynamic';
 
@@ -66,7 +67,13 @@ export default async function FounderProfilePage(props: {
   const search = await props.searchParams;
   const isPreview = search.preview === '1';
 
-  const sections = await fetchPageSections(PAGE_SLUG, { onlyVisible: !isPreview });
+  // The header's name, photo and credentials line come from his Team &
+  // Advisors record, as on every profile.
+  const [rawSections, member] = await Promise.all([
+    fetchPageSections(PAGE_SLUG, { onlyVisible: !isPreview }),
+    fetchMemberForProfile(PAGE_SLUG),
+  ]);
+  const sections = withMemberHero(rawSections, member);
 
   // The page is entirely CMS-driven. If the seed has not run there is nothing
   // meaningful to show, and a 404 is more honest than an empty shell that

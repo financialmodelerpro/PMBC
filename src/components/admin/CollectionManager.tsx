@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   ArrowDown,
   ArrowUp,
@@ -69,6 +70,7 @@ export function CollectionManager({
   enableReorder = false,
   statusTone,
   emptyHint = 'Nothing here yet. Create your first entry.',
+  editHref,
 }: {
   apiBase: string;
   fields: FieldDef[];
@@ -78,7 +80,14 @@ export function CollectionManager({
   enableReorder?: boolean;
   statusTone?: (row: Row) => BadgeTone;
   emptyHint?: string;
+  /**
+   * When set, opening an existing row navigates to this page instead of the
+   * drawer, for a collection whose rows have their own screen (Team &
+   * Advisors). Creating still uses the drawer.
+   */
+  editHref?: (row: Row) => string;
 }) {
+  const router = useRouter();
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -109,6 +118,10 @@ export function CollectionManager({
     setIsNew(true);
   };
   const openEdit = (row: Row) => {
+    if (editHref) {
+      router.push(editHref(row));
+      return;
+    }
     setEditing({ ...row });
     setIsNew(false);
   };
@@ -460,7 +473,7 @@ export function CollectionEditorDrawer({
   );
 }
 
-function FieldInput({
+export function FieldInput({
   field,
   value,
   onChange,

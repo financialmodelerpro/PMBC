@@ -10,6 +10,8 @@ import {
   adminLabel,
 } from '@/lib/admin/styles';
 
+import { useTeamProfile } from '@/components/admin/TeamProfileContext';
+
 import type { SectionEditorProps } from './types';
 
 function s(v: unknown): string {
@@ -29,6 +31,7 @@ export function FounderCredentialsEditor({ content, onChange }: SectionEditorPro
   const display = s(content.display) || 'numbered';
   const set = (key: string, value: unknown) => onChange({ ...content, [key]: value });
   const setItems = (next: string[]) => set('items', next);
+  const team = useTeamProfile();
 
   return (
     <div style={{ display: 'grid', gap: 18 }}>
@@ -129,6 +132,32 @@ export function FounderCredentialsEditor({ content, onChange }: SectionEditorPro
         </div>
         <p style={adminFieldHint}>Blank items are dropped when the page renders.</p>
       </div>
+
+      {team && (
+        <div>
+          <label
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 8,
+              fontSize: 13,
+              color: ADMIN_COLORS.textBody,
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={content.show_on_card === true}
+              onChange={(e) => set('show_on_card', e.target.checked)}
+            />
+            Show on team card
+          </label>
+          <p style={adminFieldHint}>
+            The first three items become the key highlights on the /team card, so they are written
+            once, here. Tick it on one list; if more than one is ticked, the first in page order is
+            used. Keep those three items short.
+          </p>
+        </div>
+      )}
     </div>
   );
 }

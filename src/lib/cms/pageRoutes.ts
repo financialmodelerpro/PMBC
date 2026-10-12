@@ -19,11 +19,6 @@
 /** Slugs whose public route is not simply `/${slug}`. */
 const EXPLICIT_ROUTES: Record<string, string> = {
   home: '/',
-  // The two profile slugs kept their CMS names when the URLs moved under /team
-  // on 2026-10-11; next.config.ts 301s the old /about paths.
-  'about-ahmad-din': '/team/ahmad-din',
-  'about-kaleem-farooq': '/team/kaleem-farooq',
-  'about-muhammad-shahjahan': '/team/muhammad-shahjahan',
   // The page kept its CMS slug when its URL shortened to /fmp, so the row, its
   // is_system flag and its section history stay intact. Only the route moved.
   'financial-modeler-pro': '/fmp',
@@ -31,6 +26,15 @@ const EXPLICIT_ROUTES: Record<string, string> = {
 
 /** Service detail pages are stored as `service-<slug>` and served at `/services/<slug>`. */
 const SERVICE_PREFIX = 'service-';
+
+/**
+ * Team profile pages are stored as `about-<name>` and served at `/team/<name>`.
+ * The slugs kept their CMS names when the URLs moved under /team on 2026-10-11
+ * (next.config.ts 301s the old /about paths), and a profile created from
+ * /admin/team since 2026-10-12 follows the same pattern, so no line is needed
+ * here for a new member.
+ */
+const PROFILE_PREFIX = 'about-';
 
 /** Free tool pages are stored as `tool-<slug>` and served at `/tools/<slug>`. See src/config/tools.ts. */
 const TOOL_PREFIX = 'tool-';
@@ -42,6 +46,9 @@ export function publicPathForPageSlug(slug: string): string {
   // so the prefix check below cannot catch it by accident.
   if (slug.startsWith(SERVICE_PREFIX)) {
     return `/services/${slug.slice(SERVICE_PREFIX.length)}`;
+  }
+  if (slug.startsWith(PROFILE_PREFIX)) {
+    return `/team/${slug.slice(PROFILE_PREFIX.length)}`;
   }
   // `tools` (the hub) has no trailing hyphen, so it falls through to `/tools`.
   if (slug.startsWith(TOOL_PREFIX)) {

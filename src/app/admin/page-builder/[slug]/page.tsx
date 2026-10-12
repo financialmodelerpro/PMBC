@@ -1,9 +1,10 @@
 import type { Metadata } from 'next';
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 
 import { fetchPage, fetchPageSections } from '@/lib/cms/pages';
 import { sectionFromRow } from '@/lib/cms/serializers';
 import { ADMIN_COLORS } from '@/lib/admin/styles';
+import { fetchMemberForProfile, PROFILE_SLUG_PREFIX } from '@/lib/cms/teamProfiles';
 
 import { PageBuilder } from './PageBuilder';
 
@@ -23,6 +24,13 @@ export async function generateMetadata(props: {
 
 export default async function PageBuilderPage(props: { params: Promise<Params> }) {
   const { slug } = await props.params;
+
+  // A team profile is edited on its member's screen in Team & Advisors, next
+  // to the details its header shows, so there is one place for each person.
+  if (slug.startsWith(PROFILE_SLUG_PREFIX)) {
+    const member = await fetchMemberForProfile(slug);
+    if (member) redirect(`/admin/team/${member.id}`);
+  }
 
   const page = await fetchPage(slug);
   if (!page) notFound();

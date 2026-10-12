@@ -1,7 +1,14 @@
 'use client';
 
 import { MediaField } from '@/components/admin/MediaField';
-import { adminFieldHint, adminInput, adminLabel, adminTextarea } from '@/lib/admin/styles';
+import { useTeamProfile } from '@/components/admin/TeamProfileContext';
+import {
+  ADMIN_COLORS,
+  adminFieldHint,
+  adminInput,
+  adminLabel,
+  adminTextarea,
+} from '@/lib/admin/styles';
 
 import { HeroBackgroundFields } from './HeroBackgroundFields';
 import type { SectionEditorProps } from './types';
@@ -12,9 +19,32 @@ function s(v: unknown): string {
 
 export function FounderHeroEditor({ content, onChange }: SectionEditorProps) {
   const set = (key: string, value: unknown) => onChange({ ...content, [key]: value });
+  // Inside Team & Advisors the name, portrait and credentials line are the
+  // member's own fields, edited above this panel, so they are not offered here.
+  const team = useTeamProfile();
 
   return (
     <div style={{ display: 'grid', gap: 18 }}>
+      {team && (
+        <p
+          style={{
+            margin: 0,
+            padding: '10px 12px',
+            borderRadius: 8,
+            background: ADMIN_COLORS.altBg,
+            border: `1px solid ${ADMIN_COLORS.border}`,
+            fontSize: 12,
+            lineHeight: 1.5,
+            color: ADMIN_COLORS.textBody,
+          }}
+        >
+          The name, portrait and credentials line in this header come from the member details
+          for {team.memberName} at the top of this screen, the same ones the team card shows.
+          Edit them there.
+        </p>
+      )}
+
+      {!team && (
       <div>
         <MediaField
           content={content}
@@ -28,6 +58,7 @@ export function FounderHeroEditor({ content, onChange }: SectionEditorProps) {
           corners and no border, coloured line or edge: the site draws the frame.
         </p>
       </div>
+      )}
 
       <HeroBackgroundFields content={content} onPatch={(patch) => onChange({ ...content, ...patch })} />
 
@@ -42,6 +73,7 @@ export function FounderHeroEditor({ content, onChange }: SectionEditorProps) {
         />
       </div>
 
+      {!team && (
       <div>
         <label style={adminLabel}>Name</label>
         <input
@@ -53,6 +85,7 @@ export function FounderHeroEditor({ content, onChange }: SectionEditorProps) {
         />
         <p style={adminFieldHint}>Renders as the page h1.</p>
       </div>
+      )}
 
       <div>
         <label style={adminLabel}>Title, first line</label>
@@ -63,6 +96,9 @@ export function FounderHeroEditor({ content, onChange }: SectionEditorProps) {
           onChange={(e) => set('title_primary', e.target.value)}
           style={adminInput}
         />
+        {team && (
+          <p style={adminFieldHint}>Leave empty to show the member&apos;s role.</p>
+        )}
       </div>
 
       <div>
@@ -76,6 +112,7 @@ export function FounderHeroEditor({ content, onChange }: SectionEditorProps) {
         />
       </div>
 
+      {!team && (
       <div>
         <label style={adminLabel}>Credentials line</label>
         <input
@@ -86,6 +123,7 @@ export function FounderHeroEditor({ content, onChange }: SectionEditorProps) {
           style={adminInput}
         />
       </div>
+      )}
 
       <div>
         <label style={adminLabel}>Intro paragraph</label>
