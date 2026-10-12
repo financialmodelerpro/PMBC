@@ -24,6 +24,8 @@
  */
 
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { publicPathForPageSlug } from '@/lib/cms/pageRoutes';
+import { FOUNDER_PAGE_SLUG } from '@/lib/cms/founderProfile';
 import type { Tables } from '@/types/database';
 
 type MemberRow = Tables<'team_members'>;
@@ -33,6 +35,11 @@ export const PROFILE_SLUG_PREFIX = 'about-';
 
 /** How many key highlights a /team card shows. */
 export const CARD_HIGHLIGHTS = 3;
+
+/** How many proof points the home page founder block shows. */
+export const FOUNDER_BLOCK_PROOF_POINTS = 5;
+
+
 
 function text(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
@@ -113,10 +120,13 @@ export async function fetchMemberForProfile(profileSlug: string): Promise<Member
 
 /**
  * The card highlights of each profile page: the items of its first visible
- * list section marked "Show on team card", trimmed, at most CARD_HIGHLIGHTS.
+ * list section marked "Show on team card", trimmed, at most `limit`.
  * A page with no marked list is absent from the map. Empty on a failed read.
  */
-export async function fetchCardHighlights(profileSlugs: string[]): Promise<Map<string, string[]>> {
+export async function fetchCardHighlights(
+  profileSlugs: string[],
+  limit: number = CARD_HIGHLIGHTS,
+): Promise<Map<string, string[]>> {
   const out = new Map<string, string[]>();
   if (profileSlugs.length === 0) return out;
   try {
@@ -133,7 +143,7 @@ export async function fetchCardHighlights(profileSlugs: string[]): Promise<Map<s
       const content = (row.content ?? {}) as Record<string, unknown>;
       if (content.show_on_card !== true) continue;
       const items = Array.isArray(content.items)
-        ? content.items.map(text).filter(Boolean).slice(0, CARD_HIGHLIGHTS)
+        ? content.items.map(text).filter(Boolean).slice(0, limit)
         : [];
       out.set(row.page_slug, items);
     }
@@ -141,4 +151,48 @@ export async function fetchCardHighlights(profileSlugs: string[]): Promise<Map<s
   } catch {
     return out;
   }
+}
+
+/**
+ * The home page's founder block, filled from the founding partner's record
+ * rather than typed into the section (owner's instruction, 2026-10-12): name,
+ * photo, the credentials line (role first, then his qualification line), the
+ * bio (his Short bio in Team & Advisors), the proof points (the list on his
+ * profile marked "Show on team card", first five) and the button's link (his
+ * profile). The section keeps only its framing: eyebrow, headline, the proof
+ * points label, the button labels and the layout.
+ *
+ * Each value falls back to what the section stores when his record or that
+ * list cannot be read (migration 109 absent, a failed read), so the home page
+ * never loses the block.
+ */
+export async function withFounderBlock<T extends { section_type: string; content: unknown }>(
+  sections: T[],
+): Promise<T[]> {
+  if (!sections.some((s) => s.section_type === 'founder_block')) return sections;
+  const [founder, lists] = await Promise.all([
+    fetchMemberForProfile(FOUNDER_PAGE_SLUG),
+    fetchCardHighlights([FOUNDER_PAGE_SLUG], FOUNDER_BLOCK_PROOF_POINTS),
+  ]);
+  if (!founder) return sections;
+  const proofPoints = lists.get(FOUNDER_PAGE_SLUG);
+  const credentialsLine = [text(founder.role), ...memberCredentialsLine(founder).split(' | ')]
+    .filter(Boolean)
+    .join(' · ');
+  return sections.map((s) => {
+    if (s.section_type !== 'founder_block') return s;
+    const c = (s.content ?? {}) as Record<string, unknown>;
+    return {
+      ...s,
+      content: {
+        ...c,
+        name: founder.name,
+        photo_url: founder.photo ?? '',
+        credentials_line: credentialsLine,
+        ...(text(founder.bio) ? { bio_html: founder.bio } : {}),
+        ...(proofPoints && proofPoints.length > 0 ? { credentials: proofPoints } : {}),
+        cta_primary_href: publicPathForPageSlug(FOUNDER_PAGE_SLUG),
+      },
+    };
+  });
 }

@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 
 import { fetchPage, fetchPageSections } from '@/lib/cms/pages';
 import { SectionList } from '@/components/public/SectionRenderer';
+import { withFounderBlock } from '@/lib/cms/teamProfiles';
 import { buildPageMetadata } from '@/lib/seo/metadata';
 
 export const dynamic = 'force-dynamic';
@@ -28,8 +29,10 @@ export default async function HomePage(props: {
   const isPreview = search.preview === '1';
 
   const page = await fetchPage('home');
+  // The founder block is filled from the founding partner's Team & Advisors
+  // record (see withFounderBlock), so it always matches /team and his profile.
   const sections = page
-    ? await fetchPageSections('home', { onlyVisible: !isPreview })
+    ? await withFounderBlock(await fetchPageSections('home', { onlyVisible: !isPreview }))
     : [];
 
   if (sections.length === 0) {
