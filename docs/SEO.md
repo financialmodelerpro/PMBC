@@ -18,7 +18,7 @@ Pattern matches FMP's `/api/og/main`. Image is 1200x630, navy background, white 
 
 ### Sitemap and Robots
 
-`src/app/sitemap.ts` is rendered per request (`dynamic = 'force-dynamic'`) so the tool visibility switch and a collection's first row reach crawlers without a redeploy. It lists home, `/services`, `/sectors`, `/network`, `/team/ahmad-din`, `/team/kaleem-farooq`, `/fmp`, `/contact`, `/book`, `/privacy`, `/terms`, `/confidentiality`, the nine service pages, `/tools` and each Live tool (`toolSitemapPaths`), and `/team`, `/case-studies` and `/insights` (with their detail pages) only while their collection has rows. `/approach`, `/about` (301 to home), `/financial-modeler-pro` (301 to `/fmp`) and its three sub-pages are deliberately absent. The base URL is `NEXT_PUBLIC_SITE_URL`, falling back to `https://pacemakersglobal.com`.
+`src/app/sitemap.ts` is rendered per request (`dynamic = 'force-dynamic'`) so the tool visibility switch and a collection's first row reach crawlers without a redeploy. It lists home, `/services`, `/sectors`, `/network`, `/team/ahmad-din`, `/team/kaleem-farooq`, `/team/muhammad-shahjahan`, `/fmp`, `/contact`, `/book`, `/privacy`, `/terms`, `/confidentiality`, the nine service pages, `/tools` and each Live tool (`toolSitemapPaths`), and `/team`, `/case-studies` and `/insights` (with their detail pages) only while their collection has rows. `/approach`, `/about` (301 to home), `/financial-modeler-pro` (301 to `/fmp`) and its three sub-pages are deliberately absent. The base URL is `NEXT_PUBLIC_SITE_URL`, falling back to `https://pacemakersglobal.com`.
 
 `src/app/robots.ts` allows `/` and disallows `/admin`, `/api` and `/b/` (the booking short links), with the sitemap at `<base>/sitemap.xml`.
 

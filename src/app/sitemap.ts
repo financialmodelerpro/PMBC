@@ -73,6 +73,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
     '/team/ahmad-din',
     '/team/kaleem-farooq',
+    '/team/muhammad-shahjahan',
     // /team, /case-studies and /insights sit here when they have content. See
     // collectionIndexRoutes above.
     ...collectionIndexRoutes,

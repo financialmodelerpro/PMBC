@@ -23,6 +23,7 @@ const EXPLICIT_ROUTES: Record<string, string> = {
   // on 2026-10-11; next.config.ts 301s the old /about paths.
   'about-ahmad-din': '/team/ahmad-din',
   'about-kaleem-farooq': '/team/kaleem-farooq',
+  'about-muhammad-shahjahan': '/team/muhammad-shahjahan',
   // The page kept its CMS slug when its URL shortened to /fmp, so the row, its
   // is_system flag and its section history stay intact. Only the route moved.
   'financial-modeler-pro': '/fmp',
