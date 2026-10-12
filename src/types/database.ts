@@ -493,6 +493,8 @@ export type Database = {
           profile_type: string
           experience_items: string[]
           expertise_items: string[]
+          location: string | null
+          experience_years: string | null
           created_at: string | null
           updated_at: string | null
         }
@@ -510,6 +512,8 @@ export type Database = {
           profile_type?: string
           experience_items?: string[]
           expertise_items?: string[]
+          location?: string | null
+          experience_years?: string | null
           created_at?: string | null
           updated_at?: string | null
         }
@@ -527,6 +531,8 @@ export type Database = {
           profile_type?: string
           experience_items?: string[]
           expertise_items?: string[]
+          location?: string | null
+          experience_years?: string | null
           created_at?: string | null
           updated_at?: string | null
         }

@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { ArrowUpRight } from 'lucide-react';
+import { ArrowUpRight, Award, BriefcaseBusiness, MapPin } from 'lucide-react';
 
 import { sanitizeRichHtml } from '@/lib/cms/sanitize';
 import { fetchVisibleTeam, type TeamMemberRow } from '@/lib/cms/collections';
@@ -39,18 +39,13 @@ export async function generateMetadata(): Promise<Metadata> {
   });
 }
 
-/**
- * A member's profile type, from migration 101. Null when the column is absent
- * (101 not applied) or holds anything else, in which case the card renders as
- * it did before compact profiles existed.
- */
-function profileType(member: TeamMemberRow): 'full' | 'compact' | null {
-  const t = (member as { profile_type?: unknown }).profile_type;
-  return t === 'full' || t === 'compact' ? t : null;
-}
+/** How many "Selected experience" lines a member card shows; the rest are on the profile page. */
+const CARD_HIGHLIGHTS = 3;
 
-/** How many "Selected experience" lines a full card shows; the rest are on the profile page. */
-const FULL_CARD_HIGHLIGHTS = 2;
+/** A text column as a trimmed string. Absent (migration 108 not applied) or malformed reads as empty. */
+function text(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : '';
+}
 
 /** A list column as trimmed, non-empty strings. Absent or malformed reads as empty. */
 function items(value: unknown): string[] {
@@ -59,20 +54,18 @@ function items(value: unknown): string[] {
     : [];
 }
 
-/** Role, then the qualifications line. Shared by both card treatments. */
-function Attribution({ member, tight }: { member: TeamMemberRow; tight?: boolean }) {
+/** Role, then the qualifications line, on the founding partner's card. */
+function Attribution({ member }: { member: TeamMemberRow }) {
   return (
     <>
       {member.role && (
-        <p
-          className={`${tight ? 'mt-2 text-[13px]' : 'mt-3 text-[15px]'} font-semibold text-[color:var(--pmbc-accent-muted)]`}
-        >
+        <p className="mt-3 text-[15px] font-semibold text-[color:var(--pmbc-accent-muted)]">
           {member.role}
         </p>
       )}
       {member.credentials && (
         <p
-          className={`${tight ? 'mt-2 text-[11px]' : 'mt-3 text-[12px]'} font-semibold uppercase text-[color:var(--pmbc-muted)]`}
+          className="mt-3 text-[12px] font-semibold uppercase text-[color:var(--pmbc-muted)]"
           style={{ letterSpacing: '0.14em' }}
         >
           {member.credentials}
@@ -142,28 +135,16 @@ function ProfileLink({ href, className }: { href: string; className: string }) {
   );
 }
 
-/** The small uppercase label over each compact list. */
-function ListLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <p
-      className="mt-6 text-[11px] font-semibold uppercase text-[color:var(--pmbc-accent-muted)]"
-      style={{ letterSpacing: '0.14em' }}
-    >
-      {children}
-    </p>
-  );
-}
-
 /**
- * Every other member, in the three-up grid the collection pages share, with the
- * same framed portrait as the profile pages.
+ * Every other member, in the three-up grid the collection pages share. One
+ * small standard card for all of them, so the row reads as a set: a small
+ * framed portrait beside the name and role, then three facts (qualification,
+ * years of experience, location), up to three "Selected experience" lines as
+ * key highlights, and the link through to the profile page pinned to the foot.
  *
- * A full member (see `PROFILE_PAGE_SLUGS`) gets the teaser every full card
- * shares: the short bio, the first two "Selected experience" lines as key
- * highlights, and the link through to the profile page, pinned to the foot so
- * the links line up across a row. A compact member has no page, so the card
- * carries the detail itself: the bio, every "Selected experience" line and
- * "Expertise". Each list renders only when it has items.
+ * The bio and "Expertise" are deliberately not on the card: they belong to the
+ * profile page, which carries everything. Each fact and the list render only
+ * when filled, and a member without a profile page simply has no link.
  */
 function MemberCard({
   member,
@@ -172,64 +153,58 @@ function MemberCard({
   member: TeamMemberRow;
   profilePath: string | null;
 }) {
-  const compact = profileType(member) === 'compact';
-  const allExperience = items(member.experience_items);
-  const experience = compact ? allExperience : allExperience.slice(0, FULL_CARD_HIGHLIGHTS);
-  const expertise = compact ? items(member.expertise_items) : [];
+  const facts = [
+    { icon: Award, label: 'Qualification', value: text(member.credentials) },
+    { icon: BriefcaseBusiness, label: 'Experience', value: text(member.experience_years) },
+    { icon: MapPin, label: 'Location', value: text(member.location) },
+  ].filter((f) => f.value);
+  const highlights = items(member.experience_items).slice(0, CARD_HIGHLIGHTS);
 
   return (
-    <li className="flex h-full flex-col overflow-hidden rounded-[2px] border border-[color:var(--pmbc-border-warm)] bg-white">
-      <div className="px-7 pt-9">
-        <div className="mx-auto w-full max-w-[220px]">
-          <ProfilePhoto name={member.name} src={member.photo} accent="navy" sizes="220px" />
+    <li className="flex h-full flex-col rounded-[2px] border border-[color:var(--pmbc-border-warm)] bg-white p-7">
+      <div className="flex items-center gap-6">
+        <div className="w-[96px] shrink-0">
+          <ProfilePhoto name={member.name} src={member.photo} accent="navy" sizes="96px" />
+        </div>
+        <div className="min-w-0">
+          <h3 className="font-serif text-[19px] font-semibold leading-tight text-[color:var(--pmbc-text)]">
+            {member.name}
+          </h3>
+          {member.role && (
+            <p className="mt-2 text-[13px] font-semibold leading-snug text-[color:var(--pmbc-accent-muted)]">
+              {member.role}
+            </p>
+          )}
         </div>
       </div>
-      <div className="flex flex-1 flex-col p-7 pt-9">
-        <h3 className="font-serif text-[21px] font-semibold leading-tight text-[color:var(--pmbc-text)]">
-          {member.name}
-        </h3>
-        <Attribution member={member} tight />
-        {member.bio && (
-          <div
-            className="pmbc-prose mt-4 text-[15px] leading-[1.7] text-[color:var(--pmbc-muted)]"
-            dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(member.bio) }}
-          />
-        )}
-        {experience.length > 0 && (
-          <>
-            <ListLabel>{compact ? 'Selected experience' : 'Key highlights'}</ListLabel>
-            <ul className="mt-3 grid gap-2.5">
-              {experience.map((item) => (
-                <li
-                  key={item}
-                  className="flex gap-3 text-[14px] leading-[1.6] text-[color:var(--pmbc-muted)]"
-                >
-                  <span aria-hidden className="mt-[9px] h-1.5 w-1.5 shrink-0 bg-[#C69C3E]" />
-                  <span>{item}</span>
-                </li>
-              ))}
-            </ul>
-          </>
-        )}
-        {expertise.length > 0 && (
-          <>
-            <ListLabel>Expertise</ListLabel>
-            <ul className="mt-3 flex flex-wrap gap-2">
-              {expertise.map((item) => (
-                <li
-                  key={item}
-                  className="rounded-[2px] border border-[color:var(--pmbc-border-warm)] bg-[color:var(--pmbc-surface-cream)] px-3 py-1.5 text-[12.5px] text-[color:var(--pmbc-text)]"
-                >
-                  {item}
-                </li>
-              ))}
-            </ul>
-          </>
-        )}
-        {profilePath && !compact && (
-          <ProfileLink href={profilePath} className="mt-auto self-start pt-6" />
-        )}
-      </div>
+
+      {facts.length > 0 && (
+        <dl className="mt-7 grid gap-2.5 border-t border-[color:var(--pmbc-border-warm)] pt-5">
+          {facts.map(({ icon: Icon, label, value }) => (
+            <div key={label} className="flex items-start gap-3 text-[13.5px] leading-[1.5]">
+              <Icon aria-hidden size={15} className="mt-[3px] shrink-0 text-[#C69C3E]" />
+              <dt className="sr-only">{label}</dt>
+              <dd className="text-[color:var(--pmbc-text)]">{value}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+
+      {highlights.length > 0 && (
+        <ul className="mt-5 grid gap-2 border-t border-[color:var(--pmbc-border-warm)] pt-5">
+          {highlights.map((item) => (
+            <li
+              key={item}
+              className="flex gap-3 text-[13.5px] leading-[1.55] text-[color:var(--pmbc-muted)]"
+            >
+              <span aria-hidden className="mt-[8px] h-1.5 w-1.5 shrink-0 bg-[#C69C3E]" />
+              <span>{item}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {profilePath && <ProfileLink href={profilePath} className="mt-auto self-start pt-6" />}
     </li>
   );
 }
