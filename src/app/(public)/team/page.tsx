@@ -49,6 +49,9 @@ function profileType(member: TeamMemberRow): 'full' | 'compact' | null {
   return t === 'full' || t === 'compact' ? t : null;
 }
 
+/** How many "Selected experience" lines a full card shows; the rest are on the profile page. */
+const FULL_CARD_HIGHLIGHTS = 2;
+
 /** A list column as trimmed, non-empty strings. Absent or malformed reads as empty. */
 function items(value: unknown): string[] {
   return Array.isArray(value)
@@ -155,10 +158,12 @@ function ListLabel({ children }: { children: React.ReactNode }) {
  * Every other member, in the three-up grid the collection pages share, with the
  * same framed portrait as the profile pages.
  *
- * A full member (see `PROFILE_PAGE_SLUGS`) keeps the short bio and links
- * through to the profile page. A compact member has no page, so the card
- * carries the detail itself: the bio, "Selected experience" and "Expertise".
- * Each list renders only when it has items.
+ * A full member (see `PROFILE_PAGE_SLUGS`) gets the teaser every full card
+ * shares: the short bio, the first two "Selected experience" lines as key
+ * highlights, and the link through to the profile page, pinned to the foot so
+ * the links line up across a row. A compact member has no page, so the card
+ * carries the detail itself: the bio, every "Selected experience" line and
+ * "Expertise". Each list renders only when it has items.
  */
 function MemberCard({
   member,
@@ -168,7 +173,8 @@ function MemberCard({
   profilePath: string | null;
 }) {
   const compact = profileType(member) === 'compact';
-  const experience = compact ? items(member.experience_items) : [];
+  const allExperience = items(member.experience_items);
+  const experience = compact ? allExperience : allExperience.slice(0, FULL_CARD_HIGHLIGHTS);
   const expertise = compact ? items(member.expertise_items) : [];
 
   return (
@@ -185,15 +191,13 @@ function MemberCard({
         <Attribution member={member} tight />
         {member.bio && (
           <div
-            // Not stretched: a full card's link sits right under its bio rather
-            // than at the foot of a card grown to a compact neighbour's height.
             className="pmbc-prose mt-4 text-[15px] leading-[1.7] text-[color:var(--pmbc-muted)]"
             dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(member.bio) }}
           />
         )}
         {experience.length > 0 && (
           <>
-            <ListLabel>Selected experience</ListLabel>
+            <ListLabel>{compact ? 'Selected experience' : 'Key highlights'}</ListLabel>
             <ul className="mt-3 grid gap-2.5">
               {experience.map((item) => (
                 <li
@@ -222,7 +226,9 @@ function MemberCard({
             </ul>
           </>
         )}
-        {profilePath && !compact && <ProfileLink href={profilePath} className="mt-6 self-start" />}
+        {profilePath && !compact && (
+          <ProfileLink href={profilePath} className="mt-auto self-start pt-6" />
+        )}
       </div>
     </li>
   );

@@ -85,7 +85,11 @@ export function isFounder(memberName: string, founder: FounderProfile | null): b
  * a line here. The match to a team card is by the name on the page's own
  * founder_hero section, exactly as for the founder, so no column is needed.
  */
-export const PROFILE_PAGE_SLUGS = [FOUNDER_PAGE_SLUG, 'about-kaleem-farooq'] as const;
+export const PROFILE_PAGE_SLUGS = [
+  FOUNDER_PAGE_SLUG,
+  'about-kaleem-farooq',
+  'about-muhammad-shahjahan',
+] as const;
 
 export type MemberProfile = FounderProfile & { slug: string };
 

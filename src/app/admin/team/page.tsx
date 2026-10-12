@@ -46,14 +46,14 @@ const FIELDS: FieldDef[] = [
       { value: 'compact', label: 'Compact: details on the card' },
       { value: 'full', label: 'Full: links to a profile page' },
     ],
-    hint: 'Compact shows the bio, Selected experience and Expertise on the card. Full keeps the card short and links to the member’s profile page; a profile page has to be built first, and until it exists the card shows no link.',
+    hint: 'Compact shows the bio, Selected experience and Expertise on the card. Full keeps the card short (the bio and the first two Selected experience lines) and links to the member’s profile page; a profile page has to be built first, and until it exists the card shows no link.',
   },
   {
     key: 'experience_items',
     label: 'Selected experience',
     type: 'stringList',
     placeholder: 'Co-led advisory on an acquisition in the fertilizer sector',
-    hint: 'Compact profiles only. One line per item, up to twelve; four reads best.',
+    hint: 'One line per item, up to twelve; four reads best. A compact card shows every line; a full card shows the first two as its key highlights.',
   },
   {
     key: 'expertise_items',
