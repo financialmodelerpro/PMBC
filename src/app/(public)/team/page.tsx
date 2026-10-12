@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { ArrowUpRight, Award, BriefcaseBusiness, MapPin } from 'lucide-react';
+import { ArrowUpRight } from 'lucide-react';
 
 import { sanitizeRichHtml } from '@/lib/cms/sanitize';
 import { fetchVisibleTeam, type TeamMemberRow } from '@/lib/cms/collections';
@@ -138,13 +138,14 @@ function ProfileLink({ href, className }: { href: string; className: string }) {
 /**
  * Every other member, in the three-up grid the collection pages share. One
  * small standard card for all of them, so the row reads as a set: a small
- * framed portrait beside the name and role, then three facts (qualification,
- * years of experience, location), up to three "Selected experience" lines as
- * key highlights, and the link through to the profile page pinned to the foot.
+ * framed portrait beside the name, role and one credentials line
+ * (qualification | years of experience | location), up to three "Selected
+ * experience" lines as key highlights, and the link through to the profile
+ * page pinned to the foot.
  *
  * The bio and "Expertise" are deliberately not on the card: they belong to the
- * profile page, which carries everything. Each fact and the list render only
- * when filled, and a member without a profile page simply has no link.
+ * profile page, which carries everything. Each part of the line and the list
+ * render only when filled, and a member without a profile page has no link.
  */
 function MemberCard({
   member,
@@ -153,11 +154,14 @@ function MemberCard({
   member: TeamMemberRow;
   profilePath: string | null;
 }) {
+  // One credentials line, the same treatment as the founding partner's
+  // "ACCA | FMVA | 12+ Years Experience": qualification, years, location.
+  const years = text(member.experience_years);
   const facts = [
-    { icon: Award, label: 'Qualification', value: text(member.credentials) },
-    { icon: BriefcaseBusiness, label: 'Experience', value: text(member.experience_years) },
-    { icon: MapPin, label: 'Location', value: text(member.location) },
-  ].filter((f) => f.value);
+    text(member.credentials),
+    years && !/experience/i.test(years) ? `${years} Experience` : years,
+    text(member.location),
+  ].filter(Boolean);
   const highlights = items(member.experience_items).slice(0, CARD_HIGHLIGHTS);
 
   return (
@@ -175,23 +179,19 @@ function MemberCard({
               {member.role}
             </p>
           )}
+          {facts.length > 0 && (
+            <p
+              className="mt-2 text-[11px] font-semibold uppercase leading-[1.6] text-[color:var(--pmbc-muted)]"
+              style={{ letterSpacing: '0.14em' }}
+            >
+              {facts.join(' | ')}
+            </p>
+          )}
         </div>
       </div>
 
-      {facts.length > 0 && (
-        <dl className="mt-7 grid gap-2.5 border-t border-[color:var(--pmbc-border-warm)] pt-5">
-          {facts.map(({ icon: Icon, label, value }) => (
-            <div key={label} className="flex items-start gap-3 text-[13.5px] leading-[1.5]">
-              <Icon aria-hidden size={15} className="mt-[3px] shrink-0 text-[#C69C3E]" />
-              <dt className="sr-only">{label}</dt>
-              <dd className="text-[color:var(--pmbc-text)]">{value}</dd>
-            </div>
-          ))}
-        </dl>
-      )}
-
       {highlights.length > 0 && (
-        <ul className="mt-5 grid gap-2 border-t border-[color:var(--pmbc-border-warm)] pt-5">
+        <ul className="mt-7 grid gap-2 border-t border-[color:var(--pmbc-border-warm)] pt-5">
           {highlights.map((item) => (
             <li
               key={item}
