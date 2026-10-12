@@ -56,6 +56,8 @@ type Props = {
   pageMetaTitle: string;
   pageMetaDescription: string;
   initialSections: LocalSection[];
+  /** Replaces "Page builder" in the top bar, for a builder embedded elsewhere (Team & Advisors). */
+  eyebrow?: string;
 };
 
 /**
@@ -83,6 +85,7 @@ export function PageBuilder({
   pageMetaTitle,
   pageMetaDescription,
   initialSections,
+  eyebrow = 'Page builder',
 }: Props) {
   const router = useRouter();
   const [sections, setSections] = useState<LocalSection[]>(initialSections);
@@ -390,7 +393,7 @@ export function PageBuilder({
               color: ADMIN_COLORS.textMuted,
             }}
           >
-            Page builder ·{' '}
+            {eyebrow} ·{' '}
             <span
               style={{
                 fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',

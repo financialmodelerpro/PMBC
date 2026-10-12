@@ -7,6 +7,15 @@ import {
   fetchPublishedArticles,
   fetchVisibleTeam,
 } from '@/lib/cms/collections';
+import { memberProfileSlug } from '@/lib/cms/teamProfiles';
+import { publicPathForPageSlug } from '@/lib/cms/pageRoutes';
+
+/** The profiles listed before migration 109 linked members to their pages. */
+const LEGACY_PROFILE_PATHS = [
+  '/team/ahmad-din',
+  '/team/kaleem-farooq',
+  '/team/muhammad-shahjahan',
+];
 
 function baseUrl(): string {
   const fromEnv = process.env.NEXT_PUBLIC_SITE_URL;
@@ -53,6 +62,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
    * detail URLs below have always had, and the alternative (submitting a page
    * that may be empty) is worse.
    */
+  const linkedSlugs = team.map(memberProfileSlug).filter((s): s is string => s !== null);
+  const profilePaths =
+    linkedSlugs.length > 0 ? linkedSlugs.map(publicPathForPageSlug) : LEGACY_PROFILE_PATHS;
+
   const collectionIndexRoutes = [
     ...(team.length > 0 ? ['/team'] : []),
     ...(studies.length > 0 ? ['/case-studies'] : []),
@@ -71,9 +84,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // `/about` is gone: it was merged into the home page and now 301s there.
     // The profiles moved from /about/<name> to /team/<name> on 2026-10-11.
 
-    '/team/ahmad-din',
-    '/team/kaleem-farooq',
-    '/team/muhammad-shahjahan',
+    // Every published member's profile, from Team & Advisors, so a profile
+    // created there reaches crawlers with no code change.
+    ...profilePaths,
     // /team, /case-studies and /insights sit here when they have content. See
     // collectionIndexRoutes above.
     ...collectionIndexRoutes,

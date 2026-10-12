@@ -17,6 +17,7 @@ import sharp from 'sharp';
 
 import { fetchBranding } from '@/lib/cms/branding';
 import { FOUNDER_PAGE_SLUG } from '@/lib/cms/founderProfile';
+import { applyMemberToHero, fetchMemberForProfile } from '@/lib/cms/teamProfiles';
 import { PORTRAIT_RATIO, portraitCrop } from '@/lib/public/portrait';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 
@@ -46,7 +47,13 @@ async function sectionContent(pageSlug: string, type: string): Promise<Record<st
 /** The partner card, or null when the profile has no name or cannot be read. */
 export async function fetchPartnerCard(): Promise<PartnerCard | null> {
   try {
-    return partnerFromHero(await sectionContent(FOUNDER_PAGE_SLUG, 'founder_hero'));
+    // Name, photo and credentials line from his Team & Advisors record, the
+    // same source as the profile page and the /team card.
+    const [hero, member] = await Promise.all([
+      sectionContent(FOUNDER_PAGE_SLUG, 'founder_hero'),
+      fetchMemberForProfile(FOUNDER_PAGE_SLUG),
+    ]);
+    return partnerFromHero(hero ? applyMemberToHero(hero, member) : null);
   } catch {
     return null;
   }
