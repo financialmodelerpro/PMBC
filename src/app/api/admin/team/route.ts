@@ -22,8 +22,11 @@ const itemList = z
 const base = {
   name: z.string().min(1).max(160),
   role: z.string().nullish(),
-  /** Rendered as "Qualifications". The credentials line under the role. */
+  /** Rendered as "Qualification" on the card. */
   credentials: z.string().nullish(),
+  /** Migration 108. The card's "Experience" and "Location" facts. */
+  experience_years: z.string().max(60).nullish(),
+  location: z.string().max(120).nullish(),
   /** Rendered as "Experience". Sanitised rich text, so it is not length-capped. */
   bio: z.string().nullish(),
   photo: z.string().nullish(),
@@ -37,9 +40,27 @@ const base = {
   expertise_items: itemList,
 };
 
+/** The two columns migration 108 adds. */
+const COLUMNS_108 = ['experience_years', 'location'] as const;
+
 export const { GET, POST, PATCH, DELETE } = createCollectionApi({
   table: 'team_members',
   orderBy: { column: 'display_order', ascending: true },
+  /**
+   * Until migration 108 is applied the two columns do not exist, and writing
+   * either would fail the whole save. On update the stored row says whether
+   * they exist; on create there is no row to ask, so an empty value is simply
+   * not sent. Empty becomes null once the columns are there.
+   */
+  transformWrite: (row, { before }) => {
+    for (const key of COLUMNS_108) {
+      if (!(key in row)) continue;
+      const value = typeof row[key] === 'string' ? (row[key] as string).trim() : '';
+      if (before ? !(key in before) : !value) delete row[key];
+      else row[key] = value || null;
+    }
+    return row;
+  },
   createSchema: z.object(base),
   updateSchema: z.object({
     ...base,

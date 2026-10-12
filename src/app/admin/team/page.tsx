@@ -13,8 +13,14 @@ import { adminPageMain } from '@/lib/admin/styles';
  *
  * Two column names read differently here than in the database, because the card
  * is what an operator is filling in:
- *   credentials -> Qualifications   the letters after the name
- *   bio         -> Short bio        the short paragraph of background
+ *   credentials -> Qualification    the letters after the name
+ *   bio         -> Short bio        the founding partner's card only
+ *
+ * Every other member's card is the same small standard card: qualification,
+ * years of experience, location and up to three Selected experience lines,
+ * with everything else on their profile page. `profile_type` and
+ * `expertise_items` (migration 101) stay on the table but are no longer
+ * edited here, since no card renders them any more.
  *
  * `linkedin_url` and `email` are deliberately absent. Both columns still exist
  * on `team_members` (migration 023) and an applied migration is never edited, but
@@ -27,40 +33,37 @@ const FIELDS: FieldDef[] = [
   { key: 'role', label: 'Role', type: 'text', placeholder: 'Founding Partner' },
   {
     key: 'credentials',
-    label: 'Qualifications',
+    label: 'Qualification',
     type: 'text',
-    placeholder: 'ACCA | FMVA | 12+ Years Experience',
-    hint: 'The credentials line under the role. Kept short: it renders in small uppercase.',
+    placeholder: 'ACMA (ICMAP)',
+    hint: 'The professional qualification, kept short. Shown on the card; leave empty if there is none.',
+  },
+  {
+    key: 'experience_years',
+    label: 'Experience',
+    type: 'text',
+    placeholder: '12+ years',
+    hint: 'Years of experience, as it should read on the card. Needs migration 108.',
+  },
+  {
+    key: 'location',
+    label: 'Location',
+    type: 'text',
+    placeholder: 'Riyadh, KSA',
+    hint: 'Where the member is based. Needs migration 108.',
   },
   {
     key: 'bio',
     label: 'Short bio',
     type: 'richtext',
-    hint: 'A short paragraph of background. Keep it brief for a full profile, since the card links through to the profile page.',
-  },
-  {
-    key: 'profile_type',
-    label: 'Profile type',
-    type: 'select',
-    options: [
-      { value: 'compact', label: 'Compact: details on the card' },
-      { value: 'full', label: 'Full: links to a profile page' },
-    ],
-    hint: 'Compact shows the bio, Selected experience and Expertise on the card. Full keeps the card short (the bio and the first two Selected experience lines) and links to the member’s profile page; a profile page has to be built first, and until it exists the card shows no link.',
+    hint: 'Shown on the founding partner’s card only. Every other member’s background belongs on their profile page, edited in the page builder.',
   },
   {
     key: 'experience_items',
     label: 'Selected experience',
     type: 'stringList',
     placeholder: 'Co-led advisory on an acquisition in the fertilizer sector',
-    hint: 'One line per item, up to twelve; four reads best. A compact card shows every line; a full card shows the first two as its key highlights.',
-  },
-  {
-    key: 'expertise_items',
-    label: 'Expertise',
-    type: 'stringList',
-    placeholder: 'Business Valuation',
-    hint: 'Compact profiles only. One short item each, shown as small tags.',
+    hint: 'The card’s key highlights: the first three lines show, so keep each to one short sentence. The full list belongs on the profile page.',
   },
   {
     key: 'photo',
@@ -113,9 +116,7 @@ export default function AdminTeamPage() {
             name: '',
             visible: true,
             display_order: 0,
-            profile_type: 'compact',
             experience_items: [],
-            expertise_items: [],
           }}
           itemLabel={(r) => (r.name as string) || 'Team member'}
           statusTone={(r) => (r.visible ? 'success' : 'neutral')}

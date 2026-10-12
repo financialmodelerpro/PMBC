@@ -1,8 +1,9 @@
 -- 107_team_shahjahan_profile.sql
 --
 -- One card shape for every team member except the founding partner (owner's
--- instruction, 2026-10-12): a short card on /team (bio and two key highlights)
--- with "Read the full profile" through to a profile page holding the rest.
+-- instruction, 2026-10-12): a small standard card on /team (qualification,
+-- experience, location and up to three key highlights; see 108) with "Read
+-- the full profile" through to a profile page holding everything else.
 --
 --   1. Muhammad Shahjahan gets a profile page at /team/muhammad-shahjahan: a
 --      cms_pages row and four page-builder sections, the same section types
@@ -14,10 +15,11 @@
 --      The hero, experience and expertise are the owner's approved copy from
 --      migration 102, verbatim. The role paragraph states the standing delivery
 --      model and names no client or figure.
---   2. His team card becomes "full", so it shows the teaser and links through.
---   3. Kaleem Farooq's card gains two "Selected experience" lines, condensed
---      from his own profile's Career highlights, so his card shows two key
---      highlights like every other full card. Set only while the list is empty.
+--   2. His team card's profile_type becomes "full" (kept tidy; since 108 the
+--      card no longer reads it).
+--   3. Kaleem Farooq's card gains three "Selected experience" lines, condensed
+--      from his own profile's Career highlights, so his card shows key
+--      highlights like every other card. Set only while the list is empty.
 --
 -- The hero name must equal the team card name ("Muhammad Shahjahan, ACMA"):
 -- that is how /team matches a card to its profile page.
@@ -34,7 +36,7 @@
 -- only when absent, Kaleem's lines only while his list is empty, and the
 -- profile_type update sets the same value again. Nothing is deleted.
 --
--- Check after applying (expect 4 sections; Shahjahan full; Kaleem 2 lines):
+-- Check after applying (expect 4 sections; Shahjahan full; Kaleem 3 lines):
 --   SELECT section_type, display_order FROM page_sections
 --   WHERE page_slug = 'about-muhammad-shahjahan' ORDER BY display_order;
 --   SELECT name, profile_type, cardinality(experience_items) AS lines
@@ -109,7 +111,8 @@ WHERE lower(trim(name)) LIKE 'muhammad shahjahan%';
 UPDATE team_members
 SET experience_items = ARRAY[
   'Led Royal Cyber''s Regional Headquarters licensing with the Ministry of Investment (MISA), securing 240 visas and a 10-year tax exemption',
-  'Ran finance through Rewaa''s Series A fundraise, covering due diligence, the investor data room and the cap table'
+  'Ran finance through Rewaa''s Series A fundraise, covering due diligence, the investor data room and the cap table',
+  'Led financial reporting for two Ministry of Interior projects worth SAR 7.5 billion'
 ]
 WHERE lower(trim(name)) = 'kaleem farooq'
   AND cardinality(experience_items) = 0;
