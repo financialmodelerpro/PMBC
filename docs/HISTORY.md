@@ -8,6 +8,10 @@ Dated records moved out of `CLAUDE.md` on 2026-09-22, newest first. Session-by-s
 - ~~**Replace hardcoded admin password fallback in seed-admin.mjs and the four smoke/verify scripts with an environment variable.**~~ The four are `rotate-admin-password.mjs`, `smoke-admin.mjs`, `smoke-builder.mjs` and `verify-parity8.mjs`. The value is the retired password, dead since 2026-08-02; it was removed on 2026-09-22 from every markdown file (the backup `docs/archive/CLAUDE.md.bak-2026-09-22` in a follow-up the same day), and three saved permission rules carrying password values were removed from `.claude/settings.local.json`. It remains in git history. **Closed 2026-09-22:** the four scripts require `ADMIN_PASSWORD` with no fallback, and the rotation script holds the retired value only as a SHA-256 digest.
 - The tool open items listed in the handoff at the top of `SESSION_LOG.md`.
 
+## 2026-10-12: Muhammad Aadil Aamir joins /team
+
+Owner-approved: Muhammad Aadil Aamir, M&A and Financial Modeler Expert, in Shahjahan's pattern (card plus profile page, edited in Team & Advisors), placed third. The owner's copy verbatim, except "At PMBC" which reads "At PaceMakers". No qualification line (his degree is in his bio), "4+ years", no photo yet, no contacts, and no "His role at PaceMakers" section since no copy was supplied. Migration 111 (DML, hand-run); no code change.
+
 ## 2026-10-12: Home founder block from Team & Advisors
 
 The home page founder block no longer holds its own copy of the founding partner: name, photo, credentials line, bio, proof points and the profile link come from his Team & Advisors record and profile (`withFounderBlock`). The owner chose the home block's two-paragraph bio as his one bio, so it moved into his Short bio and his /team card shows it too. His credentials line on the home page now reads from his record ("Founding Partner · ACCA · FMVA · AFM · 12+ Years Experience") instead of the longer hand-typed line. Migration 110 (DML, hand-run, before the deploy).
