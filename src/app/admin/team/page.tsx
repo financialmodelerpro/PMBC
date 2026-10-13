@@ -4,6 +4,7 @@ import { AdminPageHeader } from '@/components/admin/AdminPageHeader';
 import { CollectionManager, type ListColumn } from '@/components/admin/CollectionManager';
 import { adminPageMain } from '@/lib/admin/styles';
 
+import { CardsPerRowControl } from './CardsPerRowControl';
 import { MEMBER_FIELDS } from './fields';
 
 /*
@@ -41,6 +42,7 @@ export default function AdminTeamPage() {
           title="Team & Advisors"
           description="Everything about each person, in one place: open a member to edit the details their /team card and profile header share, and their full profile page. The founding partner leads /team; use the arrows to order everyone else. While this list is empty /team stays out of the navbar, the footer and the sitemap."
         />
+        <CardsPerRowControl />
         <CollectionManager
           apiBase="/api/admin/team"
           fields={MEMBER_FIELDS}

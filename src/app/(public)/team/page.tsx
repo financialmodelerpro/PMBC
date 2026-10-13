@@ -19,6 +19,7 @@ import {
 import { publicPathForPageSlug } from '@/lib/cms/pageRoutes';
 import { buildPageMetadata } from '@/lib/seo/metadata';
 import { fetchPage, fetchPageSections } from '@/lib/cms/pages';
+import { teamCardsPerRow } from '@/lib/cms/teamSettings';
 import { FirmPageBody } from '@/components/public/FirmPageBody';
 import { ProfilePhoto } from '@/components/public/ProfilePhoto';
 
@@ -235,9 +236,10 @@ export default async function TeamPage(props: {
   const search = await props.searchParams;
   const isPreview = search.preview === '1';
 
-  const [team, sections] = await Promise.all([
+  const [team, sections, perRow] = await Promise.all([
     fetchVisibleTeam(),
     fetchPageSections('team', { onlyVisible: !isPreview }),
+    teamCardsPerRow(),
   ]);
 
   // Since migration 109 each member names their own profile page
@@ -291,7 +293,7 @@ export default async function TeamPage(props: {
               {lead && <FoundingPartnerCard member={lead} profilePath={pathFor(lead)} />}
               {rest.length > 0 && (
                 <ul
-                  className={`grid gap-6 sm:grid-cols-2 lg:grid-cols-3 ${lead ? 'mt-8' : ''}`}
+                  className={`grid gap-6 sm:grid-cols-2 ${perRow === 3 ? 'lg:grid-cols-3' : ''} ${lead ? 'mt-8' : ''}`}
                 >
                   {rest.map((m) => (
                     <MemberCard

@@ -30,6 +30,8 @@ const settingsSchema = z.object({
    * means off, which is what `isTestimonialFormPublic` reads.
    */
   testimonial_form_public: z.boolean().optional(),
+  /** Member cards per row on /team at desktop width; absent means 3. Set from Team & Advisors. */
+  team_cards_per_row: z.union([z.literal(2), z.literal(3)]).optional(),
 });
 
 async function handleMutation(req: Request) {
