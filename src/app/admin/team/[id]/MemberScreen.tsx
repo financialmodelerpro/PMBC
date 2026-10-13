@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, ArrowUpRight, Loader2, Plus, Trash2 } from 'lucide-react';
+import { ArrowLeft, ArrowUpRight, FlipHorizontal2, Loader2, Plus, Trash2 } from 'lucide-react';
 
 import { FieldInput, type FieldDef } from '@/components/admin/CollectionManager';
 import { SaveButton } from '@/components/admin/SaveButton';
@@ -70,6 +70,7 @@ export function MemberScreen({
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [mirroring, setMirroring] = useState(false);
 
   const name = String(form.name ?? '') || 'Team member';
 
@@ -99,6 +100,26 @@ export function MemberScreen({
       setError(e instanceof Error ? e.message : 'Save failed');
     } finally {
       setSaving(false);
+    }
+  };
+
+  /** A flipped copy of the current photo, held in the form until Save details. */
+  const mirrorPhoto = async () => {
+    setMirroring(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/admin/team/photo-mirror', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: form.photo }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.url) throw new Error(json.error || 'Could not mirror the photo');
+      set('photo', json.url);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not mirror the photo');
+    } finally {
+      setMirroring(false);
     }
   };
 
@@ -209,6 +230,23 @@ export function MemberScreen({
               >
                 <label style={adminLabel}>{f.label}</label>
                 <FieldInput field={f} value={form[f.key]} onChange={(v) => set(f.key, v)} />
+                {f.key === 'photo' && typeof form.photo === 'string' && form.photo && (
+                  <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      onClick={mirrorPhoto}
+                      disabled={mirroring}
+                      style={{ ...adminButtonGhost, opacity: mirroring ? 0.6 : 1 }}
+                    >
+                      {mirroring ? <Loader2 size={14} className="animate-spin" /> : <FlipHorizontal2 size={14} />}
+                      {mirroring ? 'Mirroring…' : 'Mirror photo'}
+                    </button>
+                    <span style={{ ...adminFieldHint, margin: 0 }}>
+                      Saves a left-to-right flipped copy and puts it in the Photo field. Save details to publish
+                      it; the original file is kept.
+                    </span>
+                  </div>
+                )}
                 {f.hint && <p style={adminFieldHint}>{f.hint}</p>}
               </div>
             ))}
