@@ -10,7 +10,9 @@ import { MEMBER_FIELDS } from './fields';
  * The team list. Each member opens on their own screen (/admin/team/<id>),
  * which holds everything about them: the details the card and profile header
  * share, and the profile page's sections. New members start in the drawer with
- * their details; the profile page is created from their screen.
+ * their details; the profile page is created from their screen. Publish and
+ * Unpublish on each row flip the member's Published setting without opening
+ * them: it hides or shows both their /team card and their profile page.
  */
 const COLUMNS: ListColumn[] = [
   { key: 'name', label: 'Name' },
@@ -48,6 +50,7 @@ export default function AdminTeamPage() {
           newDefaults={{ name: '', visible: true, display_order: 0 }}
           itemLabel={(r) => (r.name as string) || 'Team member'}
           statusTone={(r) => (r.visible ? 'success' : 'neutral')}
+          quickToggle={{ key: 'visible', onLabel: 'Publish', offLabel: 'Unpublish' }}
           emptyHint="No team members yet. Add the first profile to put /team back in the navbar and footer."
         />
       </div>

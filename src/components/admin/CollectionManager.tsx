@@ -71,6 +71,7 @@ export function CollectionManager({
   statusTone,
   emptyHint = 'Nothing here yet. Create your first entry.',
   editHref,
+  quickToggle,
 }: {
   apiBase: string;
   fields: FieldDef[];
@@ -86,11 +87,18 @@ export function CollectionManager({
    * Advisors). Creating still uses the drawer.
    */
   editHref?: (row: Row) => string;
+  /**
+   * When set, each row gets a one-click button beside Edit that flips this
+   * boolean column and saves at once through the same PATCH (Team & Advisors'
+   * Published), so the row need not be opened to publish or unpublish it.
+   */
+  quickToggle?: { key: string; onLabel: string; offLabel: string };
 }) {
   const router = useRouter();
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [toggling, setToggling] = useState<string | null>(null);
   const [editing, setEditing] = useState<Row | null>(null);
   const [isNew, setIsNew] = useState(false);
 
@@ -160,6 +168,30 @@ export function CollectionManager({
     [rows, apiBase, load],
   );
 
+  const toggle = useCallback(
+    async (row: Row) => {
+      if (!quickToggle) return;
+      const next = !row[quickToggle.key];
+      setToggling(row.id);
+      setError(null);
+      try {
+        const res = await fetch(apiBase, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: row.id, [quickToggle.key]: next }),
+        });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(json.error || 'Failed to save');
+        setRows((list) => list.map((r) => (r.id === row.id ? { ...r, [quickToggle.key]: next } : r)));
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Failed to save');
+      } finally {
+        setToggling(null);
+      }
+    },
+    [quickToggle, apiBase],
+  );
+
   return (
     <div>
       <div
@@ -214,7 +246,7 @@ export function CollectionManager({
                     {c.label}
                   </th>
                 ))}
-                <th style={{ ...thStyle, width: 60 }} />
+                <th style={{ ...thStyle, width: quickToggle ? 190 : 60 }} />
               </tr>
             </thead>
             <tbody>
@@ -273,7 +305,28 @@ export function CollectionManager({
                       </td>
                     );
                   })}
-                  <td style={{ ...tdStyle, textAlign: 'right' }}>
+                  <td style={{ ...tdStyle, textAlign: 'right', whiteSpace: 'nowrap' }}>
+                    {quickToggle && (
+                      <button
+                        type="button"
+                        onClick={() => toggle(row)}
+                        disabled={toggling === row.id}
+                        style={{
+                          ...adminButtonGhost,
+                          padding: '5px 12px',
+                          marginRight: 6,
+                          opacity: toggling === row.id ? 0.6 : 1,
+                        }}
+                      >
+                        {toggling === row.id ? (
+                          <Loader2 size={13} className="animate-spin" />
+                        ) : row[quickToggle.key] ? (
+                          quickToggle.offLabel
+                        ) : (
+                          quickToggle.onLabel
+                        )}
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={() => openEdit(row)}
