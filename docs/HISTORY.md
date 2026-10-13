@@ -8,6 +8,10 @@ Dated records moved out of `CLAUDE.md` on 2026-09-22, newest first. Session-by-s
 - ~~**Replace hardcoded admin password fallback in seed-admin.mjs and the four smoke/verify scripts with an environment variable.**~~ The four are `rotate-admin-password.mjs`, `smoke-admin.mjs`, `smoke-builder.mjs` and `verify-parity8.mjs`. The value is the retired password, dead since 2026-08-02; it was removed on 2026-09-22 from every markdown file (the backup `docs/archive/CLAUDE.md.bak-2026-09-22` in a follow-up the same day), and three saved permission rules carrying password values were removed from `.claude/settings.local.json`. It remains in git history. **Closed 2026-09-22:** the four scripts require `ADMIN_PASSWORD` with no fallback, and the rotation script holds the retired value only as a SHA-256 digest.
 - The tool open items listed in the handoff at the top of `SESSION_LOG.md`.
 
+## 2026-10-13: Muhammad Abuzar Sadiq joins /team
+
+Owner-approved: Muhammad Abuzar Sadiq, Market Research and Feasibility Expert, in Aadil's pattern (card plus profile page with header, Selected experience and Areas of expertise, edited in Team & Advisors), placed fifth after the existing members. The owner's copy verbatim, "3+ years", no photo yet, no contacts. Qualification rule, set by the owner: a professional qualification goes on the card line (Shahjahan ACMA (ICMAP), Abuzar FMVA) and a degree alone does not (Kaleem, Aadil). Migration 112 (DML, hand-run); no code change.
+
 ## 2026-10-12: Muhammad Aadil Aamir joins /team
 
 Owner-approved: Muhammad Aadil Aamir, M&A and Financial Modeler Expert, in Shahjahan's pattern (card plus profile page, edited in Team & Advisors), placed third. The owner's copy verbatim, except "At PMBC" which reads "At PaceMakers". No qualification line (his degree is in his bio), "4+ years", no photo yet, no contacts, and no "His role at PaceMakers" section since no copy was supplied. Migration 111 (DML, hand-run); no code change.
