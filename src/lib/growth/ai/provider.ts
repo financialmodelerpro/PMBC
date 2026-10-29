@@ -24,7 +24,17 @@ export type ProviderRequest = {
   agent: string;
   /** Let the model search the web, at most `maxUses` times. */
   webSearch?: { maxUses: number };
+  /**
+   * A tool the model calls once to return its result (2026-10-29). Its input,
+   * checked by the API against the schema, comes back as `toolInput`, so the
+   * agent never has to read JSON out of prose.
+   */
+  resultTool?: ResultTool;
+  /** Give up on one request after this long. */
+  timeoutMs?: number;
 };
+
+export type ResultTool = { name: string; description: string; inputSchema: Record<string, unknown> };
 
 export type ProviderResponse = {
   text: string;
@@ -40,6 +50,12 @@ export type ProviderResponse = {
   webSearchRequests?: number;
   /** Every URL returned by a web search result or a citation in the answer. */
   sourceUrls?: string[];
+  /** The result tool's input, when the model called it. */
+  toolInput?: unknown;
+  /** Why each request in the call stopped, in order (end_turn, pause_turn, tool_use, max_tokens, refusal). */
+  stopReasons?: string[];
+  /** Requests made, resumes and the reminder to report included. */
+  requests?: number;
 };
 
 export interface AiProvider {

@@ -13,6 +13,13 @@
  * resumed up to three times. Token usage and searches are summed across the
  * resumed requests, and every URL a search returned or a citation named is
  * reported back so the agent can check its sources against them.
+ *
+ * Result tool (2026-10-29): an agent that needs a structured answer passes
+ * `resultTool`. It is offered as a strict tool next to web search, with
+ * tool_choice auto (forced tool choice is refused by some current models).
+ * The call ends when the model calls it; if the model finishes without doing
+ * so, it is asked once to call it now. The tool input is returned as
+ * `toolInput`, along with every request's stop reason.
  */
 
 import Anthropic from '@anthropic-ai/sdk';
@@ -21,6 +28,7 @@ import type { AiProvider, ProviderRequest, ProviderResponse } from './provider';
 
 const FALLBACK_MODELS = new Set(['claude-opus-5']);
 const MAX_RESUMES = 3;
+const REPORT_NOW = (name: string) => `Call ${name} now, once, with every event you found, or with an empty list if none qualified. Do not search again.`;
 
 export function createAnthropicProvider(apiKey: string): AiProvider {
   const client = new Anthropic({ apiKey });
@@ -29,23 +37,35 @@ export function createAnthropicProvider(apiKey: string): AiProvider {
     isMock: false,
     async call(req: ProviderRequest): Promise<ProviderResponse> {
       const messages: Anthropic.Beta.BetaMessageParam[] = req.messages.map((m) => ({ role: m.role, content: m.content }));
-      const tools: Anthropic.Beta.BetaToolUnion[] | undefined = req.webSearch ? [{ type: 'web_search_20260209', name: 'web_search', max_uses: req.webSearch.maxUses }] : undefined;
+      const tools: Anthropic.Beta.BetaToolUnion[] = [];
+      if (req.webSearch) tools.push({ type: 'web_search_20260209', name: 'web_search', max_uses: req.webSearch.maxUses });
+      if (req.resultTool) tools.push({ name: req.resultTool.name, description: req.resultTool.description, input_schema: req.resultTool.inputSchema as Anthropic.Beta.BetaTool.InputSchema, strict: true });
+      const result = req.resultTool?.name;
       const fallback = FALLBACK_MODELS.has(req.model);
       const totals = { input: 0, output: 0, cacheWrite: 0, cacheRead: 0, searches: 0 };
       const urls = new Set<string>();
       const texts: string[] = [];
       let model = req.model;
       let refused = false;
+      let toolInput: unknown = undefined;
+      let reminded = false;
+      const stopReasons: string[] = [];
 
-      for (let attempt = 0; attempt <= MAX_RESUMES; attempt++) {
-        const response = await client.beta.messages.create({
-          model: req.model,
-          max_tokens: req.maxTokens,
-          ...(req.system ? { system: req.system } : {}),
-          messages,
-          ...(tools ? { tools } : {}),
-          ...(fallback ? { betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' as const } : {}),
-        });
+      // Resumes after a paused turn, plus one reminder to report.
+      for (let attempt = 0; attempt <= MAX_RESUMES + 1; attempt++) {
+        const response = await client.beta.messages.create(
+          {
+            model: req.model,
+            max_tokens: req.maxTokens,
+            ...(req.system ? { system: req.system } : {}),
+            messages,
+            ...(tools.length ? { tools } : {}),
+            ...(result ? { tool_choice: { type: 'auto' as const } } : {}),
+            ...(fallback ? { betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' as const } : {}),
+          },
+          req.timeoutMs ? { timeout: req.timeoutMs, maxRetries: 1 } : undefined,
+        );
+        stopReasons.push(String(response.stop_reason));
         model = response.model;
         totals.input += response.usage.input_tokens;
         totals.output += response.usage.output_tokens;
@@ -57,6 +77,7 @@ export function createAnthropicProvider(apiKey: string): AiProvider {
           if (block.type === 'web_search_tool_result' && Array.isArray(block.content)) {
             for (const r of block.content) if (r.type === 'web_search_result') urls.add(r.url);
           }
+          if (block.type === 'tool_use' && result && block.name === result && toolInput === undefined) toolInput = block.input;
           if (block.type === 'text') {
             texts.push(block.text);
             for (const c of block.citations ?? []) if ('url' in c && typeof c.url === 'string') urls.add(c.url);
@@ -66,8 +87,19 @@ export function createAnthropicProvider(apiKey: string): AiProvider {
           refused = true;
           break;
         }
-        if (response.stop_reason !== 'pause_turn') break;
-        messages.push({ role: 'assistant', content: response.content as Anthropic.Beta.BetaContentBlockParam[] });
+        if (toolInput !== undefined) break;
+        if (response.stop_reason === 'pause_turn') {
+          messages.push({ role: 'assistant', content: response.content as Anthropic.Beta.BetaContentBlockParam[] });
+          continue;
+        }
+        // Finished without reporting: ask once for the tool call, so the answer is never left as prose.
+        if (result && !reminded && response.stop_reason === 'end_turn') {
+          reminded = true;
+          messages.push({ role: 'assistant', content: response.content as Anthropic.Beta.BetaContentBlockParam[] });
+          messages.push({ role: 'user', content: REPORT_NOW(result) });
+          continue;
+        }
+        break;
       }
 
       return {
@@ -80,6 +112,9 @@ export function createAnthropicProvider(apiKey: string): AiProvider {
         refused,
         webSearchRequests: totals.searches,
         sourceUrls: [...urls],
+        toolInput: refused ? undefined : toolInput,
+        stopReasons,
+        requests: stopReasons.length,
       };
     },
   };

@@ -86,7 +86,7 @@ check('the prompt spells out GCC only when a GCC keyword is on', p.system.includ
 
 const src = read('src/lib/growth/feed.ts');
 check('paused: the cron run is skipped', /trigger === 'cron' && paused\) return skip/.test(src));
-check('paused: a run by hand saves nothing', /const noSave = ai\.mock \|\| paused;/.test(src) && src.indexOf('if (noSave) {') > 0 && src.indexOf('if (noSave) {') < src.indexOf('await createSignal('));
+check('paused: a run by hand saves nothing', /const noSave = mock \|\| paused;/.test(src) && src.indexOf('if (noSave) {') > 0 && src.indexOf('if (noSave) {') < src.indexOf('await createSignal('));
 check('the feed reads the library, falling back to the old list before 094', src.includes('activeKeywords(lib)') && src.includes("lib.source === 'pending'"));
 check('the AI call still goes through runAi with web search', /runAi\(\{ agent: FEED_AGENT[^)]*webSearch/.test(src));
 

@@ -9,7 +9,17 @@ import { dateTime } from '@/lib/growth/format';
 import { sendJson } from '../ui/client';
 import { MockBadge, NoticeLine, PrimaryButton, useAction } from '../ui/kit';
 
-type Run = { id: string; created_at: string; trigger: string; mode: string; status: string; found: number; saved: number; duplicates: number; discarded: number; is_test: boolean };
+type Run = { id: string; created_at: string; trigger: string; mode: string; status: string; found: number; saved: number; duplicates: number; discarded: number; is_test: boolean; detail?: Record<string, unknown> | null };
+
+/** How a past run read its answers and what it searched, from its stored detail (runs before 2026-10-29 have neither). */
+function runDetail(r: Run): string {
+  const d = r.detail ?? {};
+  const parts: string[] = [];
+  if (typeof d.parse_summary === 'string') parts.push(d.parse_summary);
+  if (typeof d.searches === 'number') parts.push(`${d.searches} searches`);
+  if (typeof d.cost_usd === 'number') parts.push(`USD ${d.cost_usd.toFixed(2)}`);
+  return parts.length ? ` (${parts.join(', ')})` : '';
+}
 
 const TONE = { kept: 'success', duplicate: 'neutral', discarded: 'danger', over_limit: 'warning' } as const;
 
@@ -33,7 +43,7 @@ export function FeedPanel({ runs, available, keywords, paused }: { runs: Run[]; 
             Daily signal feed
           </h2>
           <p style={{ margin: '4px 0 0', fontSize: 12, color: ADMIN_COLORS.textMuted }}>
-            {available ? `Runs each morning at 09:00 Riyadh time${paused ? ' (paused)' : ''} with ${keywords} keywords switched on (Settings). While paused a run by hand is a preview and saves nothing. Keeps only signals with a real evidence link, skips duplicates and stops at the AI budget.` : 'Needs 088_growth_prospecting.sql applied first.'}
+            {available ? `Runs each morning at 09:00 Riyadh time${paused ? ' (paused)' : ''} with ${keywords} keywords switched on (Settings). While paused a run by hand is a preview and saves nothing. Searches each keyword group in its own call, inside the cost ceiling in Settings. Keeps only signals with a real evidence link, skips duplicates and stops at the AI budget. Each run says how its answers read, so nothing found is never confused with an answer that could not be read.` : 'Needs 088_growth_prospecting.sql applied first.'}
           </p>
         </div>
         <PrimaryButton onClick={go} disabled={busy !== null || !available}>
@@ -50,7 +60,7 @@ export function FeedPanel({ runs, available, keywords, paused }: { runs: Run[]; 
           )}
           {decisions.map((d, i) => (
             <li key={`${d.evidence_url}-${i}`} style={{ fontSize: 13 }}>
-              <span style={adminBadge(TONE[d.outcome])}>{d.outcome.replace('_', ' ')}</span> <strong>{d.company_name || 'Unnamed'}</strong>: {d.summary} {d.matched_keyword && <span style={{ color: ADMIN_COLORS.textMuted }}>[{d.matched_keyword}] </span>}<span style={{ color: ADMIN_COLORS.textMuted }}>({d.why})</span>
+              <span style={adminBadge(TONE[d.outcome])}>{d.outcome.replace('_', ' ')}</span> <strong>{d.company_name || 'Unnamed'}</strong>: {d.summary} {d.matched_keyword && <span style={{ color: ADMIN_COLORS.textMuted }}>[{d.matched_keyword}] </span>}<span style={{ color: ADMIN_COLORS.textMuted }}>({d.group ? `${d.group}: ` : ''}{d.why})</span>
             </li>
           ))}
         </ul>
@@ -59,8 +69,9 @@ export function FeedPanel({ runs, available, keywords, paused }: { runs: Run[]; 
         <div style={{ marginTop: 12, fontSize: 12, color: ADMIN_COLORS.textMuted }}>
           Last runs:{' '}
           {runs.map((r) => (
-            <span key={r.id} style={{ marginRight: 12 }}>
+            <span key={r.id} style={{ display: 'block', marginTop: 2 }}>
               {dateTime(r.created_at)} {r.trigger} {r.mode === 'mock_preview' ? '(mock preview)' : ''}: {r.status}, {r.saved} kept, {r.duplicates} duplicates, {r.discarded} discarded
+              {runDetail(r)}
             </span>
           ))}
         </div>
