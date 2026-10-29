@@ -74,6 +74,10 @@ export const mockProvider: AiProvider = {
       refused: false,
       webSearchRequests: 0,
       sourceUrls: json !== undefined ? sampleUrls(json) : [],
+      // A result tool gets the sample as its input, as a real model's tool call would carry it.
+      toolInput: req.resultTool && json !== undefined ? json : undefined,
+      stopReasons: [req.resultTool && json !== undefined ? 'tool_use' : 'end_turn'],
+      requests: 1,
     };
   },
 };

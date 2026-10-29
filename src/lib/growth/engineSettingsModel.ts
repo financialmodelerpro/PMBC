@@ -104,6 +104,9 @@ export const ENGINE_LIMITS = {
   keywords: 50,
   keyword: 120,
   feedMax: { min: 1, max: 50 },
+  feedWindowDays: { min: 1, max: 90 },
+  feedSearchesPerGroup: { min: 1, max: 10 },
+  feedMaxCostUsd: { min: 0.1, max: 50 },
   chatMessages: { min: 4, max: 100 },
   chatPerIp: { min: 1, max: 100 },
   checkinDays: { min: 7, max: 730 },
@@ -116,6 +119,9 @@ export type EngineSettings = {
   signal_keywords: string[];
   signal_feed_paused: boolean;
   signal_feed_max_per_run: number;
+  signal_feed_window_days: number;
+  signal_feed_searches_per_group: number;
+  signal_feed_max_cost_usd: number;
   scoring_weights: ScoringWeights;
   sector_tiers: SectorTiers;
   agent_models: Record<string, string>;
@@ -141,6 +147,10 @@ export const ENGINE_SETTING_COLUMNS: Record<EngineSettingKey, { migration: strin
   signal_keywords: { migration: '088_growth_prospecting.sql', default: [] },
   signal_feed_paused: { migration: '088_growth_prospecting.sql', default: false },
   signal_feed_max_per_run: { migration: '088_growth_prospecting.sql', default: 10 },
+  // Coverage (113): the feed runs on these defaults until 113 is applied; the form shows them read only.
+  signal_feed_window_days: { migration: '113_growth_feed_coverage.sql', default: 30 },
+  signal_feed_searches_per_group: { migration: '113_growth_feed_coverage.sql', default: 5 },
+  signal_feed_max_cost_usd: { migration: '113_growth_feed_coverage.sql', default: 3 },
   scoring_weights: { migration: '088_growth_prospecting.sql', default: DEFAULT_SCORING_WEIGHTS },
   sector_tiers: { migration: '096_growth_sector_tiers.sql', default: DEFAULT_SECTOR_TIERS },
   agent_models: { migration: '088_growth_prospecting.sql', default: {} },
@@ -186,6 +196,16 @@ export const engineGroupSchemas = {
       .optional(),
     signal_feed_paused: z.boolean(),
     signal_feed_max_per_run: z.number().int().min(ENGINE_LIMITS.feedMax.min).max(ENGINE_LIMITS.feedMax.max),
+  }),
+  /** Feed coverage (migration 113): the date window, searches per keyword group and the cost ceiling of one run. */
+  signal_feed_coverage: z.object({
+    signal_feed_window_days: z.number().int().min(ENGINE_LIMITS.feedWindowDays.min).max(ENGINE_LIMITS.feedWindowDays.max),
+    signal_feed_searches_per_group: z.number().int().min(ENGINE_LIMITS.feedSearchesPerGroup.min).max(ENGINE_LIMITS.feedSearchesPerGroup.max),
+    signal_feed_max_cost_usd: z
+      .number()
+      .min(ENGINE_LIMITS.feedMaxCostUsd.min)
+      .max(ENGINE_LIMITS.feedMaxCostUsd.max)
+      .transform((n) => Math.round(n * 100) / 100),
   }),
   scoring: z.object({ scoring_weights: scoringWeightsSchema }),
   sector_tiers: z.object({ sector_tiers: sectorTiersSchema }),

@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 
 import { AdminPageHeader } from '@/components/admin/AdminPageHeader';
-import { AgentModelsForm, ChatOpeningForm, ChatSettingsForm, MeetingsSettingsForm, NurtureSettingsForm, LeadWeightsForm, ScoringWeightsForm, SectorTiersForm, SignalFeedForm } from '@/components/admin/growth/settings/EngineForms';
+import { AgentModelsForm, ChatOpeningForm, ChatSettingsForm, FeedCoverageForm, MeetingsSettingsForm, NurtureSettingsForm, LeadWeightsForm, ScoringWeightsForm, SectorTiersForm, SignalFeedForm } from '@/components/admin/growth/settings/EngineForms';
 import { KeywordLibrary } from '@/components/admin/growth/settings/KeywordLibrary';
 import { SettingsTabs } from '@/components/admin/growth/settings/SettingsTabs';
 import { ADMIN_COLORS } from '@/lib/admin/styles';
@@ -28,6 +28,7 @@ export default async function GrowthEngineSettingsPage() {
       <SettingsTabs active="engine" />
       {read.source === 'error' && <p style={{ color: ADMIN_COLORS.danger, fontSize: 13 }}>Could not read the settings: {read.error}</p>}
       <SignalFeedForm values={v} pending={p('signal_feed_paused', 'signal_feed_max_per_run')} />
+      <FeedCoverageForm values={v} pending={p('signal_feed_window_days', 'signal_feed_searches_per_group', 'signal_feed_max_cost_usd')} groups={library.groups.filter((g) => g.enabled && g.keywords.some((k) => k.enabled)).length} />
       <KeywordLibrary initial={library} />
       <ScoringWeightsForm values={v} pending={p('scoring_weights')} />
       <SectorTiersForm values={v} pending={p('sector_tiers')} />

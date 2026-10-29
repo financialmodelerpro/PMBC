@@ -5,6 +5,7 @@ import { useState, type ReactNode } from 'react';
 import { ADMIN_COLORS, adminCard, adminInput, adminTextarea } from '@/lib/admin/styles';
 import { GROWTH_AGENTS } from '@/lib/growth/ai/agents';
 import { DEFAULT_MODEL, MODEL_PRICES } from '@/lib/growth/ai/pricing';
+import { FEED_CONCURRENCY, estimateGroupCostUsd } from '@/lib/growth/feedModel';
 import { LEAD_FACTORS, SCORING_FACTORS, SECTOR_TIERS, type EngineGroup, type EngineSettings, type SectorTier } from '@/lib/growth/engineSettingsModel';
 
 import { sendJson } from '../ui/client';
@@ -33,6 +34,49 @@ function useSave(group: EngineGroup) {
       return done;
     });
   return { ...a, save };
+}
+
+/** The feed's reach and cost (migration 113): the date window, searches per keyword group and the most one run may cost. */
+export function FeedCoverageForm({ values, pending, groups }: { values: EngineSettings; pending: string | null; groups: number }) {
+  const [windowDays, setWindowDays] = useState(String(values.signal_feed_window_days));
+  const [searches, setSearches] = useState(String(values.signal_feed_searches_per_group));
+  const [ceiling, setCeiling] = useState(values.signal_feed_max_cost_usd.toFixed(2));
+  const { busy, notice, save } = useSave('signal_feed_coverage');
+  const n = Number(searches);
+  const perGroup = Number.isFinite(n) && n > 0 ? estimateGroupCostUsd(n) : 0;
+  const estimate = perGroup * groups;
+  return (
+    <Card
+      id="feed-coverage"
+      title="Signal feed: reach and cost"
+      intro={`Each run makes one AI call per keyword group switched on (${groups} today), ${FEED_CONCURRENCY} at a time. A call starts only while the run's spend so far plus its estimate stays within the ceiling; groups left out are named on the run and come first on a later day. The window is the age limit stated in the prompt and enforced on every signal.`}
+      pending={pending}
+    >
+      <div style={grid}>
+        <Field label="Look back (days)">
+          <input value={windowDays} onChange={(e) => setWindowDays(e.target.value)} style={adminInput} inputMode="numeric" />
+        </Field>
+        <Field label="Searches per keyword group">
+          <input value={searches} onChange={(e) => setSearches(e.target.value)} style={adminInput} inputMode="numeric" />
+        </Field>
+        <Field label="Most one run may cost (USD)">
+          <input value={ceiling} onChange={(e) => setCeiling(e.target.value)} style={adminInput} inputMode="decimal" />
+        </Field>
+      </div>
+      <p style={{ margin: '8px 0 0', fontSize: 12, color: ADMIN_COLORS.textMuted }}>
+        Estimate: about USD {perGroup.toFixed(2)} a group, USD {estimate.toFixed(2)} a run with every group searched (USD 0.05 a search, set high against the USD 0.042 measured). Each search also adds to the monthly AI budget, which still applies.
+      </p>
+      <div style={{ marginTop: 12 }}>
+        <PrimaryButton
+          disabled={busy !== null}
+          onClick={() => save({ signal_feed_window_days: Number(windowDays), signal_feed_searches_per_group: Number(searches), signal_feed_max_cost_usd: Number(ceiling) })}
+        >
+          Save reach and cost
+        </PrimaryButton>
+      </div>
+      <NoticeLine notice={notice} />
+    </Card>
+  );
 }
 
 export function SignalFeedForm({ values, pending }: { values: EngineSettings; pending: string | null }) {

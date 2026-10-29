@@ -1,15 +1,32 @@
 /**
- * The daily signal feed (Unit 2.6, 2026-09-23). Server only.
+ * The daily signal feed (Unit 2.6, 2026-09-23; reworked 2026-10-29). Server only.
  *
  * Each morning (Riyadh time) the Growth cron asks the signal-feed agent to
  * search for new trigger events matching the keyword library Ahmad manages in
- * Settings (keywords.ts). Each signal names the keyword it matched; the
- * keyword's trigger type becomes the signal's suggested trigger, which Ahmad
- * can change in the inbox. A signal is kept only with a real evidence link
- * that the search actually returned; one without is discarded. The same event
- * found twice in one run is kept once, and duplicates of signals already in
- * the inbox are skipped. At most `signal_feed_max_per_run` are kept. The AI
- * budget applies through runAi, like every call.
+ * Settings (keywords.ts). A run makes one AI call per active keyword group,
+ * each with its own search allowance (`signal_feed_searches_per_group`), so
+ * every group gets real coverage instead of 115 keywords sharing ten
+ * searches. Calls run five at a time; a call starts only while the run's
+ * spend plus its estimate stays within `signal_feed_max_cost_usd`, and no new
+ * round starts late in the function's time. Groups rotate daily, so one left
+ * out runs early another day. Every group left out is recorded on the run.
+ *
+ * The model returns its findings by calling the `report_signals` tool, whose
+ * input the API checks against a schema (feedModel.ts); text is only a
+ * fallback, read robustly. Each call records its parse outcome (no JSON,
+ * invalid JSON, no signals list, an empty list, or a count of candidates),
+ * its searches and returned URLs, its stop reasons, and the raw answer, cut
+ * to a readable length. So "found nothing" is never confused with "could not
+ * read the answer".
+ *
+ * Each signal names the keyword it matched; the keyword's trigger type
+ * becomes the signal's suggested trigger, which Ahmad can change in the
+ * inbox. A signal is kept only with a real evidence link that the search
+ * actually returned, dated inside the window (`signal_feed_window_days`, the
+ * same number the prompt states). The same event found twice in one run is
+ * kept once, and duplicates of signals already in the inbox are skipped. At
+ * most `signal_feed_max_per_run` are kept. The AI budget applies through
+ * runAi, like every call.
  *
  * Scheduled runs happen once a Riyadh day (a unique key on the run date), and
  * do not run while the feed is paused or in mock mode. A manual run is always
@@ -23,6 +40,19 @@ import { runAi } from './ai/run';
 import type { WriteResult } from './api';
 import { growthDb, tableExists } from './db';
 import { getEngineSettings, pendingMigration } from './engineSettings';
+import {
+  FEED_CALL_TIMEOUT_MS,
+  FEED_CONCURRENCY,
+  FEED_TIME_BUDGET_MS,
+  estimateGroupCostUsd,
+  feedResultTool,
+  oldestAllowed,
+  readFeedAnswer,
+  rotateGroups,
+  summarizeOutcomes,
+  withinCeiling,
+  type ParseOutcome,
+} from './feedModel';
 import { riyadhDate } from './format';
 import type { Actor } from './kb';
 import { GCC_PLACES, suggestKeyword } from './keywordLibrary';
@@ -30,11 +60,13 @@ import { activeKeywords, ensureSeeded, getKeywordLibrary } from './keywords';
 import { TRIGGER_TYPES, type TriggerType } from './model';
 import { createSignal, existingDuplicate } from './signals';
 import { companyNameKey, evidenceKey, isRealEvidenceUrl } from './signalsModel';
-import { extractJsonObject } from './agents/json';
 
 export const FEED_AGENT = 'signal-feed';
-/** Signals older than this are not news and are discarded. */
+/** The default date window; the setting `signal_feed_window_days` (113) overrides it. */
 export const FEED_MAX_AGE_DAYS = 30;
+/** How much of each answer the run keeps for diagnosis. */
+const RAW_TEXT_CHARS = 4000;
+const RAW_TOOL_CHARS = 8000;
 
 export type FeedCandidate = {
   company_name: string;
@@ -47,24 +79,29 @@ export type FeedCandidate = {
   matched_keyword?: string | null;
   matched_keyword_id?: string | null;
 };
-export type FeedDecision = FeedCandidate & { outcome: 'kept' | 'duplicate' | 'discarded' | 'over_limit'; why: string };
+export type FeedDecision = FeedCandidate & { outcome: 'kept' | 'duplicate' | 'discarded' | 'over_limit'; why: string; group?: string };
 
 /** A keyword as the feed numbers it in the prompt. `id` is null before the library is saved, and for the old list before 094. */
 export type FeedKeyword = { id: string | null; keyword: string; trigger: TriggerType | null; region: 'ksa' | 'gcc' };
+/** One AI call's worth of keywords: an active library group, or the old list as one group. */
+export type FeedGroup = { key: string; label: string; keywords: FeedKeyword[] };
 
 /**
  * Checks what the agent returned. Pure: the verifier runs it directly. A
  * candidate is discarded without a real evidence link the search returned,
- * with an unreadable or future or stale date, or with no company or summary.
+ * with an unreadable or future date, one older than the window, or with no
+ * company or summary.
  */
-export function screenCandidates(raw: unknown, opts: { sourceUrls: string[]; mock: boolean; today: string }): { valid: FeedCandidate[]; discarded: FeedDecision[] } {
+export function screenCandidates(raw: unknown, opts: { sourceUrls: string[]; mock: boolean; today: string; maxAgeDays?: number }): { valid: FeedCandidate[]; discarded: FeedDecision[] } {
   const list = raw && typeof raw === 'object' && Array.isArray((raw as { signals?: unknown }).signals) ? ((raw as { signals: unknown[] }).signals as Record<string, unknown>[]) : [];
   const allowed = new Set(opts.sourceUrls);
   const triggers = TRIGGER_TYPES.map((t) => t.value) as string[];
   const valid: FeedCandidate[] = [];
   const discarded: FeedDecision[] = [];
-  const oldest = new Date(Date.parse(`${opts.today}T00:00:00Z`) - FEED_MAX_AGE_DAYS * 86_400_000).toISOString().slice(0, 10);
+  const maxAge = opts.maxAgeDays ?? FEED_MAX_AGE_DAYS;
+  const oldest = oldestAllowed(opts.today, maxAge);
   for (const s of list.slice(0, 100)) {
+    if (!s || typeof s !== 'object') continue;
     const n = Number(s.keyword_number);
     const c: FeedCandidate = {
       company_name: String(s.company_name ?? '').trim().slice(0, 200),
@@ -83,7 +120,7 @@ export function screenCandidates(raw: unknown, opts: { sourceUrls: string[]; moc
     else if (c.summary.length < 10) why = 'no usable summary';
     else if (!/^\d{4}-\d{2}-\d{2}$/.test(c.signal_date) || Number.isNaN(Date.parse(c.signal_date))) why = 'no readable date';
     else if (c.signal_date > opts.today) why = 'dated in the future';
-    else if (c.signal_date < oldest) why = `older than ${FEED_MAX_AGE_DAYS} days`;
+    else if (c.signal_date < oldest) why = `older than ${maxAge} days`;
     if (why) discarded.push({ ...c, outcome: 'discarded', why });
     else valid.push(c);
   }
@@ -124,36 +161,66 @@ export function dedupeWithinRun(valid: FeedCandidate[]): { unique: FeedCandidate
   return { unique, repeats };
 }
 
-export function feedPrompt(keywords: FeedKeyword[], today: string): { system: string; user: string } {
+/** The prompt for one group's call. Pure. The window it states is the one `screenCandidates` enforces. */
+export function feedPrompt(keywords: FeedKeyword[], today: string, opts: { windowDays?: number; searches?: number; groupLabel?: string } = {}): { system: string; user: string } {
   const gcc = keywords.some((k) => k.region === 'gcc');
+  const windowDays = opts.windowDays ?? FEED_MAX_AGE_DAYS;
+  const tool = feedResultTool().name;
   return {
     system: [
       'You find trigger events that suggest a company in Saudi Arabia or the wider GCC may need corporate finance or transaction advisory: new projects, off-plan registrations, fundraising or debt, market entry, finance leadership hires, contract awards, acquisitions or joint ventures, capital market activity, and expansions.',
-      'Use web search. Report only events published in the last 7 days that match at least one of the numbered keywords. For each event give keyword_number: the number of the keyword it best matches.',
+      `Use web search. Report only events published in the last ${windowDays} days (on or after ${oldestAllowed(today, windowDays)}) that match at least one of the numbered keywords. For each event give keyword_number: the number of the keyword it best matches.`,
+      opts.searches ? `You have ${opts.searches} searches. Spread them across the keywords, combining closely related keywords in one query, and prefer business news, official announcements and exchange filings.` : '',
       gcc ? `Where a keyword says GCC, it means any of: ${GCC_PLACES.join(', ')}.` : '',
       'Every event must have an evidence_url: the exact URL of the article or filing you read, as returned by your search. Never construct, shorten or guess a URL. If you cannot give one, leave the event out.',
       'Report each event once, even if it matches several keywords. Never invent companies, people, amounts or dates. Summaries are one or two plain sentences stating what the source says.',
       `Trigger types: ${TRIGGER_TYPES.map((t) => t.value).join(', ')}.`,
-      'Answer with one JSON object and nothing else: {"signals":[{"company_name":string,"trigger_type":string,"signal_date":"YYYY-MM-DD","summary":string,"evidence_url":string,"source_name":string,"keyword_number":number}]}',
+      `When you have finished searching, call the ${tool} tool once with every event you found, or with an empty signals list if none qualify. Do not write the results as text.`,
     ]
       .filter(Boolean)
       .join('\n'),
-    user: `Today is ${today} (Riyadh). Keywords:\n${keywords.map((k, i) => `${i + 1}. ${k.keyword}${k.trigger ? ` [${k.trigger}]` : ''}`).join('\n')}`,
+    user: `Today is ${today} (Riyadh).${opts.groupLabel ? ` Keyword group: ${opts.groupLabel}.` : ''} Keywords:\n${keywords.map((k, i) => `${i + 1}. ${k.keyword}${k.trigger ? ` [${k.trigger}]` : ''}`).join('\n')}`,
   };
 }
 
-/** The keywords the feed searches: the library's active ones, or the old list in Settings before 094. */
-async function loadFeedKeywords(opts: { seed: boolean; legacy: string[] }): Promise<{ keywords: FeedKeyword[]; source: 'library' | 'legacy' }> {
+/** The keywords the feed searches, by group: the library's active ones, or the old list in Settings before 094. */
+async function loadFeedGroups(opts: { seed: boolean; legacy: string[] }): Promise<{ groups: FeedGroup[]; source: 'library' | 'legacy' }> {
   let lib = await getKeywordLibrary();
-  if (lib.source === 'pending') return { keywords: opts.legacy.map((k) => ({ id: null, keyword: k, trigger: null, region: 'ksa' as const })), source: 'legacy' };
+  if (lib.source === 'pending') {
+    const keywords = opts.legacy.map((k) => ({ id: null, keyword: k, trigger: null, region: 'ksa' as const }));
+    return { groups: keywords.length ? [{ key: 'legacy', label: 'Keywords', keywords }] : [], source: 'legacy' };
+  }
   // A run that saves signals needs saved keyword ids, so the defaults are saved first.
   if (opts.seed && lib.source === 'defaults') {
     const seeded = await ensureSeeded(null);
     if (seeded.ok) lib = await getKeywordLibrary();
   }
   const saved = lib.source === 'database';
-  return { keywords: activeKeywords(lib).map((k) => ({ id: saved ? k.id : null, keyword: k.keyword, trigger: k.trigger, region: k.region })), source: 'library' };
+  const active = activeKeywords(lib);
+  const groups = lib.groups
+    .map((g) => ({ key: g.key, label: g.label, keywords: active.filter((k) => k.group === g.key).map((k) => ({ id: saved ? k.id : null, keyword: k.keyword, trigger: k.trigger, region: k.region })) }))
+    .filter((g) => g.keywords.length > 0);
+  return { groups, source: 'library' };
 }
+
+/** What one group's call did, kept on the run for diagnosis. */
+export type FeedCall = {
+  group: string;
+  label: string;
+  keywords: number;
+  status: 'completed' | 'refused';
+  outcome: ParseOutcome | null;
+  message?: string;
+  searches: number;
+  source_urls: number;
+  stop_reasons: string[];
+  requests: number;
+  cost_usd: number;
+  usage_id: string | null;
+  raw_text: string;
+  raw_tool_input: string | null;
+};
+export type FeedSkip = { group: string; label: string; why: 'cost_ceiling' | 'time_limit' };
 
 export type FeedRunResult = {
   runId: string | null;
@@ -164,9 +231,19 @@ export type FeedRunResult = {
   message: string;
   decisions: FeedDecision[];
   saved: number;
+  /** How the answers read, e.g. "9 answers read: 23 candidates from 7 groups; 2 found nothing". */
+  parse?: string;
+  searches?: number;
+  costUsd?: number;
+  groupsRun?: number;
+  groupsTotal?: number;
 };
 
+const round2 = (n: number) => Math.round(n * 100) / 100;
+const usd = (n: number) => `USD ${n.toFixed(2)}`;
+
 export async function runSignalFeed(opts: { trigger: 'cron' | 'manual'; actor?: Actor | null; isTest?: boolean; now?: Date }): Promise<WriteResult<FeedRunResult>> {
+  const started = Date.now();
   const today = riyadhDate(opts.now);
   const mock = isMockMode();
   const isTest = Boolean(opts.isTest);
@@ -174,17 +251,19 @@ export async function runSignalFeed(opts: { trigger: 'cron' | 'manual'; actor?: 
   const pending = pendingMigration(engine, ['signal_keywords', 'signal_feed_paused', 'signal_feed_max_per_run']);
   if (engine.source !== 'database') return { ok: false, status: 503, error: 'Growth Settings cannot be read, so the feed does not run.' };
   if (pending || !(await tableExists('growth_feed_runs'))) return { ok: false, status: 503, error: `The signal feed needs ${pending ?? '088_growth_prospecting.sql'} applied first.` };
-  const { signal_feed_paused: paused, signal_feed_max_per_run: max } = engine.values;
+  // The coverage settings (113) fall back to their defaults until 113 is applied: the window, five searches a group and a USD 3.00 ceiling.
+  const { signal_feed_paused: paused, signal_feed_max_per_run: max, signal_feed_window_days: windowDays, signal_feed_searches_per_group: searches, signal_feed_max_cost_usd: ceiling } = engine.values;
   const previewOnly = mock || paused;
   const skip = (message: string): WriteResult<FeedRunResult> => ({ ok: true, value: { runId: null, mode: mock ? 'mock_preview' : 'real', previewOnly, status: 'skipped', message, decisions: [], saved: 0 } });
   if (opts.trigger === 'cron' && paused) return skip('The feed is paused in Settings.');
   if (opts.trigger === 'cron' && mock) return skip('Mock mode: the morning run only happens with an Anthropic key. Run it by hand for a labelled preview.');
-  const { keywords, source: keywordSource } = await loadFeedKeywords({ seed: !previewOnly, legacy: engine.values.signal_keywords });
-  if (!keywords.length) return skip('No keywords are switched on. Choose them in Growth Settings.');
+  const { groups: allGroups, source: keywordSource } = await loadFeedGroups({ seed: !previewOnly, legacy: engine.values.signal_keywords });
+  if (!allGroups.length) return skip('No keywords are switched on. Choose them in Growth Settings.');
+  const groups = rotateGroups(allGroups, today);
 
   const { data: run, error } = await growthDb()
     .from('growth_feed_runs')
-    .insert({ is_test: isTest, trigger: opts.trigger, run_date: today, mode: mock ? 'mock_preview' : 'real', keywords: keywords.map((k) => k.keyword), created_by_name: opts.actor?.name ?? 'Growth cron' })
+    .insert({ is_test: isTest, trigger: opts.trigger, run_date: today, mode: mock ? 'mock_preview' : 'real', keywords: groups.flatMap((g) => g.keywords.map((k) => k.keyword)), created_by_name: opts.actor?.name ?? 'Growth cron' })
     .select('id')
     .single();
   if (error) {
@@ -194,17 +273,83 @@ export async function runSignalFeed(opts: { trigger: 'cron' | 'manual'; actor?: 
   const runId = (run as { id: string }).id;
   const finish = async (patch: Record<string, unknown>) => growthDb().from('growth_feed_runs').update({ ...patch, finished_at: new Date().toISOString() }).eq('id', runId);
 
-  const p = feedPrompt(keywords, today);
-  const ai = await runAi({ agent: FEED_AGENT, purpose: 'signal_feed', system: p.system, messages: [{ role: 'user', content: p.user }], webSearch: { maxUses: Math.min(10, Math.max(3, keywords.length)) }, maxTokens: 6000, isTest });
-  if (!ai.ok) {
-    await finish({ status: 'refused', detail: { reason: ai.reason, message: ai.message } });
-    return { ok: true, value: { runId, mode: mock ? 'mock_preview' : 'real', previewOnly, status: 'refused', message: ai.message, decisions: [], saved: 0 } };
+  // One call per group, FEED_CONCURRENCY at a time, inside the cost ceiling and the time limit.
+  const tool = feedResultTool();
+  const calls: FeedCall[] = [];
+  const skipped: FeedSkip[] = [];
+  const valid: FeedCandidate[] = [];
+  const discarded: FeedDecision[] = [];
+  let spent = 0;
+  let dearest = 0;
+  for (let i = 0; i < groups.length; i += FEED_CONCURRENCY) {
+    const round = groups.slice(i, i + FEED_CONCURRENCY);
+    if (i > 0 && Date.now() - started > FEED_TIME_BUDGET_MS) {
+      skipped.push(...round.map((g) => ({ group: g.key, label: g.label, why: 'time_limit' as const })));
+      continue;
+    }
+    const go: FeedGroup[] = [];
+    let committed = 0;
+    for (const g of round) {
+      // The estimate is the larger of the per-search figure and the dearest call so far this run.
+      const estimate = mock ? 0 : Math.max(estimateGroupCostUsd(searches), dearest);
+      if (!withinCeiling(spent, committed, estimate, ceiling)) skipped.push({ group: g.key, label: g.label, why: 'cost_ceiling' });
+      else {
+        committed += estimate;
+        go.push(g);
+      }
+    }
+    const results = await Promise.all(
+      go.map(async (g) => {
+        const p = feedPrompt(g.keywords, today, { windowDays, searches, groupLabel: g.label });
+        const ai = await runAi({ agent: FEED_AGENT, purpose: 'signal_feed', system: p.system, messages: [{ role: 'user', content: p.user }], webSearch: { maxUses: searches }, resultTool: tool, timeoutMs: FEED_CALL_TIMEOUT_MS, maxTokens: 8000, isTest });
+        return { g, ai };
+      }),
+    );
+    for (const { g, ai } of results) {
+      if (!ai.ok) {
+        calls.push({ group: g.key, label: g.label, keywords: g.keywords.length, status: 'refused', outcome: null, message: ai.message, searches: 0, source_urls: 0, stop_reasons: [], requests: 0, cost_usd: 0, usage_id: ai.usageId, raw_text: '', raw_tool_input: null });
+        continue;
+      }
+      spent = round2(spent + ai.costUsd);
+      dearest = Math.max(dearest, ai.costUsd);
+      const read = readFeedAnswer({ toolInput: ai.toolInput, text: ai.text });
+      const screened = screenCandidates(read.value, { sourceUrls: ai.sourceUrls, mock: ai.mock, today, maxAgeDays: windowDays });
+      valid.push(...assignKeywords(screened.valid, g.keywords));
+      discarded.push(...screened.discarded.map((d) => ({ ...d, group: g.label })));
+      calls.push({
+        group: g.key,
+        label: g.label,
+        keywords: g.keywords.length,
+        status: 'completed',
+        outcome: read.outcome,
+        searches: ai.webSearchRequests,
+        source_urls: ai.sourceUrls.length,
+        stop_reasons: ai.stopReasons,
+        requests: ai.requests,
+        cost_usd: ai.costUsd,
+        usage_id: ai.usageId,
+        raw_text: ai.text.slice(0, RAW_TEXT_CHARS),
+        raw_tool_input: ai.toolInput === undefined ? null : JSON.stringify(ai.toolInput).slice(0, RAW_TOOL_CHARS),
+      });
+    }
   }
 
-  const { valid, discarded } = screenCandidates(extractJsonObject(ai.text), { sourceUrls: ai.sourceUrls, mock: ai.mock, today });
-  const { unique, repeats } = dedupeWithinRun(assignKeywords(valid, keywords));
+  const done = calls.filter((c) => c.status === 'completed');
+  const searchesRun = calls.reduce((a, c) => a + c.searches, 0);
+  const parse = summarizeOutcomes(done.map((c) => c.outcome as ParseOutcome));
+  const skippedLine = skipped.length ? ` ${skipped.length} ${skipped.length === 1 ? 'group was' : 'groups were'} left out (${[...new Set(skipped.map((s) => (s.why === 'cost_ceiling' ? `the ${usd(ceiling)} ceiling` : 'the time limit')))].join(', ')}).` : '';
+  const coverage = `Searched ${done.length} of ${allGroups.length} keyword groups: ${searchesRun} searches, ${usd(spent)}.${skippedLine}`;
+  const detailBase = { mock, preview_only: previewOnly, paused, keyword_source: keywordSource, window_days: windowDays, searches_per_group: searches, max_cost_usd: ceiling, cost_usd: spent, searches: searchesRun, source_urls: calls.reduce((a, c) => a + c.source_urls, 0), parse_summary: parse, calls, skipped };
+
+  if (!done.length) {
+    const reason = calls.find((c) => c.message)?.message ?? 'No group could be searched within the cost ceiling.';
+    await finish({ status: 'refused', usage_id: calls[0]?.usage_id ?? null, detail: { ...detailBase, reason } });
+    return { ok: true, value: { runId, mode: mock ? 'mock_preview' : 'real', previewOnly, status: 'refused', message: reason, decisions: [], saved: 0, parse, searches: searchesRun, costUsd: spent, groupsRun: 0, groupsTotal: allGroups.length } };
+  }
+
+  const { unique, repeats } = dedupeWithinRun(valid);
   const decisions: FeedDecision[] = [...discarded, ...repeats];
-  const noSave = ai.mock || paused;
+  const noSave = mock || paused;
   let saved = 0;
   let duplicates = repeats.length;
   for (const c of unique) {
@@ -234,21 +379,23 @@ export async function runSignalFeed(opts: { trigger: 'cron' | 'manual'; actor?: 
     } else decisions.push({ ...c, outcome: 'discarded', why: r.error });
   }
 
-  await finish({ status: 'completed', found: valid.length + discarded.length, saved, duplicates, discarded: discarded.length, usage_id: ai.usageId, detail: { decisions: decisions.slice(0, 100), mock: ai.mock, preview_only: noSave, paused, keyword_source: keywordSource } });
+  const found = valid.length + discarded.length;
+  await finish({ status: 'completed', found, saved, duplicates, discarded: discarded.length, usage_id: done[0].usage_id, detail: { ...detailBase, decisions: decisions.slice(0, 200) } });
   await logActivity({
     actorType: 'ai',
     actorId: FEED_AGENT,
     action: 'feed.run',
-    summary: `${ai.mock ? 'Mock preview of the signal feed' : paused ? 'Preview of the paused signal feed' : 'Signal feed'}: ${saved} kept, ${duplicates} duplicates skipped, ${discarded.length} discarded without evidence or date`,
+    summary: `${mock ? 'Mock preview of the signal feed' : paused ? 'Preview of the paused signal feed' : 'Signal feed'}: ${saved} kept, ${duplicates} duplicates skipped, ${discarded.length} discarded without evidence or date. ${parse}. ${coverage}`,
     isTest,
-    metadata: { run_id: runId, trigger: opts.trigger, mock: ai.mock, preview_only: noSave },
+    metadata: { run_id: runId, trigger: opts.trigger, mock, preview_only: noSave, cost_usd: spent, searches: searchesRun },
   });
-  const message = ai.mock
+  const head = mock
     ? 'Mock preview: nothing was saved. With an Anthropic key the same run adds real signals.'
     : paused
       ? 'Preview: the feed is paused, so nothing was saved. Switch it on in Settings to add signals.'
       : `${saved} signals added to the inbox.`;
-  return { ok: true, value: { runId, mode: ai.mock ? 'mock_preview' : 'real', previewOnly: noSave, status: 'completed', message, decisions, saved } };
+  const message = `${head} ${parse}. ${coverage}`;
+  return { ok: true, value: { runId, mode: mock ? 'mock_preview' : 'real', previewOnly: noSave, status: 'completed', message, decisions, saved, parse, searches: searchesRun, costUsd: spent, groupsRun: done.length, groupsTotal: allGroups.length } };
 }
 
 export type FeedRunRow = { id: string; created_at: string; trigger: string; run_date: string; mode: string; status: string; found: number; saved: number; duplicates: number; discarded: number; is_test: boolean; detail: Record<string, unknown> };
