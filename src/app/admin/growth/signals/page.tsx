@@ -15,6 +15,7 @@ import { activeKeywords, getKeywordLibrary } from '@/lib/growth/keywords';
 import { day } from '@/lib/growth/format';
 import { TRIGGER_TYPES } from '@/lib/growth/model';
 import { growthPage } from '@/lib/growth/pages';
+import { describeDays } from '@/lib/growth/settingsModel';
 import { companyOptions } from '@/lib/growth/prospects';
 import { listSignals, triggerLabel } from '@/lib/growth/signals';
 import { SIGNAL_ORIGINS, parseSignalFilters } from '@/lib/growth/signalsModel';
@@ -60,7 +61,7 @@ export default async function GrowthSignalsPage({ searchParams }: { searchParams
       )}
       {list.error && <p style={{ color: ADMIN_COLORS.danger, fontSize: 13 }}>Could not read the signals: {list.error}</p>}
 
-      <FeedPanel runs={runs} available={has088 && !engine.missing.includes('signal_keywords')} keywords={keywordCount} paused={engine.values.signal_feed_paused} />
+      <FeedPanel runs={runs} available={has088 && !engine.missing.includes('signal_keywords')} keywords={keywordCount} paused={engine.values.signal_feed_paused} days={describeDays(engine.values.signal_feed_days)} />
       <SignalAddForm companies={companies} keywords={library.source === 'pending' ? [] : active.map((k) => ({ id: k.id, keyword: k.keyword, trigger: k.trigger, enabled: true }))} />
 
       <nav aria-label="Signal status" style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>

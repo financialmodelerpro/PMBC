@@ -5,7 +5,8 @@ import { useState, type ReactNode } from 'react';
 import { ADMIN_COLORS, adminCard, adminInput, adminTextarea } from '@/lib/admin/styles';
 import { GROWTH_AGENTS } from '@/lib/growth/ai/agents';
 import { DEFAULT_MODEL, MODEL_PRICES } from '@/lib/growth/ai/pricing';
-import { FEED_CONCURRENCY, estimateGroupCostUsd } from '@/lib/growth/feedModel';
+import { FEED_CONCURRENCY, estimateGroupCostUsd, overHalfBudget, projectMonthlyUsd, type FeedCostBasis } from '@/lib/growth/feedModel';
+import { WEEKDAYS } from '@/lib/growth/settingsModel';
 import { LEAD_FACTORS, SCORING_FACTORS, SECTOR_TIERS, type EngineGroup, type EngineSettings, type SectorTier } from '@/lib/growth/engineSettingsModel';
 
 import { sendJson } from '../ui/client';
@@ -36,8 +37,45 @@ function useSave(group: EngineGroup) {
   return { ...a, save };
 }
 
+/** The expected monthly feed cost for the ticked days, from the measured cost per run, and the warning past half the AI budget. No router: verifiers render it directly. */
+export function FeedCostProjection({ days, basis, budgetUsd }: { days: number[]; basis: FeedCostBasis; budgetUsd: number | null }) {
+  const monthly = projectMonthlyUsd(basis.perRunUsd, days);
+  const warn = overHalfBudget(monthly, budgetUsd);
+  return (
+    <>
+      <p data-feed-projection={monthly.toFixed(2)} style={{ margin: '6px 0 0', fontSize: 13, color: ADMIN_COLORS.textHeading }}>
+        Expected feed cost: about USD {monthly.toFixed(2)} a month ({days.length} {days.length === 1 ? 'run' : 'runs'} a week at USD {basis.perRunUsd.toFixed(2)} a run,{' '}
+        {basis.basis === 'measured' ? `the average of the last ${basis.runs} ${basis.runs === 1 ? 'run' : 'runs'}` : 'an estimate until the first run of this kind completes'}
+        ){budgetUsd !== null ? `, against a monthly AI budget of USD ${budgetUsd.toFixed(2)}` : ''}.
+      </p>
+      {warn && budgetUsd !== null && (
+        <p role="alert" data-feed-warning="over-half" style={{ margin: '6px 0 0', fontSize: 13, color: ADMIN_COLORS.danger }}>
+          This would take more than half the monthly AI budget (USD {(budgetUsd / 2).toFixed(2)}), leaving less for research, outreach drafts and the website chat. Untick a day or lower the searches per group.
+        </p>
+      )}
+    </>
+  );
+}
+
 /** The feed's reach and cost (migration 113): the date window, searches per keyword group and the most one run may cost. */
-export function FeedCoverageForm({ values, pending, groups }: { values: EngineSettings; pending: string | null; groups: number }) {
+export function FeedCoverageForm({
+  values,
+  pending,
+  groups,
+  daysPending,
+  basis,
+  budgetUsd,
+}: {
+  values: EngineSettings;
+  pending: string | null;
+  groups: number;
+  /** The migration the day boxes wait for (114), or null once applied. */
+  daysPending: string | null;
+  basis: FeedCostBasis;
+  budgetUsd: number | null;
+}) {
+  const [days, setDays] = useState<number[]>(values.signal_feed_days);
+  const toggleDay = (d: number) => setDays((cur) => (cur.includes(d) ? cur.filter((x) => x !== d) : [...cur, d].sort((a, b) => a - b)));
   const [windowDays, setWindowDays] = useState(String(values.signal_feed_window_days));
   const [searches, setSearches] = useState(String(values.signal_feed_searches_per_group));
   const [ceiling, setCeiling] = useState(values.signal_feed_max_cost_usd.toFixed(2));
@@ -63,15 +101,30 @@ export function FeedCoverageForm({ values, pending, groups }: { values: EngineSe
           <input value={ceiling} onChange={(e) => setCeiling(e.target.value)} style={adminInput} inputMode="decimal" />
         </Field>
       </div>
+      <fieldset style={{ border: 'none', margin: '12px 0 0', padding: 0 }}>
+        <legend style={{ fontSize: 13, fontWeight: 600, color: ADMIN_COLORS.textHeading, marginBottom: 6 }}>Days the morning run happens (09:00 Riyadh)</legend>
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+          {WEEKDAYS.map((w) => (
+            <label key={w.value} style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13 }}>
+              <input type="checkbox" data-day={w.value} checked={days.includes(w.value)} onChange={() => toggleDay(w.value)} disabled={daysPending !== null} /> {w.label}
+            </label>
+          ))}
+        </div>
+        <p style={{ margin: '6px 0 0', fontSize: 12, color: ADMIN_COLORS.textMuted }}>
+          {daysPending ? `Needs ${daysPending} applied before the days can be changed; until then the run happens on Sunday, Tuesday and Thursday. ` : ''}A run by hand works on any day.
+        </p>
+        <FeedCostProjection days={days} basis={basis} budgetUsd={budgetUsd} />
+        {days.length === 0 && <p style={{ margin: '6px 0 0', fontSize: 13, color: ADMIN_COLORS.danger }}>Tick at least one day.</p>}
+      </fieldset>
       <p style={{ margin: '8px 0 0', fontSize: 12, color: ADMIN_COLORS.textMuted }}>
         Estimate: about USD {perGroup.toFixed(2)} a group, USD {estimate.toFixed(2)} a run with every group searched (USD 0.05 a search, set high against the USD 0.042 measured). Each search also adds to the monthly AI budget, which still applies.
       </p>
       <div style={{ marginTop: 12 }}>
         <PrimaryButton
           disabled={busy !== null}
-          onClick={() => save({ signal_feed_window_days: Number(windowDays), signal_feed_searches_per_group: Number(searches), signal_feed_max_cost_usd: Number(ceiling) })}
+          onClick={() => save({ signal_feed_window_days: Number(windowDays), signal_feed_searches_per_group: Number(searches), signal_feed_max_cost_usd: Number(ceiling), ...(daysPending ? {} : { signal_feed_days: days }) })}
         >
-          Save reach and cost
+          Save reach, cost and days
         </PrimaryButton>
       </div>
       <NoticeLine notice={notice} />

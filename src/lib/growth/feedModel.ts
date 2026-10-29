@@ -171,3 +171,51 @@ export function withinCeiling(spentUsd: number, committedUsd: number, nextUsd: n
 export function oldestAllowed(today: string, windowDays: number): string {
   return new Date(Date.parse(`${today}T00:00:00Z`) - windowDays * 86_400_000).toISOString().slice(0, 10);
 }
+
+/* Cadence and the monthly projection (2026-10-29, migration 114). */
+
+/** The Riyadh weekday, 0 Sunday to 6 Saturday. Riyadh keeps UTC+3 all year. */
+export function riyadhWeekday(now: Date = new Date()): number {
+  return new Date(now.getTime() + 3 * 3_600_000).getUTCDay();
+}
+
+/** Whether the morning job runs the feed today. A run by hand ignores this. */
+export function isFeedDay(days: number[], now: Date = new Date()): boolean {
+  return days.includes(riyadhWeekday(now));
+}
+
+/** Each weekday falls about 52 / 12 times a month. */
+export const WEEKS_PER_MONTH = 52 / 12;
+
+/** Expected feed spend in a month: cost per run times the ticked days times weeks a month. */
+export function projectMonthlyUsd(perRunUsd: number, days: number[]): number {
+  return Math.round(perRunUsd * days.length * WEEKS_PER_MONTH * 100) / 100;
+}
+
+/** True when the projection takes more than half the monthly AI budget. No budget set: no warning (nothing runs without one). */
+export function overHalfBudget(projectedUsd: number, budgetUsd: number | null): boolean {
+  return budgetUsd !== null && budgetUsd > 0 && projectedUsd > budgetUsd / 2;
+}
+
+/** Whether a run expected to cost `runUsd` fits what is left of the month's budget. */
+export function budgetAllowsRun(spentUsd: number, runUsd: number, budgetUsd: number | null): boolean {
+  if (budgetUsd === null || !(budgetUsd > 0)) return false;
+  return Math.round((spentUsd + runUsd) * 100) / 100 <= budgetUsd;
+}
+
+/**
+ * The cost a run is expected to have: the average of recent completed real
+ * runs, measured; or, before any, the per-search estimate for every group.
+ */
+export type FeedCostBasis = { perRunUsd: number; basis: 'measured' | 'estimate'; runs: number };
+export function costBasis(recentRunCosts: number[], groups: number, searchesPerGroup: number): FeedCostBasis {
+  const measured = recentRunCosts.filter((c) => Number.isFinite(c) && c > 0);
+  if (measured.length) return { perRunUsd: Math.round((measured.reduce((a, b) => a + b, 0) / measured.length) * 100) / 100, basis: 'measured', runs: measured.length };
+  return { perRunUsd: Math.round(estimateGroupCostUsd(searchesPerGroup) * groups * 100) / 100, basis: 'estimate', runs: 0 };
+}
+
+/** Why the morning job skips today, or null when it runs. A run by hand never skips for the day. */
+export function morningDaySkip(trigger: 'cron' | 'manual', days: number[], now: Date = new Date()): string | null {
+  if (trigger !== 'cron' || isFeedDay(days, now)) return null;
+  return 'Not a feed day: the morning run happens only on the days ticked in Settings. A run by hand works any day.';
+}
