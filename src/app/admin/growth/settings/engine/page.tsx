@@ -8,9 +8,11 @@ import { ADMIN_COLORS } from '@/lib/admin/styles';
 import { requireGrowthSession } from '@/lib/growth/access';
 import { isMockMode } from '@/lib/growth/ai/provider';
 import { getEngineSettings, pendingMigration } from '@/lib/growth/engineSettings';
+import { feedCostBasis } from '@/lib/growth/feed';
 import { getKeywordLibrary } from '@/lib/growth/keywords';
 import { nurtureConfigured } from '@/lib/growth/nurture';
 import { growthPage } from '@/lib/growth/pages';
+import { getGrowthSettings } from '@/lib/growth/settings';
 
 export const metadata: Metadata = { title: 'Engine settings | Growth | PMBC Admin', robots: { index: false, follow: false } };
 export const dynamic = 'force-dynamic';
@@ -18,8 +20,10 @@ export const dynamic = 'force-dynamic';
 export default async function GrowthEngineSettingsPage() {
   await requireGrowthSession();
   const page = growthPage('settings');
-  const [read, library] = await Promise.all([getEngineSettings(), getKeywordLibrary()]);
+  const [read, library, growth] = await Promise.all([getEngineSettings(), getKeywordLibrary(), getGrowthSettings()]);
   const v = read.values;
+  const activeGroups = library.groups.filter((g) => g.enabled && g.keywords.some((k) => k.enabled)).length;
+  const basis = await feedCostBasis({ groups: activeGroups, searches: v.signal_feed_searches_per_group });
   const p = (...keys: Parameters<typeof pendingMigration>[1]) => pendingMigration(read, keys);
 
   return (
@@ -28,7 +32,14 @@ export default async function GrowthEngineSettingsPage() {
       <SettingsTabs active="engine" />
       {read.source === 'error' && <p style={{ color: ADMIN_COLORS.danger, fontSize: 13 }}>Could not read the settings: {read.error}</p>}
       <SignalFeedForm values={v} pending={p('signal_feed_paused', 'signal_feed_max_per_run')} />
-      <FeedCoverageForm values={v} pending={p('signal_feed_window_days', 'signal_feed_searches_per_group', 'signal_feed_max_cost_usd')} groups={library.groups.filter((g) => g.enabled && g.keywords.some((k) => k.enabled)).length} />
+      <FeedCoverageForm
+        values={v}
+        pending={p('signal_feed_window_days', 'signal_feed_searches_per_group', 'signal_feed_max_cost_usd')}
+        daysPending={p('signal_feed_days')}
+        groups={activeGroups}
+        basis={basis}
+        budgetUsd={growth.source === 'database' ? growth.settings.ai_monthly_budget_usd : null}
+      />
       <KeywordLibrary initial={library} />
       <ScoringWeightsForm values={v} pending={p('scoring_weights')} />
       <SectorTiersForm values={v} pending={p('sector_tiers')} />

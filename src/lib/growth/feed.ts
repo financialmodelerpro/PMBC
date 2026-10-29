@@ -28,19 +28,29 @@
  * most `signal_feed_max_per_run` are kept. The AI budget applies through
  * runAi, like every call.
  *
- * Scheduled runs happen once a Riyadh day (a unique key on the run date), and
- * do not run while the feed is paused or in mock mode. A manual run is always
+ * Scheduled runs happen at most once a Riyadh day (a unique key on the run
+ * date), only on the weekdays ticked in `signal_feed_days` (114, default
+ * Sunday, Tuesday and Thursday), and not while the feed is paused or in mock
+ * mode. Before any real run, its expected cost (the average of recent runs,
+ * or the estimate before there are any) is checked against what is left of
+ * the month's AI budget: a run that would go over is skipped and recorded as
+ * refused with the reason, so the Signals screen says so; a run that fits has
+ * its ceiling lowered to what is left. A manual run is always
  * allowed, but while paused or in mock mode it is a preview and saves no
  * signals.
  */
 
 import { logActivity } from './activity';
 import { isMockMode } from './ai/provider';
-import { runAi } from './ai/run';
+import { monthSpend, runAi } from './ai/run';
 import type { WriteResult } from './api';
 import { growthDb, tableExists } from './db';
 import { getEngineSettings, pendingMigration } from './engineSettings';
 import {
+  budgetAllowsRun,
+  costBasis,
+  morningDaySkip,
+  type FeedCostBasis,
   FEED_CALL_TIMEOUT_MS,
   FEED_CONCURRENCY,
   FEED_TIME_BUDGET_MS,
@@ -58,6 +68,7 @@ import type { Actor } from './kb';
 import { GCC_PLACES, suggestKeyword } from './keywordLibrary';
 import { activeKeywords, ensureSeeded, getKeywordLibrary } from './keywords';
 import { TRIGGER_TYPES, type TriggerType } from './model';
+import { getGrowthSettings } from './settings';
 import { createSignal, existingDuplicate } from './signals';
 import { companyNameKey, evidenceKey, isRealEvidenceUrl } from './signalsModel';
 
@@ -252,11 +263,13 @@ export async function runSignalFeed(opts: { trigger: 'cron' | 'manual'; actor?: 
   if (engine.source !== 'database') return { ok: false, status: 503, error: 'Growth Settings cannot be read, so the feed does not run.' };
   if (pending || !(await tableExists('growth_feed_runs'))) return { ok: false, status: 503, error: `The signal feed needs ${pending ?? '088_growth_prospecting.sql'} applied first.` };
   // The coverage settings (113) fall back to their defaults until 113 is applied: the window, five searches a group and a USD 3.00 ceiling.
-  const { signal_feed_paused: paused, signal_feed_max_per_run: max, signal_feed_window_days: windowDays, signal_feed_searches_per_group: searches, signal_feed_max_cost_usd: ceiling } = engine.values;
+  const { signal_feed_paused: paused, signal_feed_max_per_run: max, signal_feed_window_days: windowDays, signal_feed_searches_per_group: searches, signal_feed_max_cost_usd: ceiling, signal_feed_days: days } = engine.values;
   const previewOnly = mock || paused;
   const skip = (message: string): WriteResult<FeedRunResult> => ({ ok: true, value: { runId: null, mode: mock ? 'mock_preview' : 'real', previewOnly, status: 'skipped', message, decisions: [], saved: 0 } });
   if (opts.trigger === 'cron' && paused) return skip('The feed is paused in Settings.');
   if (opts.trigger === 'cron' && mock) return skip('Mock mode: the morning run only happens with an Anthropic key. Run it by hand for a labelled preview.');
+  const notToday = morningDaySkip(opts.trigger, days, opts.now);
+  if (notToday) return skip(notToday);
   const { groups: allGroups, source: keywordSource } = await loadFeedGroups({ seed: !previewOnly, legacy: engine.values.signal_keywords });
   if (!allGroups.length) return skip('No keywords are switched on. Choose them in Growth Settings.');
   const groups = rotateGroups(allGroups, today);
@@ -272,6 +285,24 @@ export async function runSignalFeed(opts: { trigger: 'cron' | 'manual'; actor?: 
   }
   const runId = (run as { id: string }).id;
   const finish = async (patch: Record<string, unknown>) => growthDb().from('growth_feed_runs').update({ ...patch, finished_at: new Date().toISOString() }).eq('id', runId);
+
+  // The month's budget: skip a run that would go over it, and keep a run that fits within what is left.
+  let runCeiling = ceiling;
+  if (!mock) {
+    const [growth, spend, basis] = await Promise.all([getGrowthSettings(), monthSpend({ isTest, now: opts.now }), feedCostBasis({ groups: allGroups.length, searches, isTest })]);
+    const budget = growth.source === 'database' ? growth.settings.ai_monthly_budget_usd : null;
+    const expected = round2(Math.min(basis.perRunUsd, ceiling));
+    if (!spend.error && budget !== null && budget > 0) {
+      if (!budgetAllowsRun(spend.spentUsd, expected, budget)) {
+        const how = basis.basis === 'measured' ? `average of the last ${basis.runs} ${basis.runs === 1 ? 'run' : 'runs'}` : 'estimate';
+        const message = `Skipped: this run would cost about ${usd(expected)} (${how}) and take this month's AI spend, ${usd(spend.spentUsd)} so far, over the ${usd(budget)} budget. Raise the budget in Growth Settings, or the feed resumes next month.`;
+        await finish({ status: 'refused', detail: { reason: 'budget', message, spent_usd: spend.spentUsd, budget_usd: budget, expected_usd: expected, basis: basis.basis, cost_usd: 0, searches: 0 } });
+        await logActivity({ actorType: 'ai', actorId: FEED_AGENT, action: 'feed.skipped', summary: message, isTest, metadata: { run_id: runId, trigger: opts.trigger } });
+        return { ok: true, value: { runId, mode: 'real', previewOnly, status: 'refused', message, decisions: [], saved: 0, searches: 0, costUsd: 0, groupsRun: 0, groupsTotal: allGroups.length } };
+      }
+      runCeiling = Math.min(ceiling, round2(budget - spend.spentUsd));
+    }
+  }
 
   // One call per group, FEED_CONCURRENCY at a time, inside the cost ceiling and the time limit.
   const tool = feedResultTool();
@@ -292,7 +323,7 @@ export async function runSignalFeed(opts: { trigger: 'cron' | 'manual'; actor?: 
     for (const g of round) {
       // The estimate is the larger of the per-search figure and the dearest call so far this run.
       const estimate = mock ? 0 : Math.max(estimateGroupCostUsd(searches), dearest);
-      if (!withinCeiling(spent, committed, estimate, ceiling)) skipped.push({ group: g.key, label: g.label, why: 'cost_ceiling' });
+      if (!withinCeiling(spent, committed, estimate, runCeiling)) skipped.push({ group: g.key, label: g.label, why: 'cost_ceiling' });
       else {
         committed += estimate;
         go.push(g);
@@ -337,9 +368,9 @@ export async function runSignalFeed(opts: { trigger: 'cron' | 'manual'; actor?: 
   const done = calls.filter((c) => c.status === 'completed');
   const searchesRun = calls.reduce((a, c) => a + c.searches, 0);
   const parse = summarizeOutcomes(done.map((c) => c.outcome as ParseOutcome));
-  const skippedLine = skipped.length ? ` ${skipped.length} ${skipped.length === 1 ? 'group was' : 'groups were'} left out (${[...new Set(skipped.map((s) => (s.why === 'cost_ceiling' ? `the ${usd(ceiling)} ceiling` : 'the time limit')))].join(', ')}).` : '';
+  const skippedLine = skipped.length ? ` ${skipped.length} ${skipped.length === 1 ? 'group was' : 'groups were'} left out (${[...new Set(skipped.map((s) => (s.why === 'cost_ceiling' ? `the ${usd(runCeiling)} ceiling` : 'the time limit')))].join(', ')}).` : '';
   const coverage = `Searched ${done.length} of ${allGroups.length} keyword groups: ${searchesRun} searches, ${usd(spent)}.${skippedLine}`;
-  const detailBase = { mock, preview_only: previewOnly, paused, keyword_source: keywordSource, window_days: windowDays, searches_per_group: searches, max_cost_usd: ceiling, cost_usd: spent, searches: searchesRun, source_urls: calls.reduce((a, c) => a + c.source_urls, 0), parse_summary: parse, calls, skipped };
+  const detailBase = { mock, preview_only: previewOnly, paused, keyword_source: keywordSource, window_days: windowDays, searches_per_group: searches, max_cost_usd: runCeiling, cost_usd: spent, searches: searchesRun, source_urls: calls.reduce((a, c) => a + c.source_urls, 0), parse_summary: parse, calls, skipped };
 
   if (!done.length) {
     const reason = calls.find((c) => c.message)?.message ?? 'No group could be searched within the cost ceiling.';
@@ -398,9 +429,42 @@ export async function runSignalFeed(opts: { trigger: 'cron' | 'manual'; actor?: 
   return { ok: true, value: { runId, mode: mock ? 'mock_preview' : 'real', previewOnly: noSave, status: 'completed', message, decisions, saved, parse, searches: searchesRun, costUsd: spent, groupsRun: done.length, groupsTotal: allGroups.length } };
 }
 
-export type FeedRunRow = { id: string; created_at: string; trigger: string; run_date: string; mode: string; status: string; found: number; saved: number; duplicates: number; discarded: number; is_test: boolean; detail: Record<string, unknown> };
+export type FeedRunRow = { id: string; created_at: string; trigger: string; run_date: string; mode: string; status: string; found: number; saved: number; duplicates: number; discarded: number; is_test: boolean; detail: Record<string, unknown>; usage_id?: string | null; cost_usd: number | null };
 
+/**
+ * The latest runs, each with its actual cost: the run's own total, or for a
+ * run from before 2026-10-29 the cost of its one AI call.
+ */
 export async function recentFeedRuns(limit = 5): Promise<FeedRunRow[]> {
   const { data } = await growthDb().from('growth_feed_runs').select('*').order('created_at', { ascending: false }).limit(limit);
-  return (data ?? []) as FeedRunRow[];
+  const rows = (data ?? []) as Omit<FeedRunRow, 'cost_usd'>[];
+  const own = (r: Omit<FeedRunRow, 'cost_usd'>) => (typeof r.detail?.cost_usd === 'number' ? (r.detail.cost_usd as number) : null);
+  const ids = rows.filter((r) => own(r) === null && r.usage_id).map((r) => r.usage_id as string);
+  const costs = new Map<string, number>();
+  if (ids.length) {
+    const { data: usage } = await growthDb().from('growth_ai_usage').select('id, cost_usd').in('id', ids);
+    for (const u of (usage ?? []) as { id: string; cost_usd: number | string }[]) costs.set(u.id, Number(u.cost_usd));
+  }
+  return rows.map((r) => ({ ...r, cost_usd: own(r) ?? (r.usage_id ? (costs.get(r.usage_id) ?? null) : null) }));
+}
+
+/**
+ * What a run is expected to cost, for the budget check and the Settings
+ * projection: the average of the last five completed real runs made one call
+ * per group (since 2026-10-29), else the estimate for every group.
+ */
+export async function feedCostBasis(opts: { groups: number; searches: number; isTest?: boolean }): Promise<FeedCostBasis> {
+  const { data } = await growthDb()
+    .from('growth_feed_runs')
+    .select('detail')
+    .eq('is_test', Boolean(opts.isTest))
+    .eq('mode', 'real')
+    .eq('status', 'completed')
+    .order('created_at', { ascending: false })
+    .limit(20);
+  const costs = ((data ?? []) as { detail: Record<string, unknown> | null }[])
+    .filter((r) => Array.isArray(r.detail?.calls) && typeof r.detail?.cost_usd === 'number')
+    .slice(0, 5)
+    .map((r) => r.detail!.cost_usd as number);
+  return costBasis(costs, opts.groups, opts.searches);
 }

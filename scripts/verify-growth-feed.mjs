@@ -13,7 +13,14 @@
 //
 //   npm run verify-growth-feed
 
-import { DASHES, check, finish, load, migrationChecks, read } from './lib/growthVerify.mjs';
+import path from 'node:path';
+
+import { createJiti } from 'jiti';
+
+import { DASHES, check, finish, load, migrationChecks, read, root } from './lib/growthVerify.mjs';
+
+// The Settings form is TSX: load it with JSX on.
+const loadTsx = (rel) => createJiti(import.meta.url, { alias: { '@': path.join(root, 'src') }, jsx: { runtime: 'automatic' } }).import(path.join(root, rel));
 
 const fm = await load('src/lib/growth/feedModel.ts');
 const feed = await load('src/lib/growth/feed.ts');
@@ -89,7 +96,7 @@ check('calls run a few at a time inside the time limit', fm.FEED_CONCURRENCY >= 
 const src = read('src/lib/growth/feed.ts');
 check('one call per keyword group, not one for all', src.includes('go.map(async (g) =>') && src.includes('feedPrompt(g.keywords, today,'));
 check('each group gets its own search allowance', /webSearch: \{ maxUses: searches \}/.test(src));
-check('the ceiling is checked before each call starts', src.includes('withinCeiling(spent, committed, estimate, ceiling)'));
+check('the ceiling is checked before each call starts', src.includes('withinCeiling(spent, committed, estimate, runCeiling)'));
 check('groups left out are recorded with the reason', src.includes("why: 'cost_ceiling'") && src.includes("why: 'time_limit'") && src.includes('skipped,'));
 check('each call records outcome, searches, URLs, stop reasons and the raw answer', ['outcome: read.outcome', 'searches: ai.webSearchRequests', 'source_urls: ai.sourceUrls.length', 'stop_reasons: ai.stopReasons', 'raw_text: ai.text.slice(0, RAW_TEXT_CHARS)', 'raw_tool_input:'].every((s) => src.includes(s)));
 check('the run stores the parse summary, cost and searches', src.includes('parse_summary: parse') && src.includes('cost_usd: spent') && src.includes('searches: searchesRun'));
@@ -122,6 +129,56 @@ check('the Settings screen shows the reach and cost form', read('src/app/admin/g
 const sql = migrationChecks('113_growth_feed_coverage.sql', []);
 check('113: three columns with the same defaults', sql.includes('signal_feed_window_days INTEGER NOT NULL DEFAULT 30') && sql.includes('signal_feed_searches_per_group INTEGER NOT NULL DEFAULT 5') && sql.includes('signal_feed_max_cost_usd NUMERIC(6, 2) NOT NULL DEFAULT 3.00'));
 check('113: the database checks the same limits', sql.includes('BETWEEN 1 AND 90') && sql.includes('BETWEEN 1 AND 10') && sql.includes('signal_feed_max_cost_usd > 0 AND signal_feed_max_cost_usd <= 50'));
-check('no dashes in the touched feed files', !['src/lib/growth/feed.ts', 'src/lib/growth/feedModel.ts', 'src/lib/growth/ai/anthropic.ts', 'src/components/admin/growth/signals/FeedPanel.tsx'].some((f) => DASHES.test(read(f))));
+check('no dashes in the touched feed files', !['src/lib/growth/feed.ts', 'src/lib/growth/feedModel.ts', 'src/lib/growth/ai/anthropic.ts', 'src/components/admin/growth/signals/FeedPanel.tsx', 'src/components/admin/growth/settings/EngineForms.tsx', 'supabase/migrations/114_growth_feed_days.sql'].some((f) => DASHES.test(read(f))));
+
+console.log('6. Cadence, projection and the budget (2026-10-29, migration 114)');
+// 2026-11-01 is a Sunday, 2026-11-02 a Monday, 2026-11-03 a Tuesday, 2026-11-05 a Thursday; 06:00 UTC is 09:00 Riyadh.
+const at9 = (d) => new Date(`${d}T06:00:00Z`);
+const SUN_TUE_THU = [0, 2, 4];
+check('default days: Sunday, Tuesday and Thursday', JSON.stringify(cols.signal_feed_days.default) === '[0,2,4]' && cols.signal_feed_days.migration === '114_growth_feed_days.sql');
+check('Riyadh weekday: late Saturday UTC is already Sunday in Riyadh', fm.riyadhWeekday(new Date('2026-10-31T22:00:00Z')) === 0);
+check('feed days: Sunday, Tuesday and Thursday run', ['2026-11-01', '2026-11-03', '2026-11-05'].every((d) => fm.isFeedDay(SUN_TUE_THU, at9(d))));
+check('feed days: Monday, Wednesday, Friday and Saturday do not', ['2026-11-02', '2026-11-04', '2026-11-06', '2026-11-07'].every((d) => !fm.isFeedDay(SUN_TUE_THU, at9(d))));
+check('morning job: skipped on a Monday with Sunday, Tuesday and Thursday ticked', fm.morningDaySkip('cron', SUN_TUE_THU, at9('2026-11-02'))?.startsWith('Not a feed day') === true);
+check('morning job: runs on a ticked day', fm.morningDaySkip('cron', SUN_TUE_THU, at9('2026-11-03')) === null && fm.morningDaySkip('cron', [1], at9('2026-11-02')) === null);
+check('a run by hand works on any day, ticked or not', ['2026-11-01', '2026-11-02', '2026-11-04', '2026-11-06', '2026-11-07'].every((d) => fm.morningDaySkip('manual', SUN_TUE_THU, at9(d)) === null));
+check('the feed applies the gate with its trigger and the stored days', src.includes('const notToday = morningDaySkip(opts.trigger, days, opts.now);') && src.includes('if (notToday) return skip(notToday);'));
+check('the gate comes before the run is recorded or any AI call', src.indexOf('morningDaySkip(opts.trigger') < src.indexOf(".from('growth_feed_runs')\n    .insert(") && src.indexOf('morningDaySkip(opts.trigger') < src.indexOf('await runAi('));
+{
+  const days = esm.feedDaysSchema;
+  check('days form: sorted and unique, at least one, 0 to 6', JSON.stringify(days.parse([4, 0, 2, 2])) === '[0,2,4]' && !days.safeParse([]).success && !days.safeParse([7]).success);
+  check('days form: saved with the reach and cost group once 114 is in', esm.engineGroupSchemas.signal_feed_coverage.safeParse({ signal_feed_window_days: 30, signal_feed_searches_per_group: 5, signal_feed_max_cost_usd: 3, signal_feed_days: [1, 3] }).success);
+  check('stored days are read as numbers, a bad value falls back to the default', JSON.stringify(esm.readEngineValue('signal_feed_days', [2, 4])) === '[2,4]' && JSON.stringify(esm.readEngineValue('signal_feed_days', ['x'])) === '[0,2,4]');
+}
+check('projection: USD 2.25 a run on three days is USD 29.25 a month', fm.projectMonthlyUsd(2.25, SUN_TUE_THU) === 29.25);
+check('projection: every day at USD 2.25 is USD 68.25 a month', fm.projectMonthlyUsd(2.25, [0, 1, 2, 3, 4, 5, 6]) === 68.25);
+{
+  const m = fm.costBasis([2.1, 2.3], 9, 5);
+  const e = fm.costBasis([], 9, 5);
+  check('cost basis: the average of measured runs', m.basis === 'measured' && m.perRunUsd === 2.2 && m.runs === 2);
+  check('cost basis: before any run, the estimate for every group', e.basis === 'estimate' && e.perRunUsd === 2.25);
+}
+check('the projection reads measured runs of this design only', src.includes("Array.isArray(r.detail?.calls) && typeof r.detail?.cost_usd === 'number'") && src.includes(".eq('mode', 'real')") && src.includes(".eq('status', 'completed')"));
+check('warning: more than half the budget warns, half or less does not, no budget never', fm.overHalfBudget(40.01, 80) && !fm.overHalfBudget(40, 80) && !fm.overHalfBudget(100, null));
+{
+  const { renderToStaticMarkup } = await import('react-dom/server');
+  const React = await import('react');
+  const forms = await loadTsx('src/components/admin/growth/settings/EngineForms.tsx');
+  const html = (perRunUsd, days, budgetUsd) => renderToStaticMarkup(React.createElement(forms.FeedCostProjection, { days, basis: { perRunUsd, basis: 'measured', runs: 3 }, budgetUsd }));
+  const over = html(3.5, SUN_TUE_THU, 80);
+  const under = html(2.25, SUN_TUE_THU, 80);
+  const daily = html(2.25, [0, 1, 2, 3, 4, 5, 6], 80);
+  check('form: three days at USD 3.50 (USD 45.50) shows the half-budget warning', over.includes('data-feed-warning="over-half"') && over.includes('data-feed-projection="45.50"'), over.slice(0, 200));
+  check('form: three days at USD 2.25 (USD 29.25) shows no warning', !under.includes('data-feed-warning') && under.includes('data-feed-projection="29.25"'));
+  check('form: ticking every day moves the projection and brings the warning', daily.includes('data-feed-projection="68.25"') && daily.includes('data-feed-warning'));
+  check('form: the projection says it is measured', under.includes('the average of the last 3 runs'));
+}
+check('budget: a run that fits what is left goes ahead, one that does not is skipped', fm.budgetAllowsRun(77, 2.25, 80) && !fm.budgetAllowsRun(78, 2.25, 80) && !fm.budgetAllowsRun(0, 1, null));
+check('budget: the skip is recorded as refused with the reason, and logged', src.includes("await finish({ status: 'refused', detail: { reason: 'budget', message,") && src.includes("action: 'feed.skipped'"));
+check('budget: the check runs before any AI call', src.indexOf('budgetAllowsRun(spend.spentUsd, expected, budget)') < src.indexOf('await runAi('));
+check('budget: a run that goes ahead is held to what is left', src.includes('runCeiling = Math.min(ceiling, round2(budget - spend.spentUsd))') && src.includes('withinCeiling(spent, committed, estimate, runCeiling)'));
+check('Signals: shows the last run cost, or why it was skipped', panel.includes('lastRunLine(runs[0])') && read('src/components/admin/growth/signals/FeedPanel.tsx').includes("d.reason === 'budget'") && src.includes('cost_usd: own(r) ??'));
+const sql114 = migrationChecks('114_growth_feed_days.sql', []);
+check('114: the column, its default and the same checks as send_days', sql114.includes("signal_feed_days INTEGER[] NOT NULL DEFAULT '{0,2,4}'") && sql114.includes('cardinality(signal_feed_days) BETWEEN 1 AND 7') && sql114.includes('growth_is_increasing(signal_feed_days)'));
 
 finish('verify-growth-feed');

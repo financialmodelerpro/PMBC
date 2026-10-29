@@ -122,6 +122,8 @@ export type EngineSettings = {
   signal_feed_window_days: number;
   signal_feed_searches_per_group: number;
   signal_feed_max_cost_usd: number;
+  /** Riyadh weekdays the morning job runs the feed, 0 Sunday to 6 Saturday. */
+  signal_feed_days: number[];
   scoring_weights: ScoringWeights;
   sector_tiers: SectorTiers;
   agent_models: Record<string, string>;
@@ -151,6 +153,8 @@ export const ENGINE_SETTING_COLUMNS: Record<EngineSettingKey, { migration: strin
   signal_feed_window_days: { migration: '113_growth_feed_coverage.sql', default: 30 },
   signal_feed_searches_per_group: { migration: '113_growth_feed_coverage.sql', default: 5 },
   signal_feed_max_cost_usd: { migration: '113_growth_feed_coverage.sql', default: 3 },
+  // Cadence (114): the morning job uses this default until 114 is applied.
+  signal_feed_days: { migration: '114_growth_feed_days.sql', default: [0, 2, 4] },
   scoring_weights: { migration: '088_growth_prospecting.sql', default: DEFAULT_SCORING_WEIGHTS },
   sector_tiers: { migration: '096_growth_sector_tiers.sql', default: DEFAULT_SECTOR_TIERS },
   agent_models: { migration: '088_growth_prospecting.sql', default: {} },
@@ -183,6 +187,13 @@ const weightsSchema = <K extends string>(keys: readonly K[]) =>
 export const scoringWeightsSchema = weightsSchema(SCORING_FACTORS.map((f) => f.key));
 export const leadWeightsSchema = weightsSchema(LEAD_FACTORS.map((f) => f.key));
 
+/** Feed days: at least one, each 0 to 6, sorted and unique (the database checks the same). */
+export const feedDaysSchema = z
+  .array(z.number().int().min(0).max(6))
+  .min(1, 'Choose at least one day')
+  .max(7)
+  .transform((a) => [...new Set(a)].sort((x, y) => x - y));
+
 const keyword = z.string().trim().min(2, 'A keyword needs at least two characters').max(ENGINE_LIMITS.keyword);
 
 /** One group of engine settings per settings form. Each saves only its own columns. */
@@ -206,6 +217,8 @@ export const engineGroupSchemas = {
       .min(ENGINE_LIMITS.feedMaxCostUsd.min)
       .max(ENGINE_LIMITS.feedMaxCostUsd.max)
       .transform((n) => Math.round(n * 100) / 100),
+    // Sent only once 114 is applied, so the rest of the form saves before it.
+    signal_feed_days: feedDaysSchema.optional(),
   }),
   scoring: z.object({ scoring_weights: scoringWeightsSchema }),
   sector_tiers: z.object({ sector_tiers: sectorTiersSchema }),
@@ -247,6 +260,10 @@ export function readEngineValue<K extends EngineSettingKey>(key: K, raw: unknown
   const d = ENGINE_SETTING_COLUMNS[key].default as EngineSettings[K];
   if (raw === null || raw === undefined) return d;
   if (key === 'sector_tiers') return resolveSectorTiers(raw) as EngineSettings[K];
+  if (key === 'signal_feed_days') {
+    const parsed = feedDaysSchema.safeParse(raw);
+    return (parsed.success ? parsed.data : d) as EngineSettings[K];
+  }
   if (Array.isArray(d)) return (Array.isArray(raw) ? raw.filter((x) => typeof x === 'string') : d) as EngineSettings[K];
   if (typeof d === 'boolean') return (typeof raw === 'boolean' ? raw : d) as EngineSettings[K];
   if (typeof d === 'number') return (typeof raw === 'number' ? raw : Number.isFinite(Number(raw)) ? Number(raw) : d) as EngineSettings[K];
