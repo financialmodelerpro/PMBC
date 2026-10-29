@@ -67,6 +67,7 @@ import { riyadhDate } from './format';
 import type { Actor } from './kb';
 import { GCC_PLACES, suggestKeyword } from './keywordLibrary';
 import { activeKeywords, ensureSeeded, getKeywordLibrary } from './keywords';
+import { keptReason, notAProspectReason, planKeeps, rankCandidates, PROSPECT_FITS, type ProspectFit } from './feedRank';
 import { TRIGGER_TYPES, type TriggerType } from './model';
 import { getGrowthSettings } from './settings';
 import { createSignal, existingDuplicate } from './signals';
@@ -89,8 +90,13 @@ export type FeedCandidate = {
   keyword_number?: number | null;
   matched_keyword?: string | null;
   matched_keyword_id?: string | null;
+  location?: string | null;
+  company_sector?: string | null;
+  size_sar?: number | null;
+  prospect_fit?: ProspectFit | null;
+  fit_reason?: string | null;
 };
-export type FeedDecision = FeedCandidate & { outcome: 'kept' | 'duplicate' | 'discarded' | 'over_limit'; why: string; group?: string };
+export type FeedDecision = FeedCandidate & { outcome: 'kept' | 'duplicate' | 'discarded' | 'not_a_prospect' | 'below_rank' | 'over_limit'; why: string; group?: string; rank?: number; score?: number };
 
 /** A keyword as the feed numbers it in the prompt. `id` is null before the library is saved, and for the old list before 094. */
 export type FeedKeyword = { id: string | null; keyword: string; trigger: TriggerType | null; region: 'ksa' | 'gcc' };
@@ -122,6 +128,11 @@ export function screenCandidates(raw: unknown, opts: { sourceUrls: string[]; moc
       evidence_url: String(s.evidence_url ?? '').trim(),
       source_name: s.source_name ? String(s.source_name).trim().slice(0, 120) : null,
       keyword_number: Number.isInteger(n) && n > 0 ? n : null,
+      location: s.location ? String(s.location).trim().slice(0, 120) : null,
+      company_sector: s.company_sector ? String(s.company_sector).trim().slice(0, 120) : null,
+      size_sar: Number.isFinite(Number(s.size_sar)) && Number(s.size_sar) > 0 ? Number(s.size_sar) : null,
+      prospect_fit: (PROSPECT_FITS as readonly string[]).includes(String(s.prospect_fit)) ? (s.prospect_fit as ProspectFit) : null,
+      fit_reason: s.fit_reason ? String(s.fit_reason).trim().slice(0, 200) : null,
     };
     let why = '';
     if (!c.evidence_url) why = 'no evidence link';
@@ -186,6 +197,7 @@ export function feedPrompt(keywords: FeedKeyword[], today: string, opts: { windo
       'Every event must have an evidence_url: the exact URL of the article or filing you read, as returned by your search. Never construct, shorten or guess a URL. If you cannot give one, leave the event out.',
       'Report each event once, even if it matches several keywords. Never invent companies, people, amounts or dates. Summaries are one or two plain sentences stating what the source says.',
       `Trigger types: ${TRIGGER_TYPES.map((t) => t.value).join(', ')}.`,
+      'For each event judge prospect_fit: could the named company plausibly need financial modelling, valuation, due diligence or fundraising support? Judge on that, not on size alone. prospect: developers (including government-linked developers and giga-project owners such as ROSHN, Diriyah, NEOM and the Royal Commissions), investors, funds, family offices, holding companies, and operating companies raising money, buying, selling or building. unlikely_buyer: global contractors, EPC firms and equipment or technology suppliers winning work, and foreign firms opening an office, who would not buy this advice. not_a_prospect: regulators and government bodies acting as regulators, exchanges and index news, and market or sector commentary with no named company. Give location, company_sector and size_sar (in SAR, 0 if the source states none) as the source says them.',
       `When you have finished searching, call the ${tool} tool once with every event you found, or with an empty signals list if none qualify. Do not write the results as text.`,
     ]
       .filter(Boolean)
@@ -383,40 +395,56 @@ export async function runSignalFeed(opts: { trigger: 'cron' | 'manual'; actor?: 
   const noSave = mock || paused;
   let saved = 0;
   let duplicates = repeats.length;
+  // 1. Not a prospect at all: dropped before ranking. 2. Already in the inbox: skipped. 3. The rest are ranked and the best kept.
+  const prospects: FeedCandidate[] = [];
+  let notProspect = 0;
   for (const c of unique) {
+    const why = notAProspectReason(c);
+    if (why) {
+      notProspect++;
+      decisions.push({ ...c, outcome: 'not_a_prospect', why });
+      continue;
+    }
     const dup = await existingDuplicate({ company_id: null, company_name: c.company_name, trigger_type: c.trigger_type, signal_date: c.signal_date, evidence_url: c.evidence_url });
     if (dup) {
       duplicates++;
       decisions.push({ ...c, outcome: 'duplicate', why: 'already in the inbox' });
       continue;
     }
-    if (saved >= max) {
-      decisions.push({ ...c, outcome: 'over_limit', why: `the run keeps at most ${max}` });
-      continue;
-    }
+    prospects.push(c);
+  }
+  const ranked = rankCandidates(prospects, { today, weights: engine.values.scoring_weights, sectorTiers: engine.values.sector_tiers });
+  const plan = planKeeps(ranked, max);
+  for (const r of plan.keep) {
+    const c = r.candidate;
+    const reason = keptReason(r, ranked.length);
     if (noSave) {
       // Mock mode and a paused feed preview only: nothing is saved as a signal.
-      decisions.push({ ...c, outcome: 'kept', why: 'would be kept (preview only)' });
+      decisions.push({ ...c, outcome: 'kept', why: `would be kept (preview only). ${reason}`, rank: r.rank, score: r.score });
       continue;
     }
-    const r = await createSignal(
+    const res = await createSignal(
       { company_name: c.company_name, trigger_type: c.trigger_type, signal_date: c.signal_date, summary: c.summary, evidence_url: c.evidence_url, source_name: c.source_name, company_id: null },
       null,
-      { origin: 'feed', feedRunId: runId, isTest, actorType: 'ai', actorId: FEED_AGENT, matchedKeyword: c.matched_keyword ? { id: c.matched_keyword_id ?? null, keyword: c.matched_keyword } : null },
+      { origin: 'feed', feedRunId: runId, isTest, actorType: 'ai', actorId: FEED_AGENT, matchedKeyword: c.matched_keyword ? { id: c.matched_keyword_id ?? null, keyword: c.matched_keyword } : null, feedRank: { rank: r.rank, score: r.score, reason } },
     );
-    if (r.ok) {
+    if (res.ok) {
       saved++;
-      decisions.push({ ...c, outcome: 'kept', why: 'added to the inbox' });
-    } else decisions.push({ ...c, outcome: 'discarded', why: r.error });
+      decisions.push({ ...c, outcome: 'kept', why: reason, rank: r.rank, score: r.score });
+    } else decisions.push({ ...c, outcome: 'discarded', why: res.error, rank: r.rank, score: r.score });
   }
+  for (const r of plan.belowRank) decisions.push({ ...r.candidate, outcome: 'below_rank', why: `rank ${r.rank} of ${ranked.length}; ${r.basis}`, rank: r.rank, score: r.score });
+  for (const r of plan.overLimit) decisions.push({ ...r.candidate, outcome: 'over_limit', why: `rank ${r.rank} of ${ranked.length}, past the ${max} kept per run; ${r.basis}`, rank: r.rank, score: r.score });
+  const counts = { not_a_prospect: notProspect, below_rank: plan.belowRank.length, over_limit: plan.overLimit.length };
+  const dropped = `${counts.not_a_prospect} not a prospect, ${counts.below_rank} below rank, ${counts.over_limit} over the limit`;
 
   const found = valid.length + discarded.length;
-  await finish({ status: 'completed', found, saved, duplicates, discarded: discarded.length, usage_id: done[0].usage_id, detail: { ...detailBase, decisions: decisions.slice(0, 200) } });
+  await finish({ status: 'completed', found, saved, duplicates, discarded: discarded.length, usage_id: done[0].usage_id, detail: { ...detailBase, counts, decisions: decisions.slice(0, 200) } });
   await logActivity({
     actorType: 'ai',
     actorId: FEED_AGENT,
     action: 'feed.run',
-    summary: `${mock ? 'Mock preview of the signal feed' : paused ? 'Preview of the paused signal feed' : 'Signal feed'}: ${saved} kept, ${duplicates} duplicates skipped, ${discarded.length} discarded without evidence or date. ${parse}. ${coverage}`,
+    summary: `${mock ? 'Mock preview of the signal feed' : paused ? 'Preview of the paused signal feed' : 'Signal feed'}: ${saved} kept by rank, ${duplicates} duplicates skipped, ${discarded.length} discarded without evidence or date, ${dropped}. ${parse}. ${coverage}`,
     isTest,
     metadata: { run_id: runId, trigger: opts.trigger, mock, preview_only: noSave, cost_usd: spent, searches: searchesRun },
   });
@@ -424,8 +452,8 @@ export async function runSignalFeed(opts: { trigger: 'cron' | 'manual'; actor?: 
     ? 'Mock preview: nothing was saved. With an Anthropic key the same run adds real signals.'
     : paused
       ? 'Preview: the feed is paused, so nothing was saved. Switch it on in Settings to add signals.'
-      : `${saved} signals added to the inbox.`;
-  const message = `${head} ${parse}. ${coverage}`;
+      : `${saved} signals added to the inbox, the highest ranked.`;
+  const message = `${head} Not kept: ${dropped}. ${parse}. ${coverage}`;
   return { ok: true, value: { runId, mode: mock ? 'mock_preview' : 'real', previewOnly: noSave, status: 'completed', message, decisions, saved, parse, searches: searchesRun, costUsd: spent, groupsRun: done.length, groupsTotal: allGroups.length } };
 }
 

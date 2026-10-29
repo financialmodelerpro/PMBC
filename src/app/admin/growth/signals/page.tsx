@@ -155,6 +155,11 @@ export default async function GrowthSignalsPage({ searchParams }: { searchParams
                       </div>
                       <div style={{ fontSize: 13 }}>{s.summary}</div>
                       {s.matched_keyword && <div style={{ fontSize: 12, marginTop: 4, color: ADMIN_COLORS.textMuted }}>Keyword: {s.matched_keyword}</div>}
+                      {s.feed_rank && (
+                        <div data-feed-rank={s.feed_rank} style={{ fontSize: 12, marginTop: 4, color: ADMIN_COLORS.textMuted }}>
+                          <span style={adminBadge('success')}>Rank {s.feed_rank}</span> {s.feed_reason}
+                        </div>
+                      )}
                       <div style={{ fontSize: 12, marginTop: 4 }}>
                         <a href={s.evidence_url} target="_blank" rel="noopener noreferrer nofollow">
                           Evidence{s.source_name ? `: ${s.source_name}` : ''}

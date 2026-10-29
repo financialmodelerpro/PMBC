@@ -148,7 +148,8 @@ export type EngineSettingKey = keyof EngineSettings;
 export const ENGINE_SETTING_COLUMNS: Record<EngineSettingKey, { migration: string; default: EngineSettings[EngineSettingKey] }> = {
   signal_keywords: { migration: '088_growth_prospecting.sql', default: [] },
   signal_feed_paused: { migration: '088_growth_prospecting.sql', default: false },
-  signal_feed_max_per_run: { migration: '088_growth_prospecting.sql', default: 10 },
+  // Raised from 10 to 20 on 2026-10-29 (115 moves the stored 10 to 20); the feed ranks before the limit applies.
+  signal_feed_max_per_run: { migration: '088_growth_prospecting.sql', default: 20 },
   // Coverage (113): the feed runs on these defaults until 113 is applied; the form shows them read only.
   signal_feed_window_days: { migration: '113_growth_feed_coverage.sql', default: 30 },
   signal_feed_searches_per_group: { migration: '113_growth_feed_coverage.sql', default: 5 },

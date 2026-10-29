@@ -63,6 +63,11 @@ export const JSON_SAMPLES: Record<string, Sample> = {
           evidence_url: 'https://example.invalid/sample-sukuk',
           source_name: 'Sample News',
           keyword_number: sukuk,
+          location: 'Dammam, Saudi Arabia',
+          company_sector: 'logistics holding company',
+          size_sar: 600_000_000,
+          prospect_fit: 'prospect',
+          fit_reason: 'raising debt for expansion, may need a model and lender support',
         },
         {
           company_name: 'Sample Logistics Holding (made up)',
