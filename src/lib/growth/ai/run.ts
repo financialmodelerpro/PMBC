@@ -43,6 +43,8 @@ export type AiRequest = {
   resultTool?: ResultTool;
   /** Give up on one provider request after this long. */
   timeoutMs?: number;
+  /** Epoch ms: the provider starts no new request after this and cuts one at it. */
+  deadlineAt?: number;
   related?: { companyId?: string | null; leadId?: string | null; kbItemId?: string | null };
   /**
    * Knowledge Base kinds that must have at least one approved item before the
@@ -55,7 +57,7 @@ export type AiRequest = {
 };
 
 export type AiResult =
-  | { ok: true; text: string; mock: boolean; model: string; inputTokens: number; outputTokens: number; costUsd: number; usageId: string; sourceUrls: string[]; webSearchRequests: number; toolInput?: unknown; stopReasons: string[]; requests: number }
+  | { ok: true; text: string; mock: boolean; model: string; inputTokens: number; outputTokens: number; costUsd: number; usageId: string; sourceUrls: string[]; webSearchRequests: number; toolInput?: unknown; stopReasons: string[]; requests: number; stoppedEarly?: 'deadline' }
   | { ok: false; reason: AiRefusal; message: string; mock: boolean; usageId: string | null };
 
 export type BudgetAlertSender = (alert: { to: string; month: string; spentUsd: number; budgetUsd: number; thresholdPct: number }) => Promise<boolean>;
@@ -217,7 +219,7 @@ export async function runAi(req: AiRequest, opts: RunOptions = {}): Promise<AiRe
   const started = Date.now();
   let response;
   try {
-    response = await provider.call({ model, system: req.system, messages: req.messages, maxTokens: req.maxTokens ?? MAX_TOKENS, purpose: req.purpose, agent: req.agent, webSearch: req.webSearch, resultTool: req.resultTool, timeoutMs: req.timeoutMs });
+    response = await provider.call({ model, system: req.system, messages: req.messages, maxTokens: req.maxTokens ?? MAX_TOKENS, purpose: req.purpose, agent: req.agent, webSearch: req.webSearch, resultTool: req.resultTool, timeoutMs: req.timeoutMs, deadlineAt: req.deadlineAt });
   } catch (err) {
     const message = err instanceof Error ? err.message.slice(0, 300) : 'The provider call failed';
     const usageId = await record({ ...base, status: 'failed', reason: message, duration_ms: Date.now() - started });
@@ -258,5 +260,5 @@ export async function runAi(req: AiRequest, opts: RunOptions = {}): Promise<AiRe
   }
 
   if (response.refused) return { ok: false, reason: 'model_refused', message: 'The model declined the request.', mock: provider.isMock, usageId };
-  return { ok: true, text: response.text, mock: provider.isMock, model: response.model, inputTokens: row.input_tokens ?? 0, outputTokens: response.outputTokens, costUsd: cost, usageId, sourceUrls: response.sourceUrls ?? [], webSearchRequests: response.webSearchRequests ?? 0, toolInput: response.toolInput, stopReasons: response.stopReasons ?? [], requests: response.requests ?? 1 };
+  return { ok: true, text: response.text, mock: provider.isMock, model: response.model, inputTokens: row.input_tokens ?? 0, outputTokens: response.outputTokens, costUsd: cost, usageId, sourceUrls: response.sourceUrls ?? [], webSearchRequests: response.webSearchRequests ?? 0, toolInput: response.toolInput, stopReasons: response.stopReasons ?? [], requests: response.requests ?? 1, stoppedEarly: response.stoppedEarly };
 }

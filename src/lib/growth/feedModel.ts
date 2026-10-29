@@ -18,6 +18,10 @@ import { TRIGGER_TYPES } from './model';
 export const PROSPECT_FITS = ['prospect', 'unlikely_buyer', 'not_a_prospect'] as const;
 export type ProspectFit = (typeof PROSPECT_FITS)[number];
 
+/** The sector tiers the Prospect Score credits (Settings, Sector tiers), as the model names a company's own business. */
+export const FEED_SECTOR_TIERS = ['real_estate', 'infrastructure', 'investment', 'services', 'other'] as const;
+export type FeedSectorTier = (typeof FEED_SECTOR_TIERS)[number];
+
 export const FEED_RESULT_TOOL = 'report_signals';
 
 /** The tool the model calls once with its findings. Strict: the API checks the input against this schema. */
@@ -36,7 +40,7 @@ export function feedResultTool(): { name: string; description: string; inputSche
           items: {
             type: 'object',
             additionalProperties: false,
-            required: ['company_name', 'trigger_type', 'signal_date', 'summary', 'evidence_url', 'source_name', 'keyword_number', 'location', 'company_sector', 'size_sar', 'prospect_fit', 'fit_reason'],
+            required: ['company_name', 'trigger_type', 'signal_date', 'summary', 'evidence_url', 'source_name', 'keyword_number', 'location', 'company_sector', 'sector_tier', 'size_sar', 'prospect_fit', 'fit_reason'],
             properties: {
               company_name: { type: 'string' },
               trigger_type: { type: 'string', enum: TRIGGER_TYPES.map((t) => t.value) },
@@ -47,6 +51,11 @@ export function feedResultTool(): { name: string; description: string; inputSche
               keyword_number: { type: 'integer', description: 'The number of the keyword this event best matches' },
               location: { type: 'string', description: 'Country and city of the company or project as the source says, e.g. "Riyadh, Saudi Arabia"; empty when not stated' },
               company_sector: { type: 'string', description: 'The named company\'s sector in a few words, e.g. "real estate developer", "logistics fund", "EPC contractor"' },
+              sector_tier: {
+                type: 'string',
+                enum: [...FEED_SECTOR_TIERS],
+                description: "The named company's own business, never the project's location or a headline word: real_estate (residential, commercial or hospitality developers and owners, master and giga-project developers), infrastructure (energy and power, utilities, water, rail and transport, construction and EPC, industrial, logistics operators), investment (funds, asset managers, private equity, family offices, holding companies), services (healthcare, education, retail, technology, banks and other services), other",
+              },
               size_sar: { type: 'number', description: 'Project or deal size in SAR as the source states it (convert USD at 3.75); 0 when not stated' },
               prospect_fit: { type: 'string', enum: [...PROSPECT_FITS], description: 'prospect, unlikely_buyer or not_a_prospect, by the rules in the instructions' },
               fit_reason: { type: 'string', description: 'One short clause: why this fit' },
@@ -152,12 +161,43 @@ export function estimateGroupCostUsd(searches: number): number {
   return Math.round(searches * FEED_ESTIMATE_USD_PER_SEARCH * 100) / 100;
 }
 
-/** Calls run this many at a time, so a run of ten groups takes two rounds. */
-export const FEED_CONCURRENCY = 5;
-/** No new round starts after this long, so the daily cron leaves time for the jobs after the feed. */
-export const FEED_TIME_BUDGET_MS = 170_000;
-/** One request inside a call gives up after this long. */
-export const FEED_CALL_TIMEOUT_MS = 120_000;
+/**
+ * Every active group is searched at once (2026-10-29: running them in rounds
+ * of five let the 170 second limit drop the second round, real estate
+ * included). The cost ceiling is the constraint, not time. Up to this many
+ * calls start together; the library has eleven groups.
+ */
+export const FEED_CONCURRENCY = 12;
+/**
+ * The run's deadline, from its start. The function may run 300 seconds; this
+ * leaves time to save. A call never starts a new request (a resume, or the
+ * reminder to report) after the deadline, and a request is cut at it.
+ */
+export const FEED_RUN_BUDGET_MS = 250_000;
+/** One request inside a call gives up after this long, or at the run deadline if sooner. */
+export const FEED_CALL_TIMEOUT_MS = 240_000;
+/** Kept for the Settings text: groups are no longer run in rounds. */
+export const FEED_TIME_BUDGET_MS = FEED_RUN_BUDGET_MS;
+
+/** Why a group was not fully searched in a run; it is searched first next time. */
+export type CarryReason = 'cost_ceiling' | 'time_limit' | 'failed';
+
+/**
+ * The order groups are searched in: any the last run could not search first
+ * (in that run's order), then the rest rotated by the day of the year.
+ */
+export function orderGroups<T extends { key: string }>(groups: T[], carriedOver: string[], today: string): T[] {
+  const first = carriedOver.map((k) => groups.find((g) => g.key === k)).filter((g): g is T => Boolean(g));
+  const rest = rotateGroups(groups.filter((g) => !carriedOver.includes(g.key)), today);
+  return [...first, ...rest];
+}
+
+/** The cost one group's call is expected to have: the average of recent calls, or USD 0.05 a search before any. */
+export function callEstimateUsd(recentCallCosts: number[], searches: number): number {
+  const m = recentCallCosts.filter((c) => Number.isFinite(c) && c > 0);
+  if (!m.length) return estimateGroupCostUsd(searches);
+  return Math.round((m.reduce((a, b) => a + b, 0) / m.length) * 100) / 100;
+}
 
 /**
  * The order groups run in: rotated by the day of the year, so a group left

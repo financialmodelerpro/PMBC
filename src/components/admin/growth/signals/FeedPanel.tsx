@@ -85,7 +85,7 @@ export function FeedPanel({ runs, available, keywords, paused, days }: { runs: R
           )}
           {ordered(decisions).map((d, i) => (
             <li key={`${d.evidence_url}-${i}`} style={{ fontSize: 13 }}>
-              <span style={adminBadge(TONE[d.outcome])}>{OUTCOME_LABEL[d.outcome]}</span> {d.rank && <span data-rank={d.rank} style={{ fontWeight: 700, color: ADMIN_COLORS.textHeading }}>#{d.rank}</span>} <strong>{d.company_name || 'Unnamed'}</strong>: {d.summary} {d.matched_keyword && <span style={{ color: ADMIN_COLORS.textMuted }}>[{d.matched_keyword}] </span>}<span style={{ color: ADMIN_COLORS.textMuted }}>({d.group ? `${d.group}: ` : ''}{d.why})</span>
+              <span style={adminBadge(TONE[d.outcome])}>{OUTCOME_LABEL[d.outcome]}</span> {d.rank && <span data-rank={d.rank} style={{ fontWeight: 700, color: ADMIN_COLORS.textHeading }}>#{d.rank}</span>} <strong>{d.company_name || 'Unnamed'}</strong>: {d.summary} {d.sector && <span data-sector={d.sector} style={adminBadge('neutral')}>{d.sector.replace('_', ' ')}</span>} {d.matched_keyword && <span style={{ color: ADMIN_COLORS.textMuted }}>[{d.matched_keyword}] </span>}<span style={{ color: ADMIN_COLORS.textMuted }}>({d.group ? `${d.group}: ` : ''}{d.why})</span>
             </li>
           ))}
         </ul>

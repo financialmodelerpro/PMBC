@@ -5,7 +5,7 @@ import { useState, type ReactNode } from 'react';
 import { ADMIN_COLORS, adminCard, adminInput, adminTextarea } from '@/lib/admin/styles';
 import { GROWTH_AGENTS } from '@/lib/growth/ai/agents';
 import { DEFAULT_MODEL, MODEL_PRICES } from '@/lib/growth/ai/pricing';
-import { FEED_CONCURRENCY, estimateGroupCostUsd, overHalfBudget, projectMonthlyUsd, type FeedCostBasis } from '@/lib/growth/feedModel';
+import { estimateGroupCostUsd, overHalfBudget, projectMonthlyUsd, type FeedCostBasis } from '@/lib/growth/feedModel';
 import { WEEKDAYS } from '@/lib/growth/settingsModel';
 import { LEAD_FACTORS, SCORING_FACTORS, SECTOR_TIERS, type EngineGroup, type EngineSettings, type SectorTier } from '@/lib/growth/engineSettingsModel';
 
@@ -87,7 +87,7 @@ export function FeedCoverageForm({
     <Card
       id="feed-coverage"
       title="Signal feed: reach and cost"
-      intro={`Each run makes one AI call per keyword group switched on (${groups} today), ${FEED_CONCURRENCY} at a time. A call starts only while the run's spend so far plus its estimate stays within the ceiling; groups left out are named on the run and come first on a later day. The window is the age limit stated in the prompt and enforced on every signal.`}
+      intro={`Each run makes one AI call per keyword group switched on (${groups} today), all at once, so every group is searched in each run; a group that cannot finish is named on the run and searched first next time. A call starts only while the run's spend so far plus its estimate stays within the ceiling; groups left out are named on the run and come first on a later day. The window is the age limit stated in the prompt and enforced on every signal.`}
       pending={pending}
     >
       <div style={grid}>
