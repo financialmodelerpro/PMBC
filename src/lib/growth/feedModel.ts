@@ -14,6 +14,10 @@
 
 import { TRIGGER_TYPES } from './model';
 
+/** How the model judges a candidate's company as a buyer of the firm's advice (2026-10-29). */
+export const PROSPECT_FITS = ['prospect', 'unlikely_buyer', 'not_a_prospect'] as const;
+export type ProspectFit = (typeof PROSPECT_FITS)[number];
+
 export const FEED_RESULT_TOOL = 'report_signals';
 
 /** The tool the model calls once with its findings. Strict: the API checks the input against this schema. */
@@ -32,7 +36,7 @@ export function feedResultTool(): { name: string; description: string; inputSche
           items: {
             type: 'object',
             additionalProperties: false,
-            required: ['company_name', 'trigger_type', 'signal_date', 'summary', 'evidence_url', 'source_name', 'keyword_number'],
+            required: ['company_name', 'trigger_type', 'signal_date', 'summary', 'evidence_url', 'source_name', 'keyword_number', 'location', 'company_sector', 'size_sar', 'prospect_fit', 'fit_reason'],
             properties: {
               company_name: { type: 'string' },
               trigger_type: { type: 'string', enum: TRIGGER_TYPES.map((t) => t.value) },
@@ -41,6 +45,11 @@ export function feedResultTool(): { name: string; description: string; inputSche
               evidence_url: { type: 'string', description: 'The exact URL of the article or filing, as returned by your search' },
               source_name: { type: 'string' },
               keyword_number: { type: 'integer', description: 'The number of the keyword this event best matches' },
+              location: { type: 'string', description: 'Country and city of the company or project as the source says, e.g. "Riyadh, Saudi Arabia"; empty when not stated' },
+              company_sector: { type: 'string', description: 'The named company\'s sector in a few words, e.g. "real estate developer", "logistics fund", "EPC contractor"' },
+              size_sar: { type: 'number', description: 'Project or deal size in SAR as the source states it (convert USD at 3.75); 0 when not stated' },
+              prospect_fit: { type: 'string', enum: [...PROSPECT_FITS], description: 'prospect, unlikely_buyer or not_a_prospect, by the rules in the instructions' },
+              fit_reason: { type: 'string', description: 'One short clause: why this fit' },
             },
           },
         },

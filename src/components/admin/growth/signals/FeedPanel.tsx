@@ -17,6 +17,8 @@ function runDetail(r: Run): string {
   const parts: string[] = [];
   if (d.reason === 'budget' && typeof d.message === 'string') return ` (${d.message})`;
   if (typeof d.parse_summary === 'string') parts.push(d.parse_summary);
+  const c = d.counts as { not_a_prospect?: number; below_rank?: number; over_limit?: number } | undefined;
+  if (c) parts.push(`not kept: ${c.not_a_prospect ?? 0} not a prospect, ${c.below_rank ?? 0} below rank, ${c.over_limit ?? 0} over the limit`);
   if (typeof d.searches === 'number') parts.push(`${d.searches} searches`);
   if (typeof r.cost_usd === 'number') parts.push(`USD ${r.cost_usd.toFixed(2)}`);
   return parts.length ? ` (${parts.join(', ')})` : '';
@@ -31,7 +33,14 @@ function lastRunLine(r: Run | undefined): { text: string; skipped: boolean } | n
   return { text: `Last run, ${dateTime(r.created_at)}: cost USD ${r.cost_usd.toFixed(2)}${typeof d.searches === 'number' ? ` for ${d.searches} searches` : ''}, ${r.saved} kept.`, skipped: false };
 }
 
-const TONE = { kept: 'success', duplicate: 'neutral', discarded: 'danger', over_limit: 'warning' } as const;
+const TONE = { kept: 'success', duplicate: 'neutral', discarded: 'danger', not_a_prospect: 'neutral', below_rank: 'neutral', over_limit: 'warning' } as const;
+const OUTCOME_LABEL = { kept: 'kept', duplicate: 'duplicate', discarded: 'discarded', not_a_prospect: 'not a prospect', below_rank: 'below rank', over_limit: 'over limit' } as const;
+
+/** Kept first in rank order, then what was cut, then what was never a prospect or had no evidence. */
+const ORDER = { kept: 0, over_limit: 1, below_rank: 2, not_a_prospect: 3, duplicate: 4, discarded: 5 } as const;
+function ordered(decisions: FeedDecision[]): FeedDecision[] {
+  return [...decisions].sort((a, b) => ORDER[a.outcome] - ORDER[b.outcome] || (a.rank ?? 9999) - (b.rank ?? 9999));
+}
 
 /** Run the daily feed by hand, see what it kept, skipped and discarded, and the last runs. */
 export function FeedPanel({ runs, available, keywords, paused, days }: { runs: Run[]; available: boolean; keywords: number; paused: boolean; days: string }) {
@@ -74,9 +83,9 @@ export function FeedPanel({ runs, available, keywords, paused, days }: { runs: R
               <MockBadge /> <span style={{ fontSize: 12, color: ADMIN_COLORS.warning }}>Sample output about made-up companies; nothing was saved.</span>
             </li>
           )}
-          {decisions.map((d, i) => (
+          {ordered(decisions).map((d, i) => (
             <li key={`${d.evidence_url}-${i}`} style={{ fontSize: 13 }}>
-              <span style={adminBadge(TONE[d.outcome])}>{d.outcome.replace('_', ' ')}</span> <strong>{d.company_name || 'Unnamed'}</strong>: {d.summary} {d.matched_keyword && <span style={{ color: ADMIN_COLORS.textMuted }}>[{d.matched_keyword}] </span>}<span style={{ color: ADMIN_COLORS.textMuted }}>({d.group ? `${d.group}: ` : ''}{d.why})</span>
+              <span style={adminBadge(TONE[d.outcome])}>{OUTCOME_LABEL[d.outcome]}</span> {d.rank && <span data-rank={d.rank} style={{ fontWeight: 700, color: ADMIN_COLORS.textHeading }}>#{d.rank}</span>} <strong>{d.company_name || 'Unnamed'}</strong>: {d.summary} {d.matched_keyword && <span style={{ color: ADMIN_COLORS.textMuted }}>[{d.matched_keyword}] </span>}<span style={{ color: ADMIN_COLORS.textMuted }}>({d.group ? `${d.group}: ` : ''}{d.why})</span>
             </li>
           ))}
         </ul>

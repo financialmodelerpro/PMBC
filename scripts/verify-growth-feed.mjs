@@ -100,13 +100,13 @@ check('the ceiling is checked before each call starts', src.includes('withinCeil
 check('groups left out are recorded with the reason', src.includes("why: 'cost_ceiling'") && src.includes("why: 'time_limit'") && src.includes('skipped,'));
 check('each call records outcome, searches, URLs, stop reasons and the raw answer', ['outcome: read.outcome', 'searches: ai.webSearchRequests', 'source_urls: ai.sourceUrls.length', 'stop_reasons: ai.stopReasons', 'raw_text: ai.text.slice(0, RAW_TEXT_CHARS)', 'raw_tool_input:'].every((s) => src.includes(s)));
 check('the run stores the parse summary, cost and searches', src.includes('parse_summary: parse') && src.includes('cost_usd: spent') && src.includes('searches: searchesRun'));
-check('the result line carries the parse summary', src.includes('const message = `${head} ${parse}. ${coverage}`'));
+check('the result line carries the parse summary', src.includes('const message = `${head} Not kept: ${dropped}. ${parse}. ${coverage}`'));
 
 console.log('4. The rules that stay');
 check('every call goes through runAi with web search and the result tool', /runAi\(\{ agent: FEED_AGENT[^)]*webSearch[^)]*resultTool: tool/.test(src));
 check('evidence: a link the search did not return is still discarded', src.includes("why = 'the evidence link was not returned by the search'") && src.includes('sourceUrls: ai.sourceUrls'));
 check('duplicates: in the run and in the inbox', src.includes('dedupeWithinRun(valid)') && src.includes("why: 'already in the inbox'"));
-check('the per-run limit still applies', src.includes('if (saved >= max)'));
+check('the per-run limit still applies, after ranking', src.includes('const plan = planKeeps(ranked, max);') && src.includes('for (const r of plan.keep)'));
 check('paused or mock: nothing is saved', /const noSave = mock \|\| paused;/.test(src) && src.indexOf('if (noSave) {') < src.indexOf('await createSignal('));
 const anth = read('src/lib/growth/ai/anthropic.ts');
 check('provider: the result tool is strict, tool choice auto, never forced', anth.includes('strict: true') && anth.includes("tool_choice: { type: 'auto' as const }") && !/type: '(any|tool)'/.test(anth));
@@ -180,5 +180,67 @@ check('budget: a run that goes ahead is held to what is left', src.includes('run
 check('Signals: shows the last run cost, or why it was skipped', panel.includes('lastRunLine(runs[0])') && read('src/components/admin/growth/signals/FeedPanel.tsx').includes("d.reason === 'budget'") && src.includes('cost_usd: own(r) ??'));
 const sql114 = migrationChecks('114_growth_feed_days.sql', []);
 check('114: the column, its default and the same checks as send_days', sql114.includes("signal_feed_days INTEGER[] NOT NULL DEFAULT '{0,2,4}'") && sql114.includes('cardinality(signal_feed_days) BETWEEN 1 AND 7') && sql114.includes('growth_is_increasing(signal_feed_days)'));
+
+console.log('7. Ranking before the limit (2026-10-29, migration 115)');
+const rk = await load('src/lib/growth/feedRank.ts');
+{
+  // The shape of the 2026-10-29 run: the weak ten it kept, and the strong ones the limit cut.
+  const T = '2026-10-29';
+  const c = (company_name, o) => ({ company_name, trigger_type: 'new_project', signal_date: '2026-10-20', summary: `${company_name} news.`, location: 'Riyadh, Saudi Arabia', company_sector: '', size_sar: 0, prospect_fit: 'prospect', fit_reason: '', ...o });
+  const pool = [
+    c('Saudi Capital Market Authority (CMA)', { trigger_type: 'capital_market_activity', company_sector: 'regulator' }),
+    c('Tadawul / Saudi Capital Market Authority', { trigger_type: 'capital_market_activity' }),
+    c('Saudi IPO market', { trigger_type: 'capital_market_activity' }),
+    c('Ministry of Investment', { prospect_fit: 'not_a_prospect', fit_reason: 'a government body acting as regulator' }),
+    c('SriLankan Airlines', { trigger_type: 'market_entry', company_sector: 'airline', prospect_fit: 'unlikely_buyer', fit_reason: 'a foreign airline opening an office' }),
+    c('Siemens / Alstom', { trigger_type: 'contract_award', company_sector: 'rolling stock supplier', size_sar: 5_500_000_000, prospect_fit: 'unlikely_buyer', fit_reason: 'global equipment suppliers winning work' }),
+    c('Arada', { company_sector: 'real estate developer', size_sar: 14_250_000_000 }),
+    c('Sample Master Developer', { company_sector: 'master plan developer', size_sar: 14_000_000_000 }),
+    c('ROSHN', { company_sector: 'government-linked real estate developer' }),
+    c('Diriyah Company', { company_sector: 'giga-project developer', size_sar: 0 }),
+    c('Sample Logistics Fund', { trigger_type: 'fundraising_debt', company_sector: 'logistics fund', size_sar: 500_000_000 }),
+    c('Small Sample Co', { company_sector: 'real estate developer', size_sar: 20_000_000 }),
+  ];
+  const kept = pool.filter((x) => !rk.notAProspectReason(x));
+  const dropped = pool.filter((x) => rk.notAProspectReason(x)).map((x) => x.company_name);
+  check('not a prospect: regulators, exchanges, commentary and a regulator body are dropped before ranking', dropped.length === 4 && ['Saudi Capital Market Authority (CMA)', 'Tadawul / Saudi Capital Market Authority', 'Saudi IPO market', 'Ministry of Investment'].every((n) => dropped.includes(n)), dropped.join(', '));
+  check('government-linked developers and giga-project owners stay in', ['ROSHN', 'Diriyah Company', 'Royal Commission for AlUla', 'NEOM'].every((n) => rk.notAProspectReason(c(n, {})) === null));
+  check('a regulator stays out even when the model calls it a prospect', rk.notAProspectReason(c('Capital Market Authority', { prospect_fit: 'prospect' })) !== null);
+  // Reversed, so the weak candidates come first and only the score can lift the strong ones.
+  const ranked = rk.rankCandidates([...kept].reverse(), { today: T, weights: esm.DEFAULT_SCORING_WEIGHTS, sectorTiers: esm.DEFAULT_SECTOR_TIERS });
+  const order = ranked.map((r) => r.candidate.company_name);
+  const plan = rk.planKeeps(ranked, 4);
+  const keptNames = plan.keep.map((r) => r.candidate.company_name);
+  check('with four kept, the four real estate projects are kept', ['Arada', 'Sample Master Developer', 'ROSHN', 'Diriyah Company'].every((n) => keptNames.includes(n)), order.join(' > '));
+  check('sized real estate outranks unsized real estate', order.indexOf('Arada') < order.indexOf('ROSHN') && order.indexOf('Sample Master Developer') < order.indexOf('Diriyah Company'), order.join(' > '));
+  check('the logistics fund is cut only by the limit (over limit, not below rank)', plan.overLimit.map((r) => r.candidate.company_name).join() === 'Sample Logistics Fund', plan.overLimit.map((r) => r.candidate.company_name).join());
+  check('global suppliers and an airline office rank last, below every prospect', order.slice(-3).every((n) => ['SriLankan Airlines', 'Siemens / Alstom', 'Small Sample Co'].includes(n)) && plan.belowRank.length === 3, order.join(' > '));
+  check('a known size under SAR 50 million ranks last too', ranked.find((r) => r.candidate.company_name === 'Small Sample Co').tier === 1);
+  check('a big contract does not lift an unlikely buyer above a prospect', order.indexOf('Siemens / Alstom') > order.indexOf('Sample Logistics Fund'));
+  check('ranks run 1 to n with scores 0 to 100', ranked.every((r, i) => r.rank === i + 1 && r.score >= 0 && r.score <= 100));
+  const top = plan.keep[0];
+  const reason = rk.keptReason(top, ranked.length);
+  check('the kept reason names the rank, the score and why', reason.startsWith(`Kept: rank 1 of ${ranked.length}; score ${top.score}`) && /real estate sector/.test(reason) && /size about SAR 14/.test(reason), reason);
+  check('a ranked-last reason says why', ranked.find((r) => r.candidate.company_name === 'Siemens / Alstom').basis.includes('ranked last: global equipment suppliers winning work'));
+  check('real estate scores above infrastructure for the same event', rk.rankCandidates([c('Infra Co', { company_sector: 'power utility', size_sar: 1e9 }), c('Dev Co', { company_sector: 'real estate developer', size_sar: 1e9 })], { today: T })[0].candidate.company_name === 'Dev Co');
+  check('the ranking reads the Settings weights and tiers', src.includes('rankCandidates(prospects, { today, weights: engine.values.scoring_weights, sectorTiers: engine.values.sector_tiers })'));
+}
+{
+  const t = fm.feedResultTool().inputSchema.properties.signals.items;
+  check('the result tool asks for location, sector, size and fit', ['location', 'company_sector', 'size_sar', 'prospect_fit', 'fit_reason'].every((k) => t.required.includes(k)) && JSON.stringify(t.properties.prospect_fit.enum) === '["prospect","unlikely_buyer","not_a_prospect"]');
+  check('the prompt states the fit rules, judged on need not size', p30.system.includes('Judge on that, not on size alone') && p30.system.includes('government-linked developers and giga-project owners') && p30.system.includes('unlikely_buyer: global contractors'));
+  const s = feed.screenCandidates({ signals: [{ ...sig, location: 'Riyadh', company_sector: 'developer', size_sar: 1e9, prospect_fit: 'unlikely_buyer', fit_reason: 'x' }, { ...sig, evidence_url: 'https://news.test.sa/b', prospect_fit: 'nonsense', size_sar: 'big' }] }, { sourceUrls: [sig.evidence_url, 'https://news.test.sa/b'], mock: false, today: '2026-10-29' });
+  check('screen: the new fields are read, and nonsense becomes unknown', s.valid[0].prospect_fit === 'unlikely_buyer' && s.valid[0].size_sar === 1e9 && s.valid[1].prospect_fit === null && s.valid[1].size_sar === null);
+}
+check('order: not a prospect, then inbox duplicates, then ranking, then the limit', src.indexOf('notAProspectReason(c)') < src.indexOf('await existingDuplicate(') && src.indexOf('await existingDuplicate(') < src.indexOf('rankCandidates(prospects') && src.indexOf('rankCandidates(prospects') < src.indexOf('planKeeps(ranked, max)'));
+check('each kept signal stores its rank, score and reason', src.includes('feedRank: { rank: r.rank, score: r.score, reason }') && read('src/lib/growth/signals.ts').includes('row.feed_reason = opts.feedRank.reason'));
+check('before 115 the insert drops only the rank columns first', read('src/lib/growth/signals.ts').includes("insertTolerant<InboxSignal>('growth_signals', row, SIGNAL_115_COLUMNS)"));
+check('the run counts not a prospect, below rank and over limit separately', src.includes('const counts = { not_a_prospect: notProspect, below_rank: plan.belowRank.length, over_limit: plan.overLimit.length };') && src.includes('counts, decisions'));
+check('the Signals screen shows rank and reason, and the three counts', panel.includes('data-rank={d.rank}') && read('src/components/admin/growth/signals/FeedPanel.tsx').includes('below rank') && read('src/app/admin/growth/signals/page.tsx').includes('data-feed-rank={s.feed_rank}'));
+check('kept per run defaults to 20 and stays a setting', cols.signal_feed_max_per_run.default === 20 && esm.engineGroupSchemas.signal_feed.safeParse({ signal_feed_paused: false, signal_feed_max_per_run: 20 }).success);
+const sql115 = migrationChecks('115_growth_feed_ranking.sql', []);
+check('115: rank, score and reason on signals, with checks', sql115.includes('ADD COLUMN IF NOT EXISTS feed_rank INTEGER') && sql115.includes('feed_score BETWEEN 0 AND 100') && sql115.includes('ADD COLUMN IF NOT EXISTS feed_reason TEXT'));
+check('115: the limit moves from 10 to 20 only where it is still 10', sql115.includes('SET DEFAULT 20') && sql115.includes('WHERE id = 1 AND signal_feed_max_per_run = 10'));
+check('no dashes in the ranking files', !['src/lib/growth/feedRank.ts', 'supabase/migrations/115_growth_feed_ranking.sql', 'src/app/admin/growth/signals/page.tsx'].some((f) => DASHES.test(read(f))));
 
 finish('verify-growth-feed');

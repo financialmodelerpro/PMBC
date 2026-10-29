@@ -18,7 +18,9 @@ import type { Actor } from './kb';
 import { TRIGGER_TYPES, type ActorType, type GrowthSignal, type TriggerType } from './model';
 import { createCompany, createLead, getCompany, rescoreCompany } from './prospects';
 import { DUPLICATE_WINDOW_DAYS, evidenceKey, findDuplicate, type SignalCreateInput, type SignalFilters, type SignalOrigin, type SignalTriage } from './signalsModel';
-import { insertTolerant, updateTolerant } from './tolerant';
+import { insertTolerant, isMissingColumn, updateTolerant } from './tolerant';
+
+const stripKeys = (row: Record<string, unknown>, keys: readonly string[]) => Object.fromEntries(Object.entries(row).filter(([k]) => !keys.includes(k)));
 
 /** The signal row with the columns migration 088 adds (absent until it runs). */
 export type InboxSignal = GrowthSignal & {
@@ -30,10 +32,15 @@ export type InboxSignal = GrowthSignal & {
   feed_run_id?: string | null;
   matched_keyword_id?: string | null;
   matched_keyword?: string | null;
+  feed_rank?: number | null;
+  feed_score?: number | null;
+  feed_reason?: string | null;
 };
 
 /** Columns later migrations add (088, and 094 for the matched keyword); a write drops them until they exist. */
 const SIGNAL_088_COLUMNS = ['origin', 'evidence_key', 'duplicate_of', 'triaged_at', 'triaged_by_name', 'feed_run_id', 'matched_keyword_id', 'matched_keyword'] as const;
+/** The feed's rank, score and reason (migration 115). */
+const SIGNAL_115_COLUMNS = ['feed_rank', 'feed_score', 'feed_reason'] as const;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export const triggerLabel = (t: string) => TRIGGER_TYPES.find((x) => x.value === t)?.label ?? t;
@@ -110,6 +117,8 @@ export type CreateSignalOpts = {
   actorId?: string | null;
   /** The library keyword the feed matched (migration 094). */
   matchedKeyword?: { id: string | null; keyword: string } | null;
+  /** Where the feed ranked it and why (migration 115). */
+  feedRank?: { rank: number; score: number; reason: string } | null;
 };
 
 export async function createSignal(input: SignalCreateInput, actor: Actor | null, opts: CreateSignalOpts = {}): Promise<WriteResult<InboxSignal & { duplicateWhy: string | null }>> {
@@ -141,7 +150,14 @@ export async function createSignal(input: SignalCreateInput, actor: Actor | null
     row.matched_keyword = opts.matchedKeyword.keyword;
     row.matched_keyword_id = opts.matchedKeyword.id && UUID.test(opts.matchedKeyword.id) ? opts.matchedKeyword.id : null;
   }
-  const { data, error } = await insertTolerant<InboxSignal>('growth_signals', row, SIGNAL_088_COLUMNS);
+  if (opts.feedRank) {
+    row.feed_rank = opts.feedRank.rank;
+    row.feed_score = Math.max(0, Math.min(100, Math.round(opts.feedRank.score)));
+    row.feed_reason = opts.feedRank.reason.slice(0, 500);
+  }
+  // Before 115 only the rank columns are dropped; before 088, everything optional.
+  let { data, error } = await insertTolerant<InboxSignal>('growth_signals', row, SIGNAL_115_COLUMNS);
+  if (isMissingColumn(error)) ({ data, error } = await insertTolerant<InboxSignal>('growth_signals', stripKeys(row, SIGNAL_115_COLUMNS), SIGNAL_088_COLUMNS));
   if (error || !data) {
     if (error && isMissingSchema(error)) return { ok: false, status: 503, error: 'The signals table is missing. Apply 083_growth_core.sql.' };
     if (error?.code === '23514') return { ok: false, status: 422, error: 'The database refused the signal: check the evidence link and the date' };
