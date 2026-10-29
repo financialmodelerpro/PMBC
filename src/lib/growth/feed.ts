@@ -53,12 +53,13 @@ import {
   type FeedCostBasis,
   FEED_CALL_TIMEOUT_MS,
   FEED_CONCURRENCY,
-  FEED_TIME_BUDGET_MS,
-  estimateGroupCostUsd,
+  FEED_RUN_BUDGET_MS,
+  callEstimateUsd,
+  orderGroups,
+  type CarryReason,
   feedResultTool,
   oldestAllowed,
   readFeedAnswer,
-  rotateGroups,
   summarizeOutcomes,
   withinCeiling,
   type ParseOutcome,
@@ -67,7 +68,7 @@ import { riyadhDate } from './format';
 import type { Actor } from './kb';
 import { GCC_PLACES, suggestKeyword } from './keywordLibrary';
 import { activeKeywords, ensureSeeded, getKeywordLibrary } from './keywords';
-import { keptReason, notAProspectReason, planKeeps, rankCandidates, PROSPECT_FITS, type ProspectFit } from './feedRank';
+import { FEED_SECTOR_TIERS, keptReason, notAProspectReason, planKeeps, rankCandidates, PROSPECT_FITS, type FeedSectorTier, type ProspectFit } from './feedRank';
 import { TRIGGER_TYPES, type TriggerType } from './model';
 import { getGrowthSettings } from './settings';
 import { createSignal, existingDuplicate } from './signals';
@@ -92,11 +93,12 @@ export type FeedCandidate = {
   matched_keyword_id?: string | null;
   location?: string | null;
   company_sector?: string | null;
+  sector_tier?: FeedSectorTier | null;
   size_sar?: number | null;
   prospect_fit?: ProspectFit | null;
   fit_reason?: string | null;
 };
-export type FeedDecision = FeedCandidate & { outcome: 'kept' | 'duplicate' | 'discarded' | 'not_a_prospect' | 'below_rank' | 'over_limit'; why: string; group?: string; rank?: number; score?: number };
+export type FeedDecision = FeedCandidate & { outcome: 'kept' | 'duplicate' | 'discarded' | 'not_a_prospect' | 'below_rank' | 'over_limit'; why: string; group?: string; rank?: number; score?: number; sector?: string | null };
 
 /** A keyword as the feed numbers it in the prompt. `id` is null before the library is saved, and for the old list before 094. */
 export type FeedKeyword = { id: string | null; keyword: string; trigger: TriggerType | null; region: 'ksa' | 'gcc' };
@@ -130,6 +132,7 @@ export function screenCandidates(raw: unknown, opts: { sourceUrls: string[]; moc
       keyword_number: Number.isInteger(n) && n > 0 ? n : null,
       location: s.location ? String(s.location).trim().slice(0, 120) : null,
       company_sector: s.company_sector ? String(s.company_sector).trim().slice(0, 120) : null,
+      sector_tier: (FEED_SECTOR_TIERS as readonly string[]).includes(String(s.sector_tier)) ? (s.sector_tier as FeedSectorTier) : null,
       size_sar: Number.isFinite(Number(s.size_sar)) && Number(s.size_sar) > 0 ? Number(s.size_sar) : null,
       prospect_fit: (PROSPECT_FITS as readonly string[]).includes(String(s.prospect_fit)) ? (s.prospect_fit as ProspectFit) : null,
       fit_reason: s.fit_reason ? String(s.fit_reason).trim().slice(0, 200) : null,
@@ -197,7 +200,7 @@ export function feedPrompt(keywords: FeedKeyword[], today: string, opts: { windo
       'Every event must have an evidence_url: the exact URL of the article or filing you read, as returned by your search. Never construct, shorten or guess a URL. If you cannot give one, leave the event out.',
       'Report each event once, even if it matches several keywords. Never invent companies, people, amounts or dates. Summaries are one or two plain sentences stating what the source says.',
       `Trigger types: ${TRIGGER_TYPES.map((t) => t.value).join(', ')}.`,
-      'For each event judge prospect_fit: could the named company plausibly need financial modelling, valuation, due diligence or fundraising support? Judge on that, not on size alone. prospect: developers (including government-linked developers and giga-project owners such as ROSHN, Diriyah, NEOM and the Royal Commissions), investors, funds, family offices, holding companies, and operating companies raising money, buying, selling or building. unlikely_buyer: global contractors, EPC firms and equipment or technology suppliers winning work, and foreign firms opening an office, who would not buy this advice. not_a_prospect: regulators and government bodies acting as regulators, exchanges and index news, and market or sector commentary with no named company. Give location, company_sector and size_sar (in SAR, 0 if the source states none) as the source says them.',
+      'For each event judge prospect_fit: could the named company plausibly need financial modelling, valuation, due diligence or fundraising support? Judge on that, not on size alone. prospect: developers (including government-linked developers and giga-project owners such as ROSHN, Diriyah, NEOM and the Royal Commissions), investors, funds, family offices, holding companies, and operating companies raising money, buying, selling or building. unlikely_buyer: plausible but weak, such as global contractors, EPC firms and equipment suppliers winning work. not_a_prospect: regulators and government bodies acting as regulators, exchanges and index news, market or sector commentary with no named company, and any company, foreign or local, whose news is opening or growing a sales, regional or representative office. For sector_tier, judge the business of the company itself, never the location of the project or a word in the headline: a power plant developer is infrastructure, a rolling stock supplier is infrastructure, a residential or commercial developer is real estate. Give location, company_sector and size_sar (in SAR, 0 if the source states none) as the source says them.',
       `When you have finished searching, call the ${tool} tool once with every event you found, or with an empty signals list if none qualify. Do not write the results as text.`,
     ]
       .filter(Boolean)
@@ -243,7 +246,7 @@ export type FeedCall = {
   raw_text: string;
   raw_tool_input: string | null;
 };
-export type FeedSkip = { group: string; label: string; why: 'cost_ceiling' | 'time_limit' };
+export type FeedSkip = { group: string; label: string; why: CarryReason; message?: string };
 
 export type FeedRunResult = {
   runId: string | null;
@@ -265,7 +268,7 @@ export type FeedRunResult = {
 const round2 = (n: number) => Math.round(n * 100) / 100;
 const usd = (n: number) => `USD ${n.toFixed(2)}`;
 
-export async function runSignalFeed(opts: { trigger: 'cron' | 'manual'; actor?: Actor | null; isTest?: boolean; now?: Date }): Promise<WriteResult<FeedRunResult>> {
+export async function runSignalFeed(opts: { trigger: 'cron' | 'manual'; actor?: Actor | null; isTest?: boolean; now?: Date; deadlineAt?: number }): Promise<WriteResult<FeedRunResult>> {
   const started = Date.now();
   const today = riyadhDate(opts.now);
   const mock = isMockMode();
@@ -284,7 +287,11 @@ export async function runSignalFeed(opts: { trigger: 'cron' | 'manual'; actor?: 
   if (notToday) return skip(notToday);
   const { groups: allGroups, source: keywordSource } = await loadFeedGroups({ seed: !previewOnly, legacy: engine.values.signal_keywords });
   if (!allGroups.length) return skip('No keywords are switched on. Choose them in Growth Settings.');
-  const groups = rotateGroups(allGroups, today);
+  // Groups the last run could not search go first; the rest rotate by day.
+  const history = await feedHistory({ isTest });
+  const groups = orderGroups(allGroups, history.carriedOver, today);
+  // The run deadline: its own budget, or the caller's (the daily cron) if sooner.
+  const deadlineAt = Math.min(started + FEED_RUN_BUDGET_MS, opts.deadlineAt ?? Infinity);
 
   const { data: run, error } = await growthDb()
     .from('growth_feed_runs')
@@ -316,73 +323,71 @@ export async function runSignalFeed(opts: { trigger: 'cron' | 'manual'; actor?: 
     }
   }
 
-  // One call per group, FEED_CONCURRENCY at a time, inside the cost ceiling and the time limit.
+  // Every group at once (up to FEED_CONCURRENCY), inside the cost ceiling; the run deadline only stops a call from starting another request.
   const tool = feedResultTool();
   const calls: FeedCall[] = [];
   const skipped: FeedSkip[] = [];
   const valid: FeedCandidate[] = [];
   const discarded: FeedDecision[] = [];
   let spent = 0;
-  let dearest = 0;
-  for (let i = 0; i < groups.length; i += FEED_CONCURRENCY) {
-    const round = groups.slice(i, i + FEED_CONCURRENCY);
-    if (i > 0 && Date.now() - started > FEED_TIME_BUDGET_MS) {
-      skipped.push(...round.map((g) => ({ group: g.key, label: g.label, why: 'time_limit' as const })));
+  const estimate = mock ? 0 : callEstimateUsd(history.recentCallCosts, searches);
+  const go: FeedGroup[] = [];
+  let committed = 0;
+  for (const g of groups) {
+    if (go.length >= FEED_CONCURRENCY) skipped.push({ group: g.key, label: g.label, why: 'time_limit' });
+    else if (!withinCeiling(0, committed, estimate, runCeiling)) skipped.push({ group: g.key, label: g.label, why: 'cost_ceiling' });
+    else {
+      committed += estimate;
+      go.push(g);
+    }
+  }
+  const results = await Promise.all(
+    go.map(async (g) => {
+      const p = feedPrompt(g.keywords, today, { windowDays, searches, groupLabel: g.label });
+      const ai = await runAi({ agent: FEED_AGENT, purpose: 'signal_feed', system: p.system, messages: [{ role: 'user', content: p.user }], webSearch: { maxUses: searches }, resultTool: tool, timeoutMs: FEED_CALL_TIMEOUT_MS, deadlineAt, maxTokens: 8000, isTest });
+      return { g, ai };
+    }),
+  );
+  for (const { g, ai } of results) {
+    if (!ai.ok) {
+      // A call cut at the deadline fails as a timeout: say so, and search the group first next time.
+      const late = Date.now() >= deadlineAt - 5_000 || /timed? ?out/i.test(ai.message);
+      skipped.push({ group: g.key, label: g.label, why: late ? 'time_limit' : 'failed', message: ai.message });
+      calls.push({ group: g.key, label: g.label, keywords: g.keywords.length, status: 'refused', outcome: null, message: ai.message, searches: 0, source_urls: 0, stop_reasons: [], requests: 0, cost_usd: 0, usage_id: ai.usageId, raw_text: '', raw_tool_input: null });
       continue;
     }
-    const go: FeedGroup[] = [];
-    let committed = 0;
-    for (const g of round) {
-      // The estimate is the larger of the per-search figure and the dearest call so far this run.
-      const estimate = mock ? 0 : Math.max(estimateGroupCostUsd(searches), dearest);
-      if (!withinCeiling(spent, committed, estimate, runCeiling)) skipped.push({ group: g.key, label: g.label, why: 'cost_ceiling' });
-      else {
-        committed += estimate;
-        go.push(g);
-      }
-    }
-    const results = await Promise.all(
-      go.map(async (g) => {
-        const p = feedPrompt(g.keywords, today, { windowDays, searches, groupLabel: g.label });
-        const ai = await runAi({ agent: FEED_AGENT, purpose: 'signal_feed', system: p.system, messages: [{ role: 'user', content: p.user }], webSearch: { maxUses: searches }, resultTool: tool, timeoutMs: FEED_CALL_TIMEOUT_MS, maxTokens: 8000, isTest });
-        return { g, ai };
-      }),
-    );
-    for (const { g, ai } of results) {
-      if (!ai.ok) {
-        calls.push({ group: g.key, label: g.label, keywords: g.keywords.length, status: 'refused', outcome: null, message: ai.message, searches: 0, source_urls: 0, stop_reasons: [], requests: 0, cost_usd: 0, usage_id: ai.usageId, raw_text: '', raw_tool_input: null });
-        continue;
-      }
-      spent = round2(spent + ai.costUsd);
-      dearest = Math.max(dearest, ai.costUsd);
-      const read = readFeedAnswer({ toolInput: ai.toolInput, text: ai.text });
-      const screened = screenCandidates(read.value, { sourceUrls: ai.sourceUrls, mock: ai.mock, today, maxAgeDays: windowDays });
-      valid.push(...assignKeywords(screened.valid, g.keywords));
-      discarded.push(...screened.discarded.map((d) => ({ ...d, group: g.label })));
-      calls.push({
-        group: g.key,
-        label: g.label,
-        keywords: g.keywords.length,
-        status: 'completed',
-        outcome: read.outcome,
-        searches: ai.webSearchRequests,
-        source_urls: ai.sourceUrls.length,
-        stop_reasons: ai.stopReasons,
-        requests: ai.requests,
-        cost_usd: ai.costUsd,
-        usage_id: ai.usageId,
-        raw_text: ai.text.slice(0, RAW_TEXT_CHARS),
-        raw_tool_input: ai.toolInput === undefined ? null : JSON.stringify(ai.toolInput).slice(0, RAW_TOOL_CHARS),
-      });
-    }
+    spent = round2(spent + ai.costUsd);
+    const read = readFeedAnswer({ toolInput: ai.toolInput, text: ai.text });
+    const screened = screenCandidates(read.value, { sourceUrls: ai.sourceUrls, mock: ai.mock, today, maxAgeDays: windowDays });
+    valid.push(...assignKeywords(screened.valid, g.keywords));
+    discarded.push(...screened.discarded.map((d) => ({ ...d, group: g.label })));
+    // Stopped at the deadline before reporting: what it read is used, and the group goes first next time.
+    if (ai.stoppedEarly === 'deadline' && ai.toolInput === undefined) skipped.push({ group: g.key, label: g.label, why: 'time_limit', message: 'stopped at the run deadline before reporting' });
+    calls.push({
+      group: g.key,
+      label: g.label,
+      keywords: g.keywords.length,
+      status: 'completed',
+      outcome: read.outcome,
+      searches: ai.webSearchRequests,
+      source_urls: ai.sourceUrls.length,
+      stop_reasons: ai.stopReasons,
+      requests: ai.requests,
+      cost_usd: ai.costUsd,
+      usage_id: ai.usageId,
+      raw_text: ai.text.slice(0, RAW_TEXT_CHARS),
+      raw_tool_input: ai.toolInput === undefined ? null : JSON.stringify(ai.toolInput).slice(0, RAW_TOOL_CHARS),
+    });
   }
 
   const done = calls.filter((c) => c.status === 'completed');
   const searchesRun = calls.reduce((a, c) => a + c.searches, 0);
   const parse = summarizeOutcomes(done.map((c) => c.outcome as ParseOutcome));
-  const skippedLine = skipped.length ? ` ${skipped.length} ${skipped.length === 1 ? 'group was' : 'groups were'} left out (${[...new Set(skipped.map((s) => (s.why === 'cost_ceiling' ? `the ${usd(runCeiling)} ceiling` : 'the time limit')))].join(', ')}).` : '';
-  const coverage = `Searched ${done.length} of ${allGroups.length} keyword groups: ${searchesRun} searches, ${usd(spent)}.${skippedLine}`;
-  const detailBase = { mock, preview_only: previewOnly, paused, keyword_source: keywordSource, window_days: windowDays, searches_per_group: searches, max_cost_usd: runCeiling, cost_usd: spent, searches: searchesRun, source_urls: calls.reduce((a, c) => a + c.source_urls, 0), parse_summary: parse, calls, skipped };
+  const whyText = (k: FeedSkip) => (k.why === 'cost_ceiling' ? `the ${usd(runCeiling)} cost ceiling` : k.why === 'time_limit' ? 'the time limit' : `the call failed: ${k.message ?? 'no reason given'}`);
+  const skippedLine = skipped.length ? ` Not fully searched, and first next time: ${skipped.map((k) => `${k.label} (${whyText(k)})`).join('; ')}.` : '';
+  const searchedFully = done.length - skipped.filter((k) => k.why === 'time_limit' && done.some((c) => c.group === k.group)).length;
+  const coverage = `Searched ${searchedFully} of ${allGroups.length} keyword groups: ${searchesRun} searches, ${usd(spent)}.${skippedLine}`;
+  const detailBase = { mock, preview_only: previewOnly, paused, keyword_source: keywordSource, window_days: windowDays, searches_per_group: searches, max_cost_usd: runCeiling, cost_usd: spent, searches: searchesRun, source_urls: calls.reduce((a, c) => a + c.source_urls, 0), parse_summary: parse, calls, skipped, carry_over: [...new Set(skipped.map((k) => k.group))], groups_total: allGroups.length, groups_searched: searchedFully };
 
   if (!done.length) {
     const reason = calls.find((c) => c.message)?.message ?? 'No group could be searched within the cost ceiling.';
@@ -420,7 +425,7 @@ export async function runSignalFeed(opts: { trigger: 'cron' | 'manual'; actor?: 
     const reason = keptReason(r, ranked.length);
     if (noSave) {
       // Mock mode and a paused feed preview only: nothing is saved as a signal.
-      decisions.push({ ...c, outcome: 'kept', why: `would be kept (preview only). ${reason}`, rank: r.rank, score: r.score });
+      decisions.push({ ...c, outcome: 'kept', why: `would be kept (preview only). ${reason}`, rank: r.rank, score: r.score, sector: r.sectorTier });
       continue;
     }
     const res = await createSignal(
@@ -430,11 +435,11 @@ export async function runSignalFeed(opts: { trigger: 'cron' | 'manual'; actor?: 
     );
     if (res.ok) {
       saved++;
-      decisions.push({ ...c, outcome: 'kept', why: reason, rank: r.rank, score: r.score });
-    } else decisions.push({ ...c, outcome: 'discarded', why: res.error, rank: r.rank, score: r.score });
+      decisions.push({ ...c, outcome: 'kept', why: reason, rank: r.rank, score: r.score, sector: r.sectorTier });
+    } else decisions.push({ ...c, outcome: 'discarded', why: res.error, rank: r.rank, score: r.score, sector: r.sectorTier });
   }
-  for (const r of plan.belowRank) decisions.push({ ...r.candidate, outcome: 'below_rank', why: `rank ${r.rank} of ${ranked.length}; ${r.basis}`, rank: r.rank, score: r.score });
-  for (const r of plan.overLimit) decisions.push({ ...r.candidate, outcome: 'over_limit', why: `rank ${r.rank} of ${ranked.length}, past the ${max} kept per run; ${r.basis}`, rank: r.rank, score: r.score });
+  for (const r of plan.belowRank) decisions.push({ ...r.candidate, outcome: 'below_rank', why: `rank ${r.rank} of ${ranked.length}; ${r.basis}`, rank: r.rank, score: r.score, sector: r.sectorTier });
+  for (const r of plan.overLimit) decisions.push({ ...r.candidate, outcome: 'over_limit', why: `rank ${r.rank} of ${ranked.length}, past the ${max} kept per run; ${r.basis}`, rank: r.rank, score: r.score, sector: r.sectorTier });
   const counts = { not_a_prospect: notProspect, below_rank: plan.belowRank.length, over_limit: plan.overLimit.length };
   const dropped = `${counts.not_a_prospect} not a prospect, ${counts.below_rank} below rank, ${counts.over_limit} over the limit`;
 
@@ -474,6 +479,36 @@ export async function recentFeedRuns(limit = 5): Promise<FeedRunRow[]> {
     for (const u of (usage ?? []) as { id: string; cost_usd: number | string }[]) costs.set(u.id, Number(u.cost_usd));
   }
   return rows.map((r) => ({ ...r, cost_usd: own(r) ?? (r.usage_id ? (costs.get(r.usage_id) ?? null) : null) }));
+}
+
+/**
+ * What the last runs leave for this one: the groups the latest run could not
+ * fully search (searched first now), and the cost of recent calls (the
+ * per-group estimate for the cost ceiling).
+ */
+export async function feedHistory(opts: { isTest?: boolean }): Promise<{ carriedOver: string[]; recentCallCosts: number[] }> {
+  const { data } = await growthDb()
+    .from('growth_feed_runs')
+    .select('detail, status')
+    .eq('is_test', Boolean(opts.isTest))
+    .eq('mode', 'real')
+    .in('status', ['completed', 'refused'])
+    .order('created_at', { ascending: false })
+    .limit(5);
+  const rows = (data ?? []) as { detail: Record<string, unknown> | null; status: string }[];
+  // The latest run that searched anything sets the carry-over; a budget skip searched nothing and carries everything anyway.
+  const last = rows.find((r) => Array.isArray(r.detail?.calls));
+  const carriedOver = Array.isArray(last?.detail?.carry_over)
+    ? (last!.detail!.carry_over as unknown[]).filter((k): k is string => typeof k === 'string')
+    : Array.isArray(last?.detail?.skipped)
+      ? (last!.detail!.skipped as { group?: unknown }[]).map((k) => k.group).filter((k): k is string => typeof k === 'string')
+      : [];
+  const recentCallCosts = rows
+    .flatMap((r) => (Array.isArray(r.detail?.calls) ? (r.detail!.calls as { status?: string; cost_usd?: unknown }[]) : []))
+    .filter((c) => c.status === 'completed' && typeof c.cost_usd === 'number')
+    .slice(0, 20)
+    .map((c) => c.cost_usd as number);
+  return { carriedOver, recentCallCosts };
 }
 
 /**

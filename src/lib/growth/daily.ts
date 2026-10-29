@@ -31,14 +31,9 @@ async function runJobs(jobs: Job[]): Promise<JobResult[]> {
 }
 
 export async function runGrowthDaily(now: Date = new Date()): Promise<JobResult[]> {
+  // The function may run 300 seconds; the feed, last, must finish its calls by 280 seconds after the start.
+  const deadlineAt = Date.now() + 280_000;
   return runJobs([
-    {
-      name: 'signal-feed',
-      run: async () => {
-        const r = await runSignalFeed({ trigger: 'cron', now });
-        return r.ok ? r.value.message : r.error;
-      },
-    },
     // Replies first, so a reply stops its follow-up before one is drafted or sent.
     { name: 'reply-check', run: () => checkReplies() },
     { name: 'follow-up-drafts', run: () => draftDueFollowUps(now) },
@@ -54,5 +49,13 @@ export async function runGrowthDaily(now: Date = new Date()): Promise<JobResult[
     { name: 'nurture-sync', run: async () => (await syncToBrevo()).message },
     { name: 'nurture-sequence', run: async () => (await runSequence(now)).message },
     { name: 'partner-checkins', run: () => remindCheckins(now) },
+    // The feed runs last (2026-10-29): it searches every keyword group at once and may use most of the function's time, so the quick jobs go first.
+    {
+      name: 'signal-feed',
+      run: async () => {
+        const r = await runSignalFeed({ trigger: 'cron', now, deadlineAt });
+        return r.ok ? r.value.message : r.error;
+      },
+    },
   ]);
 }

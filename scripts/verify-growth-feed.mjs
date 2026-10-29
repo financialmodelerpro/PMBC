@@ -92,11 +92,11 @@ check('ceiling: a call that fits starts, one that does not is left out', fm.with
   const r2 = fm.rotateGroups(g, '2026-01-02');
   check('rotation: every group runs, the start moves each day', r1.join() === 'a,b,c,d' && r2.join() === 'b,c,d,a' && [...r2].sort().join() === 'a,b,c,d');
 }
-check('calls run a few at a time inside the time limit', fm.FEED_CONCURRENCY >= 2 && fm.FEED_CONCURRENCY <= 5 && fm.FEED_TIME_BUDGET_MS < 300_000 && fm.FEED_CALL_TIMEOUT_MS < 300_000);
+check('every group starts at once, inside a deadline under the 300 second function limit', fm.FEED_CONCURRENCY >= 11 && fm.FEED_RUN_BUDGET_MS < 300_000 && fm.FEED_CALL_TIMEOUT_MS <= fm.FEED_RUN_BUDGET_MS && !read('src/lib/growth/feed.ts').includes('i += FEED_CONCURRENCY'));
 const src = read('src/lib/growth/feed.ts');
 check('one call per keyword group, not one for all', src.includes('go.map(async (g) =>') && src.includes('feedPrompt(g.keywords, today,'));
 check('each group gets its own search allowance', /webSearch: \{ maxUses: searches \}/.test(src));
-check('the ceiling is checked before each call starts', src.includes('withinCeiling(spent, committed, estimate, runCeiling)'));
+check('the ceiling is checked before each call starts', src.includes('withinCeiling(0, committed, estimate, runCeiling)'));
 check('groups left out are recorded with the reason', src.includes("why: 'cost_ceiling'") && src.includes("why: 'time_limit'") && src.includes('skipped,'));
 check('each call records outcome, searches, URLs, stop reasons and the raw answer', ['outcome: read.outcome', 'searches: ai.webSearchRequests', 'source_urls: ai.sourceUrls.length', 'stop_reasons: ai.stopReasons', 'raw_text: ai.text.slice(0, RAW_TEXT_CHARS)', 'raw_tool_input:'].every((s) => src.includes(s)));
 check('the run stores the parse summary, cost and searches', src.includes('parse_summary: parse') && src.includes('cost_usd: spent') && src.includes('searches: searchesRun'));
@@ -176,7 +176,7 @@ check('warning: more than half the budget warns, half or less does not, no budge
 check('budget: a run that fits what is left goes ahead, one that does not is skipped', fm.budgetAllowsRun(77, 2.25, 80) && !fm.budgetAllowsRun(78, 2.25, 80) && !fm.budgetAllowsRun(0, 1, null));
 check('budget: the skip is recorded as refused with the reason, and logged', src.includes("await finish({ status: 'refused', detail: { reason: 'budget', message,") && src.includes("action: 'feed.skipped'"));
 check('budget: the check runs before any AI call', src.indexOf('budgetAllowsRun(spend.spentUsd, expected, budget)') < src.indexOf('await runAi('));
-check('budget: a run that goes ahead is held to what is left', src.includes('runCeiling = Math.min(ceiling, round2(budget - spend.spentUsd))') && src.includes('withinCeiling(spent, committed, estimate, runCeiling)'));
+check('budget: a run that goes ahead is held to what is left', src.includes('runCeiling = Math.min(ceiling, round2(budget - spend.spentUsd))') && src.includes('withinCeiling(0, committed, estimate, runCeiling)'));
 check('Signals: shows the last run cost, or why it was skipped', panel.includes('lastRunLine(runs[0])') && read('src/components/admin/growth/signals/FeedPanel.tsx').includes("d.reason === 'budget'") && src.includes('cost_usd: own(r) ??'));
 const sql114 = migrationChecks('114_growth_feed_days.sql', []);
 check('114: the column, its default and the same checks as send_days', sql114.includes("signal_feed_days INTEGER[] NOT NULL DEFAULT '{0,2,4}'") && sql114.includes('cardinality(signal_feed_days) BETWEEN 1 AND 7') && sql114.includes('growth_is_increasing(signal_feed_days)'));
@@ -220,7 +220,7 @@ const rk = await load('src/lib/growth/feedRank.ts');
   check('ranks run 1 to n with scores 0 to 100', ranked.every((r, i) => r.rank === i + 1 && r.score >= 0 && r.score <= 100));
   const top = plan.keep[0];
   const reason = rk.keptReason(top, ranked.length);
-  check('the kept reason names the rank, the score and why', reason.startsWith(`Kept: rank 1 of ${ranked.length}; score ${top.score}`) && /real estate sector/.test(reason) && /size about SAR 14/.test(reason), reason);
+  check('the kept reason names the rank, the score, the sector and why', reason.startsWith(`Kept: rank 1 of ${ranked.length}; score ${top.score}; sector: real estate`) && /size about SAR 14/.test(reason), reason);
   check('a ranked-last reason says why', ranked.find((r) => r.candidate.company_name === 'Siemens / Alstom').basis.includes('ranked last: global equipment suppliers winning work'));
   check('real estate scores above infrastructure for the same event', rk.rankCandidates([c('Infra Co', { company_sector: 'power utility', size_sar: 1e9 }), c('Dev Co', { company_sector: 'real estate developer', size_sar: 1e9 })], { today: T })[0].candidate.company_name === 'Dev Co');
   check('the ranking reads the Settings weights and tiers', src.includes('rankCandidates(prospects, { today, weights: engine.values.scoring_weights, sectorTiers: engine.values.sector_tiers })'));
@@ -228,7 +228,7 @@ const rk = await load('src/lib/growth/feedRank.ts');
 {
   const t = fm.feedResultTool().inputSchema.properties.signals.items;
   check('the result tool asks for location, sector, size and fit', ['location', 'company_sector', 'size_sar', 'prospect_fit', 'fit_reason'].every((k) => t.required.includes(k)) && JSON.stringify(t.properties.prospect_fit.enum) === '["prospect","unlikely_buyer","not_a_prospect"]');
-  check('the prompt states the fit rules, judged on need not size', p30.system.includes('Judge on that, not on size alone') && p30.system.includes('government-linked developers and giga-project owners') && p30.system.includes('unlikely_buyer: global contractors'));
+  check('the prompt states the fit rules, judged on need not size', p30.system.includes('Judge on that, not on size alone') && p30.system.includes('government-linked developers and giga-project owners') && p30.system.includes('unlikely_buyer: plausible but weak'));
   const s = feed.screenCandidates({ signals: [{ ...sig, location: 'Riyadh', company_sector: 'developer', size_sar: 1e9, prospect_fit: 'unlikely_buyer', fit_reason: 'x' }, { ...sig, evidence_url: 'https://news.test.sa/b', prospect_fit: 'nonsense', size_sar: 'big' }] }, { sourceUrls: [sig.evidence_url, 'https://news.test.sa/b'], mock: false, today: '2026-10-29' });
   check('screen: the new fields are read, and nonsense becomes unknown', s.valid[0].prospect_fit === 'unlikely_buyer' && s.valid[0].size_sar === 1e9 && s.valid[1].prospect_fit === null && s.valid[1].size_sar === null);
 }
@@ -237,10 +237,54 @@ check('each kept signal stores its rank, score and reason', src.includes('feedRa
 check('before 115 the insert drops only the rank columns first', read('src/lib/growth/signals.ts').includes("insertTolerant<InboxSignal>('growth_signals', row, SIGNAL_115_COLUMNS)"));
 check('the run counts not a prospect, below rank and over limit separately', src.includes('const counts = { not_a_prospect: notProspect, below_rank: plan.belowRank.length, over_limit: plan.overLimit.length };') && src.includes('counts, decisions'));
 check('the Signals screen shows rank and reason, and the three counts', panel.includes('data-rank={d.rank}') && read('src/components/admin/growth/signals/FeedPanel.tsx').includes('below rank') && read('src/app/admin/growth/signals/page.tsx').includes('data-feed-rank={s.feed_rank}'));
-check('kept per run defaults to 20 and stays a setting', cols.signal_feed_max_per_run.default === 20 && esm.engineGroupSchemas.signal_feed.safeParse({ signal_feed_paused: false, signal_feed_max_per_run: 20 }).success);
+check('kept per run defaults to 12 and stays a setting', cols.signal_feed_max_per_run.default === 12 && esm.engineGroupSchemas.signal_feed.safeParse({ signal_feed_paused: false, signal_feed_max_per_run: 12 }).success);
 const sql115 = migrationChecks('115_growth_feed_ranking.sql', []);
 check('115: rank, score and reason on signals, with checks', sql115.includes('ADD COLUMN IF NOT EXISTS feed_rank INTEGER') && sql115.includes('feed_score BETWEEN 0 AND 100') && sql115.includes('ADD COLUMN IF NOT EXISTS feed_reason TEXT'));
 check('115: the limit moves from 10 to 20 only where it is still 10', sql115.includes('SET DEFAULT 20') && sql115.includes('WHERE id = 1 AND signal_feed_max_per_run = 10'));
 check('no dashes in the ranking files', !['src/lib/growth/feedRank.ts', 'supabase/migrations/115_growth_feed_ranking.sql', 'src/app/admin/growth/signals/page.tsx'].some((f) => DASHES.test(read(f))));
+
+console.log('8. Coverage, sector and filters (2026-10-29, migration 116)');
+{
+  const g = ['new_project', 'real_estate_off_plan', 'fundraising_debt', 'transactions', 'capital_markets'].map((key) => ({ key }));
+  const o = fm.orderGroups(g, ['real_estate_off_plan', 'transactions'], '2026-01-01');
+  check('coverage: groups the last run could not search go first', o[0].key === 'real_estate_off_plan' && o[1].key === 'transactions' && o.length === 5 && new Set(o.map((x) => x.key)).size === 5);
+  check('coverage: an unknown carried-over key is ignored', fm.orderGroups(g, ['gone'], '2026-01-01').length === 5);
+  check('coverage: the per-group estimate is the average of recent calls, else USD 0.05 a search', fm.callEstimateUsd([0.2, 0.3, 0.4], 5) === 0.3 && fm.callEstimateUsd([], 5) === 0.25);
+  check('coverage: nine groups at the measured USD 0.30 fit the USD 3.00 ceiling', fm.withinCeiling(0, 0.3 * 8, 0.3, 3));
+}
+check('coverage: every group is started together, one Promise.all', src.includes('go.map(async (g) =>') && (src.match(/await Promise\.all\(/g) ?? []).length >= 1 && !src.includes('FEED_TIME_BUDGET_MS) {'));
+check('coverage: the last run carry-over orders this run', src.includes('const history = await feedHistory({ isTest });') && src.includes('orderGroups(allGroups, history.carriedOver, today)'));
+check('coverage: the run stores which groups were not fully searched, and why', src.includes('carry_over: [...new Set(skipped.map((k) => k.group))]') && src.includes('Not fully searched, and first next time:'));
+check('coverage: a call cut at the deadline or failing is named, not lost', src.includes("why: late ? 'time_limit' : 'failed'") && src.includes("ai.stoppedEarly === 'deadline'"));
+const anth2 = read('src/lib/growth/ai/anthropic.ts');
+check('coverage: the provider starts no request after the deadline and cuts one at it', anth2.includes("stoppedEarly = 'deadline'") && anth2.includes('Math.min(req.timeoutMs ?? 600_000, left)'));
+const daily = read('src/lib/growth/daily.ts');
+check('coverage: in the morning job the feed runs last, with the cron deadline', daily.lastIndexOf("name: 'signal-feed'") > daily.lastIndexOf("name: 'partner-checkins'") && daily.includes('runSignalFeed({ trigger: \'cron\', now, deadlineAt })') && src.includes('Math.min(started + FEED_RUN_BUDGET_MS, opts.deadlineAt ?? Infinity)'));
+{
+  const t = (company_sector, sector_tier = null) => rk.resolveSectorTier({ company_sector, sector_tier });
+  check('sector: an IPP or power plant developer is infrastructure, even when the model says real estate', t('independent power producer (IPP) developer', 'real_estate') === 'infrastructure' && t('gas-fired power plant developer', 'real_estate') === 'infrastructure');
+  check('sector: a metro or rolling stock business is infrastructure', t('government-linked urban developer / metro operator', 'real_estate') === 'infrastructure' && t('rolling stock supplier') === 'infrastructure');
+  check('sector: "developer" alone decides nothing; residential, master plan and giga-project developers are real estate', t('developer') === 'other' && t('residential developer') === 'real_estate' && t('master plan developer') === 'real_estate' && t('giga-project developer', 'real_estate') === 'real_estate');
+  check('sector: the model tier stands when the words agree or say nothing', t('asset manager', 'investment') === 'investment' && t('Arada', 'real_estate') === 'real_estate');
+  check('sector: funds and holdings are investment, banks are services', t('logistics fund') === 'investment' && t('commercial bank') === 'services');
+  const today = '2026-10-29';
+  const c = (company_name, o) => ({ company_name, trigger_type: 'new_project', signal_date: '2026-10-20', summary: 'x', location: 'Riyadh, Saudi Arabia', size_sar: 0, prospect_fit: 'prospect', ...o });
+  const r = rk.rankCandidates([c('Al Mourjan Two Electricity Co.', { company_sector: 'independent power producer (IPP) developer', sector_tier: 'real_estate', size_sar: 8_250_000_000 }), c('Sample Homes', { company_sector: 'residential developer', sector_tier: 'real_estate', size_sar: 8_250_000_000 })], { today });
+  check('sector: the same project scores higher for a real estate developer than for a power producer', r[0].candidate.company_name === 'Sample Homes' && r[0].score > r[1].score && r[1].sectorTier === 'infrastructure', r.map((x) => `${x.candidate.company_name} ${x.score}`).join(', '));
+  check('sector: the kept line shows the sector so a wrong one is visible', r[1].basis.includes('sector: infrastructure, energy or industrial (independent power producer (IPP) developer)'));
+  check('sector: the result tool asks for the tier of the company business', fm.feedResultTool().inputSchema.properties.signals.items.required.includes('sector_tier') && p30.system.includes('a power plant developer is infrastructure'));
+  check('sector: each decision carries its sector, shown on the Signals screen', src.includes('sector: r.sectorTier') && read('src/components/admin/growth/signals/FeedPanel.tsx').includes('data-sector={d.sector}'));
+}
+{
+  const n = (o) => rk.notAProspectReason({ company_name: 'X', trigger_type: 'market_entry', signal_date: '2026-10-20', summary: '', prospect_fit: 'unlikely_buyer', ...o });
+  check('filter: a foreign company opening a Riyadh office is dropped, not ranked last', n({ company_name: 'Bloomberg', summary: 'Bloomberg is expanding its existing office in Riyadh.' }) !== null && n({ company_name: 'Omnissa', summary: 'Omnissa opened a new regional office in Riyadh to serve customers.' }) !== null);
+  check('filter: the model can drop an office opening itself', n({ company_name: 'Y', prospect_fit: 'not_a_prospect', fit_reason: 'opening a sales office' }) === 'opening a sales office');
+  check('filter: plausible but weak stays in (ranked last), not dropped', n({ company_name: 'Hassan Allam Construction', trigger_type: 'contract_award', summary: 'Won a SAR 750 million contract.' }) === null);
+  check('filter: a prospect entering the market with real assets is not dropped', n({ company_name: 'Sample Fund', summary: 'The fund opened an office and committed SAR 2 billion to Riyadh projects.', prospect_fit: 'prospect' }) === null);
+  check('filter: the prompt drops office openings and keeps last only the plausible but weak', p30.system.includes('opening or growing a sales, regional or representative office'));
+}
+const sql116 = migrationChecks('116_growth_feed_keep_12.sql', []);
+check('116: the default goes to 12, and a stored 20 to 12 only', sql116.includes('SET DEFAULT 12') && sql116.includes('WHERE id = 1 AND signal_feed_max_per_run = 20'));
+check('no dashes in the coverage and sector files', !['src/lib/growth/daily.ts', 'src/lib/growth/ai/provider.ts', 'src/lib/growth/ai/run.ts', 'supabase/migrations/116_growth_feed_keep_12.sql'].some((f) => DASHES.test(read(f))));
 
 finish('verify-growth-feed');

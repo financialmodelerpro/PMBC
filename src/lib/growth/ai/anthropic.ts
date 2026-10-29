@@ -50,9 +50,17 @@ export function createAnthropicProvider(apiKey: string): AiProvider {
       let toolInput: unknown = undefined;
       let reminded = false;
       const stopReasons: string[] = [];
+      let stoppedEarly: 'deadline' | undefined;
 
       // Resumes after a paused turn, plus one reminder to report.
       for (let attempt = 0; attempt <= MAX_RESUMES + 1; attempt++) {
+        // A deadline: no new request once it is near, and a request is cut at it.
+        const left = req.deadlineAt ? req.deadlineAt - Date.now() : Infinity;
+        if (attempt > 0 && left < 15_000) {
+          stoppedEarly = 'deadline';
+          break;
+        }
+        const timeout = Math.max(5_000, Math.min(req.timeoutMs ?? 600_000, left));
         const response = await client.beta.messages.create(
           {
             model: req.model,
@@ -63,7 +71,7 @@ export function createAnthropicProvider(apiKey: string): AiProvider {
             ...(result ? { tool_choice: { type: 'auto' as const } } : {}),
             ...(fallback ? { betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' as const } : {}),
           },
-          req.timeoutMs ? { timeout: req.timeoutMs, maxRetries: 1 } : undefined,
+          req.timeoutMs || req.deadlineAt ? { timeout, maxRetries: req.deadlineAt ? 0 : 1 } : undefined,
         );
         stopReasons.push(String(response.stop_reason));
         model = response.model;
@@ -115,6 +123,7 @@ export function createAnthropicProvider(apiKey: string): AiProvider {
         toolInput: refused ? undefined : toolInput,
         stopReasons,
         requests: stopReasons.length,
+        stoppedEarly,
       };
     },
   };

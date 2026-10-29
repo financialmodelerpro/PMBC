@@ -32,6 +32,8 @@ export type ProviderRequest = {
   resultTool?: ResultTool;
   /** Give up on one request after this long. */
   timeoutMs?: number;
+  /** Epoch ms: start no new request after this, and cut a request at it. */
+  deadlineAt?: number;
 };
 
 export type ResultTool = { name: string; description: string; inputSchema: Record<string, unknown> };
@@ -56,6 +58,8 @@ export type ProviderResponse = {
   stopReasons?: string[];
   /** Requests made, resumes and the reminder to report included. */
   requests?: number;
+  /** Set when the call stopped before finishing because the deadline came. */
+  stoppedEarly?: 'deadline';
 };
 
 export interface AiProvider {
