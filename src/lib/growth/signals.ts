@@ -85,14 +85,14 @@ export async function getSignal(id: string): Promise<InboxSignal | null> {
   return (data as InboxSignal | null) ?? null;
 }
 
-/** Earlier signals that could be duplicates: same evidence key, or same trigger type close in date. */
+/** Earlier signals that could be duplicates: same evidence key, or any trigger close in date (`sameEvent` decides). */
 async function duplicateCandidates(input: { trigger_type: TriggerType; signal_date: string; evidence_url: string }): Promise<InboxSignal[]> {
   const day = Date.parse(`${input.signal_date}T00:00:00Z`);
   const from = new Date(day - DUPLICATE_WINDOW_DAYS * 86_400_000).toISOString().slice(0, 10);
   const to = new Date(day + DUPLICATE_WINDOW_DAYS * 86_400_000).toISOString().slice(0, 10);
   const key = evidenceKey(input.evidence_url);
   const [byType, byKey, byUrl] = await Promise.all([
-    growthDb().from('growth_signals').select('*').eq('trigger_type', input.trigger_type).gte('signal_date', from).lte('signal_date', to).limit(300),
+    growthDb().from('growth_signals').select('*').gte('signal_date', from).lte('signal_date', to).limit(1000),
     key ? growthDb().from('growth_signals').select('*').eq('evidence_key', key).limit(5) : Promise.resolve({ data: [], error: null }),
     growthDb().from('growth_signals').select('*').eq('evidence_url', input.evidence_url.trim()).limit(5),
   ]);
@@ -105,8 +105,12 @@ async function duplicateCandidates(input: { trigger_type: TriggerType; signal_da
 }
 
 /** The earlier signal a new one would duplicate, if any. The daily feed skips these. */
-export async function existingDuplicate(input: { company_id: string | null; company_name: string | null; trigger_type: TriggerType; signal_date: string; evidence_url: string }): Promise<{ id: string; why: string } | null> {
-  return findDuplicate(input, await duplicateCandidates(input));
+export async function existingDuplicate(input: { company_id: string | null; company_name: string | null; trigger_type: TriggerType; signal_date: string; evidence_url: string }): Promise<{ id: string; why: string; company_name: string | null; status: string } | null> {
+  const candidates = await duplicateCandidates(input);
+  const dup = findDuplicate(input, candidates);
+  if (!dup) return null;
+  const match = candidates.find((c) => c.id === dup.id);
+  return { ...dup, company_name: match?.company_name ?? null, status: match?.status ?? 'new' };
 }
 
 export type CreateSignalOpts = {
@@ -176,6 +180,30 @@ export async function createSignal(input: SignalCreateInput, actor: Actor | null
   });
   if (data.company_id) await rescoreCompany(data.company_id, { actor });
   return { ok: true, value: { ...data, duplicateWhy: dup?.why ?? null } };
+}
+
+/**
+ * Dismisses several signals, each with its reason, through the same triage
+ * path as one at a time (activity row and rescore for each). A signal no
+ * longer new, or gone, is skipped and counted, never changed.
+ */
+export async function dismissSignals(items: { id: string; reason: string }[], actor: Actor): Promise<{ dismissed: string[]; skipped: number; failed: { id: string; error: string }[] }> {
+  const ids = items.map((i) => i.id);
+  const { data } = await growthDb().from('growth_signals').select('id, status').in('id', ids);
+  const status = new Map(((data ?? []) as { id: string; status: string }[]).map((r) => [r.id, r.status]));
+  const dismissed: string[] = [];
+  const failed: { id: string; error: string }[] = [];
+  let skipped = 0;
+  for (const item of items) {
+    if (status.get(item.id) !== 'new') {
+      skipped++;
+      continue;
+    }
+    const res = await triageSignal(item.id, { action: 'dismiss', reason: item.reason }, actor);
+    if (res.ok) dismissed.push(item.id);
+    else failed.push({ id: item.id, error: res.error });
+  }
+  return { dismissed, skipped, failed };
 }
 
 /** Converts, attaches, dismisses or reopens a signal. */

@@ -3,6 +3,7 @@ import Link from 'next/link';
 
 import { AdminPageHeader } from '@/components/admin/AdminPageHeader';
 import { FeedPanel } from '@/components/admin/growth/signals/FeedPanel';
+import { BulkDismissBar, InboxCleanup } from '@/components/admin/growth/signals/SignalBulkTools';
 import { SignalActions } from '@/components/admin/growth/signals/SignalActions';
 import { SignalAddForm } from '@/components/admin/growth/signals/SignalAddForm';
 import { MigrationNotice } from '@/components/admin/tools/MigrationNotice';
@@ -14,6 +15,7 @@ import { recentFeedRuns } from '@/lib/growth/feed';
 import { activeKeywords, getKeywordLibrary } from '@/lib/growth/keywords';
 import { day } from '@/lib/growth/format';
 import { TRIGGER_TYPES } from '@/lib/growth/model';
+import { planInboxCleanup, type CleanupSignal } from '@/lib/growth/inboxCleanup';
 import { growthPage } from '@/lib/growth/pages';
 import { describeDays } from '@/lib/growth/settingsModel';
 import { companyOptions } from '@/lib/growth/prospects';
@@ -41,6 +43,11 @@ export default async function GrowthSignalsPage({ searchParams }: { searchParams
     tableExists('growth_feed_runs'),
     growthDb().from('growth_leads').select('id, title, company_id').not('stage', 'in', '(won,lost)').order('title').limit(1000),
   ]);
+  // Every new signal, whatever the filters, for the cleanup proposal; a failed read proposes nothing.
+  const { data: fresh } = await growthDb().from('growth_signals').select('id, created_at, status, company_id, company_name, trigger_type, signal_date, summary, evidence_url').eq('status', 'new').eq('is_test', false).limit(1000);
+  const freshRows = (fresh ?? []) as CleanupSignal[];
+  const proposals = planInboxCleanup(freshRows);
+  const bulk = f.status === 'new' && list.rows.length > 0;
   const [runs, engine, library] = await Promise.all([has088 ? recentFeedRuns() : Promise.resolve([]), getEngineSettings(), getKeywordLibrary()]);
   const active = activeKeywords(library);
   const keywordCount = library.source === 'pending' ? engine.values.signal_keywords.length : active.length;
@@ -62,6 +69,7 @@ export default async function GrowthSignalsPage({ searchParams }: { searchParams
       {list.error && <p style={{ color: ADMIN_COLORS.danger, fontSize: 13 }}>Could not read the signals: {list.error}</p>}
 
       <FeedPanel runs={runs} available={has088 && !engine.missing.includes('signal_keywords')} keywords={keywordCount} paused={engine.values.signal_feed_paused} days={describeDays(engine.values.signal_feed_days)} />
+      <InboxCleanup proposals={proposals} newCount={freshRows.length} />
       <SignalAddForm companies={companies} keywords={library.source === 'pending' ? [] : active.map((k) => ({ id: k.id, keyword: k.keyword, trigger: k.trigger, enabled: true }))} />
 
       <nav aria-label="Signal status" style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
@@ -125,6 +133,7 @@ export default async function GrowthSignalsPage({ searchParams }: { searchParams
         </button>
       </form>
 
+      {bulk && <BulkDismissBar />}
       <section style={{ ...adminCard, padding: 0 }}>
         {list.rows.length === 0 ? (
           <p style={{ padding: 24, margin: 0, fontSize: 13, color: ADMIN_COLORS.textMuted }}>No signals match. Add one above, or wait for the daily feed.</p>
@@ -133,6 +142,11 @@ export default async function GrowthSignalsPage({ searchParams }: { searchParams
             <table style={adminTable}>
               <thead style={adminThead}>
                 <tr>
+                  {bulk && (
+                    <th style={adminTh}>
+                      <span style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>Tick</span>
+                    </th>
+                  )}
                   <th style={adminTh}>Date</th>
                   <th style={adminTh}>Signal</th>
                   <th style={adminTh}>Status</th>
@@ -142,6 +156,9 @@ export default async function GrowthSignalsPage({ searchParams }: { searchParams
               <tbody>
                 {list.rows.map((s) => (
                   <tr key={s.id} style={{ verticalAlign: 'top' }}>
+                    {bulk && (
+                      <td style={adminTd}>{s.status === 'new' && <input type="checkbox" data-bulk-signal={s.id} aria-label={`Tick ${s.companyLabel ?? 'this signal'}`} />}</td>
+                    )}
                     <td style={{ ...adminTd, whiteSpace: 'nowrap', fontSize: 12 }}>{day(s.signal_date)}</td>
                     <td style={{ ...adminTd, minWidth: 280 }}>
                       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginBottom: 4 }}>

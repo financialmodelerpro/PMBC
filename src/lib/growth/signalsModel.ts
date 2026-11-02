@@ -74,29 +74,126 @@ export function companyNameKey(input: string | null | undefined): string {
     .trim();
 }
 
-type DupCandidate = Pick<GrowthSignal, 'id' | 'created_at' | 'company_id' | 'company_name' | 'trigger_type' | 'signal_date'> & { evidence_key?: string | null };
+/*
+ * Matching on the event, not the wording (2026-11-02). Before this, two
+ * different events that cited the same site homepage were treated as one
+ * (Mnzil and DataVolt were both dropped as "found twice"), while one event
+ * worded twice slipped through (Arada as a market entry and as a new project;
+ * "Hassan Allam Construction" and "Hassan Allam, Sterling & Wilson JV").
+ */
+
+/** Words that name a deal structure or a trade, not the company: left out when names are compared. */
+const PARTY_FILLER = new Set(['construction', 'contracting', 'trading', 'consortium', 'jv', 'joint', 'venture', 'led', 'partnership']);
+/** Where a name divides into parties: slashes, commas, en and em dashes (built from char codes so no dash sits in the source), " - ", " & ", "and", "with". */
+const PARTY_SPLIT = new RegExp(`[/,;|+${String.fromCharCode(0x2013)}${String.fromCharCode(0x2014)}]|\\s-\\s|\\s&\\s|\\band\\b|\\bwith\\b`, 'i');
+/** Words too common to identify a company on their own. */
+const PARTY_COMMON = new Set(['saudi', 'arabia', 'arabian', 'national', 'gulf', 'al', 'arab', 'international', 'global', 'united', 'first', 'new', 'emirates', 'qatar', 'dubai', 'abu', 'dhabi', 'kingdom', 'middle', 'east', 'development', 'developments', 'investment', 'investments', 'real', 'estate', 'energy', 'power', 'capital', 'king', 'royal']);
 
 /**
- * The earlier signal this one duplicates, or null. Same evidence link wins;
- * otherwise the same company (by id, or by name when neither has an id) with
- * the same trigger type within the window.
+ * The companies a name refers to, each as a list of words: "Elsewedy Electric /
+ * Sinohydro (JV)" is two parties, "ACWA Power-led consortium" one.
+ */
+export function companyParties(input: string | null | undefined): string[][] {
+  return (input ?? '')
+    .replace(/\(.*?\)/g, ' ')
+    .split(PARTY_SPLIT)
+    .map((p) => companyNameKey(p).split(' ').filter((w) => w && !PARTY_FILLER.has(w)))
+    .filter((p) => p.length > 0);
+}
+
+/** Two parties are one company when their words match, or one name starts the other and is distinctive enough to stand alone. */
+function sameParty(a: string[], b: string[]): boolean {
+  const [short, long] = a.length <= b.length ? [a, b] : [b, a];
+  if (!short.every((w, i) => long[i] === w)) return false;
+  if (short.length === long.length) return true;
+  if (short.length >= 2) return true;
+  return short[0].length >= 4 && !PARTY_COMMON.has(short[0]);
+}
+
+/** Whether two company names refer to the same company: any party in one matches a party in the other. */
+export function sameCompanyName(a: string | null | undefined, b: string | null | undefined): boolean {
+  const pa = companyParties(a);
+  const pb = companyParties(b);
+  return pa.some((x) => pb.some((y) => sameParty(x, y)));
+}
+
+/**
+ * Triggers that describe the same kind of news. The feed sets the trigger from
+ * the keyword a story matched, so one project can arrive as a new project, an
+ * expansion or a market entry; those count as one family.
+ */
+const TRIGGER_FAMILY: Record<TriggerType, string> = {
+  new_project: 'project',
+  off_plan_registration: 'project',
+  expansion: 'project',
+  market_entry: 'project',
+  contract_award: 'project',
+  fundraising_debt: 'capital',
+  capital_market_activity: 'capital',
+  acquisition_jv: 'deal',
+  finance_leadership_hire: 'people',
+  other: 'other',
+};
+export const triggerFamily = (t: TriggerType): string => TRIGGER_FAMILY[t] ?? 'other';
+
+/**
+ * A link that points at one article or filing, not a site's home or section
+ * page. A homepage can carry many stories, so it never proves two signals are
+ * the same event.
+ */
+export function isArticleLink(input: string | null | undefined): boolean {
+  const key = evidenceKey(input);
+  if (!key) return false;
+  const path = key.replace(/^[^/?]+/, '').replace(/\?.*$/, '');
+  const segments = path.split('/').filter((s) => s && !/^(en|ar|news|home|index(\.\w+)?|default(\.\w+)?)$/i.test(s));
+  return segments.length > 0 || key.includes('?');
+}
+
+export type EventLike = { company_id?: string | null; company_name: string | null; trigger_type: TriggerType; signal_date: string; evidence_url: string };
+
+/**
+ * Why two signals describe the same event, or null. Always the same company
+ * (by id when both have one, else by name, loosely); then the same article,
+ * or a trigger of the same family within DUPLICATE_WINDOW_DAYS, or any trigger
+ * on the same day. A shared homepage alone, or two companies in one article,
+ * is never a match.
+ */
+export function sameEvent(a: EventLike, b: EventLike & { evidence_key?: string | null }): 'same_evidence' | 'same_company_trigger' | null {
+  const company = a.company_id && b.company_id ? a.company_id === b.company_id : sameCompanyName(a.company_name, b.company_name);
+  if (!company) return null;
+  const keyA = evidenceKey(a.evidence_url);
+  const keyB = b.evidence_key ?? evidenceKey(b.evidence_url);
+  if (keyA && keyA === keyB && isArticleLink(a.evidence_url)) return 'same_evidence';
+  const gap = Math.abs(Date.parse(a.signal_date) - Date.parse(b.signal_date));
+  if (!Number.isFinite(gap)) return null;
+  if (gap === 0) return 'same_company_trigger';
+  if (triggerFamily(a.trigger_type) === triggerFamily(b.trigger_type) && gap <= DUPLICATE_WINDOW_DAYS * 86_400_000) return 'same_company_trigger';
+  return null;
+}
+
+/** How good a signal's evidence and summary are, to keep the better of two versions of one event. Higher is better. */
+export function signalQuality(s: { evidence_url: string; summary: string | null }): number {
+  return (isArticleLink(s.evidence_url) ? 10_000 : 0) + Math.min((s.summary ?? '').trim().length, 1000);
+}
+
+type DupCandidate = Pick<GrowthSignal, 'id' | 'created_at' | 'company_id' | 'company_name' | 'trigger_type' | 'signal_date' | 'evidence_url'> & { evidence_key?: string | null };
+
+/**
+ * The earlier signal this one duplicates, or null: the oldest signal that
+ * describes the same event (`sameEvent`). Flagged, never blocked.
  */
 export function findDuplicate(
   signal: { id?: string; company_id: string | null; company_name: string | null; trigger_type: TriggerType; signal_date: string; evidence_url: string },
   existing: DupCandidate[],
 ): { id: string; why: 'same_evidence' | 'same_company_trigger' } | null {
-  const key = evidenceKey(signal.evidence_url);
   const others = existing.filter((e) => e.id !== signal.id).sort((a, b) => Date.parse(a.created_at) - Date.parse(b.created_at));
-  if (key) {
-    const same = others.find((e) => e.evidence_key === key);
-    if (same) return { id: same.id, why: 'same_evidence' };
-  }
-  const nameKey = companyNameKey(signal.company_name);
-  const day = Date.parse(signal.signal_date);
   for (const e of others) {
-    const sameCompany = signal.company_id && e.company_id ? signal.company_id === e.company_id : Boolean(nameKey) && companyNameKey(e.company_name) === nameKey;
-    if (!sameCompany || e.trigger_type !== signal.trigger_type) continue;
-    if (Math.abs(Date.parse(e.signal_date) - day) <= DUPLICATE_WINDOW_DAYS * 86_400_000) return { id: e.id, why: 'same_company_trigger' };
+    const why = sameEvent(signal, e);
+    if (why === 'same_evidence') return { id: e.id, why };
+  }
+  for (const e of others) {
+    const why = sameEvent(signal, e);
+    if (why) return { id: e.id, why };
   }
   return null;
 }
@@ -150,6 +247,23 @@ export const signalTriageSchema = z.discriminatedUnion('action', [
 ]);
 
 export type SignalTriage = z.infer<typeof signalTriageSchema>;
+
+/** Most signals one bulk dismissal may touch. */
+export const BULK_DISMISS_MAX = 200;
+
+/**
+ * Dismiss several signals at once (2026-11-02): each with its own reason (the
+ * inbox cleanup) or one reason for all (ticked in the list). Only signals
+ * still new are dismissed.
+ */
+export const signalBulkDismissSchema = z.object({
+  items: z
+    .array(z.object({ id: z.string().uuid(), reason: z.string().trim().min(3, 'Give a reason').max(SIGNAL_LIMITS.reason) }))
+    .min(1, 'Tick at least one signal')
+    .max(BULK_DISMISS_MAX, `At most ${BULK_DISMISS_MAX} at a time`)
+    .refine((items) => new Set(items.map((i) => i.id)).size === items.length, 'A signal is listed twice'),
+});
+export type SignalBulkDismiss = z.infer<typeof signalBulkDismissSchema>;
 
 export const SIGNAL_FILTER_KEYS = ['status', 'trigger', 'origin', 'from', 'to', 'q', 'dup', 'test'] as const;
 export type SignalFilters = { status: string; trigger: string; origin: string; from: string; to: string; q: string; dup: boolean; includeTest: boolean };

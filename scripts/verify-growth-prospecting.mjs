@@ -95,7 +95,8 @@ console.log('2. Signals (offline)');
   const existing = [
     { id: 'a', created_at: '2026-09-01T00:00:00Z', company_id: null, company_name: 'Al Noor Development Co.', trigger_type: 'new_project', signal_date: '2026-09-01', evidence_key: 'argaam.com/1' },
   ];
-  check('same evidence link is a duplicate', sig.findDuplicate({ company_id: null, company_name: 'Other', trigger_type: 'expansion', signal_date: '2026-09-20', evidence_url: 'https://www.argaam.com/1/' }, existing)?.why === 'same_evidence');
+  check('same article and same company is a duplicate', sig.findDuplicate({ company_id: null, company_name: 'Al Noor Development', trigger_type: 'expansion', signal_date: '2026-09-30', evidence_url: 'https://www.argaam.com/1/' }, existing)?.why === 'same_evidence');
+  check('another company in the same article is not', sig.findDuplicate({ company_id: null, company_name: 'Other', trigger_type: 'expansion', signal_date: '2026-09-20', evidence_url: 'https://www.argaam.com/1/' }, existing) === null);
   check('same company and trigger within two weeks is a duplicate', sig.findDuplicate({ company_id: null, company_name: 'AL NOOR DEVELOPMENT COMPANY', trigger_type: 'new_project', signal_date: '2026-09-10', evidence_url: 'https://other.sa/2' }, existing)?.why === 'same_company_trigger');
   check('the same company after the window is not', sig.findDuplicate({ company_id: null, company_name: 'Al Noor Development', trigger_type: 'new_project', signal_date: '2026-10-20', evidence_url: 'https://other.sa/3' }, existing) === null);
   check('a signal needs a real evidence link', !sig.signalCreateSchema.safeParse({ trigger_type: 'other', signal_date: '2026-09-01', summary: 'A long enough summary', evidence_url: 'https://example.invalid/x', company_name: 'X' }).success);
@@ -136,8 +137,8 @@ console.log('3. Research Agent and signal feed (offline)');
   const feedOut = await mock.mockProvider.call({ model: 'mock', messages: [{ role: 'user', content: 'x' }], maxTokens: 6000, purpose: 'signal_feed', agent: 'signal-feed' });
   const today = new Date(Date.now() + 3 * 3_600_000).toISOString().slice(0, 10);
   const screened = feedMod.screenCandidates(json.extractJsonObject(feedOut.text), { sourceUrls: feedOut.sourceUrls, mock: true, today });
-  // The sample reports the sourced story twice (the in-run repeat is caught by dedupeWithinRun, see verify-growth-keywords).
-  check('the mock feed keeps the sourced sample and discards the one without a link', screened.valid.length === 2 && feedMod.dedupeWithinRun(screened.valid).unique.length === 1 && screened.discarded.length === 1 && screened.discarded[0].why === 'no evidence link');
+  // The sample reports the sourced story twice (the in-run repeat is merged by mergeWithinRun, see verify-growth-keywords).
+  check('the mock feed keeps the sourced sample and discards the one without a link', screened.valid.length === 2 && feedMod.mergeWithinRun(screened.valid).unique.length === 1 && screened.discarded.length === 1 && screened.discarded[0].why === 'no evidence link');
   const realScreen = feedMod.screenCandidates(json.extractJsonObject(feedOut.text), { sourceUrls: feedOut.sourceUrls, mock: false, today });
   check('in real mode a reserved evidence link is discarded', realScreen.valid.length === 0);
   const notReturned = feedMod.screenCandidates({ signals: [{ company_name: 'A', trigger_type: 'new_project', signal_date: today, summary: 'A real sounding summary', evidence_url: 'https://argaam.com/z' }] }, { sourceUrls: [], mock: false, today });
@@ -239,7 +240,7 @@ async function live(svc) {
     check('contact created', ct.ok, ct.error);
     const s1 = await sigs.createSignal({ trigger_type: 'off_plan_registration', signal_date: '2026-09-20', summary: `${tag} off-plan registration`, evidence_url: `https://www.argaam.com/zz/${tag}?utm_source=x`, company_id: co.value.id }, actor, { isTest: true });
     check('signal created', s1.ok && s1.value.origin === 'manual' && s1.value.duplicateWhy === null, s1.error);
-    const s2 = await sigs.createSignal({ trigger_type: 'fundraising_debt', signal_date: '2026-09-21', summary: `${tag} same article again`, evidence_url: `https://argaam.com/zz/${tag}/`, company_name: 'Anyone' }, actor, { isTest: true });
+    const s2 = await sigs.createSignal({ trigger_type: 'fundraising_debt', signal_date: '2026-09-21', summary: `${tag} same article again`, evidence_url: `https://argaam.com/zz/${tag}/`, company_id: co.value.id }, actor, { isTest: true });
     check('the same evidence link is flagged as a duplicate, not refused', s2.ok && s2.value.duplicate_of === s1.value.id && s2.value.duplicateWhy === 'same_evidence');
     const dis = await sigs.triageSignal(s2.value.id, { action: 'dismiss', reason: 'Duplicate of the registration' }, actor);
     check('dismiss keeps the reason and who triaged', dis.ok && dis.value.status === 'dismissed' && dis.value.dismissed_reason && dis.value.triaged_by_name === actor.name);

@@ -32,7 +32,7 @@ export function SignalAddForm({ companies, keywords = [] }: { companies: { id: s
       });
       setForm({ ...form, summary: '', evidence_url: '', source_name: '', company_name: '', company_id: '' });
       const why = data.signal.duplicateWhy;
-      return why ? `Added, and flagged as a possible duplicate (${why === 'same_evidence' ? 'same evidence link' : 'same company and trigger within two weeks'}).` : 'Signal added to the inbox.';
+      return why ? `Added, and flagged as a possible duplicate (${why === 'same_evidence' ? 'same evidence link' : 'same company, related news within two weeks'}).` : 'Signal added to the inbox.';
     });
 
   if (!open) {

@@ -87,14 +87,14 @@ export function FeedCoverageForm({
     <Card
       id="feed-coverage"
       title="Signal feed: reach and cost"
-      intro={`Each run makes one AI call per keyword group switched on (${groups} today), all at once, so every group is searched in each run; a group that cannot finish is named on the run and searched first next time. A call starts only while the run's spend so far plus its estimate stays within the ceiling; groups left out are named on the run and come first on a later day. The window is the age limit stated in the prompt and enforced on every signal.`}
+      intro={`Each run makes one AI call per keyword group switched on (${groups} today), all at once, so every group is searched in each run; a group that cannot finish is named on the run and searched first next time. Searches per group is a most: each run lowers it until every group fits the ceiling at the dearest cost measured so far, so the ceiling holds; a group that still does not fit is named on the run and comes first on a later day. The window is the age limit stated in the prompt and enforced on every signal.`}
       pending={pending}
     >
       <div style={grid}>
         <Field label="Look back (days)">
           <input value={windowDays} onChange={(e) => setWindowDays(e.target.value)} style={adminInput} inputMode="numeric" />
         </Field>
-        <Field label="Searches per keyword group">
+        <Field label="Most searches per keyword group">
           <input value={searches} onChange={(e) => setSearches(e.target.value)} style={adminInput} inputMode="numeric" />
         </Field>
         <Field label="Most one run may cost (USD)">

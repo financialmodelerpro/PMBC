@@ -192,13 +192,6 @@ export function orderGroups<T extends { key: string }>(groups: T[], carriedOver:
   return [...first, ...rest];
 }
 
-/** The cost one group's call is expected to have: the average of recent calls, or USD 0.05 a search before any. */
-export function callEstimateUsd(recentCallCosts: number[], searches: number): number {
-  const m = recentCallCosts.filter((c) => Number.isFinite(c) && c > 0);
-  if (!m.length) return estimateGroupCostUsd(searches);
-  return Math.round((m.reduce((a, b) => a + b, 0) / m.length) * 100) / 100;
-}
-
 /**
  * The order groups run in: rotated by the day of the year, so a group left
  * out by the cost ceiling or the time limit one day runs early on another.
@@ -209,6 +202,53 @@ export function rotateGroups<T>(groups: T[], today: string): T[] {
   const day = Number.isFinite(d) ? Math.floor((d - Date.UTC(new Date(d).getUTCFullYear(), 0, 1)) / 86_400_000) : 0;
   const k = day % groups.length;
   return [...groups.slice(k), ...groups.slice(0, k)];
+}
+
+/*
+ * Holding the ceiling (2026-11-02). The 2026-10-29 run cost USD 3.22 against
+ * USD 3.00: every group was reserved at the average call (about USD 0.25),
+ * but all nine run at once and calls ranged from USD 0.16 to 0.55. A call
+ * cannot be stopped once it has started, so the reservation must be the worst
+ * case, and the number of searches is what brings nine worst cases under the
+ * ceiling.
+ */
+
+/** One past call: what it cost and how many searches it made. */
+export type CallCost = { cost: number; searches: number };
+/** The dearest call measured before this rule (2026-10-29: USD 0.55 for 5 searches), used until there is history. */
+export const FEED_WORST_CALL: CallCost = { cost: 0.55, searches: 5 };
+/** Fewer searches than this leaves a group barely searched: below it, groups are left out and carried over instead. */
+export const FEED_MIN_SEARCHES = 2;
+
+const ceil2 = (n: number) => Math.ceil(n * 100 - 1e-9) / 100;
+
+/**
+ * The most a call with `searches` searches is expected to cost: the dearest
+ * recent call per search, scaled to this many searches. A call's cost grows
+ * faster than its searches (each search reads the results of the ones before
+ * it), so the rate per search is scaled by (searches + 1) / (its searches + 1).
+ */
+export function worstCallUsd(recent: CallCost[], searches: number): number {
+  const known = recent.filter((c) => Number.isFinite(c.cost) && c.cost > 0 && c.searches > 0);
+  const basis = known.length ? known : [FEED_WORST_CALL];
+  const rate = Math.max(...basis.map((c) => (c.cost / c.searches) * ((searches + 1) / (c.searches + 1))));
+  return ceil2(rate * searches);
+}
+
+/**
+ * The searches each group gets this run: the setting, lowered until every
+ * group's worst case fits the ceiling together, but not below
+ * FEED_MIN_SEARCHES. `fits` is false when even that does not fit every group;
+ * the start check then leaves the rest out, to be searched first next run.
+ */
+export function fitSearches(opts: { groups: number; ceilingUsd: number; maxSearches: number; recent: CallCost[] }): { searches: number; reserveUsd: number; fits: boolean } {
+  const top = Math.max(1, Math.floor(opts.maxSearches));
+  const floor = Math.min(FEED_MIN_SEARCHES, top);
+  for (let s = top; s >= floor; s--) {
+    const reserve = worstCallUsd(opts.recent, s);
+    if (Math.round(reserve * opts.groups * 100) / 100 <= opts.ceilingUsd) return { searches: s, reserveUsd: reserve, fits: true };
+  }
+  return { searches: floor, reserveUsd: worstCallUsd(opts.recent, floor), fits: false };
 }
 
 /** Whether the next call may start: spend so far plus the calls already started plus this one stays within the ceiling. */
