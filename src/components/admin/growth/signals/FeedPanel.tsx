@@ -17,8 +17,8 @@ function runDetail(r: Run): string {
   const parts: string[] = [];
   if (d.reason === 'budget' && typeof d.message === 'string') return ` (${d.message})`;
   if (typeof d.parse_summary === 'string') parts.push(d.parse_summary);
-  const c = d.counts as { not_a_prospect?: number; below_rank?: number; over_limit?: number } | undefined;
-  if (c) parts.push(`not kept: ${c.not_a_prospect ?? 0} not a prospect, ${c.below_rank ?? 0} below rank, ${c.over_limit ?? 0} over the limit`);
+  const c = d.counts as { merged?: number; not_a_prospect?: number; below_rank?: number; over_limit?: number } | undefined;
+  if (c) parts.push(`not kept: ${c.not_a_prospect ?? 0} not a prospect, ${c.below_rank ?? 0} below rank, ${c.over_limit ?? 0} over the limit${c.merged ? `, ${c.merged} repeats merged` : ''}`);
   if (typeof d.searches === 'number') parts.push(`${d.searches} searches`);
   if (typeof r.cost_usd === 'number') parts.push(`USD ${r.cost_usd.toFixed(2)}`);
   return parts.length ? ` (${parts.join(', ')})` : '';
@@ -33,11 +33,11 @@ function lastRunLine(r: Run | undefined): { text: string; skipped: boolean } | n
   return { text: `Last run, ${dateTime(r.created_at)}: cost USD ${r.cost_usd.toFixed(2)}${typeof d.searches === 'number' ? ` for ${d.searches} searches` : ''}, ${r.saved} kept.`, skipped: false };
 }
 
-const TONE = { kept: 'success', duplicate: 'neutral', discarded: 'danger', not_a_prospect: 'neutral', below_rank: 'neutral', over_limit: 'warning' } as const;
-const OUTCOME_LABEL = { kept: 'kept', duplicate: 'duplicate', discarded: 'discarded', not_a_prospect: 'not a prospect', below_rank: 'below rank', over_limit: 'over limit' } as const;
+const TONE = { kept: 'success', merged: 'neutral', duplicate: 'neutral', discarded: 'danger', not_a_prospect: 'neutral', below_rank: 'neutral', over_limit: 'warning' } as const;
+const OUTCOME_LABEL = { kept: 'kept', merged: 'merged', duplicate: 'duplicate', discarded: 'discarded', not_a_prospect: 'not a prospect', below_rank: 'below rank', over_limit: 'over limit' } as const;
 
 /** Kept first in rank order, then what was cut, then what was never a prospect or had no evidence. */
-const ORDER = { kept: 0, over_limit: 1, below_rank: 2, not_a_prospect: 3, duplicate: 4, discarded: 5 } as const;
+const ORDER = { kept: 0, over_limit: 1, below_rank: 2, merged: 3, not_a_prospect: 4, duplicate: 5, discarded: 6 } as const;
 function ordered(decisions: FeedDecision[]): FeedDecision[] {
   return [...decisions].sort((a, b) => ORDER[a.outcome] - ORDER[b.outcome] || (a.rank ?? 9999) - (b.rank ?? 9999));
 }

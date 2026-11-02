@@ -69,8 +69,8 @@ const assigned = feed.assignKeywords([cand({ keyword_number: 2 }), cand({ summar
 check('the keyword the agent names sets the trigger', assigned[0].matched_keyword === 'appoints CFO Saudi Arabia' && assigned[0].trigger_type === 'finance_leadership_hire' && assigned[0].matched_keyword_id === 'k2');
 check('a number out of range falls back to matching the text', assigned[1].matched_keyword_id === 'k1' && assigned[1].trigger_type === 'fundraising_debt');
 check('no match keeps the agent trigger and no keyword', assigned[2].matched_keyword === null && assigned[2].trigger_type === 'other');
-const d = feed.dedupeWithinRun([cand({}), cand({ company_name: 'Other', evidence_url: 'https://www.news.test.sa/a/?utm_source=x' }), cand({ evidence_url: 'https://news.test.sa/b' }), cand({ company_name: 'Third', evidence_url: 'https://news.test.sa/c' })]);
-check('in-run dedupe: same link (after tidying) and same company, trigger and date are kept once', d.unique.length === 2 && d.repeats.length === 2 && d.repeats.every((r) => r.outcome === 'duplicate'));
+const d = feed.mergeWithinRun([cand({}), cand({ company_name: 'Other', evidence_url: 'https://www.news.test.sa/a/?utm_source=x' }), cand({ evidence_url: 'https://news.test.sa/b' }), cand({ company_name: 'Third', evidence_url: 'https://news.test.sa/c' })]);
+check('in-run merge: the same company and event is kept once; another company on the same link is its own event', d.unique.length === 3 && d.merged.length === 1 && d.merged.every((r) => r.outcome === 'merged'));
 const p = feed.feedPrompt([...fk, { id: null, keyword: 'IPO GCC', trigger: 'capital_market_activity', region: 'gcc' }], today);
 check('the prompt numbers each keyword with its trigger', p.user.includes('1. sukuk issuance Saudi Arabia [fundraising_debt]') && p.user.includes('3. IPO GCC [capital_market_activity]'));
 check('the prompt asks for keyword_number and a real link', p.system.includes('keyword_number') && p.system.includes('Never construct, shorten or guess a URL'));
@@ -78,9 +78,9 @@ check('the prompt spells out GCC only when a GCC keyword is on', p.system.includ
 {
   const raw = mock.JSON_SAMPLES.signal_feed({ messages: [{ role: 'user', content: feed.feedPrompt(fk, today).user }] });
   const s = feed.screenCandidates(raw, { sourceUrls: mock.sampleUrls(raw), mock: true, today: new Date().toISOString().slice(0, 10) });
-  const a = feed.dedupeWithinRun(feed.assignKeywords(s.valid, fk));
+  const a = feed.mergeWithinRun(feed.assignKeywords(s.valid, fk));
   check('mock sample: the link-less candidate is discarded', s.discarded.length === 1 && s.discarded[0].why === 'no evidence link');
-  check('mock sample: the repeat is caught in the run', a.unique.length === 1 && a.repeats.length === 1);
+  check('mock sample: the repeat is merged in the run', a.unique.length === 1 && a.merged.length === 1);
   check('mock sample: names its keyword by number', a.unique[0].matched_keyword_id === 'k1');
 }
 

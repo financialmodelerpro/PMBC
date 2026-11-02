@@ -121,7 +121,7 @@ try {
     ok('a signal with a real evidence link is added', a.ok && a.value.status === 'new', a.error);
     const bad = L.sm.signalCreateSchema.safeParse({ trigger_type: 'other', signal_date: '2026-09-20', summary: 'A long enough summary here', evidence_url: 'https://example.invalid/x', company_name: 'X' });
     ok('a made-up evidence link is refused', !bad.success);
-    const dup = await L.sigs.createSignal({ trigger_type: 'new_project', signal_date: '2026-09-21', summary: `${TAG} same article, other wording`, evidence_url: `${EVIDENCE(1)}&utm_source=newsletter`, company_name: 'Anyone' }, actor, { isTest: true });
+    const dup = await L.sigs.createSignal({ trigger_type: 'new_project', signal_date: '2026-09-21', summary: `${TAG} same article, other wording`, evidence_url: `${EVIDENCE(1)}&utm_source=newsletter`, company_name: `${TAG} Alpha Developments` }, actor, { isTest: true });
     ok('the same evidence link is flagged as a duplicate, not refused', dup.ok && dup.value.duplicate_of === a.value.id && dup.value.duplicateWhy === 'same_evidence');
     const near = await L.sigs.createSignal({ trigger_type: 'off_plan_registration', signal_date: '2026-09-25', summary: `${TAG} Alpha registered it again`, evidence_url: EVIDENCE(2), company_name: `${TAG} Alpha Developments Co.` }, actor, { isTest: true });
     ok('the same company and trigger within 14 days is flagged', near.ok && near.value.duplicateWhy === 'same_company_trigger');

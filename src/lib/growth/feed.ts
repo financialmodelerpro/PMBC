@@ -6,10 +6,12 @@
  * Settings (keywords.ts). A run makes one AI call per active keyword group,
  * each with its own search allowance (`signal_feed_searches_per_group`), so
  * every group gets real coverage instead of 115 keywords sharing ten
- * searches. Calls run five at a time; a call starts only while the run's
- * spend plus its estimate stays within `signal_feed_max_cost_usd`, and no new
- * round starts late in the function's time. Groups rotate daily, so one left
- * out runs early another day. Every group left out is recorded on the run.
+ * searches. Every group starts at once. The setting is a most: each run
+ * lowers the searches a group gets until every group's worst case (the
+ * dearest recent call, scaled) fits `signal_feed_max_cost_usd` together, and
+ * a call starts only while its worst case fits, so the ceiling holds.
+ * Groups rotate daily, so one left out runs early another day. Every group
+ * left out is recorded on the run.
  *
  * The model returns its findings by calling the `report_signals` tool, whose
  * input the API checks against a schema (feedModel.ts); text is only a
@@ -23,8 +25,9 @@
  * becomes the signal's suggested trigger, which Ahmad can change in the
  * inbox. A signal is kept only with a real evidence link that the search
  * actually returned, dated inside the window (`signal_feed_window_days`, the
- * same number the prompt states). The same event found twice in one run is
- * kept once, and duplicates of signals already in the inbox are skipped. At
+ * same number the prompt states). The same event found more than once in a
+ * run is merged and kept once, and an event already in the inbox from an
+ * earlier run (matched on the event, not the wording) is skipped. At
  * most `signal_feed_max_per_run` are kept. The AI budget applies through
  * runAi, like every call.
  *
@@ -54,7 +57,8 @@ import {
   FEED_CALL_TIMEOUT_MS,
   FEED_CONCURRENCY,
   FEED_RUN_BUDGET_MS,
-  callEstimateUsd,
+  fitSearches,
+  type CallCost,
   orderGroups,
   type CarryReason,
   feedResultTool,
@@ -72,7 +76,7 @@ import { FEED_SECTOR_TIERS, keptReason, notAProspectReason, planKeeps, rankCandi
 import { TRIGGER_TYPES, type TriggerType } from './model';
 import { getGrowthSettings } from './settings';
 import { createSignal, existingDuplicate } from './signals';
-import { companyNameKey, evidenceKey, isRealEvidenceUrl } from './signalsModel';
+import { isArticleLink, isRealEvidenceUrl, sameEvent, signalQuality } from './signalsModel';
 
 export const FEED_AGENT = 'signal-feed';
 /** The default date window; the setting `signal_feed_window_days` (113) overrides it. */
@@ -98,7 +102,7 @@ export type FeedCandidate = {
   prospect_fit?: ProspectFit | null;
   fit_reason?: string | null;
 };
-export type FeedDecision = FeedCandidate & { outcome: 'kept' | 'duplicate' | 'discarded' | 'not_a_prospect' | 'below_rank' | 'over_limit'; why: string; group?: string; rank?: number; score?: number; sector?: string | null };
+export type FeedDecision = FeedCandidate & { outcome: 'kept' | 'merged' | 'duplicate' | 'discarded' | 'not_a_prospect' | 'below_rank' | 'over_limit'; why: string; group?: string; rank?: number; score?: number; sector?: string | null };
 
 /** A keyword as the feed numbers it in the prompt. `id` is null before the library is saved, and for the old list before 094. */
 export type FeedKeyword = { id: string | null; keyword: string; trigger: TriggerType | null; region: 'ksa' | 'gcc' };
@@ -169,21 +173,50 @@ export function assignKeywords(valid: FeedCandidate[], keywords: FeedKeyword[]):
   });
 }
 
-/** The same event found twice in one run (same evidence link, or same company, trigger and date) is kept once. Pure. */
-export function dedupeWithinRun(valid: FeedCandidate[]): { unique: FeedCandidate[]; repeats: FeedDecision[] } {
-  const seen = new Set<string>();
-  const unique: FeedCandidate[] = [];
-  const repeats: FeedDecision[] = [];
+/**
+ * The same event found more than once in one run is merged and kept once
+ * (2026-11-02). Before, the later copies were dropped as "found twice", and
+ * because several stories cited one site homepage, different events were
+ * thrown away (Mnzil's housing fund, DataVolt with HUMAIN). Now two candidates
+ * are one event only by `sameEvent`: the same company, and the same article
+ * or a related trigger close in date. The merged candidate takes the better
+ * summary and evidence link (an article over a homepage, then the fuller
+ * summary), and fills anything it lacks from the others. Pure.
+ */
+export function mergeWithinRun(valid: FeedCandidate[]): { unique: FeedCandidate[]; merged: FeedDecision[] } {
+  const clusters: FeedCandidate[][] = [];
   for (const c of valid) {
-    const keys = [`e:${evidenceKey(c.evidence_url) ?? c.evidence_url}`, `c:${companyNameKey(c.company_name)}|${c.trigger_type}|${c.signal_date}`];
-    if (keys.some((k) => seen.has(k))) {
-      repeats.push({ ...c, outcome: 'duplicate', why: 'found twice in this run' });
-      continue;
-    }
-    keys.forEach((k) => seen.add(k));
-    unique.push(c);
+    const hit = clusters.find((cl) => cl.some((m) => sameEvent(c, m)));
+    if (hit) hit.push(c);
+    else clusters.push([c]);
   }
-  return { unique, repeats };
+  const unique: FeedCandidate[] = [];
+  const merged: FeedDecision[] = [];
+  for (const cl of clusters) {
+    const best = cl.reduce((a, b) => (signalQuality(b) > signalQuality(a) ? b : a));
+    const rest = cl.filter((c) => c !== best);
+    const fill = <K extends keyof FeedCandidate>(k: K): FeedCandidate[K] => {
+      const own = best[k];
+      if (own !== null && own !== undefined && own !== '') return own;
+      return rest.find((c) => c[k] !== null && c[k] !== undefined && c[k] !== '')?.[k] ?? own;
+    };
+    const sizes = cl.map((c) => c.size_sar ?? 0).filter((n) => n > 0);
+    unique.push({
+      ...best,
+      source_name: fill('source_name'),
+      location: fill('location'),
+      company_sector: fill('company_sector'),
+      sector_tier: fill('sector_tier'),
+      prospect_fit: fill('prospect_fit'),
+      fit_reason: fill('fit_reason'),
+      matched_keyword: fill('matched_keyword'),
+      matched_keyword_id: fill('matched_keyword_id'),
+      size_sar: sizes.length ? Math.max(...sizes) : null,
+    });
+    const kept = isArticleLink(best.evidence_url) ? 'its article link and fuller summary' : 'the fuller summary';
+    for (const c of rest) merged.push({ ...c, outcome: 'merged', why: `the same event as "${best.company_name}", found again in this run; merged and kept once, with ${kept}` });
+  }
+  return { unique, merged };
 }
 
 /** The prompt for one group's call. Pure. The window it states is the one `screenCandidates` enforces. */
@@ -330,21 +363,23 @@ export async function runSignalFeed(opts: { trigger: 'cron' | 'manual'; actor?: 
   const valid: FeedCandidate[] = [];
   const discarded: FeedDecision[] = [];
   let spent = 0;
-  const estimate = mock ? 0 : callEstimateUsd(history.recentCallCosts, searches);
+  // Each group is reserved at its worst case, and the searches a group gets are lowered until every group fits, so the ceiling holds.
+  const fit = mock ? { searches, reserveUsd: 0, fits: true } : fitSearches({ groups: Math.min(groups.length, FEED_CONCURRENCY), ceilingUsd: runCeiling, maxSearches: searches, recent: history.recentCalls });
+  const perGroup = fit.searches;
   const go: FeedGroup[] = [];
   let committed = 0;
   for (const g of groups) {
     if (go.length >= FEED_CONCURRENCY) skipped.push({ group: g.key, label: g.label, why: 'time_limit' });
-    else if (!withinCeiling(0, committed, estimate, runCeiling)) skipped.push({ group: g.key, label: g.label, why: 'cost_ceiling' });
+    else if (!withinCeiling(0, committed, fit.reserveUsd, runCeiling)) skipped.push({ group: g.key, label: g.label, why: 'cost_ceiling' });
     else {
-      committed += estimate;
+      committed += fit.reserveUsd;
       go.push(g);
     }
   }
   const results = await Promise.all(
     go.map(async (g) => {
-      const p = feedPrompt(g.keywords, today, { windowDays, searches, groupLabel: g.label });
-      const ai = await runAi({ agent: FEED_AGENT, purpose: 'signal_feed', system: p.system, messages: [{ role: 'user', content: p.user }], webSearch: { maxUses: searches }, resultTool: tool, timeoutMs: FEED_CALL_TIMEOUT_MS, deadlineAt, maxTokens: 8000, isTest });
+      const p = feedPrompt(g.keywords, today, { windowDays, searches: perGroup, groupLabel: g.label });
+      const ai = await runAi({ agent: FEED_AGENT, purpose: 'signal_feed', system: p.system, messages: [{ role: 'user', content: p.user }], webSearch: { maxUses: perGroup }, resultTool: tool, timeoutMs: FEED_CALL_TIMEOUT_MS, deadlineAt, maxTokens: 8000, isTest });
       return { g, ai };
     }),
   );
@@ -386,8 +421,9 @@ export async function runSignalFeed(opts: { trigger: 'cron' | 'manual'; actor?: 
   const whyText = (k: FeedSkip) => (k.why === 'cost_ceiling' ? `the ${usd(runCeiling)} cost ceiling` : k.why === 'time_limit' ? 'the time limit' : `the call failed: ${k.message ?? 'no reason given'}`);
   const skippedLine = skipped.length ? ` Not fully searched, and first next time: ${skipped.map((k) => `${k.label} (${whyText(k)})`).join('; ')}.` : '';
   const searchedFully = done.length - skipped.filter((k) => k.why === 'time_limit' && done.some((c) => c.group === k.group)).length;
-  const coverage = `Searched ${searchedFully} of ${allGroups.length} keyword groups: ${searchesRun} searches, ${usd(spent)}.${skippedLine}`;
-  const detailBase = { mock, preview_only: previewOnly, paused, keyword_source: keywordSource, window_days: windowDays, searches_per_group: searches, max_cost_usd: runCeiling, cost_usd: spent, searches: searchesRun, source_urls: calls.reduce((a, c) => a + c.source_urls, 0), parse_summary: parse, calls, skipped, carry_over: [...new Set(skipped.map((k) => k.group))], groups_total: allGroups.length, groups_searched: searchedFully };
+  const fitLine = perGroup < searches ? ` ${perGroup} searches a group (of ${searches}) so every group fits the ${usd(runCeiling)} ceiling at its worst case.` : '';
+  const coverage = `Searched ${searchedFully} of ${allGroups.length} keyword groups: ${searchesRun} searches, ${usd(spent)}.${fitLine}${skippedLine}`;
+  const detailBase = { mock, preview_only: previewOnly, paused, keyword_source: keywordSource, window_days: windowDays, searches_per_group: perGroup, searches_setting: searches, reserve_per_group_usd: fit.reserveUsd, max_cost_usd: runCeiling, cost_usd: spent, searches: searchesRun, source_urls: calls.reduce((a, c) => a + c.source_urls, 0), parse_summary: parse, calls, skipped, carry_over: [...new Set(skipped.map((k) => k.group))], groups_total: allGroups.length, groups_searched: searchedFully };
 
   if (!done.length) {
     const reason = calls.find((c) => c.message)?.message ?? 'No group could be searched within the cost ceiling.';
@@ -395,11 +431,12 @@ export async function runSignalFeed(opts: { trigger: 'cron' | 'manual'; actor?: 
     return { ok: true, value: { runId, mode: mock ? 'mock_preview' : 'real', previewOnly, status: 'refused', message: reason, decisions: [], saved: 0, parse, searches: searchesRun, costUsd: spent, groupsRun: 0, groupsTotal: allGroups.length } };
   }
 
-  const { unique, repeats } = dedupeWithinRun(valid);
-  const decisions: FeedDecision[] = [...discarded, ...repeats];
+  const { unique, merged } = mergeWithinRun(valid);
+  const decisions: FeedDecision[] = [...discarded, ...merged];
   const noSave = mock || paused;
   let saved = 0;
-  let duplicates = repeats.length;
+  // Only an event already in the inbox from an earlier run counts as a duplicate; repeats inside this run were merged.
+  let duplicates = 0;
   // 1. Not a prospect at all: dropped before ranking. 2. Already in the inbox: skipped. 3. The rest are ranked and the best kept.
   const prospects: FeedCandidate[] = [];
   let notProspect = 0;
@@ -413,7 +450,9 @@ export async function runSignalFeed(opts: { trigger: 'cron' | 'manual'; actor?: 
     const dup = await existingDuplicate({ company_id: null, company_name: c.company_name, trigger_type: c.trigger_type, signal_date: c.signal_date, evidence_url: c.evidence_url });
     if (dup) {
       duplicates++;
-      decisions.push({ ...c, outcome: 'duplicate', why: 'already in the inbox' });
+      const how = dup.why === 'same_evidence' ? 'same article' : 'same company, related news within two weeks';
+      const where = dup.status === 'dismissed' ? 'already seen and dismissed' : 'already in the inbox';
+      decisions.push({ ...c, outcome: 'duplicate', why: `${where} as "${dup.company_name ?? 'a signal'}" (${how})` });
       continue;
     }
     prospects.push(c);
@@ -440,8 +479,8 @@ export async function runSignalFeed(opts: { trigger: 'cron' | 'manual'; actor?: 
   }
   for (const r of plan.belowRank) decisions.push({ ...r.candidate, outcome: 'below_rank', why: `rank ${r.rank} of ${ranked.length}; ${r.basis}`, rank: r.rank, score: r.score, sector: r.sectorTier });
   for (const r of plan.overLimit) decisions.push({ ...r.candidate, outcome: 'over_limit', why: `rank ${r.rank} of ${ranked.length}, past the ${max} kept per run; ${r.basis}`, rank: r.rank, score: r.score, sector: r.sectorTier });
-  const counts = { not_a_prospect: notProspect, below_rank: plan.belowRank.length, over_limit: plan.overLimit.length };
-  const dropped = `${counts.not_a_prospect} not a prospect, ${counts.below_rank} below rank, ${counts.over_limit} over the limit`;
+  const counts = { merged: merged.length, not_a_prospect: notProspect, below_rank: plan.belowRank.length, over_limit: plan.overLimit.length };
+  const dropped = `${counts.not_a_prospect} not a prospect, ${counts.below_rank} below rank, ${counts.over_limit} over the limit${merged.length ? `; ${merged.length} repeats merged into events kept once` : ''}`;
 
   const found = valid.length + discarded.length;
   await finish({ status: 'completed', found, saved, duplicates, discarded: discarded.length, usage_id: done[0].usage_id, detail: { ...detailBase, counts, decisions: decisions.slice(0, 200) } });
@@ -486,7 +525,7 @@ export async function recentFeedRuns(limit = 5): Promise<FeedRunRow[]> {
  * fully search (searched first now), and the cost of recent calls (the
  * per-group estimate for the cost ceiling).
  */
-export async function feedHistory(opts: { isTest?: boolean }): Promise<{ carriedOver: string[]; recentCallCosts: number[] }> {
+export async function feedHistory(opts: { isTest?: boolean }): Promise<{ carriedOver: string[]; recentCalls: CallCost[] }> {
   const { data } = await growthDb()
     .from('growth_feed_runs')
     .select('detail, status')
@@ -503,12 +542,12 @@ export async function feedHistory(opts: { isTest?: boolean }): Promise<{ carried
     : Array.isArray(last?.detail?.skipped)
       ? (last!.detail!.skipped as { group?: unknown }[]).map((k) => k.group).filter((k): k is string => typeof k === 'string')
       : [];
-  const recentCallCosts = rows
-    .flatMap((r) => (Array.isArray(r.detail?.calls) ? (r.detail!.calls as { status?: string; cost_usd?: unknown }[]) : []))
-    .filter((c) => c.status === 'completed' && typeof c.cost_usd === 'number')
+  const recentCalls = rows
+    .flatMap((r) => (Array.isArray(r.detail?.calls) ? (r.detail!.calls as { status?: string; cost_usd?: unknown; searches?: unknown }[]) : []))
+    .filter((c) => c.status === 'completed' && typeof c.cost_usd === 'number' && typeof c.searches === 'number')
     .slice(0, 20)
-    .map((c) => c.cost_usd as number);
-  return { carriedOver, recentCallCosts };
+    .map((c) => ({ cost: c.cost_usd as number, searches: c.searches as number }));
+  return { carriedOver, recentCalls };
 }
 
 /**

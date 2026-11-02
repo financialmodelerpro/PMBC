@@ -95,8 +95,8 @@ check('ceiling: a call that fits starts, one that does not is left out', fm.with
 check('every group starts at once, inside a deadline under the 300 second function limit', fm.FEED_CONCURRENCY >= 11 && fm.FEED_RUN_BUDGET_MS < 300_000 && fm.FEED_CALL_TIMEOUT_MS <= fm.FEED_RUN_BUDGET_MS && !read('src/lib/growth/feed.ts').includes('i += FEED_CONCURRENCY'));
 const src = read('src/lib/growth/feed.ts');
 check('one call per keyword group, not one for all', src.includes('go.map(async (g) =>') && src.includes('feedPrompt(g.keywords, today,'));
-check('each group gets its own search allowance', /webSearch: \{ maxUses: searches \}/.test(src));
-check('the ceiling is checked before each call starts', src.includes('withinCeiling(0, committed, estimate, runCeiling)'));
+check('each group gets its own search allowance, fitted to the ceiling', /webSearch: \{ maxUses: perGroup \}/.test(src));
+check('the ceiling is checked before each call starts, at its worst case', src.includes('withinCeiling(0, committed, fit.reserveUsd, runCeiling)'));
 check('groups left out are recorded with the reason', src.includes("why: 'cost_ceiling'") && src.includes("why: 'time_limit'") && src.includes('skipped,'));
 check('each call records outcome, searches, URLs, stop reasons and the raw answer', ['outcome: read.outcome', 'searches: ai.webSearchRequests', 'source_urls: ai.sourceUrls.length', 'stop_reasons: ai.stopReasons', 'raw_text: ai.text.slice(0, RAW_TEXT_CHARS)', 'raw_tool_input:'].every((s) => src.includes(s)));
 check('the run stores the parse summary, cost and searches', src.includes('parse_summary: parse') && src.includes('cost_usd: spent') && src.includes('searches: searchesRun'));
@@ -105,7 +105,7 @@ check('the result line carries the parse summary', src.includes('const message =
 console.log('4. The rules that stay');
 check('every call goes through runAi with web search and the result tool', /runAi\(\{ agent: FEED_AGENT[^)]*webSearch[^)]*resultTool: tool/.test(src));
 check('evidence: a link the search did not return is still discarded', src.includes("why = 'the evidence link was not returned by the search'") && src.includes('sourceUrls: ai.sourceUrls'));
-check('duplicates: in the run and in the inbox', src.includes('dedupeWithinRun(valid)') && src.includes("why: 'already in the inbox'"));
+check('repeats in the run are merged; inbox duplicates are skipped', src.includes('mergeWithinRun(valid)') && src.includes("'already in the inbox'"));
 check('the per-run limit still applies, after ranking', src.includes('const plan = planKeeps(ranked, max);') && src.includes('for (const r of plan.keep)'));
 check('paused or mock: nothing is saved', /const noSave = mock \|\| paused;/.test(src) && src.indexOf('if (noSave) {') < src.indexOf('await createSignal('));
 const anth = read('src/lib/growth/ai/anthropic.ts');
@@ -176,7 +176,7 @@ check('warning: more than half the budget warns, half or less does not, no budge
 check('budget: a run that fits what is left goes ahead, one that does not is skipped', fm.budgetAllowsRun(77, 2.25, 80) && !fm.budgetAllowsRun(78, 2.25, 80) && !fm.budgetAllowsRun(0, 1, null));
 check('budget: the skip is recorded as refused with the reason, and logged', src.includes("await finish({ status: 'refused', detail: { reason: 'budget', message,") && src.includes("action: 'feed.skipped'"));
 check('budget: the check runs before any AI call', src.indexOf('budgetAllowsRun(spend.spentUsd, expected, budget)') < src.indexOf('await runAi('));
-check('budget: a run that goes ahead is held to what is left', src.includes('runCeiling = Math.min(ceiling, round2(budget - spend.spentUsd))') && src.includes('withinCeiling(0, committed, estimate, runCeiling)'));
+check('budget: a run that goes ahead is held to what is left', src.includes('runCeiling = Math.min(ceiling, round2(budget - spend.spentUsd))') && src.includes('withinCeiling(0, committed, fit.reserveUsd, runCeiling)'));
 check('Signals: shows the last run cost, or why it was skipped', panel.includes('lastRunLine(runs[0])') && read('src/components/admin/growth/signals/FeedPanel.tsx').includes("d.reason === 'budget'") && src.includes('cost_usd: own(r) ??'));
 const sql114 = migrationChecks('114_growth_feed_days.sql', []);
 check('114: the column, its default and the same checks as send_days', sql114.includes("signal_feed_days INTEGER[] NOT NULL DEFAULT '{0,2,4}'") && sql114.includes('cardinality(signal_feed_days) BETWEEN 1 AND 7') && sql114.includes('growth_is_increasing(signal_feed_days)'));
@@ -235,7 +235,7 @@ const rk = await load('src/lib/growth/feedRank.ts');
 check('order: not a prospect, then inbox duplicates, then ranking, then the limit', src.indexOf('notAProspectReason(c)') < src.indexOf('await existingDuplicate(') && src.indexOf('await existingDuplicate(') < src.indexOf('rankCandidates(prospects') && src.indexOf('rankCandidates(prospects') < src.indexOf('planKeeps(ranked, max)'));
 check('each kept signal stores its rank, score and reason', src.includes('feedRank: { rank: r.rank, score: r.score, reason }') && read('src/lib/growth/signals.ts').includes('row.feed_reason = opts.feedRank.reason'));
 check('before 115 the insert drops only the rank columns first', read('src/lib/growth/signals.ts').includes("insertTolerant<InboxSignal>('growth_signals', row, SIGNAL_115_COLUMNS)"));
-check('the run counts not a prospect, below rank and over limit separately', src.includes('const counts = { not_a_prospect: notProspect, below_rank: plan.belowRank.length, over_limit: plan.overLimit.length };') && src.includes('counts, decisions'));
+check('the run counts not a prospect, below rank and over limit separately', src.includes('const counts = { merged: merged.length, not_a_prospect: notProspect, below_rank: plan.belowRank.length, over_limit: plan.overLimit.length };') && src.includes('counts, decisions'));
 check('the Signals screen shows rank and reason, and the three counts', panel.includes('data-rank={d.rank}') && read('src/components/admin/growth/signals/FeedPanel.tsx').includes('below rank') && read('src/app/admin/growth/signals/page.tsx').includes('data-feed-rank={s.feed_rank}'));
 check('kept per run defaults to 12 and stays a setting', cols.signal_feed_max_per_run.default === 12 && esm.engineGroupSchemas.signal_feed.safeParse({ signal_feed_paused: false, signal_feed_max_per_run: 12 }).success);
 const sql115 = migrationChecks('115_growth_feed_ranking.sql', []);
@@ -249,8 +249,7 @@ console.log('8. Coverage, sector and filters (2026-10-29, migration 116)');
   const o = fm.orderGroups(g, ['real_estate_off_plan', 'transactions'], '2026-01-01');
   check('coverage: groups the last run could not search go first', o[0].key === 'real_estate_off_plan' && o[1].key === 'transactions' && o.length === 5 && new Set(o.map((x) => x.key)).size === 5);
   check('coverage: an unknown carried-over key is ignored', fm.orderGroups(g, ['gone'], '2026-01-01').length === 5);
-  check('coverage: the per-group estimate is the average of recent calls, else USD 0.05 a search', fm.callEstimateUsd([0.2, 0.3, 0.4], 5) === 0.3 && fm.callEstimateUsd([], 5) === 0.25);
-  check('coverage: nine groups at the measured USD 0.30 fit the USD 3.00 ceiling', fm.withinCeiling(0, 0.3 * 8, 0.3, 3));
+  check('coverage: nine groups reserved at USD 0.22 fit the USD 3.00 ceiling', fm.withinCeiling(0, 0.22 * 8, 0.22, 3));
 }
 check('coverage: every group is started together, one Promise.all', src.includes('go.map(async (g) =>') && (src.match(/await Promise\.all\(/g) ?? []).length >= 1 && !src.includes('FEED_TIME_BUDGET_MS) {'));
 check('coverage: the last run carry-over orders this run', src.includes('const history = await feedHistory({ isTest });') && src.includes('orderGroups(allGroups, history.carriedOver, today)'));
@@ -286,5 +285,84 @@ check('coverage: in the morning job the feed runs last, with the cron deadline',
 const sql116 = migrationChecks('116_growth_feed_keep_12.sql', []);
 check('116: the default goes to 12, and a stored 20 to 12 only', sql116.includes('SET DEFAULT 12') && sql116.includes('WHERE id = 1 AND signal_feed_max_per_run = 20'));
 check('no dashes in the coverage and sector files', !['src/lib/growth/daily.ts', 'src/lib/growth/ai/provider.ts', 'src/lib/growth/ai/run.ts', 'supabase/migrations/116_growth_feed_keep_12.sql'].some((f) => DASHES.test(read(f))));
+
+console.log('9. Event matching, in-run merge, the ceiling and the inbox cleanup (2026-11-02)');
+{
+  const sm = await load('src/lib/growth/signalsModel.ts');
+  const ic = await load('src/lib/growth/inboxCleanup.ts');
+  const ev = (company_name, trigger_type, signal_date, evidence_url = `https://news.test.sa/${Math.random().toString(36).slice(2)}`) => ({ company_name, trigger_type, signal_date, evidence_url, summary: `${company_name} news of some length.` });
+  // The five pairs left in the inbox by earlier runs, each a different wording of one event.
+  check('event: Arada as a market entry and as a new project is one event', sm.sameEvent(ev('Arada', 'market_entry', '2026-10-14'), ev('Arada', 'new_project', '2026-10-20')) !== null);
+  check('event: Links Investments as a new project and an expansion is one event', sm.sameEvent(ev('Links Investments', 'new_project', '2026-10-27'), ev('Links Investments', 'expansion', '2026-10-27')) !== null);
+  check('event: the Royal Commission for Riyadh City twice within a week is one event', sm.sameEvent(ev('Royal Commission for Riyadh City (RCRC)', 'new_project', '2026-10-18'), ev('Royal Commission for Riyadh City', 'expansion', '2026-10-13')) !== null);
+  check('event: Investcorp on the same day under two triggers is one event', sm.sameEvent(ev('Investcorp', 'acquisition_jv', '2026-10-27'), ev('Investcorp', 'market_entry', '2026-10-27')) !== null);
+  check('event: Hassan Allam Construction and its JV are one company', sm.sameCompanyName('Hassan Allam Construction', 'Hassan Allam\u2013Sterling & Wilson JV') && sm.sameEvent(ev('Hassan Allam Construction', 'contract_award', '2026-10-19'), ev('Hassan Allam\u2013Sterling & Wilson JV', 'contract_award', '2026-10-19')) !== null);
+  check('event: a consortium named by its leader matches the leader', sm.sameCompanyName('ACWA Power-led consortium', 'ACWA Power') && sm.sameCompanyName('Elsewedy Electric / Sinohydro (JV)', 'Elsewedy Electric / Sinohydro / POWERCHINA'));
+  // What must stay apart.
+  check('event: different companies on one homepage are not one event (Mnzil, DataVolt)', sm.sameEvent(ev('Mnzil, TDG and Capital Partners', 'new_project', '2026-10-06', 'https://www.saudigulfprojects.com/'), ev('ACWA Power', 'new_project', '2026-10-04', 'https://www.saudigulfprojects.com/')) === null);
+  check('event: two companies in one article are two events', sm.sameEvent(ev('Al Mourjan Two Electricity Co.', 'expansion', '2026-10-14', 'https://www.enr.com/articles/63927-rabigh-2'), ev('Elsewedy Electric', 'contract_award', '2026-10-14', 'https://www.enr.com/articles/63927-rabigh-2')) === null);
+  check('event: one company, a loan and an acquisition days apart, stay two events', sm.sameEvent(ev('Saudi Aramco', 'fundraising_debt', '2026-10-27'), ev('Saudi Aramco', 'acquisition_jv', '2026-10-23')) === null);
+  check('event: one company, same kind of news three weeks apart, stay two events', sm.sameEvent(ev('Arada', 'new_project', '2026-10-01'), ev('Arada', 'new_project', '2026-10-25')) === null);
+  check('event: a common word alone never makes two companies one', !sm.sameCompanyName('Saudi Ghanem', 'Saudi Fisheries Co.') && !sm.sameCompanyName('Saudi', 'Saudi Investment Bank') && !sm.sameCompanyName('National', 'National Water Company'));
+  check('event: a homepage is not an article link; a story path is', !sm.isArticleLink('https://www.saudigulfprojects.com/') && !sm.isArticleLink('https://www.argaam.com/en/') && sm.isArticleLink('https://www.argaam.com/en/article/123'));
+  check('event: the better version is the article link, then the fuller summary', sm.signalQuality({ evidence_url: 'https://a.sa/story/1', summary: 'short' }) > sm.signalQuality({ evidence_url: 'https://a.sa/', summary: 'a much longer summary of the same event' }));
+
+  // In-run: merged and kept once, never thrown away.
+  const c = (o) => ({ company_name: 'Mnzil, TDG and Capital Partners', trigger_type: 'new_project', signal_date: '2026-10-06', summary: 'A SAR 1 billion workforce housing fund.', evidence_url: 'https://www.saudigulfprojects.com/', source_name: null, location: null, company_sector: null, sector_tier: null, size_sar: null, prospect_fit: null, fit_reason: null, ...o });
+  const run = feed.mergeWithinRun([
+    c({ company_name: 'ACWA Power', summary: 'ACWA Power news.', signal_date: '2026-10-04' }),
+    c({}),
+    c({ company_name: 'DataVolt and HUMAIN', summary: 'NEOM data centre capacity.', signal_date: '2026-10-21' }),
+    c({ summary: 'Mnzil, TDG and Capital Partners launched a SAR 1 billion workforce housing fund for Saudi projects.', evidence_url: 'https://news.test.sa/mnzil-fund', size_sar: 1_000_000_000, sector_tier: 'investment' }),
+  ]);
+  const mnzil = run.unique.find((u) => u.company_name.startsWith('Mnzil'));
+  check('merge: different events sharing a homepage are all kept', run.unique.length === 3 && run.unique.some((u) => u.company_name === 'DataVolt and HUMAIN') && run.unique.some((u) => u.company_name === 'ACWA Power'));
+  check('merge: the repeat is merged, not dropped, and kept with the article link and fuller summary', Boolean(mnzil) && mnzil.evidence_url === 'https://news.test.sa/mnzil-fund' && mnzil.summary.includes('workforce housing fund for Saudi') && run.merged.length === 1 && run.merged[0].outcome === 'merged');
+  check('merge: the kept version fills what it lacks from the other', mnzil.size_sar === 1_000_000_000 && mnzil.sector_tier === 'investment');
+  check('merge: a repeat in the run is no longer counted as a duplicate', src.includes('let duplicates = 0;') && !src.includes('found twice in this run') && src.includes('merged: merged.length'));
+  check('merge: the inbox check names the signal it matched, and whether it was dismissed', src.includes("'already seen and dismissed'") && src.includes('dup.company_name'));
+  check('merge: the Signals screen shows merged repeats', read('src/components/admin/growth/signals/FeedPanel.tsx').includes("merged: 'merged'"));
+  check('inbox: the candidates for a duplicate span every trigger in the window', read('src/lib/growth/signals.ts').includes(".select('*').gte('signal_date', from).lte('signal_date', to).limit(1000)"));
+
+  // The ceiling holds: each group reserved at its worst case, searches lowered until nine fit.
+  const measured = [{ cost: 0.549534, searches: 5 }, { cost: 0.256902, searches: 5 }, { cost: 0.49366, searches: 5 }, { cost: 0.230046, searches: 5 }];
+  const f3 = fm.fitSearches({ groups: 9, ceilingUsd: 3, maxSearches: 5, recent: measured });
+  check('ceiling: the 2026-10-29 calls (up to USD 0.55 for 5 searches) give 3 searches a group at USD 3.00', f3.searches === 3 && f3.fits && Math.round(f3.reserveUsd * 9 * 100) / 100 <= 3, JSON.stringify(f3));
+  check('ceiling: the 2026-10-29 run would not have fitted at 5 searches (9 x 0.55)', fm.worstCallUsd(measured, 5) === 0.55 && !fm.withinCeiling(0, 0.55 * 8, 0.55, 3));
+  check('ceiling: a higher ceiling buys more searches (USD 4.00 gives 4, USD 5.00 gives 5)', fm.fitSearches({ groups: 9, ceilingUsd: 4, maxSearches: 5, recent: measured }).searches === 4 && fm.fitSearches({ groups: 9, ceilingUsd: 5, maxSearches: 5, recent: measured }).searches === 5);
+  check('ceiling: never more than the setting', fm.fitSearches({ groups: 9, ceilingUsd: 50, maxSearches: 4, recent: measured }).searches === 4);
+  check('ceiling: below the floor, groups are left out instead (fits false)', (() => { const f = fm.fitSearches({ groups: 9, ceilingUsd: 0.5, maxSearches: 5, recent: measured }); return f.searches === fm.FEED_MIN_SEARCHES && !f.fits; })());
+  check('ceiling: with no history the dearest measured call is assumed', fm.worstCallUsd([], 5) === 0.55);
+  check('ceiling: cheaper recent calls let the searches rise again', fm.fitSearches({ groups: 9, ceilingUsd: 3, maxSearches: 5, recent: [{ cost: 0.15, searches: 3 }, { cost: 0.18, searches: 3 }] }).searches === 4);
+  check('ceiling: the run uses the fitted searches and records them', src.includes('const perGroup = fit.searches;') && src.includes('searches_per_group: perGroup, searches_setting: searches, reserve_per_group_usd: fit.reserveUsd'));
+  check('ceiling: history reads each call with its searches', src.includes('.map((c) => ({ cost: c.cost_usd as number, searches: c.searches as number }))'));
+
+  // Inbox cleanup: today's rules re-applied, reviewed, then dismissed in one step.
+  const s = (id, company_name, trigger_type, signal_date, summary, evidence_url, created_at = '2026-10-29T10:00:00Z') => ({ id, created_at, status: 'new', company_name, trigger_type, signal_date, summary, evidence_url });
+  const plan = ic.planInboxCleanup([
+    s('a', 'Saudi Capital Market Authority (CMA)', 'capital_market_activity', '2026-10-20', 'CMA approved new rules.', 'https://cma.gov.sa/n/1'),
+    s('b', 'Omnissa', 'market_entry', '2026-10-20', 'Omnissa opened a new regional office in Riyadh.', 'https://news.test.sa/omnissa'),
+    s('c', 'Arada', 'market_entry', '2026-10-14', 'Arada enters Saudi Arabia.', 'https://www.saudigulfprojects.com/'),
+    s('d', 'Arada', 'new_project', '2026-10-20', 'Arada launched a SAR 3.8 billion Riyadh project, its first in the Kingdom.', 'https://www.thenationalnews.com/business/property/2026/10/20/arada', '2026-10-29T11:00:00Z'),
+    s('e', 'Saudi Aramco', 'fundraising_debt', '2026-10-27', 'Aramco nears a USD 10 billion loan.', 'https://news.test.sa/aramco-loan'),
+    { ...s('f', 'Bloomberg', 'market_entry', '2026-10-01', 'Bloomberg is expanding its office in Riyadh.', 'https://news.test.sa/bb'), status: 'dismissed' },
+  ]);
+  const by = Object.fromEntries(plan.map((p) => [p.id, p]));
+  check('cleanup: a regulator and an office opening are proposed, with the reason', by.a?.kind === 'not_a_prospect' && by.b?.kind === 'not_a_prospect' && by.b.reason.startsWith('Inbox cleanup: '));
+  check('cleanup: of one event twice, the weaker version is proposed and the better one kept', by.c?.kind === 'duplicate' && by.c.keep_id === 'd' && !by.d);
+  check('cleanup: a good signal and one already triaged are left alone', !by.e && !by.f && plan.length === 3);
+  const bulk = sm.signalBulkDismissSchema;
+  const id = '00000000-0000-4000-8000-000000000001';
+  check('bulk: each item needs a uuid and a reason; repeats and empty lists are refused', bulk.safeParse({ items: [{ id, reason: 'Inbox cleanup: x' }] }).success && !bulk.safeParse({ items: [] }).success && !bulk.safeParse({ items: [{ id, reason: '' }] }).success && !bulk.safeParse({ items: [{ id, reason: 'abc' }, { id, reason: 'abc' }] }).success && !bulk.safeParse({ items: Array.from({ length: sm.BULK_DISMISS_MAX + 1 }, (_, i) => ({ id: `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`, reason: 'abc' })) }).success);
+  const route = read('src/app/api/admin/growth/signals/bulk/route.ts');
+  check('bulk: the route is admin only, validated and audited', route.includes('ownerRequest(req, signalBulkDismissSchema)') && route.includes("auditGrowth(r.adminId, 'update', 'growth_signals'") && route.includes('export async function POST'));
+  const sigSrc = read('src/lib/growth/signals.ts');
+  check('bulk: only signals still new are dismissed, through the one triage path', sigSrc.includes("if (status.get(item.id) !== 'new')") && sigSrc.includes("triageSignal(item.id, { action: 'dismiss', reason: item.reason }, actor)"));
+  const page = read('src/app/admin/growth/signals/page.tsx');
+  const tools = read('src/components/admin/growth/signals/SignalBulkTools.tsx');
+  check('screen: the cleanup is proposed from every new signal and confirmed before anything is dismissed', page.includes('planInboxCleanup(freshRows)') && page.includes('<InboxCleanup') && tools.includes('Confirm: dismiss'));
+  check('screen: rows can be ticked and dismissed with one reason', page.includes('data-bulk-signal={s.id}') && page.includes('<BulkDismissBar />') && tools.includes("input[data-bulk-signal]"));
+  check('no dashes in the files changed today', !['src/lib/growth/signalsModel.ts', 'src/lib/growth/inboxCleanup.ts', 'src/lib/growth/feed.ts', 'src/lib/growth/feedModel.ts', 'src/lib/growth/signals.ts', 'src/components/admin/growth/signals/SignalBulkTools.tsx', 'src/app/api/admin/growth/signals/bulk/route.ts', 'src/app/admin/growth/signals/page.tsx', 'src/components/admin/growth/signals/FeedPanel.tsx', 'src/components/admin/growth/settings/EngineForms.tsx'].some((f) => DASHES.test(read(f))));
+}
 
 finish('verify-growth-feed');
